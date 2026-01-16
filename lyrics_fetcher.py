@@ -66,6 +66,7 @@ APP_VERSION = "1.0.1"
 APP_AUTHOR = "iBridge Zhao"
 APP_EMAIL = "toadeater731@gmail.com"
 APP_GITHUB = "https://github.com/TK88101/Azathoths-Whisper"
+APP_DESCRIPTION = "Automated lyrics fetching and scribing for iTunes.\nWhispers from the abyss, directly to your library."
 
 # Localization Dictionary
 TRANSLATIONS = {
@@ -611,12 +612,15 @@ class LyricsApp(tk.Tk):
         
         about_win = tk.Toplevel(self)
         about_win.title("") # macOS About windows usually don't have titles or use the app name
-        about_win.geometry("400x260")
+        about_win.geometry("400x300")
         about_win.resizable(False, False)
         
         # App Name & Version
         tk.Label(about_win, text=TRANSLATIONS["en"]["app_title"], font=("System", 16, "bold")).pack(pady=(20, 5))
-        tk.Label(about_win, text=f"Version {APP_VERSION}", font=("System", 12)).pack(pady=(0, 15))
+        tk.Label(about_win, text=f"Version {APP_VERSION}", font=("System", 12)).pack(pady=(0, 10))
+
+        # Description
+        tk.Label(about_win, text=APP_DESCRIPTION, font=("System", 10, "italic"), fg="#555555").pack(pady=(0, 15))
         
         # Author
         tk.Label(about_win, text=f"Created by {APP_AUTHOR}", font=("System", 12)).pack()
