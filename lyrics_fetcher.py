@@ -592,10 +592,10 @@ class LyricsApp(tk.Tk):
         settings_menu.add_command(label=self._get_text("menu_lang"), command=self.open_language_settings)
         menubar.add_cascade(label=self._get_text("settings_menu"), menu=settings_menu)
         
-        # Help Menu - Removed, using system About menu only
-        # help_menu = tk.Menu(menubar, tearoff=0)
-        # help_menu.add_command(label=self._get_text("menu_about"), command=self.open_about_dialog)
-        # menubar.add_cascade(label=self._get_text("menu_help"), menu=help_menu)
+        # Help Menu
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label=self._get_text("menu_about"), command=self.open_about_dialog)
+        menubar.add_cascade(label=self._get_text("menu_help"), menu=help_menu)
 
         # macOS System "About" override
         try:
@@ -611,7 +611,7 @@ class LyricsApp(tk.Tk):
         
         about_win = tk.Toplevel(self)
         about_win.title("") # macOS About windows usually don't have titles or use the app name
-        about_win.geometry("400x220")
+        about_win.geometry("400x260")
         about_win.resizable(False, False)
         
         # App Name & Version

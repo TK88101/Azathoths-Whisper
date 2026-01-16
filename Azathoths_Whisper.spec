@@ -49,9 +49,12 @@ app = BUNDLE(
     icon='MyIcon.icns',
     bundle_identifier='com.ibridgezhao.azathothswhisper',
     info_plist={
-        'NSAppleEventsUsageDescription': 'Azathoth\'s Whisper needs access to Music to read track info and scribe lyrics.',
+        'NSAppleEventsUsageDescription': 'Azathoth\'s Whisper needs access to iTunes to read track info and scribe lyrics.',
         'NSHighResolutionCapable': 'True',
         'CFBundleLocalizations': ['en', 'zh_TW', 'ja'],
-        'CFBundleDevelopmentRegion': 'en'
+        'CFBundleDevelopmentRegion': 'en',
+        'CFBundleShortVersionString': '1.0.1',
+        'CFBundleVersion': '1.0.1',
+        'NSHumanReadableCopyright': 'Copyright © 2026 iBridge Zhao. All rights reserved.'
     },
 )
