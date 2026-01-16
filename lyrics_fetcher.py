@@ -61,6 +61,12 @@ else:
 
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
 
+# App Metadata
+APP_VERSION = "1.0.1"
+APP_AUTHOR = "iBridge Zhao"
+APP_EMAIL = "toadeater731@gmail.com"
+APP_GITHUB = "https://github.com/TK88101/Azathoths-Whisper"
+
 # Localization Dictionary
 TRANSLATIONS = {
     "en": {
@@ -97,7 +103,10 @@ TRANSLATIONS = {
         "welcome": "Welcome",
         "welcome_msg": "Please set your Genius Access Token in Settings.",
         "lyrics_not_found": "No lyrics found.",
-        "manual_check": "Check Track"
+        "manual_check": "Check Track",
+        "menu_about": "About",
+        "about_text": "Created by: {}\nEmail: {}\nVersion: {}",
+        "menu_help": "Help"
     },
     "zh_TW": {
         "app_title": "Azathoth's Whisper (阿撒托斯之低語)",
@@ -133,7 +142,10 @@ TRANSLATIONS = {
         "welcome": "歡迎",
         "welcome_msg": "請在設置中設置您的 Genius Access Token。",
         "lyrics_not_found": "未找到歌詞。",
-        "manual_check": "檢查曲目"
+        "manual_check": "檢查曲目",
+        "menu_about": "關於",
+        "about_text": "製作人: {}\n郵箱: {}\n版本: {}",
+        "menu_help": "幫助"
     },
     "ja": {
         "app_title": "Azathoth's Whisper (アザトースの囁き)",
@@ -169,7 +181,10 @@ TRANSLATIONS = {
         "welcome": "ようこそ",
         "welcome_msg": "設定でGenius Access Tokenを設定してください。",
         "lyrics_not_found": "歌詞が見つかりませんでした。",
-        "manual_check": "トラックを確認"
+        "manual_check": "トラックを確認",
+        "menu_about": "アザトースの囁きについて",
+        "about_text": "作者: {}\nメール: {}\nバージョン: {}",
+        "menu_help": "ヘルプ"
     }
 }
 
@@ -571,14 +586,53 @@ class LyricsApp(tk.Tk):
     def _build_menu(self):
         menubar = tk.Menu(self)
         
+        # Settings Menu
         settings_menu = tk.Menu(menubar, tearoff=0)
-        # Split Token and Language
         settings_menu.add_command(label=self._get_text("menu_token"), command=self.open_token_settings)
         settings_menu.add_command(label=self._get_text("menu_lang"), command=self.open_language_settings)
-        
         menubar.add_cascade(label=self._get_text("settings_menu"), menu=settings_menu)
         
+        # Help Menu - Removed, using system About menu only
+        # help_menu = tk.Menu(menubar, tearoff=0)
+        # help_menu.add_command(label=self._get_text("menu_about"), command=self.open_about_dialog)
+        # menubar.add_cascade(label=self._get_text("menu_help"), menu=help_menu)
+
+        # macOS System "About" override
+        try:
+             self.createcommand('tk::mac::ShowAbout', self.open_about_dialog)
+        except:
+             pass
+        
         self.config(menu=menubar)
+
+    def open_about_dialog(self):
+        """Shows the custom About dialog with clickable links."""
+        import webbrowser
+        
+        about_win = tk.Toplevel(self)
+        about_win.title("") # macOS About windows usually don't have titles or use the app name
+        about_win.geometry("400x220")
+        about_win.resizable(False, False)
+        
+        # App Name & Version
+        tk.Label(about_win, text=TRANSLATIONS["en"]["app_title"], font=("System", 16, "bold")).pack(pady=(20, 5))
+        tk.Label(about_win, text=f"Version {APP_VERSION}", font=("System", 12)).pack(pady=(0, 15))
+        
+        # Author
+        tk.Label(about_win, text=f"Created by {APP_AUTHOR}", font=("System", 12)).pack()
+        
+        # Email Link
+        email_lbl = tk.Label(about_win, text=APP_EMAIL, font=("System", 12, "underline"), fg="blue", cursor="pointinghand")
+        email_lbl.pack(pady=(5, 0))
+        email_lbl.bind("<Button-1>", lambda e: webbrowser.open(f"mailto:{APP_EMAIL}"))
+        
+        # GitHub Link
+        github_lbl = tk.Label(about_win, text="GitHub Project", font=("System", 12, "underline"), fg="blue", cursor="pointinghand")
+        github_lbl.pack(pady=(5, 5))
+        github_lbl.bind("<Button-1>", lambda e: webbrowser.open(APP_GITHUB))
+        
+        # Copyright / Footer
+        tk.Label(about_win, text="© 2026 iBridge Zhao", font=("System", 10), fg="gray").pack(side=tk.BOTTOM, pady=15)
         
     def _build_ui(self):
         # Top Frame: Track Info and Controls

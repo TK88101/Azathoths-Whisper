@@ -32,8 +32,8 @@
 
 1.  **リポジトリのクローン**
     ```bash
-    git clone https://github.com/yourusername/azathoths-whisper.git
-    cd azathoths-whisper
+    git clone https://github.com/TK88101/Azathoths-Whisper.git
+    cd Azathoths-Whisper
     ```
 
 2.  **仮想環境のセットアップ**

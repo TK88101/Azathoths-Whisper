@@ -32,8 +32,8 @@ Requirements: Python 3.10+, macOS.
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/yourusername/azathoths-whisper.git
-    cd azathoths-whisper
+    git clone https://github.com/TK88101/Azathoths-Whisper.git
+    cd Azathoths-Whisper
     ```
 
 2.  **Set up Virtual Environment**

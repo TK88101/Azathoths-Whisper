@@ -32,8 +32,8 @@
 
 1.  **克隆倉庫**
     ```bash
-    git clone https://github.com/yourusername/azathoths-whisper.git
-    cd azathoths-whisper
+    git clone https://github.com/TK88101/Azathoths-Whisper.git
+    cd Azathoths-Whisper
     ```
 
 2.  **設置虛擬環境**
