@@ -22,10 +22,48 @@ It supports multiple lyrics sources and features a dark-themed, localized user i
 
 ## Installation
 
-### Pre-built App
-If you have the `.app` bundle:
-1. Drag `Azathoth's Whisper.app` to your **Applications** folder.
-2. Open the app. You may need to grant **Automation Permissions** for it to control iTunes.
+### Pre-built App (DMG)
+
+Download the latest release from [GitHub Releases](https://github.com/TK88101/Azathoths-Whisper/releases).
+
+**⚠️ Important: First-time Installation on macOS**
+
+Since this app is not signed with an Apple Developer ID, macOS Gatekeeper will block it. You'll likely see an error saying **"App is damaged and can't be opened"**. This is a security feature, not actual damage.
+
+**Installation Steps:**
+
+1. **Download and Mount DMG**
+   - Download `Azathoths-Whisper-v1.0.1.dmg`
+   - Double-click to mount it
+
+2. **Install the App**
+   - Drag `Azathoth's Whisper.app` to the **Applications** folder shortcut in the DMG window
+
+3. **Remove Quarantine Flag (Required for Downloaded Apps)**
+   
+   Open **Terminal** (Applications → Utilities → Terminal) and run:
+   ```bash
+   xattr -d com.apple.quarantine /Applications/Azathoth\'s\ Whisper.app
+   ```
+   
+   This removes the macOS quarantine attribute that causes the "damaged" error.
+
+4. **Open the App**
+   
+   Now you can open it normally:
+   - **Option A**: Double-click the app in Applications folder
+   - **Option B**: Right-click → Open (if still prompted)
+   
+   ✅ The app will run. macOS will remember your choice for future launches.
+
+5. **Grant Automation Permissions**
+   - On first launch, you'll be asked to grant permission to control iTunes
+   - Click **"OK"** to allow
+
+**Why does this happen?**
+- macOS adds a "quarantine" flag to all apps downloaded from the internet
+- Apps without Apple Developer signatures are marked as "damaged" with this flag
+- Removing the flag allows the app to run normally
 
 ### Build from Source
 Requirements: Python 3.10+, macOS.

@@ -22,10 +22,48 @@
 
 ## 安裝
 
-### 預編譯的應用程序 (App Bundle)
-如果您擁有 `.app` 文件：
-1. 將 `Azathoth's Whisper.app` 拖入您的 **應用程序 (Applications)** 文件夾。
-2. 打開應用程序。您可能需要授予 **自動化權限 (Automation Permissions)** 以便其控制 iTunes。
+### 預編譯應用程序 (DMG)
+
+從 [GitHub Releases](https://github.com/TK88101/Azathoths-Whisper/releases) 下載最新版本。
+
+**⚠️ 重要：macOS 首次安裝說明**
+
+由於此應用未經 Apple Developer ID 簽名，macOS Gatekeeper 會阻止運行。您很可能會看到錯誤提示：**「應用程序已損壞，無法打開」**。這是安全功能，並非真的損壞。
+
+**安裝步驟：**
+
+1. **下載並掛載 DMG**
+   - 下載 `Azathoths-Whisper-v1.0.1.dmg`
+   - 雙擊掛載
+
+2. **安裝應用**
+   - 將 `Azathoth's Whisper.app` 拖動到 DMG 窗口中的 **應用程序 (Applications)** 文件夾快捷方式
+
+3. **移除隔離標記（下載應用必需步驟）**
+   
+   打開 **終端機 (Terminal)**（應用程序 → 工具程式 → 終端機）並執行：
+   ```bash
+   xattr -d com.apple.quarantine /Applications/Azathoth\'s\ Whisper.app
+   ```
+   
+   這會移除導致"損壞"錯誤的 macOS 隔離屬性。
+
+4. **打開應用**
+   
+   現在可以正常打開了：
+   - **方式 A**：在應用程序文件夾中雙擊應用
+   - **方式 B**：右鍵點擊 → 打開（如果仍有提示）
+   
+   ✅ 應用將運行。macOS 會記住您的選擇，之後啟動不再提示。
+
+5. **授予自動化權限**
+   - 首次啟動時，系統會要求授權控制 iTunes
+   - 點擊 **「好 (OK)」** 允許
+
+**為什麼會這樣？**
+- macOS 會為所有從網路下載的應用添加"隔離"標記
+- 沒有 Apple Developer 簽名的應用帶此標記時會被標為"損壞"
+- 移除標記後應用即可正常運行
 
 ### 從源碼構建
 要求：Python 3.10+, macOS。
