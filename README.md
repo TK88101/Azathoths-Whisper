@@ -20,6 +20,21 @@ It supports multiple lyrics sources and features a dark-themed, localized user i
 *   ⚙️ **Smart Config:** Remembers your Genius Token and Language preferences.
 *   🍎 **macOS Native Support:** Respects system language settings and specialized iTunes integration.
 
+## Prerequisites
+
+**🔑 Genius API Token (Required)**
+
+To fetch lyrics, you'll need a free Genius API token:
+
+1. Visit [genius.com/api-clients](https://genius.com/api-clients/)
+2. Sign in or create an account
+3. Click **"New API Client"**
+4. Fill in the required info (App Name, App Website URL - can be anything)
+5. Copy your **Client Access Token**
+6. Paste it into the app's Settings on first launch
+
+> **Note:** The Token is completely free and takes less than 2 minutes to get.
+
 ## Installation
 
 ### Pre-built App (DMG)

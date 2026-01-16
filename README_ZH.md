@@ -20,6 +20,21 @@
 *   ⚙️ **智能配置：** 記住您的 Genius Token 和語言偏好。
 *   🍎 **macOS 原生支持：** 遵循系統語言設置，專為 iTunes 優化。
 
+## 前置要求
+
+**🔑 Genius API Token（必需）**
+
+要獲取歌詞，您需要一個免費的 Genius API Token：
+
+1. 訪問 [genius.com/api-clients](https://genius.com/api-clients/)
+2. 登錄或創建帳號
+3. 點擊 **"New API Client"**
+4. 填寫必需信息（應用名稱、網站 URL - 可以隨意填寫）
+5. 複製您的 **Client Access Token**
+6. 首次啟動時在應用的 Settings 中粘貼
+
+> **注意：** Token 完全免費，申請過程不到 2 分鐘。
+
 ## 安裝
 
 ### 預編譯應用程序 (DMG)
