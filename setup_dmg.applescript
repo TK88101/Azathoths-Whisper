@@ -1,5 +1,5 @@
 tell application "Finder"
-    tell disk "Azathoth's Whisper 2"
+    tell disk "Azathoth's Whisper"
         open
         set current view of container window to icon view
         set toolbar visible of container window to false
