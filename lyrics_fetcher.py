@@ -62,7 +62,7 @@ else:
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
 
 # App Metadata
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 APP_AUTHOR = "iBridge Zhao"
 APP_EMAIL = "toadeater731@gmail.com"
 APP_GITHUB = "https://github.com/TK88101/Azathoths-Whisper"
@@ -83,6 +83,7 @@ TRANSLATIONS = {
         "status_limit_msg": "Fetching...",
         "status_fetching": "Fetching from {}...",
         "status_complete": "Fetch complete.",
+        "status_loaded_track": "Loaded existing lyrics from track.",
         "msg_no_track": "No track is currently playing in Music.",
         "msg_success": "Lyrics written to iTunes track!",
         "msg_fail": "Failed to write to iTunes. Track might be read-only (streaming) or app unreachable.",
@@ -122,6 +123,7 @@ TRANSLATIONS = {
         "status_limit_msg": "獲取中...",
         "status_fetching": "正在從 {} 獲取...",
         "status_complete": "獲取完成。",
+        "status_loaded_track": "已加載曲目現有歌詞。",
         "msg_no_track": "Music 目前沒有播放曲目。",
         "msg_success": "歌詞已寫入 iTunes 曲目！",
         "msg_fail": "寫入 iTunes 失敗。曲目可能是唯讀的 (串流) 或應用程序無法連接。",
@@ -161,6 +163,7 @@ TRANSLATIONS = {
         "status_limit_msg": "取得中...",
         "status_fetching": "{} から取得中...",
         "status_complete": "取得完了。",
+        "status_loaded_track": "トラックから既存の歌詞を読み込みました。",
         "msg_no_track": "Musicで再生中の曲がありません。",
         "msg_success": "iTunesの曲に歌詞を書き込みました！",
         "msg_fail": "iTunesへの書き込みに失敗しました。トラックが読み取り専用（ストリーミング）か、アプリに接続できません。",
@@ -204,6 +207,18 @@ class MusicController:
             # If Music app is not running or other error
             pass
         return None
+
+    def get_lyrics(self):
+        """Returns the lyrics of the currently playing track, or empty string."""
+        try:
+            if self.music.player_state() == appscript.k.playing:
+                # Some versions/conditions might return k.missing_value which is None
+                lyrics = self.music.current_track.lyrics.get()
+                return lyrics if lyrics else ""
+        except Exception as e:
+            # print(f"Error getting lyrics: {e}")
+            pass
+        return ""
 
     def set_lyrics(self, lyrics_text):
         """Writes lyrics to the currently playing track's metadata."""
@@ -691,6 +706,16 @@ class LyricsApp(tk.Tk):
                 self.current_track_info = (artist, title)
                 self.lbl_info.config(text=f"{artist} - {title}")
                 self.lbl_status.config(text=self._get_text("track_detected"))
+                
+                # Check for existing lyrics
+                existing_lyrics = self.music_ctrl.get_lyrics()
+                if existing_lyrics and existing_lyrics.strip():
+                    self.txt_lyrics.delete("1.0", tk.END)
+                    self.txt_lyrics.insert("1.0", existing_lyrics)
+                    self.lbl_status.config(text=self._get_text("status_loaded_track"))
+                else:
+                    # No lyrics found in iTunes, auto-fetch (Search only, no auto-save)
+                    self.start_fetch_lyrics()
         else:
             self.current_track_info = None
             self.lbl_info.config(text=self._get_text("music_not_playing"))

@@ -1,5 +1,15 @@
-# -*- mode: python ; coding: utf-8 -*-
+import re
 
+def get_metadata(key):
+    with open('lyrics_fetcher.py', 'r', encoding='utf-8') as f:
+        content = f.read()
+        match = re.search(f'^{key} = ["\']([^"\']+)["\']', content, re.MULTILINE)
+        if match:
+            return match.group(1)
+    return "1.0.0" # Fallback
+
+app_version = get_metadata("APP_VERSION")
+app_author = get_metadata("APP_AUTHOR")
 
 a = Analysis(
     ['lyrics_fetcher.py'],
@@ -53,8 +63,8 @@ app = BUNDLE(
         'NSHighResolutionCapable': 'True',
         'CFBundleLocalizations': ['en', 'zh_TW', 'ja'],
         'CFBundleDevelopmentRegion': 'en',
-        'CFBundleShortVersionString': '1.0.1',
-        'CFBundleVersion': '1.0.1',
-        'NSHumanReadableCopyright': 'Copyright © 2026 iBridge Zhao. All rights reserved.'
+        'CFBundleShortVersionString': app_version,
+        'CFBundleVersion': app_version,
+        'NSHumanReadableCopyright': f'Copyright © 2026 {app_author}. All rights reserved.'
     },
 )
