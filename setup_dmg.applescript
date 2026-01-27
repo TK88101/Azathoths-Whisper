@@ -1,16 +1,20 @@
 tell application "Finder"
     tell disk "Azathoth's Whisper"
         open
-        set current view of container window to icon view
-        set toolbar visible of container window to false
-        set statusbar visible of container window to false
-        set the bounds of container window to {100, 100, 700, 500}
-        set viewOptions to the icon view options of container window
+        delay 1
+        set targetWindow to container window
+        tell targetWindow
+            set current view to icon view
+            set the bounds to {100, 100, 800, 520}
+            set viewOptions to the icon view options of it
+        end tell
         set arrangement of viewOptions to not arranged
-        set icon size of viewOptions to 128
-        -- Skip background for now, will set manually if needed
-        set position of item "Azathoth's Whisper.app" of container window to {150, 200}
-        set position of item "Applications" of container window to {450, 200}
+        set icon size of viewOptions to 160
+        delay 1
+        set bgPath to file "dmg_background.png"
+        set background picture of viewOptions to bgPath
+        set position of item "Azathoth's Whisper.app" of targetWindow to {170, 230}
+        set position of item "Applications" of targetWindow to {520, 230}
         close
         open
         update without registering applications

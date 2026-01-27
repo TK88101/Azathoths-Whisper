@@ -6,7 +6,7 @@ a = Analysis(
     pathex=['/Users/ibridgezhao/Documents/Bjork/.venv/lib/python3.14/site-packages/aeosa'],
     binaries=[],
     datas=[('MyIcon.iconset/icon_128x128@2x.png', '.')],
-    hiddenimports=['appscript', 'aeosa', 'pkg_resources.py2_warn'],
+    hiddenimports=['appscript', 'aeosa'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -45,7 +45,7 @@ coll = COLLECT(
 )
 app = BUNDLE(
     coll,
-    name='Azathoths_Whisper.app',
+    name="Azathoth's Whisper.app",
     icon='MyIcon.icns',
     bundle_identifier='com.ibridgezhao.azathothswhisper',
     version='1.2.2',

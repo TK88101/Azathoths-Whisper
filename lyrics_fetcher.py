@@ -743,15 +743,16 @@ HTML_CONTENT = """
         hydrate();
         loadSettings();
     });
-    // Cmd+P: quit app
+    // Cmd+Q: quit app
     document.addEventListener('keydown', (e) => {
-        if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === 'p') {
+        if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === 'q') {
             e.preventDefault();
+            e.stopImmediatePropagation();
             if (window.pywebview && window.pywebview.api && window.pywebview.api.request_quit) {
                 window.pywebview.api.request_quit();
             }
         }
-    });
+    }, true);
     document.addEventListener('DOMContentLoaded', () => { 
         setTimeout(hydrate, 100);
         setInterval(pollTrack, 3000); 
@@ -1817,6 +1818,8 @@ class LyricsApp:
         self.lang_code = config.get("language", "system")
         self._force_quit = False
         self._activation_observer = None
+        self._quit_handler = None
+        self._key_monitor = None
         
         if self.lang_code == "system":
             self.current_lang = ConfigManager.detect_system_language()
@@ -1842,6 +1845,7 @@ class LyricsApp:
         
         # Bind closing event
         self.window.events.closing += self.on_closing
+        self.window.events.shown += self.install_cmd_p_monitor
 
         # macOS: show window when app is activated (dock icon click)
         try:
@@ -1890,6 +1894,65 @@ class LyricsApp:
                 ]
             )
         ]
+
+    def setup_macos_hotkey(self):
+        """Ensure Cmd+Q quits via the native macOS Quit menu item."""
+        try:
+            import AppKit
+        except Exception:
+            return
+
+        app = AppKit.NSApplication.sharedApplication()
+        main_menu = app.mainMenu()
+        if main_menu is None:
+            return
+
+        app_menu_item = main_menu.itemAtIndex_(0)
+        if app_menu_item is None:
+            return
+        app_menu = app_menu_item.submenu()
+        if app_menu is None:
+            return
+
+        # Find the standard Quit menu item (action terminate:) and remap it to Cmd+P
+        quit_item = None
+        for i in range(app_menu.numberOfItems()):
+            item = app_menu.itemAtIndex_(i)
+            if item and item.action() == 'terminate:':
+                quit_item = item
+                break
+
+        if quit_item is not None:
+            quit_item.setKeyEquivalent_('q')
+            quit_item.setKeyEquivalentModifierMask_(AppKit.NSEventModifierFlagCommand)
+
+    def install_cmd_p_monitor(self):
+        """Install a local key monitor to intercept Cmd+Q."""
+        if self._key_monitor is not None:
+            return
+        try:
+            import AppKit
+        except Exception:
+            return
+
+        def _key_handler(event):
+            try:
+                flags = event.modifierFlags()
+                cmd = bool(flags & AppKit.NSEventModifierFlagCommand)
+                chars = event.charactersIgnoringModifiers()
+                if cmd and chars and chars.lower() == 'q':
+                    self.request_quit()
+                    return None
+            except Exception:
+                pass
+            return event
+
+        try:
+            self._key_monitor = AppKit.NSEvent.addLocalMonitorForEventsMatchingMask_handler_(  # noqa: E501
+                AppKit.NSEventMaskKeyDown, _key_handler
+            )
+        except Exception:
+            self._key_monitor = None
 
     def load_main_content(self):
         # Inject APP ICON from bundle/source
@@ -1961,6 +2024,18 @@ class LyricsApp:
         self._force_quit = True
         try:
             self.window.destroy()
+        except Exception:
+            pass
+        # Ensure app fully terminates on macOS
+        try:
+            import AppKit
+            AppKit.NSApplication.sharedApplication().terminate_(None)
+        except Exception:
+            pass
+        # Fallback hard-exit if GUI loop is still alive
+        try:
+            import os
+            os._exit(0)
         except Exception:
             pass
         return True
@@ -2149,4 +2224,4 @@ class LyricsApp:
 if __name__ == '__main__':
     config = ConfigManager.load_config()
     app = LyricsApp(config)
-    webview.start(menu=app.menu_items, debug=False)
+    webview.start(func=app.setup_macos_hotkey, menu=app.menu_items, debug=False)
