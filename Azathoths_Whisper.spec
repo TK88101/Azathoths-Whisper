@@ -1,22 +1,12 @@
-import re
+# -*- mode: python ; coding: utf-8 -*-
 
-def get_metadata(key):
-    with open('lyrics_fetcher.py', 'r', encoding='utf-8') as f:
-        content = f.read()
-        match = re.search(f'^{key} = ["\']([^"\']+)["\']', content, re.MULTILINE)
-        if match:
-            return match.group(1)
-    return "1.0.0" # Fallback
-
-app_version = get_metadata("APP_VERSION")
-app_author = get_metadata("APP_AUTHOR")
 
 a = Analysis(
     ['lyrics_fetcher.py'],
-    pathex=[],
+    pathex=['/Users/ibridgezhao/Documents/Bjork/.venv/lib/python3.14/site-packages/aeosa'],
     binaries=[],
-    datas=[],
-    hiddenimports=[],
+    datas=[('MyIcon.iconset/icon_128x128@2x.png', '.')],
+    hiddenimports=['appscript', 'aeosa', 'pkg_resources.py2_warn'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -55,16 +45,14 @@ coll = COLLECT(
 )
 app = BUNDLE(
     coll,
-    name="Azathoth's Whisper.app",
+    name='Azathoths_Whisper.app',
     icon='MyIcon.icns',
     bundle_identifier='com.ibridgezhao.azathothswhisper',
+    version='1.2.2',
     info_plist={
-        'NSAppleEventsUsageDescription': 'Azathoth\'s Whisper needs access to iTunes to read track info and scribe lyrics.',
+        'CFBundleShortVersionString': '1.2.2',
+        'CFBundleVersion': '1.2.2',
         'NSHighResolutionCapable': 'True',
-        'CFBundleLocalizations': ['en', 'zh_TW', 'ja'],
-        'CFBundleDevelopmentRegion': 'en',
-        'CFBundleShortVersionString': app_version,
-        'CFBundleVersion': app_version,
-        'NSHumanReadableCopyright': f'Copyright © 2026 {app_author}. All rights reserved.'
+        'NSAppleEventsUsageDescription': 'Azathoths Whisper needs access to Music to detect the currently playing song.',
     },
 )

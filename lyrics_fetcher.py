@@ -1,20 +1,34 @@
 #!/usr/bin/env python3
 """
-Mac Music Lyrics Fetcher
-A lightweight, surgical tool to fetch lyrics for the currently playing Apple Music track.
+A lightweight helper to fetch lyrics for the currently playing Apple Music track.
 Dependencies:
-    pip install appscript lyricsgenius requests beautifulsoup4
+    pip install appscript lyricsgenius requests beautifulsoup4 cloudscraper pywebview
 """
 
+import sys
+import os
+
+# Redirect stdout/stderr to file if frozen (bundled) to capture start-up crashes
+if getattr(sys, 'frozen', False):
+    log_path = os.path.expanduser("~/Documents/Bjork/app_debug.log")
+    try:
+        # buffer=1 means line buffered
+        sys.stdout = open(log_path, "w", buffering=1)
+        sys.stderr = sys.stdout
+        print(f"App starting at {os.getcwd()}", flush=True)
+        print(f"Python path: {sys.path}", flush=True)
+    except Exception as e:
+        pass
+
+import json
+import re
+import subprocess
+import webbrowser
+import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
-import threading
-import queue
-import re
-import json
-import time
-import subprocess
-import locale
+import mutagen
+from splash import SPLASH_HTML
 
 # Third-party libraries
 try:
@@ -24,12 +38,846 @@ try:
     import lyricsgenius
     import cloudscraper
 except ImportError as e:
-    print(f"Missing dependency: {e}")
-    print("Please install required packages: pip install appscript lyricsgenius requests beautifulsoup4 cloudscraper")
-    exit(1)
+    print(f"CRITICAL: Missing dependency during import: {e}")
+    # Try to show a native alert if possible, otherwise just log
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        # Ensure window is on top
+        root.attributes("-topmost", True) 
+        messagebox.showerror("Startup Error", f"Missing dependency: {e}")
+    except:
+        pass
+    sys.exit(1)
 
+import webview
 from dotenv import load_dotenv
-import os
+from splash import SPLASH_HTML
+
+
+# Embedded HTML content for the webview interface
+HTML_CONTENT = """
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Azathoth's Whisper - Lyrics Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#16439c",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#000000",
+                        "surface-dark": "#0a0a0a",
+                        "border-dark": "#333333",
+                        "cold-white": "#E0E0E0",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "mono": ["Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", "monospace"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    backgroundImage: {
+                        'noise': "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.07%22/%3E%3C/svg%3E')",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: "Space Grotesk", sans-serif;
+            background-color: #000;
+        }::-webkit-scrollbar {
+            width: 10px;
+            background: #000;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000;
+            border-left: 1px solid #222;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border: 1px solid #000;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .text-glow {
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.15);
+        }*:focus-visible {
+            outline: 1px solid white;
+            outline-offset: -1px;
+        }
+    </style>
+</head>
+<body class="bg-black text-gray-300 overflow-hidden h-screen flex flex-col font-display selection:bg-white selection:text-black">
+<div class="fixed inset-0 pointer-events-none z-50 bg-noise opacity-40 mix-blend-overlay"></div>
+<header class="flex shrink-0 items-center justify-between border-b border-border-dark px-6 py-3 bg-black z-40">
+<div class="flex items-center gap-3 text-white">
+<span class="material-symbols-outlined text-[20px] text-gray-400">graphic_eq</span>
+<h2 class="text-white text-sm font-bold tracking-[0.15em] uppercase text-glow">Azathoth's Whisper <span class="text-gray-600 font-normal normal-case ml-2">v1.2.2</span></h2>
+</div>
+        <nav class="hidden md:flex items-center gap-8">
+        <nav class="hidden md:flex items-center gap-8">
+            <a id="nav-editor" class="nav-link text-sm font-medium uppercase tracking-widest transition-colors text-white border-b border-white pb-1 font-bold shadow-[0_4px_20px_-4px_rgba(255,255,255,0.5)] cursor-pointer" onclick="switchTab('editor')" data-i18n="nav_editor">Editor</a>
+            <a id="nav-batch" class="nav-link text-sm font-medium uppercase tracking-widest transition-colors text-gray-500 hover:text-white cursor-pointer" onclick="switchTab('batch')" data-i18n="nav_batch">Batch</a>
+        </nav>
+</header>
+<main id="editor-main" class="view-section-editor flex flex-1 flex-col h-full p-6 md:px-12 md:py-8 max-w-6xl mx-auto w-full gap-6">
+<div class="shrink-0 border border-gray-800 bg-[#050505] p-6 flex flex-col md:flex-row justify-between items-start md:items-center relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-1 h-full bg-white/10 group-hover:bg-white transition-colors duration-500"></div>
+<div id="header-click-area" style="cursor: pointer;">
+<span class="block text-xs text-gray-500 uppercase tracking-[0.2em] mb-1">Now Editing</span>
+<h1 class="text-2xl md:text-3xl font-mono text-white tracking-tighter">
+<span class="font-bold" id="track-artist">No Artist</span> <span class="text-gray-600 mx-2">//</span> <span class="font-light" id="track-title">No Track</span>
+</h1>
+</div>
+
+</div>
+<div class="shrink-0 flex flex-col md:flex-row gap-4 items-end">
+<div class="w-full md:w-64 flex flex-col gap-1">
+<label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold ml-1" data-i18n="source">Data Source</label>
+<div class="relative">
+<select id="source-select" class="w-full appearance-none bg-black border border-gray-700 text-white pl-3 pr-8 py-2.5 text-xs uppercase tracking-wider focus:border-white focus:ring-0 cursor-pointer hover:border-gray-500 transition-colors">
+<option value="genius" selected>Genius.com</option>
+<option value="darklyrics">DarkLyrics</option>
+<option value="metalarchives">MetalArchives</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+<span class="material-symbols-outlined text-[16px]">arrow_drop_down</span>
+</div>
+</div>
+</div>
+<div class="flex gap-4 w-full md:w-auto">
+<button id="btn-fetch" class="flex-1 md:flex-none relative group overflow-hidden border border-gray-600 hover:border-white px-8 py-2.5 transition-all duration-300">
+                            <div class="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300 mix-blend-difference"></div>
+                            <span class="relative flex items-center justify-center gap-2 text-sm font-bold tracking-[0.1em] text-white group-hover:text-black uppercase">
+                                <span class="material-symbols-outlined text-[18px]">cloud_download</span>
+                                <span data-i18n="fetch_btn">Fetch Lyrics</span>
+                            </span>
+                        </button>
+                        <button id="btn-save" class="flex-1 md:flex-none relative group overflow-hidden border border-gray-600 hover:border-white px-8 py-2.5 transition-all duration-300">
+                            <div class="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300 mix-blend-difference"></div>
+                            <span class="relative flex items-center justify-center gap-2 text-sm font-bold tracking-[0.1em] text-white group-hover:text-black uppercase">
+                                <span class="material-symbols-outlined text-[18px]">save_alt</span>
+                                <span data-i18n="write_btn">Save to iTunes</span>
+                            </span>
+                        </button>
+</div>
+</div>
+<div class="flex-1 relative border border-gray-800 bg-[#020202]">
+<div class="absolute top-0 right-0 p-2 opacity-50 pointer-events-none">
+<span class="text-[10px] text-gray-700 font-mono tracking-widest">TXT_MODE: UTF-8</span>
+</div>
+<textarea id="lyrics-box" class="w-full h-full bg-transparent border-none text-gray-300 p-6 font-mono text-sm md:text-base leading-relaxed resize-none focus:ring-0 placeholder-gray-800 selection:bg-white selection:text-black scrollbar-thin" placeholder="// Waiting for input stream..." spellcheck="false"></textarea>
+</div>
+
+</main>
+</main>
+<footer id="editor-footer" class="view-section-editor border-t border-border-dark bg-black py-2 px-6 flex justify-between items-center text-[10px] text-white font-mono uppercase tracking-widest shrink-0 z-40">
+<div class="flex items-center gap-6">
+                <span class="flex items-center gap-2">
+
+            <span data-i18n="status_label">Status:</span> <span class="text-white" id="status-text" data-i18n="status_ready">Ready</span>
+</span>
+<span class="hidden md:inline text-gray-700">|</span>
+<span class="hidden md:inline"><span data-i18n="lines_label">Lines:</span> <span id="lines-count">0</span></span>
+</div>
+<div class="flex items-center gap-4 opacity-50">
+<span>Mem: 64MB</span>
+<span>Lat: 12ms</span>
+</div>
+</footer>
+
+<!-- Batch Overlay -->
+<!-- Batch Overlay -->
+<div id="batch-view" class="view-section-batch hidden flex-1 flex-col bg-black overflow-hidden">
+    <header class="flex items-center justify-between border-b border-border-dark px-6 py-4 bg-black/95">
+        <h2 class="text-white text-lg font-bold tracking-widest uppercase flex items-center gap-3">
+            Batch Processing
+            <span class="text-gray-600 mx-2">//</span>
+            <span class="text-gray-400" id="batch-album-name">Loading...</span>
+        </h2>
+    </header>
+    
+    <div class="flex flex-1 overflow-hidden">
+        <!-- List View -->
+        <div class="flex-[2] border-r border-border-dark flex flex-col bg-[#050505]">
+             <div class="flex items-center text-[10px] text-gray-500 uppercase tracking-widest border-b border-border-dark bg-black sticky top-0 z-10">
+                 <div class="w-12 py-3 text-center border-r border-border-dark">#</div>
+                 <div class="flex-1 py-3 px-4 border-r border-border-dark" data-i18n="col_artist">Artist</div>
+                 <div class="flex-1 py-3 px-4 border-r border-border-dark" data-i18n="col_title">Title</div>
+                 <div class="w-24 py-3 text-center" data-i18n="col_stat">Stat</div>
+             </div>
+             <div id="batch-list" class="overflow-y-auto flex-1 font-mono text-xs">
+                 <!-- Items injected here -->
+             </div>
+        </div>
+        
+        <!-- Preview View -->
+        <div class="flex-1 flex flex-col bg-[#0a0a0a]">
+             <div class="p-3 border-b border-border-dark bg-black text-gray-500 text-[10px] uppercase tracking-widest flex justify-between">
+                 <span data-i18n="col_preview">Preview</span>
+                 <span id="preview-meta" class="text-gray-600">--</span>
+             </div>
+             <textarea id="batch-preview" class="flex-1 bg-transparent border-none text-gray-400 p-4 font-mono text-xs leading-relaxed resize-none focus:ring-0 selection:bg-white selection:text-black" placeholder="Select a track..." spellcheck="false" readonly></textarea>
+        </div>
+    </div>
+    
+    <footer class="border-t border-border-dark bg-black p-4 flex justify-between items-center shrink-0">
+        <div class="text-[10px] uppercase tracking-widest text-white" id="batch-status">Ready</div>
+        <div class="flex gap-4">
+             <button id="btn-batch-fetch" class="relative group overflow-hidden border border-gray-600 hover:border-white px-5 py-2 transition-all duration-300">
+                <div class="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300 mix-blend-difference"></div>
+                <span class="relative flex items-center gap-2 text-xs font-bold tracking-[0.1em] text-white group-hover:text-black uppercase">
+                    <span class="material-symbols-outlined text-[14px]">cloud_download</span> <span data-i18n="batch_fetch">Fetch Missing</span>
+                </span>
+             </button>
+             <button id="btn-batch-import" class="relative group overflow-hidden border border-gray-600 hover:border-white px-5 py-2 transition-all duration-300">
+                <div class="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300 mix-blend-difference"></div>
+                <span class="relative flex items-center gap-2 text-xs font-bold tracking-[0.1em] text-white group-hover:text-black uppercase">
+                    <span class="material-symbols-outlined text-[14px]">save_as</span> <span data-i18n="batch_import">Import Selected</span>
+                </span>
+             </button>
+             <button id="btn-batch-all" class="relative group overflow-hidden border border-gray-600 hover:border-white px-5 py-2 transition-all duration-300">
+                <div class="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300 mix-blend-difference"></div>
+                <span class="relative flex items-center gap-2 text-xs font-bold tracking-[0.1em] text-white group-hover:text-black uppercase">
+                    <span class="material-symbols-outlined text-[14px]">done_all</span> <span data-i18n="batch_all">Import All</span>
+                </span>
+             </button>
+        </div>
+    </footer>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center">
+    <div class="bg-[#0a0a0a] border border-gray-800 p-8 w-full max-w-lg shadow-2xl relative">
+        <button onclick="closeSettings()" class="absolute top-4 right-4 text-gray-500 hover:text-white">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+        <h2 class="text-white text-xl font-bold uppercase tracking-widest mb-6 border-b border-gray-800 pb-4" data-i18n="settings_title">Settings</h2>
+        
+        <div class="space-y-6">
+            <!-- Token Section -->
+            <div id="group-token" class="hidden">
+                 <label class="block text-[10px] uppercase tracking-widest text-gray-500 mb-2" data-i18n="token_label">Genius Access Token</label>
+                 <input type="text" id="setting-token" class="w-full bg-black border border-gray-800 text-white px-4 py-3 text-sm focus:border-white focus:ring-0 transition-colors" placeholder="Enter your token...">
+                 <div id="token-status" class="text-xs mt-2 h-4"></div>
+                 <button onclick="saveToken()" class="w-full mt-4 bg-white text-black font-bold uppercase tracking-widest py-3 hover:bg-gray-200 transition-colors" data-i18n="save_btn">Save Token</button>
+            </div>
+            
+            <!-- Language Section -->
+            <div id="group-lang" class="hidden">
+                <label class="block text-[10px] uppercase tracking-widest text-gray-500 mb-2" data-i18n="lang_label">Language (Restart required)</label>
+                <select id="setting-lang" class="w-full bg-black border border-gray-800 text-white px-4 py-3 text-sm focus:border-white focus:ring-0 cursor-pointer">
+                    <option value="en">English</option>
+                    <option value="zh_TW">Traditional Chinese (繁體中文)</option>
+                    <option value="ja">Japanese (日本語)</option>
+                </select>
+                <button onclick="saveLanguage()" class="w-full mt-4 bg-white text-black font-bold uppercase tracking-widest py-3 hover:bg-gray-200 transition-colors" data-i18n="save_btn">Save Language</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- About Modal -->
+<div id="about-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center">
+    <div class="bg-[#0a0a0a] border border-gray-800 p-8 w-full max-w-lg shadow-2xl relative text-center rounded-2xl">
+        <button onclick="closeAbout()" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+        
+        <div class="w-32 h-32 mx-auto mb-6 flex items-center justify-center">
+             <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAAEAAElEQVR4nOz9B5hlZ1bei6996pzKOefUoTpHdZBaOWukyTNmAoYBhmAutsHYf/sa+/oaG2wwxkQ/TsAAA5OzwijHllrqnKsr55zjSXX2//m9394lYWw/vqPxaOyn9yCqu7rqnH2+/X0rvOtd7zK7ed28bl43r5vXzevmdfO6ed28bl43r5vXzevmdfO6ed28bl43r5vXzevmdfO6ed28bl43r5vXzevmdfO6ed28bl43r5vXzevmdfO6ed28bl43r5vXzevmdfO6ed28bl43r5vXzevm9cN9ee/1Ddy8/ueusvJKf35uZvN5lZZV+gvzb/+9sqraj0QitrGxYZ4XsVgs2zKZDfN9X3/n68ZG2ryIF/yd38qY+Wa+n9Hfs7Ky3O8b3/PNi0TM1188i3j8nul7/EwsFjPP8/RnrvRG2jY2MpblRWxudsqrqq7zed1oNKrXTqXS5nm+Xndudtorr6z2/UxGr8F/Gd7P3D34Gd9mZib12crLq3zffAs/e1VNnZ9Ob1gk4rnXmpm6uYffxfV/1OKxOQoKC4wNUlBYZJ6XZSUlJRbLztZHLS8vt/KyMpudm9Om5JDU1lZZXl6eLS4s2fpa3HLycy07lm2e+ZaXl6uNydf19bhFo7HgnTKWn5dvebl5Fk/EjYMXj8f1PtEsz3KycywvP884MbNz83rdeDJhkUiWRSMRHRbPPMvOybFoVpatrq3rfRKJpEUjZnn5ucbh8H1+JluHgv8iWVlmmYxFvIjuJSsWtdXVVUul03odDlJOTrZlNnxbWV21aCxqqVTS8vMKdHC571iU14nqsPI7Ed+3SFZEv8vX+fklGYSyslIrLiqyheVFi2bFdNCzsjyLRqIWy45qFRKJlOXl5ui1k8mkZbi3iGcRi+jzxHJilp3t7ieZSOreMCSpjQ1bW1/X31mr+Pq6e/9IxBZXliwVT1hBQaHWMzcvR2vP5+Q1OPR8HwOUk52tdU+n0ra4uGi5eXn6XBuZDVtaWrJYLKr742dZc4zd5NSU9kc6ndK98Wxyc3NseWXZMhsbVlJcYouLC7a0tGjr6+uWiMctkuXZ4sKixddWra+3+/+oM/O/7Ydpbmv3i4tLrbikzLJiubaRyeigZkWjeuAtTY128NBh29reZvn5ebYej1symbDcnBybnZ2zoqJiS6ZSNtA/YDPTk7bv0C126fxF27lzu924ccPq6mpkGOobGm19fdXqa+ttenraotkxy47FrLioUAZlaXnZNtJ4N89W1tatf2DQykpLbXpm2mpra62+rs5ys7NtZWXF4omUVnxtbU2ekXtJp9iIMcvJzdWG5JBlMr7eAw++uLRsRYWF+r0MHjYrS4aCv2+k0pZfkGc5OTm2trrG/tbnz+cgpFM6KPzO8sqqJZIcqgKLRrJw6fodP4OhzLdkMm3JZEq/z+HHoKysrFpBfoEl4uuWSCSsuLjIEsmUFRcX2kZ6w5KppCID1pxNFMuOyaBsZHwZL/5dhikaleFbXVm19XjCcnJilvHNSkuKLZrlDIW/kdHvsLas+dqaMw58SA7+wtKyDn46tWHx+JqlMY4Zs/XVFcsvLND6rfL5iT7mFmxhYc6KCoosNy/XIp7JCfDZZ6amLb+oyFLJpOXmZOuzWsStp7+RtumZeYtlZ8lAjI+PW8Z8y45m2+zMjIzA6MiY5eXl2Np63JYWF4g+ZDQuXjhvY6Mj/1uepf9tbrqissavqqmxqppaKywssYKiIsvJybXSslJ5AB5mQ0ODVVSUW21tnfXc6DRCx+zsqF25clUbjDB0bn7Odu7osKxolnV07LDrnV128uQbVl9fq9C4KD/PRsbGrLG+wUrLy3QQzp45Y4cPH1RUwYbGsx8+fFgbhUO8srpsndc7Ccutt7/PpicmLRqLWXZuju3o2G61NdU6uBwyjI7z6J4OXmlpqVWUlSoq4TAsLy/Z7OysVVVVWTQLT0vc7bwjBiwrYnqddMa0qdmAqWTCvEiWtbW3WV/fgAxSIr5mWVlRKy0r0yHKzs6xLEUfG/qK4aiQAVvRe0cU85jFolErLCrUYXcedl33W1VZroPPfbDWeHs+O1EGh9alFRkdRBeJ5CiyWV5e1n3MzM7KsPF3DNNGKmnbtrZbcXGxPHVZSYmipDfeOmv9fQOW8TNWVFRkHdu32pFDB+2ZZ16wsYkJRRoFBfm2Y0eH1qqktFQR2+TkpKVSG1ZVXWk1NVU2MTFu6UTKXn71pCKn48eOyhgo2sKQRiN6ndmZOZufn7OOju3W09Nnufl5VllZZdVVlZaMr9v27dttcGjIysrLbGpy2sbHJ2xqekZRCRFSbU2VLS8t2/j4mHV33bDr1y7bjc7r/9ucqx/6Gz1y6x1+fUOTFRSVWFFxiTxQZUWltbQ0yYqzUdi5hQX52pBXrl61p5960rp6B2xhccnKy8tIXC03L988nwg6Y4lE3BbmZ/Tx2bzNzW3y8nNzc/J4xSWl2qi33X67DvmNzk6Fg0QWpSUllhXL1uHGq1VWVBgvPDQ4aL4fsXQ6aa1NzRbNzraR8TF5Gw4Eh4iUI4eQ2fNkSDBceMMsdqaRB7uDRZiMJ5fXS5Nbb+hwchEZ4PHwWmFOXl5Wrp/D423m4fOzep3c/HxFFhxeXo/3JbxPpZMyPvH1uBUVF8sLu3uMymNykaasx9cslp1j+UEqouiE0Dw3V+lMABjoPgjHSWu4X9aNMBzcAaPH58R4rKwsWzSWbdFIzHx/Q69FxLK+tmqLy8s2PDomDACPmxXJklE5fuSwjY6MW9/gkMVysi03m+jIt7yCfEUphQUFNjo6Yqur63r9oqJCpQETY+O2Zes23VtvT4/l5+VaKr1hg0PD1tbWYoUFhXo+vNfs3ILNz81aeXmFPjt7JL66ajt27lYk01BfbQ89+KBVV1XY8vKKUhgiSVKPurp6GYF4Yt3W40kbGR62zmuX7cxbb9r42PAP9Rn7obw5AK4du/fZ8dtuV66Nt8das/Gj2VE98IHebjtz+oytJRJ2x4k77dVXX7aZmVkbHhmxLM+zgsJii0azrKKq2opLSmxmZsZhAwX5NjWBt0hafkG+QuWiwmJramu34YE+eeGyikqbnZqy4ydus9HhEevp6dHm3dhIafNmx3IskUpabW2N5ecXaJPPzc7q3xbnFqywqEjhLBc5NxuQjY734nXwQBxWcAgOZQi4sRm55GF993D4Pf4A3sCJz8vNdUCZ74A3ogKMAXksBycnN1s5PqE5r0fejAcuLinWn6PRiA4PBobDT46M1+MN8dp5BXl6HYxU6G2JtGxjQ69JqsL98jm4SG9yc2JWVl6ulGBkdMxyZIg2dF/pVNLW4nFbXl5V9MF6hGkCKUgyvWGpVEppBhENr49hnZubscLCQr3X/PyC5WTHLBbNtvz8fPMtI2PD65NekJphLEhD5BDM9O9EEBhtXiMZj9vo6KjuraiwyKqrq6y4qNguXrigdCUDbpFOK8RfWnJp3dLyktYBDKW8rFRGHwNw9MhRRQy7d3bY+MSEUjGiggsXLykCml9cUkqa5ZmNjgzb+XOnra+784fyrP1Q3VRZRaV/5PjtVl5VZyXFhVZRWW05sag2elNjo4Cb8+cu2PjEmN24dsW8rGxZajbO3MKi1TU0yBuRDxMmV1dX2+LSgjZVJr1hG74LWwGLlthUuTlWVFKsA4LHr62usfnFRQFQbJhUOmWLCwsOrItFBcjhFSvLq2x6dlr5aHFxid6LCIKDkgw8M14TsI40RJ4/J0fenYPHPYbenQ2m3D8alXd2KYbpEJJTJ9POKACsObTcpTLk7oS+vObmwQYDsIjFwBY2UsqTSfmzIjFneISTuPvinvlc2TGMCfcY03uTAoSbIicvT5EBwF4uhiUCvpArA0bk5HJszwq5l+xsK8zP1/rxucjjM74n7IFrFQOQyVg6kw7AwogODou1vLpiaytrlhXlsGb0/PiZkpJiW4+vK6pRpMDh9zf0/rMzs0olSGcwHqyJqg0bDijEABGBEM1MTk0qneKz8BxLS0qttb3N2lpa7JnnnrXEesImJiZkRFjfWCxHxm5tfU33k4gnZHRr6+r1WcAeVlcW7bOf/Rnr7rqun7/nnrusID9Pz2JicsouXblqly5dUpSxyutkMnb14gW7fu3iD9WZ+6G5mYcf+5C/Y89ey47majPOzk1afX2jHTlyi3V3ddmp19+0N15/2TZSKYvm5ivcI2utb2qyhYV5KyjA2rNJXZmKDcSGJiR0f45pA+HVCF/5HoaFrxgIDAMbqTC/UJsAD0LYz+Zj0wEa8nqEnfm5BZZIJTarA7wfBxzPwUGk1FZdVW3xtXVLZzaUguDBAf9WV1d08MDKCbfZWBzsMM/n8HDxPYXssYjDDCIxhbVuk24I2MTbsLExYOZlLJVMy2vyWLOyIkGpzqU9VEQow1El4fUUWZi51CDj8m0Of0F+vt5buIr5igAcMLem9cBbs45FBQVaRz4D90KqRRhMlMX6gR8sr67JS4e/B04hYxmPOwMXpQKy5g7rMumCb6lUQsYwldwQTkNqwMWzBcsoKMjTOvFeVAgIxzn4PFcOa7iGfHYcA+CrjEQ8oT9j/PlKNJKXlycMhfcvKS62oaEhvRefO4tUKxaz+NqaUkw8OutIeoEBwuCzDjt27LCe7m5bWcHYFNujjzxqR285ZDUN9Xbp8jV76803rbu71yqqamQghocH7Nxbp6yn64cDJ3jPb2LPgcP+ibvutdKyCltZXlFYVVVZYc+98ILAvNaWZnvlpRfthZdesI1URg+XsLu0vMSyc/JtYnzSolFXj87OdlWAMKxWqKwD4FssK2qFxcXaUMlEQiG6QlnzFB47FN13XppcOBuUGMR+VWkIhx9vFouCA5QqFcG7DA0N656UZwOwkb/HAm8ei2nzk2KwMVXmWloUYOYQfxB500biCmvwnFruzX1NK+UAxON92LThxaYGf+CwclgwMhimWFa2FZcW6/tgEqwJBsTzMkp7XG3et9zsHL2OAL28PCOoB+0nzeCghvV+DjlfOcRULQoKC+X5MRjk72QDfFZeV3gF65/J6KCvrjkDySFKpNJBBSTL8ogW5hdkADBSXKsra8qjAe2mp2Z0X7FYlt6XA46BduuQ0lpiqIi0lhaXFJnw/Hh9jBkGXBFNLFtGmt/lJgA1SY3y8gsslUxZZiOtfB4DwDNfXVuVoQ2jqxWqMEVFMhhUY+YX5hXprS4v6T6OHz1mZRUV9vqpN+VELl28YLt27rBPffKT9tCD99nyyoo9//xL1jc4bD093YpAcCZd16/apXOnxYmw9/B6T9/8Y5/8Mb+xuV0h2tYtW6yuutq6um/Y49/5th44ITALv766ZkVlZVp4kF82V31jk6w/PweizgEGK2CjsRnZVBwQvuL1sAQim0Q8gWQYBrwndV4OtsvL83HW8qK8HhuIshV4wuLSktD2gvxChf75hYW2vramDcaFx8OzYzBUVzfPVla4pwLVullqNq0rlWWU83OAyDVV3w8OIv9xgHi9CAeVzZidE3xO9/u8DiEvHw5Qkg1MNYTXApTKywvwEg5AdtQSibQL7T0TqEe0wuHHELn6fkSbnO9jmKIRl5aQeHCQ8Lph1BANPhvGiHspKyuWseB+HAjpKgXk5vwu67y2um7xRFLPiwNBaE20xPPAuILHwFvAuAo7SMYDghCRjycjKoNolPRKZRBYJ6KFRJzfXZaBEgCaFdHn4H5J6zCYGHzeGyOJschmLbJcGqS1TKcUJfAceH+ARbw/9xlWPng9Xov3oDy4trIkAwuAyr2srSfskYceFGDY199nrS0ttq29xdrb22x1PWHzC8uqKly9ds2uX7+m6IT/Tr3+ml27dO49O4fv2Rt/6jOf9bd17LT+vn7bt3+/Xb182Xq6u2xyatqWF+fk5YWAC9hy4JOz6hwAwlmMQ1olq2QcsCuuh+o8kcsl08m0LC4XD46fZ9EJzdl8eP6FxUXl5Hk5uZZbkKdNHl+Lq0xUVlYuj8IG4GtYJqO0RrTC/WGM2FhEFLEsB/xhRLhH6tZ43NDjh4AUG4aLP/OZXBnNRTHpjaRtpP3NqEBou2rpbmNzidiSTm9ucJcDJ2W4cnPzbCPj7isvr8CSqbhFsyDcxBye4Ju8tqs6+La6sqzPz7rxXhgGDnJIguLiwIiIpPA6JQPA4efnMFRECHwmDvnmZzPf1tcBWvNkZCmnUvZkx5HGcFDABMiZOdAcXIwD0Qe4Ds89Hk8IpMRrsx7xeMqWluZFQOKzshfI3bkvQnNwB9YQ/IbUC4/N/ujvH3C4SQGg4obF15OWTMY3jRjPCNxE6RXPM+JZPIFxSVg0lmWFhUWKCPhZUqTVeMLm52csuR63ktJyGVueQ0VlhQwbVSL4J6ffOmXDg0PWsXOHMKd9+/bZrl3brbtvwPr7BwVa8xnmp6fs+Wcef0/O4g/8Tbft2Ok//OiHraS41CYmx+zEHSfsysWL9qef+1MrLSvXgs7Pzdji/IJCTTZeCWUrws+AdgoRIzeHcN/TgyVExhvkFxRoY2XSeFiTR5d1XgOsc2E4r4eX5O8ANLOzM3rYHAoeIobGIdgOvOJ7QtOTSYWIbEZCytBbavOSOxewQRM6ECHIhQfNiuHpc/TzYX08pNEqzzc2XFSGgJSCEJg8WtFJApzBEX3Cw+/KmInNtCMMhfmqNCSTtpxYrhBxKgO8Xk42r0EovK77JIwPc3kOKhudqIW8nM/ucARHyy0tKVJ0JO+IwfMdSQkDEwuMBvk/kQpRBEaDg8jnWlpakTFei6/L81IJCMFIoiAAPscrcJUP8RvSUJld1YN/B+eIhAZV3thtW97DcSsgF2WrEgAuRMQWfgaVRoW9rOo1wUpYA763vu4ivJAfQhQg7COdUbWHiMBRmNl3aZG6eD+MAMaMf2S9ie5IGzCVVZWVVldXZ6+ffN16e7rsxB23Kw0ijcjmoC/O2+FDt9iRo7cIPH7u+RdVPi6vrLTx0WE78/prNj098QM9kz/QN9vWscv/0Mc/abn5uTYxOmqPPPKwfeMb37QXnntOD8Ui5JDBxmZjBjknnoKHSt2aTcBhBMEnf+P3iAaWlxcdm07sOsLmmEWiWVZWWqaHLgAoYNs5fCCqjaFQPwDj+LfwwAmhD/J23QMeC+OC1yIc1wZx5TTHUnN5OP/hIR0gBcMP+iu71lM93CHZruTmgEiH1vPveAPltbGY3oOL+3IbOVdf30bzHRbA3/l5Z5SydcDF64d2HMtStSDiuQiCNVRERJ1dNXzHC8D48ZVDQh7L7xPqi6sQ8BB4vzDHLyktMs/nPh1zEYMgg8jX3BxFXnxkyERT07M67BhhggOqALwGBg+mowxiNNsxInNyFZERrZHqyVAEgK5LA8yKigr0FWPL4cTw85V/Z28QjYScDYxxegNac5nKj+OTE8r7bcNXRScGQxPKtD67i7CIPjCcGDtwk3jSpR8FOBNKxGVlKvlq7aNZYhfW1NTo8/GsFhYXlHLMTE3ax37kR2x+YdEuXbggunN83RmO5rZW++nP/rQNj4zbl770ZZG7KioqtGefffI7NjI88AM7lz+wN9q1Z79/+70PiVFVVV5uhcVF1t/XZ3/5539mJaUlssLwsgGh1uJJhcJ4eRcKOk8htDxArtloblM7hF/IeEGBiBw89LXVFVtYWNADc/TZhMpO1HIxGu4gJ7RZlOvn5ipw5fDiEdlADsxzzSl6bw6WDnnUNcdEPFfrTqd0D8rxYzE9ZA4ZZS1OFXcNN4DLGYYspRJJ6LpRvLj7XGxkoh7uC4MSHm4ulaeCXgSHAaSUX5ORh0aBr6EhwJjxzvQ24KXY0CDeeh9SgeD+C/Ly9LrcE2tfUlIkNJ5bCrGMsDlobY3cHKPkWIlgMvQ8ZPP7KgcWypNi5Jyx9BXWg94THQC5RmgIMiI3Z1Qx+CuU/WA0qizqnjMHESPN+/CzzmC4yADMhucCJgNgx/vAyaiprhGY2dfXp8M9OT5uE5OTiiwwoHh2EZQWl219bSUAWd1+Ip3BCHF3vAb3U1pSZkUlJfLeIQDJ+8Jq5HPLacSc8RIVfHXVVpYWbXRkVKlmeXWVeieW5uctEsuy9dVVa25psrXVVaWXcAcOHNhvY6Oj1tM3YI3NTZZOrNsrzz9rMz+gSOAH8ibbduz277jnQatrqLfxsXFLxtcsnkyLf11fX2ff+vrXlL97HrlUjjZCTq7zODRlcLhU52ULRTzbSGcsP59ckZq7OyR4Nqi6OsQBLRUvusm6S6eFvnJNTU1u5uT8OxtU0UHQnINR0MOFGJObK+vOf84T5gfe0zHgwlyavwqTKCySgRC3T57fRRthQw8/w4GERiqAc33dhZJBROC/Axvg/fDI3OPa2orq8FyhMXQot/O+rgzmb5Y4HRBHX4EzOEvLeNa0Y+Cpr8ABaawJh5d7qKqqVsTCpqamL2MXREHOEzv8Ai/MemMaSouLgsgqJq7C0spy0JCD986oVwIAjoNHPTwszxKhsB5EZupzkJenscqh/jRZrSwvaz1CY8ZndOAnEQ7Gbk3Yj3gCenZRa2hs1L3gNCYnp1wVJ79AzymRIPzPVQrI++ZRwWBtgz4K9ldpcUnQQenWTlyHSJYcDvexBC8kAGV5dkSlGDzo2xgAoo7JyQlxEDDm9ItQEo5FIzY0OGD5RcU2Nzdv6XjchgZ77df+9W9aZWW1vfTSS3at84bWPJWI23e/9ZX/MwxAeUW1f8uJu7QQjQ2NAkg8S9uf/uf/ZDt271VZ7trVa2LfcdAB08IylfJNHj4bMACXCM/wPPNzc9oUos8qR42otES+zgEUwBOEu2GJSvXj5eXNclpYL+Zhh7VuNpbq9EGOzkNWs83amt7blcdIB5w3JW93DD8QZBhtyYBgE5QZA9zBPJdDq9z2Do/t2nedF9fBppsOMCoop6lp5x1lzXBjal3kKfGG0c3PQ8hPSsG/4YVy87LNz9Dp5yKMLA9i1YYVFxVsvobrjATI21ATjTtwjh8Rph0hUEn+C9cBI8HPFeTnal0U/QQNTnh9GcYghF9eWRNuw9pwsMUyDLxm2ILMgXRf13SQhHOkUlpjGZPgPsLqRrh1wXBYL0Uo6+s60BxlF8o71iIHFq6CuAjgB0H+n06mFOUlkknl7xjM6clp/RzRTGhkef2a2loRlog62FNgSPNz8zIMXOwr1hvWKM4Ho4ARYP0aGhrFbISKHs12aUZ/T7fF19esoaHeHnn/h+wTP/Ij9vVvfN2++8yz1tLULEzgtRef/l9+Pp1L+V94HTp2qw52TWWlNTU1yHuTpx47cYdoumdPv6WvJI0cYjwfixceCEJAAl3oqs7qOi+B18Vb+zD86Hun7JdIuMMS5OvkXRgFrC2bAk8R5teuw614s5+dKEA5YDxhidSy0g8ZEUL1gMILQASBJyuabXn5gH2+DhOfj8jAPXgH0oHAq6KQcOmESCcCnEgXops8gBBXeCcLkMgBAxDiAfw79xdGEfKgogM7AxGShsLPxu/jDdUqK94EOABhum85edlWEI2pcuL71NcdoElQo3w8J9t569UVKyT1oXMQVhzAnp/RwQDToMkKzoPuFfBQiHpMB4wwnVRgbY0DTIXFYSp8Zno5+B2o2QCVpEl4T+4x5GBgVFlXtQkH6YLAygSMvIgOfXl5pT4r6SOGguiI58k6uMNfpTVzHADXCcr762ezWOuYIwgROQUYAwdbVSJYoMFzcplfRqVGjIu4FamU7pmf3VjbUA+J44w4TkMW6+BFFHlUVlYEzM1CGc3F+XmbHB8TrkVvC+3iA7099tqrL9tdd90pQ3j+3HmrrK619u27/L6ua97/tgZg3+FjPg8KK3nk2DFbmJ21CxfPi0zR3L7Ndu/epUX8zre/IwuMNaa2zgMIDYHbnFB18SpukxOyqQEIZN8zW8bSJlMqN4EDyMNi+YOc26UQrtzkQCeHYoMJEHHIQ2OdOYRFIMMcwizLzaU057wQD1Woc8oxCSVIkcHrrImBp5q3PCmpg6sOiHMQhOs8WJpO4utuE1Nrhu9PTokRck0pWZsNMOwk7gcwjM+P5wvBs9DjhwbANdms/BVPzftziVq75geGIcvm5lM6kF6EZqSUM6JBaTIedwaWi34LAWaeb+tENVEQ/2zXxy+wFErx270Mm73+whoyQUrjWzKVttV1UHKHrQB6Ykz4OdaOXN0x+5bkqdc3/y2u8J1UyT3zdccQTKWturpW7E+wHKJKojI+Px6X9XEVk4iMBG296p+IuhIfF68BiOh5NFc5HsfaimP2uciPtBIew7rNzM1qTadnZhTdlJeWWW5RkQhMVDa4YABibOCKwGvg90ODg6Hg/ahOjE5OCgMj7aqsrrZUIqEOzu6uTq1nfWOzNTc12YULl2xxYc4OHD5KV6c/OvS/DhT8X2YAyqvq/S3bd9rk1Iwdv/W4vfnmKeu9cd0GBodscWHeRkbH1X01Mjxku3fvFh8AK4vFJMQXAJRKWcyPWSzbVz2XQ47IBEIZWXDYMxsWEfLsfj5b+X8QThM6Bvm0qxOXWDTq8vicvBwdeGrQsQi/RWttCFyBsLsavMo9gEJUHDKuNOgON+Go2yhsvhCHwGupiSfiyn0uB3eHS7iBxEWgAcORdzl7IuFydAyfKMnqFozoYHAQRE4KqgGkFn6AV7DhZCjwjb7jC4REondGFi7deDt9gDmnlMmjDg8OkLb4fFwaBnhwNj7RR5habPYfQHbyqck7Rt3U9LqMmD6jn1F9HKOhagX057RresIwcBjAe5aSCWE3DkRM2fLqqkvRIhEdDOr7NFRBGSZaYx0x5BwsCZ7gALLdOuNdKT9yiETIyo4KjceTF0L80vMjLIe8s6FynCi9aVcCpQScwNFgKHmWgTYB4Gwsx0VxPIOcWLYiGtaEsiSYRmbJHXwXrXkyPESa1XAV1lwFgkhnZmrKYjm5DhciRYpERHnG0LMfvcKMNTQ22elTp9RPgPOamJiy0uJC4RdL9Lc0ttno0ID9b2cAtu7YqXAJi8YDee67T9nZN1/x9h+93a+uK5Bne+7Z5yyTTqrHn0YdyBgub6TLLRkATxuit8LA48Bg6aNR8toN26ChRcQR16wRYgYqV+Hd+RqU7fTAE66LjhCWzQUBRCG0QD2AMHJGuOFpvSaHsay8VI0nYd7Npg+719gghMS8tkL9sMlH7bCuZs5rhCBgGKKHlGGiEPe6OVZZWalNT6QiwhC7FXDMd+29GCkJVATttiE2oNcjNQkMX1imdC27Ofp5PHlYzissynfpEuQpwuFgE+N5i4vgHiTl8djoXDrkWRFVaNzhKnKpjlhxPB9KhrQgEd24vJsIi0iBdSQVoC2bHBkiEO3WwnpokMrOUYMOuTU4jZSU8hwzkYPL95aXVm0t5tIzkbEUrYDq5yj0nhifUIVFkVJW1HKyKe9SAZqXkWC/CPAVbuC6MzloUirKuOdEZyf37IC+HBkCqhZUB8LnTdRDqW5+fl7YktZTZExP76M9CBBd4P68uLjkPmNOjl6LZ9Lc1m4L8/O671Qybn29PVbbUG/Hbr3NvvrVrwgfuueee21qYsx6e/r0PrzG1h37/J7OS/9LooD/JS964MhtftvWDjVS1NbV2Mz0jF26cNba2tptPZ5SzZ6Qr76xcbMZRO2bhXR/AbZBqnFSW+Ss/oavn2OjEQbiWbg4JBxANh6fRCWZjMudyQc52LSW8qB5Lceqo2buQCB+1+EC2WL34RFWV5dlNDASOqgqN6VcqIsnFhaAkYCaGws09jzJXtGQozw4QLLlQSMEv07CKyTxhLn9O0G98Hshwh+CfhxG9dlj2IIS4yZZR7oBWep0DI1fSB7ivcPXFdot1HzdsnOiaoeFK4FhikFUCt6XPJVUhHRD3AKVq8qEhIdqRAL7IFmpEQhsI1c8/NzsXEl98VQw/EQv3BuMycXVVUUOy0ukKY7xSGogcDZg30FgoiSKKIgrOa5tkrEwOIuLNFrFrLy01MrLS3UQoUrzc3hNLoxneCnqoBsx4So6Lgos0u9RHnYAcFTREUYCpJ7103+iErtuRSI1UpvQqLoUxSk7wYXgz6yDHALNQwF+4EhDUe3Z6toaEZWwtkRK7KfBoQEbGx622vp62717j33za1+RXN3td91ljU0tdvnyZVUrwoamy+dP2fTE9780+H2PAKpq6/365haF4IROhLPnz5yxjp0dtn3HTnvi8W9bTizP8qBl6pDRbhnflNVi44a1eRaUNlIOWigZpfbQVMbyC/OD2r2jxjr9Npdjioe/vKwHyUFJJt7RggrXu6BATTkuXHZyUkhL8dDVzUbYDpGFXvoU90Q93ywG+QevWEjPfEYGR9JYHrV12lQBJDOKaiTppWYjF86mUuvyPmEkEFJ/2VhsRu4zTDHCigSRxDt77+WBCwo2Py9AkoykePCOMBMKc1BuZAMqHQpENwFL6S6kdJZCUshLWnIxHoTvGFKnlgMuwc+UlpbIO8J0QysP5RzWgnugdq9SLesMuEYFIt9pD8ZYR0LmtXX1+0PukcelvAa7LkmZL2EbgTQaRkfGMYl+YV7QjelKfkQR5NihuOjK+or1nu0LSqaetTQ3yMsS2pvFbHp6ZtPrOlzGtWPzHtCGARiLiossmXCagDxr8RdSKZubnVMkipHi54kK1hNxPVeeZ6hx4AwAHArXBh1WXLjCda+qqRIDsK62zkbHR3UvodgI+wUmbKIybvOzM9bZ2akU7Ma1i97ho8f8LVu3qxX73Jkzej8izdLyGgyA/dAbgMbmNpufnbPa7R3W1NZq169dFWmiuq7Jnnj8CXkePxOXNfTnZnVIc/LyLZ88OL7mGHN03WVHFfKSFmwKVIjhl2teNv3yjkee8N0DzKytug3mubIbf8YTqZ0UQ6Mmm7cbbjBOohZ7vhWVFOlhcZix2Aq9CFNVr0ZNyJXYMFJiGiJisZHU5nAgH2ISiH5GlJIIZGQTv4M8ItFMPDfIcRDCi+EHKJmNoXKHJxWIV5YBNGZlSSBT2jwYoKhTAuJ3ubfFubm/QnFWQ0zQyZaV5nO4wxriES5NQoiDpijXjovXER8+P89xGcBdQmAQibIl2mm9zZ4FaNcYQUJitBrATkKeBQCmTriimWzLLs2xhYVFZyipvMTBAKBc5+orr8PvEh3wLDAAEjndSMsYZ2VBvfY3BVkVhlcSqWEckgq9wYui0RWLxfI214Y1gY0n+jaGeGNDEQQLOz42Zj7GN+WUingdlSJV8XGpF89YF5FkEWVe92zBakrLHS7iaMMurRIFGsLamlNEovOUe84tKLCK6iqbmJrU3ptfWNDzUJ9BMqGSKPe8srggEZHqumYfDOGZp56w1vZ2vSaEpYWFJauqa7C56Ql/dtqpJf9QGoCauibfp0knldJGREzj1OsnrW3LFnvj5Cu2MD+rVtpMQKLBgzugK88JQkSw8i4H5JJHgycOASgMabWBHWoOFgCzj4Wk408INnRW0OR4XNJXPGQp5ShnBl9wajFsUAAvgCVCXRByLrHncl35h/fAr3AwedhqSw3CO1RkOfxh624YoosxKC8Y1UZ7Jx/gnSkArxVyAPgeYBzGIvT20KAxADqUHK4sUpj8TR0APgvoNv9OtBCWFaWci1wWYb/67VcVQoblQtqDxRmQjDc5rmvt5SCojg+YKPku1tukgANgF5ZDs2PuszivDFKe0D1wLzxTngPsTe4JFJ3UTSlYVkR6jbyPKg7CLjDApmgiTCnE4c9suJQilbbiYmf8w5Swt6dfkUZ1ZYXSQYyGw2tcpyhirdwrdXdHDY4pjSwuKdpkSjqQ1BkLopSwjRicgIgQ/EJcDjom+Wz5Bfp8WvP8EPtwPQ8bG0401dHCI4GB9K2yqkp78OKli8IO+PwL8wsuCg1YqDQw8ffZ+Xm9H81LlDh37Npj4xOTVl5WIpxqdHTM8goLrLq+yWanJ+2H1gCUVVVbSXm5JdZWrbG5UVLKi3PzNl+2oA9cUlq2eegJmcj5WHBKTCmVwxzQ5vrO0zr0osNmZRskWDagaMEccj0Qz5J0jCH0QWgGsm6ebSRda+rK8qotLS3IM1VUVomElFSzDSh+0N0W8Nwlo5XrSBpQZcWRDzr5HI3U4QhsRA5+TmWlrSI2EdxjKETBhiEcTSZcbz8GxNFIHTgZRiCboB0bR5RfVw7TpeqAMxR4PWEkiXWZJyollEEJZbmvsDWW+3K/6rADNdlwkoMqgYwfXYYFhUoDvDTglSNOEYGFbciUCLlXEX5E0nEchRCb4DPmRHNVv8Yw4l2JIkpKXXWB9XQVCtdIVZCPYCkg4pro2VLxQcDET0mtGJxA0UKQX2M/ocomowl11nFIaAFGO0CcgvxcKS7T58BrAS7CxmNt6uvrtR9A0LnX2ppaMRt5po6RCebi+iQ2MjEZP9IfjBHRBKxTUHp+iBQhLNViKKAUY1xCzYgQtwp7SBxRLFeis+xxNApDJiqchxCDkrHKobPQlbNDrIh7AjuanJ60c2ffsmO33W7f/e5T1lBTbU0N9ZZAIam8wqpr6/2piTHvh84AlJRV+qXlFTY9OWlF+fnW0dFhv/lrv6bcGk/MIqGoykGLBV7TCTtk2cz0lCw/JSMWhAfuZKpdOBaWWkKBBzYdOSKHHOOBl8GLgaTv3XfAamprFFbDFhwcHBAnnJoyh4e4k03Kz7LglAHVhbYRl3FQMxDCInhw398Uo+DCm4eeUO2zQeNQ6BEcqAjSnVQYqvw29TbrMDQEIfiXV1DgAD+1oLpuPrAEVR8qKoSNUH+WKEdgCAAnGyWP5rgHIZgYNurw59AYOKnuqGXlODWgsN7vee6zcdEsFTLfXDckIp35SoNcbp3e7McPMRRCWEwVmIyiFHgOyxzumK2voFwcCcJ6mpicR+R1qOmvBhJfgH2oJYd1ewxUaW2N0xbAkPpUIPLkKKanprT2HEz2TENjvTXU10m9WUSdTEaVBsA9qhTJDWfguZ+QwESEx7NoamxyzyWdlKMYm1yRsYO+W1tdbft277DqmlqVFNXLYVlWWFygBqCx0TEbnxgXzkAURtWCHpTpaTdrAPnwwsLiTSDQKScjrkKEQorlDGh8xUUzOD/0HNbDtDINQ7PULl+6YDOzM3bolqNa78UVhx+VlpbZ1OiwqgTfr+v7mk/sveU2n/D72G0npNL7Z3/yx1ZVW6tUAG9DaAiVUoAOoXZOrmq1XOxHDAAlHbwinh62mgg3AXkjLFnBa6WuzAPioCHf3draLlGMK5cuCVnevX+/hCUS9GwXF6nTjOajkdFRRwjJuNowBysv13V6cXjCYRNCxAPr/M7WW+fdaJbxFMqF9XcuqeYE9X2JhSI3Jn17l3YAqHG4SA9cvwN8BGfkiGBW8CLoDqqq4EA9PSQN7XB5Kj3tTknIHWCJTwaRgzxrQJZivdUxyJoFPIJk8P4YKwwCXkdlr4wru/I7We/gDfB9MBuBVqWl8vBOloxJQQ53YH5CAUIgGSfeyXOnioB3Jx1wwKzjFYjEFMNrUw0A81lXnT2JkVlbE+hIakUuTg4vTn5WRJEc900YjVFsbGxwwjDmBUrOCG7MKxKkIsTa4nQoMYrp6ZnKckQUhOMiGq3hfRNWXVllS4uLtnffPmtuaVUXKmvY0tZmoyMj1tfTa/UN9Tro9XWNuodXXjtpnZ03AtwgIglyhEP5O2vMMwFT4t45D66hieedKwCS/ck+otRK1BlGverWpPkModqiEnvk0Udtem7W3nj1NYuroSnfhof7refq+e/buf2+vVBJRY3furXD2lvb7L4HHrA/+s//0YaHhtUApB5svAnU2aBlM0TCOVwup3UiGOL9q/PNTa8hzOaQqIbO4kokxIFo5RXVsqDKRRPr1tt9QxsLBZ+lBXT2zVpb2swnVc9s2P5bjti+/Yd0yDEEVy5dVOcWEYQ05PLzHZNQnXKITRIVOG8OP51LD0vqPGxghzJr4Ia8vSsXspldOzGHyOWhIdVXJabgwLqqR4yY1AFzlJ4wNoB/Cs1zHSV2zZFu1GqM1HfQoBRSikOwi39zgJSjHHNf79RAZM14XfLmgkJkvbkn0HmHcvM7RFQIpSgKKQUAc8ZPdfw0eIqjUytfjmbpuebn5toKTL2sLGtoqJGncx2BKTH6OPBEDa6121d5S/sgiqxaqcBU9PkpBXLPvBdIO95TnyXou8hm3yhVWBOuwXMhV+b1pVTkRayuvlbYQlhKFYUaw722bnOzM1aYny0mIY7m+PGjVlxYaFMzCzY4PKIqwfZtWyVI+8yzz9uVS+esvLLWeru7rLGxyW45ekSip+KSREyCHqQcYC2UgaFP87yppjj0Pqb7xEBpCEw6bVU11TKk/AzGBEPnelPyAyO5JgGW6qoa29axzVpb2qWP8fqbbwq/WouvWO/1yzY79f0pCX7fUoCq6lrRMtHUZ4NIxTWos+M5sXYlJWUK0SgDYRTQrXPS0660RViYWF9X2sD3CN+wmCG7rSCCHBeCkvCoS62pqcnOnnnD5mdmbWV+yissq/b5mldS5a8vTntl1XX+0GCfwtG2bVutsKTMvvKFv5BW/q0nbrdtHTvs+PFbRem8fv2qDQ0MiCPABnOjxTjwsN9cyBbm6KEaLV55U18vN08UTzY9XgbTivGgkoHFV9pAfR1gCe68n1H7KjwClQ7R3yOXXFnZNDDCC0iDcgNkO50UkMRBDWv3Eg+JxjbLXk4ayxkd1lDglxeQpGJEDkUOqecKmoD4OUmACcD35Yn5swwzP0ZK4WGEozIaTsQD2TJnzPgM5Op4UoynKNx4vohTUMLgcogx3E40BfFR9oYbEeYlfAGEYRMNRoG6OcYS8U88d8jjX56aUakQ8Q9pOqwi20UJslhGTNwBmKLi+SdseGxUh/O+u+6y5uYmlX9ZE/bh1OSMzc0tqUw5Pz9rWZ5v0zOzNre4KObpwNCInJgOczRmX/z8n6nKsyRx0QJrbGq0puZmm56aFctPUWHAFwGjcT0CEMPw/sVWlg/b0UU2YYdjPOM6Tfk7XZbx+KotrywJnFZLfCzHtu3YbucuXLDB4WG9dnFJBQbg+3Juvy9WpLSixq9rbNYDe98jj9jU1IydeuN1m4OvjdeR18+29vZ2qcOQmwPyEQKTm6Pgg+eF8QenTA+bVtigASi8HMiG4CRoc5FyIcecc15ZzDPaRSOmrjfXGgxQGLeWrVudEk4iYR27d1vX1cu2pWOPNTQ3W0trqxUVFNrUJN5kURqFhMFjI6PK7wqLiiUx7tqAXQmIjeyoslQYnJqQ5LIAc4L3Va85+aerjMnih9OEVCmIOsFNDc4gJaDLcWE+CAVRIEb8ImMZxEaICjj4QQRiwSYLwUIu8vhQSsw1GDmgTGg7swhjRFUYD4C3XHXtac6fSqnQVbOssrLcDSYh3IZp+Y4USDX1gPMvPbzCQivSqDBatT3V/4k2Qlam8AbGexERcT+idyflFR2W46tFGJAsVAOKJxm7tSzFHAA5J1u2EgwndQNU2DfwPODXw7QQgAhyH2gngAeonBvJssWVRXnv/fv2aq+0NDfrZyYnp62urlZyYch3Hzl6RLz91159xa5fu2bbO3ZYf2+3XTrzuldQWunzeuWVNeLws14MAEEanE4/OvyozoTsT3gMAOCbxLUANHQALU1C+VoLPpciRmEsGXEtxsbHLLG+qjI19OC9e3fbox/4sL34wkt24cI5rT/7tO/6he/L2f2+vEhdy3afHHvfvr1291132wsvvmhXLl2wBD3/mbSVlJXpgZIbrq8n5On5s4Y0cmADdhshKvLKHGL1qYuMg8V06LYUdAhDxelmsfGari5NKEVuzb87aW3yaBpT0ray+PYU3Z0Hj/nLKPNubNg9Dz1mlXV1ytE2EnFr37LVFubm3KwA6Q56duHcWZuYnLC+3n5raGpS3Vto/MrKZtciL64Zdxwk+vwDHr6082JOdoowkXo4eWl2Xq4DtIJZgY544w4Gm4d8l88BtRSWXwjyiXAC50EgKIClq34gO6CqBWmCDAUstyzhBQzm4CDzM47MQvkQWTLyTtRxmajEMFIXknND79QtLCkrdoIZOa4PgDIan5vnx39Qdmnh5aHQmcd7lBSBrjtNR1fmoxS5Jk9LjR9uAQxDhz04cBTPOTMzJ2PhcJGY3jc8VEQKRCRSAUomJb3lqjLrm6VA8TzSG9a+pdXa27eo5g6vvruvTzMkASoZ5HHowH5NbaosK7VLFy/r0GHgn3/+RZuanLAsL2PDfTe0Z6ob2n32AwaS1yDVfCfIB8ZDxMJhDWXb4Z5Qmobb4cRmkSBbVymRiBYHplmJCaLNoKqUHdOYNtYFB4mHb9uyVYaIkXdj4xMqo1+7dk1pxvzUhE1PjXs/FCkAHhILzaElLLvzzjtsZWHOunr71QyB16UBiF0IiAPbjY0Zav5JsSdOLRxQDcvnDjrlNNc048p+7mdduc3V9N1wjbAVVrz6wLu6tk/KPS5/LCyt9FcWZjw8B3wDkFxyqy07OuzUa69oEtDQ8JAdPXxYNGWAIpDYopJSO3DokM3MTNmrr74uMQfu0ZUkUTAKJu7EqKHn2dzsvDa2Bn5ATV7BGDkVnLA+7y0vbxJzGC/l+vYhsjhMQco0QSkwFAMNySdsPFfi4/Mvu559RQhuuAmXa2VOinjCexcWFFlZOeq1nC1ESKCtOs47rY+a1rPh5NM3fHfo3uYNbNhGasMSlhCvgVxbUZnnyoZ06RWifJyTY719/TJEW9pa9dqaMUAJML4uMow0EiMRzT0EoAVIFDEsMKjk/agSEQ2AS+j7mi1Arwdl2QKlUZCjQm1HZ0Bj6rKE83Dv3Xfag/ffa4PDo3b1+g177fU+y8pk7CMf+4jYjtdvdFtnd7d1bN9mX/nyl+1Ln/uP3q133+93d16zC6de9IrLa/2luQmvsq7Jj2U7Mdq8PCpUjvAUTWVZGYYgaBEnbKeiBMgIyGtBy3lY7iYCYM+x90kfkDtnr0iaXukRTg/VpBWnXCyuAhqNWfL04FhjY8N24rY7bSyWbVevXFX6UVRShgGwHwoDkE47lJOcf3h02J785tetvqnZqiqrbGHR1YvV05+XrwepDZbtpujwPdervxFQVh2aTajKAuKp8HQCuTQ+CyKO6DkWiTjSkJPIwlC4fFp166C85qb6ZPsbwYSdhZlpGSUO9uXLl2xmdk4P8+FH3mfJ9VVbXY/bzPS0VVZV27XLVxxRaGXZSivK7f3v/4CdO3vWent7rQYwJzikYh2i0ru0FBBaHFNP5ytQr0kpz88I6OMf8IRxeWA3ywB2XF4QGagKEtSVuSiBhlGA9BD5TMGsPkprkHZIJRyhyGECpEPiugfGk7AagFQGyJwWoTj+vm8LTNBBFx8+RtqBh+I+EHGFBicgZEH/JYIj1cHguSYfcBw3HITnI8A04piERYUFVlNdrXQFgy3vGE8o1VgI+P2OohwV6An+Qo0fHgWRGWvi2qIZMhqx9ZVVRVy8R5r0IJCGZy8dP35claFvPfG0IgCMwZXKCvvCF79sv//7f2g/9RM/bsUFuXb10iWVq5eWVqylY49/9WqnpVOu74A9VlHX7OfkgZ8wWHVJXl9t1fGVIJ2CDl5oTKcmfYMjQIREdQR5cO63vAKeCMImjndC5EU5k45WBxqmFemF/JKiInou8kVKQ8l534FDUhG6eP6sVR88anv3H7ShoW85ZxsD+3DVpffcAFTVNfnceCyW1khucndyyxtd3VZRXa1NA++8qrpiUwMuO+I2byqe0oAFcn1yKLVrIudNMwl4gCiqBY5Bpz78PCGr/BthMwcLP+F60p1yrCtvu1l74VemvPAAiytq/KXZSa+wvMYHccYKs+EwMLQlt7W223ef/I5t3dJuzzx9Tu/3/g99SEbg3IWrGv99++23WVFRvl28eFG0ZB4IX/GceFMophLTkAagq8FxWED2I9nkr3mKgAAbvYxJIFX3SN2a6TdrwSjvwgJLBXqDbwuXONYgrwlST9pFCE2fgaMbEzm4fFP0aFVLnBEh6nE1ewdsyjIh7KnZAa5L0ZX/QNPdFN+wLJXlYXxinGmLRCNq0caykAKUlxZr9mJebrZV0FIcSJaH7MNQ+8/NCXQKynwAjBrGYWkpYzEv5iTFES/JY+rTmkVyJDagg45zcaIoDqBFRyDsPSgrr7A9e3ZpmAxpJqy63t4+O3XqlB295ajt2NlhP/mZHxWg983Hn7Co50mA48zZ0zY5OmzFpeWag5Ahgi2r9hn4wsAZUiMiOdYPHEUpFixFfQY0HR3/gvSAVA9v7ZiUNGJB6uFjkkr5mh2gKVXLqxbLg8/A9yo1hXhkhIagOgGoGMwcKjuxqAhFpCVeJFup9VtvnbLKmmpFQWAVrGF5ZZU/N/PuBou8awOQV1AkOW9Cej7o5MSEvE5VRbnNTk4K+MJigYiCVBP2hRLMKK3QKaemG3lyKJpuyAQeQcQTPyiRiEu+rlxVijcKW13jjx6KVF6crJWaeWjMCabtSsEXYk8mY4Xl1f7KnONTl1U3+Jotv7xgf/4ffsd77G98xsf719bV2cc+/jfcIAumvtKxmEpYJgmZadwOHDxsDz38PnvjjTfs1VdfEauLh8JrkQfj0QjnwScYaqL+9qD7rABjRt5K2qBS4rqAMUAfPoPKQNkxW6BBKsWcACom5JOFOiCIqbK+c3OL5mfmZCjcyLOEgCU2NKkGr4FH5XtqYwZQDPrzHX/fzVcokVgnRheQykUG7F5Cfd0PZSqm56yuaS3ys6AjU7Ji6s+qyDwlhW74CfgFn53XZ91ZSzwyz5p8GMPDKHIiLqoGc/MLwidI9cLuv7X1RZG8+DysCw06GC8MLH+urCi3I7uPWG9fr6WTCVtZWrKRkREnJ7a0pGrCgw8+IAPQP9hvQ0MDtri8aIcP3mJ7du+1z/3p5yzO8BbzbHFmwotEIn5Y2oTyC08BQ4zjYQ+SshK5JTIJ21hyugfU9jUdiUoDvIOgKkOlS8rSublWStNUYZFYjUQ+AMVUFjSUJZcmJKcVQYVkenJKQCipUWNrs8DBy5cuapAIpderV6+I1zI+OmqJOGVNNyTWizjQ891c7xpEaN+xzyechtDx4MMP20svvGBXLl+0W44etYnRMUvSLCFlVdcqSWgpsCsYlMkiS7AhQEKdEjAH1+WihEoYCfInHpQbxuEYeo5R5yKAEKEPFVrDcDggvLm8OiirpWk6WZj2Ckoq/VLSlLlZW52f8koq6/29Bw7ZngMH9eBGh4Y0cHR0oE9U4oNHjmoDjI6O2/j0pOVkRW3L1napGQFMXbt21d566y2F1NU1dfLceCuMVNgdKKYestXS8A9GgZMLMyk3mbTi0hJJTVOHd5GQyyNDjgQgkvgKzOcrckSbkOjDhxXpBEAskEALh5e4UJ4RaQ7cFB1a7cYuxKY7TRu3rERRipSJpb7shoDimQH3eF2+j/ciktFQjOwcN7gFoyA9v5TNzEw7kFS5OqpGNCdFbJp6vxp/GPLh2oPdGLSI8BWea6juw0UlBLWegcEBa25ssh//8U/L04+NjSmffvPU62rwmZyeteqaGvUoAKQ98MADVl5aIjLPq6++aI8//pRVVlSriYtUrbV9i128cEY9B+w76NCE9ICRHMqQ4o0xCFmrYUepmqsk/OoqELgyAbyqDq0psiFgY6+7dQxJPi7SWliYc+sRjQnsXF1yqQXOoLKiUp9veKjXdu7aLZzq+e8+7v3G7/yhT/mTNAIpfQzK9OSYDQZg5XsWAUBZ5cPWNTQqRBvo69KG6e7pcYIPGbOCvAK170523lB6EHoXTV4NGjn4j4Xl4biD4UApbJQkswKJKykFpZ0sllh60F+Dnnyx4gLpLpUDQ0WggBTCQTCGS2RFrLC8yl+Zm/Zyc3N8Sl1+cZW0sIeH+pSvQlmGDfbKi89LWuqTjz6mjfbaayettLLCMqkN27P/gCoDXV03lFPeedc99sD999vJk6/b9c4bIpYUlZY6br6mAjtZ8cIg76U8yAHiCRZLZixoFQ6kuDEq5ITYtrXleUUO4wPrCoO52FwrKpVlbGnu7UrH/8xVUFLlU7/nnojD1hb+epdZYUmlr/CXsp48e55SFXgUHDYis6ryCmtsrFOlB4qy1q25yRrqahVGMwyEzQpphqqQUzNyXZ/SMwharGdn5+UgoD6TmoU/hxFkNPcD991rLa0tdvV6l4DTPbt2akQ3jmH7lnaVTxnE+cpLz6t0i00hEmE9f/THftIGhyftyuUL8tyAi/29PXxwR3TKQauwVOAxKQKsRwcqg/EwryBmFg9nSeCoUEMudakdI8kD0VLRsdWWTHTlHJMbQuLSMpHeVhwWQ9pF2S+cMEVEBpg4OjZi/X09Vl9XY2UlJTbQ128du/f7iOpiNGM5iLWsWBHlUDCjd3m9KwNQXlntw7MH8CPkdhNngqELEVe2IoQnjCTPoZNKqD6PHKBrPS6PF07MEWJPCQqgRbV8lz5IiDOQbMJ7YzmVQngZJxGFlxSq7oggpCOScgxKWfr/gXQ3HifqOTWYwtIqf3Zy1OMrnawg0INd17ytWzt8Dn92lidqK98nJ75xvVNhGkQNwDf441/68hf0kKV4G4/bjh07dQgOHTpk5RXlqiv3Dw5ZaXml7j0r4P+DSGO8uJ+lxQVbnJ2yxNqazc5O6+vwQM//pwOdX1rlry38j/PBwop6H6Mrum9gGD0qK75nRVUNPqGuEz7JGJQhPodFs20dPcVkylZJE2CxLXV51y7/99+nsqbW53k21DfJG7dt3Wpbtm6xmppaR3hhhNmGq4zwHFhbyDVS0SUSUhkT8dg8O7xvt91zz502M79s07Nzdu7MWf376dOr4iDk5ObbQH+/VVVX24nb77CHHrzf/uRzf25PfOdbaj77+Mc/av/2t3/HBgZ6rbV9m9Yami61di8gLTm+hVnUi2zm6+BaRFBEQERyahJLMvOgYPNnwgYp7j+Uk2cfgMWQctFc5CJZgGnXSIZRLyFlDgacYsz5GfYuRqSkuMxyqxj0mmtdPd2qnpUUF9iVS5fFpagoL9f9gLv09jghlPfMAGCNWCRID3ReUSqbHO31tnTs8xcXF4SE4gVowunsvK7cBgIPGIAGZAZlrc0xWSKa5GhTKsSnnKc6N+VD57mJKFwjC2QbPkHQ5y7yC5p8b4OCbnKNK1vxGpsy3fKuZpnI28pC+flFtjC/qL8PDg7Ke7e0tqt6EQvQeFhfp0+/KQ1DdOq++Y2vybCduO2Ebd221epqa6gCiUwkgRDft498+CP2B3/4B45pZr7NTo5qtPTy4pJNjg54xWWV/tL8f9t7F5RV+S7NoVzmhnkQosYX/urPF5bV+HAG2rbv8YUoF5eKTYm+IlRpkH+UjKurqwRGgp5jHAmRMc70HyBRhhfVTAX6JDQL0bOxcZpfJgldbHFhWR7a32j2kd1aR0F5nQGgrleB5yFK9EbaZoYGvdGhwb/2meobW/2WlmarrKrRQWhsbtFmJrfHM/JecBjCmYfrKd9Onr5oExOTtm/vbrvzrrusuLDI5uambLCv32pqKu1G96K98fprmiJ98NBBfYa2tjbbuXuvfeNrX7eV1RVVH6jOsI7LSwtKAasb2vwo4T6sSgg6hUWKbjjkmn4cc7MVOIQArhIlReJsYU67xs2q8GQU354l4FI50H++x6FmL4gyjmR7hJIno8KyhWmIH2Ku+QzBkJHhYUvEUzbY32+NLc3W0NSieYiIuDLEBT4KQCBnKTfn7UnR3+v1rvIHBAwKS8r1Krt27ZJizvPPP2MV1bVq0YSlxUZSIw296eFMNerj5ERioTkRTdWWA5Xc8BC/XRp0I6y4wnp/GNKHjTMuHEPgMyQMpYWiSwDDdymEXi/LDe0QRkDzRiDUgQILr7kwNeJV1TX7lAN37z+IVbHjx29ThHL12lXbvXevzU7P2hunXtcB++QnPqlpL2MTE3b54iVLpTaUh27ftl36b88886y99fpLtjDz3ydtFJZUyZq5NAEKaOavheS1ze1+cVGx5eYXyNvV1NSLCk24iqFlAzPYI+yOc8IjruxIOYlUQeCghp3kiHgiEZEo2IEbNaaed8mgMREZ0C4mw6DhqExrkmDHiq0lkrawtCjwqr9vwKZmpqVjPzw0aqvxuM3Ozag8B9inKCzoqlS6kdmwtXcQs8KrpW2rX1XXZMWM3pqbt6G+Xs3jg75N2F5QXCwW395du4Q/+Jmk6vHVNZSal4T8/97v/Dsh+D/+Uz9hTz75hPLqrs5Om52ecmW3wkI1ESlnz86VM6KKA7vOyZGXOYo1TWGAdVRQXKYSyNFHAlzH9bZgHBA8wfOLHcnkoZQjtFHlwdurPyBQb5YCUaAqpCYxtBhX12zLli2bQCKqSxzwwvw84UBXLl/WQd+9Z4/SZ34+nkrY8NCI0sOFuUlbmPveKwHvMgLIFagGt33Pnj125fIlKyopV4MJwA0fBsKCmkwkUJmtQwmiSzlJeXxADxXJBy29wFuH3Puwz/6dMlouV3bNN1xYZzeYwnHuw157gWIyAvzdzX8jzyfFUG0bIoZIQy58DwdwgvyuLUx56WTS54DQlPGlL33JxkZGbHZ+zmqqa+2O22+3g4cPC6t49dXX7Nmnn1HpB7Bs6/btlvE96+rqsvrmJru3+DEb6O3y+2508sD+ysMqqqgRNOGYgy5vhVnWcPyY37Z1u9hg6BXC6kOLXyIiRDsbGzIw9NhfvnTONsADVlZsbmZGxBPCZHjtaqDaSNsqDTbJtPJG5vlpXiEqQ0HZznUSOuMB6YURYfQEaODoxobV1ddZU0ODfhcwDVo3Kd1DDz2gn0NnkHyZNltGZzHuampqys6cO28DfX3CRCYnxm1h/u3PDwjLPawuzHiD/T38Z+//kc/4Hdt32PEjh6y4pNxmodRKJo5JQWs2PDSkw8NEKfCU8xcuCr2vqa2zn/qZn1V+fO3yZXv8y3/u1W/d5Tc1NEqfAnYdh1K9Cbl5+p1sNCIDQyjZ8kCDsBxyF2kPnIj8fB14jTbDkLG/gq8Y03D4iLQUYnmai6gZA0SO2TlWVUAZ2zkgla2DOQroJ5IKkb66lu+omr401p5R6jRMIdISy9Z8Qfb2vffcbZXVVXb+3AW7eu26pOACjNveEwMAgo/3qSgrVRNQeVWN2imrq6oEqNAfAKljbmY2ULnlkNK9RkMPZJf1QIPNGQMwAKwvPxtOjAl58eoDCAQ0nTqPI/aEs/NCTvVm3i99PGSwEdJ06KuQXCnoItjILbpD59qT1zf7DrgnasK9NzrFZfiX//yfibxy9933WHd3l7U0NtoDDz5gI6Nj9sorr9jlc6d1ACpqauVp0Herqa2WLlxleZm1tzSpY25oaMT+8A9+13/p2Sd1CMprmn2sfV1TsybEtG/ZZgXFRYandwBYXEjvlYtn1ZeAyg3st+WFRa3V8vx/2/LnFlf68aUZL7+0RkCf5K0Liiy30P14yDKUIGfKAacJMfJkASyxsWYzC3OW7E5udrGtvePgcuVTMwfQLMi3ivIKh16XFNmW1hbl+tt37zG07Xbv3SfR0MWlZdFZr1y+5F+8eEmeGYq1WHJEk42t/t/9u79ku/fut/KKMol/kncjh4X2HhhBd2+3vfjSq7a2vioNCXCFltZmpVOo7HJ97WtftfGRIWvv2OtzePp6ey2ZoBTrBq5I6QcuRm6upMg5qADUy4vLQcdpSoY1S9OV85TehEpLGDxAwLBbNBwZFwqCbGy4faqZDqQP6vZ0sujh3EjhC8ivBaS2yqpKYQWJlTVbWliyusZGq6upESVZw25juZZIjVhyIyNn0KfyJ9FPqVIbPuN7lgLUtWzza2rrbcuWrXbrrceVE33pS19QmF1fVydllqaW1iB/ha6bI9Vdap6SRwpaW0GxnSVz2nfhFJ93SmmF4o4+Zb9AkFMRQXpDkQW/y/urIcdzjUNON//tj6gDDkcAoxPQXGWMAgtOeW559u1QvaSyQZtcakZlFVZeWWFD/QPqG29qbtK4KPrFL5w7o0P2vkc/aMfvuN2aGuvtRucNu3zpsm3d3mHbtrZbdWWl9Q8OWklhofX13LDf+/3ft7LqWglyyOvG3BAQ+uHXlpetv+vqf/fZFJQ6bMCNHGODOtYhg0fcmjltf9ZGTEQBVq6RJpRFV2UkHOyhFMqVUSnpqEIhEDCmOQway8VoM5VVA42CIJKi9Lf830lvquubfGrhRDREEGjgsx6wLHng3X39Ntjfp/9+9mc/ax/64AdtdGQsiEyclDoYELwAZg5ye32Dw/bFL3zR5hYWbOfuPfbw/fco/aMi8Y1vfsvOnT4tB8Jagrjz+SaHe73SqnqfiJUKD9EoUWERJK4cV4FSd6o4EU4BSHMZgyErlN8E9HGAA8fEngzTUXAmh0u9XY0SyWx9LdCXcPqETidhWRwEGVVmQcDqDGZNShWKipGeo+smJdLYunWL9XR1WlFphREdNdRX2198/i9knOZnJm18uP8HnwKUllfq4UqffyNtW7e0Wd/AoN1377321lun5Snr6+qtp+eG5eYWWB5dZLEseQPCfhByDYFkHp88sCPvcIWb26nXOA/tPDuoAkRWlwo4MpHzZlyhDn/YA+/mx1MODLXyaYJBhRZtv6RlxTyLmcvL1KKZk2NlNY3+/OSIOsD4PdR9uAnRaSVRBVc9oRZiDj1TXbZu32Hv/8AH7JYjt9jc3IJduXzVvvH1r8tj7Nm7V/naSy+9LBQ3OzvPmpsa7O577rU//y///n/44Ioq6tSFFqruuMk7ruMwTHGcRLq3OTQVBF8lFDxOtgOx0GEgvVJ5Lb9ws5WZENpNOHJ9FURlqCLl5hSILKNJxl6WZdzgJMlgkx6wWUmZMBolpeX0GvhSdUYoJCsgx0AeiidtasyNtjr/X322xtYtAd223Lbt3GmnTp2zudlFpVthGZA5fY3NDRqzHgpogC392I/9mH3rW9+00ydftamRQWvZus3uvfcBu3D+vA7t+PioWqfJz+Krq8azJOwnuipQs5ZjOGarBdrRuEHtAaz5yqHkfd45aSgaqisFyD/3E2pAkHo5roBjurqSXwAGajyba+hCsYh/L0QsBim6fCffLn4KTWIIxGwwTSkp3IDoYHF+QQQsVIvoTYBCvUgviURrcQD2rq7v2QAszM2o/55cSi2ba3G1dhaVlmmR81ecCASMSFBd2n7nFxnXXWrrqy7cBqCSyg/hEBsq0LAPPfI7h2ZyhbP6uMLGH/QDCNsIl6QnF0pNiyjkFIPC8eJS7IEQpNZ3Bxa6VCOt13FKO2al1ZTE0rb4Ds+2Ulzqc2jWmGmwvGTbd+2ysbFxRQKPffAjVlZWYefPX7KxkWHrvHHdFmYn7ciRR62lpcFudPZIjaijY6ft3rNLkdAHP/xR2751i/9P/9Ev6z1oQlG7K96ZWQQB6g8VAg+NtwY45RCSh3OoZQBImyjtAW5mIRHuFI0kzx2DBZir+jEUKAyta0VAtMI1nNCTwUPQMBYxLZELp8c/olATBSdXJaEsRs8Fv4eGQKEUa1lbdx8ZN28Qyu78pFdUWQ8P24or61RYxLg4tWazjVTSRgZ69bkrapv90eEBK6+usUtXrxo9Gxjk/Qf2q4x3/vJlpZnk4hwYcAUODyQZwMDXT75mFy9cUmmPKJMxZBC7QPfpRMUw5eUXqbLkVKHdZ+Hk5IqWzbBZl8uHkQB76O0xYcxeiNo6Q2UjbrQcVygXx6WZknJCm3GsvoI3SH0pkFJzHbCIk6xuThzmNTA0pFoMG0WHUr0VefniCJBi4XBIFdtamgUYDo8OydhK+u1dggDvDgTUImf0AdA2R+AjKy9qVVWVduXieduyfbtFIgUCNMoqnBgClFIX0jPxJks1WGmwixDjbXrnEHwKZZs1zDHoBHThqVMfZvNK1x1KqY9RcOhqxHdqPBxWDgdkFEpXGs6ABLcVinMPCKMBEMFiOoPg5g7EYjn+7MSQniaaAmqcmR7zjtxxv9959ap1XTrt7Ttym89moc781a98VffW2NRk/+xXf11A2UsvPmenz5wWkg3fm+Yj2mJrq2vs7vsftt/43QL/X//LX7X56TGvpKJOj9Mp2zS4sVlMPc7Lk+fGyCXia6oW4KEAKOEobGRAoxck+EEYyedwGvt4NHT23ZBPPiflwnDUNnRcjEk0mqM1L6PenYxL3Ye23NqaGhkDojxp2wGK5eWKdce6wVknInF5M7JveULk5+bnfT4jB0Dz8jTFZz5QS1oXt4Dr/R/7lL9j5249p6bGBo3JfvPMGXnxibFRiy4t2s6dO2xhadl6urql1ZcVZTJviYBR+gCGBofszOsves89a355ZZXSOCjiudE8mxjs96B7A8ZRhwcIxnApkqSVOEETGwKurhMVAyvGZiYjajccBsRdoDRLxj2Y4xAe/HCOgWufdqkXqUUqFXfUa3MgtOZbrK4EmpKulwUOTNjizf6FeSqafAqugZOoQ1+BiLKhsUGlxK7uHtuxZ0TKwcjsuXkV3ntnAKiL99NauWOXmiLOnjknrfqW1ibbtXuPKLHkPNQ3RY4oLBBC7FR4HRpK2BWGVaG6bV7U1TdD9F/toYHCrRaZg8GiwyhU/wC0VrxfjkLPbCoLaBFEkGom5E+oLhuKWmAs2BRohTlaKiBN1Ior3FRaasYszKrmFLhLINJGxsprmnyEIijHcJF7PvnEk3b98kV5t0//6I/ZibvutJ6uLvuLL37BJkdHxQnftXevPAwJTG521GbnpsUYvP2OO+2xD3zInnrqCb+hqVmMQiHIUWbgpcWLKCwu0SFbxYARagZTf8Eyxiam9LqTk5POCBL6kj+mXDWEjai6Nl5MrMKIGpUAYJmeCCAWi6LfP++GcypaIp0AdA09XVqlQ9fFmWNrKDEzL5HIiXQrJ1e1cjfdmM5HegdWpc/AgVmRnqKTQ8stzbOlhRn7B//4//Ef+/DH1D7tcmBfUt8w4AjVB/oH7YUXX7Lf/53ftY98/ON25OhBu3K1y1LJddu5bavFUxv2x3/0x0rLmrbt8Ye7r3ixaJafov8+N9/WEIA1s/mpUW9Lxx4/KzdPgh4cWPYfximXOQfZlOfcoRdVV81XbhYAh0ydhimnYOVmVmYJIMSZcXDD4arRKPgTkauTXiPiZfx3YVGJjJ66CNFgSLuBJ+w5jGcYrbI2lCEX5xHLcX/n9RfS84pIFhfnVUafnJoWhqYht4wajzupuu/1elfmY9+xO31ylAMHDlpre6tNTkxJTKHr+jVLW5bqrnDNnRRyjo2OOTVTxByQfOL7NM9gtVmUcIhGOMaKsDS8TSen7YZZhCOwWHzXR59w+nliIjorjqFQO3HUtQq7gSMuvAzbdGEY4kVZSLwrh4cQfnlx3lbegbDDFAQscuGcEyNhs7gmpCy77a57dNhQnL3rnnvt5Guv2tmzZ+SVKb8RrtKxhj7eC88+LYNYUlZpQ4MDtn3nTnmZU6+/ZlfOnPRKqhp9RS4BGAnaHop0EAGRcqmc6fS7NuvO2oSxqN6PC16DJtswai0nT54/PzfI3xNx110oKrKrZ2saDtWVYEpxOOiDsBulW8qNfF5yXxB0Jgfh7VAUYg2R0XZAqptoRKlMnZ+xHCssLRH5hYan1ZU127ljh916+21W39RkMdK0YCpSb3+/5WZni0Z84MA+5c5Xrl23P/njP3aTnrJjtnPXLlQ/BAJf7byhPgPIUaRmjqa7Ib2AlcW/WiEpqazzIXZV19W53n7WIx+WZ/HmaC83ojwUp3Hfw8CE4rAYOno7wtbsMFXl90OBGKJhpQ2ki+BbgYEIx59DIlL6JZgmsmmstaeJLhCGWV62quoq7e/h0VHLo5JlnlXX1lpVZbXkz7/21a84/kwibsO917/nc/w9/2JpRZVfUF5lkYyvjV9TV2evnzzpDlw8YfsPH1RoOj07K6YU+mmJIFSkjguqKjkrQW1ugcLFCsd4O2WfoKSnCbyEjpm/0p/O4Q4rAYT56i5MJnTQBXRluQYhIgu36V0UAQ8BJdeq6hptTogsvf8DtVWUhDB2hG9JRpPl54lIxN9LK6rsjrvvs+O3nrCR4QH7xpe/rMPKLPiH3vc+CXMUME5bk33S6lCjJfW+Bx+2Q4ePaH4i7/+LP/cTXnldi4/xc6Or6esP1H5V/YA85TT0lU9LfIJZiW4sGePSWYuwv0JeLdBnZESX5MfVh+EYmDCv8wvyNKVZh52UoRAlH1cSdK29Ka2T1IbVNpx2GgCJdX3+iBeVqCdhdzg9KSzFihdPpAbGUVqmqIl98GOf+UnVtmGQXr581coqy2xnxzYx46isEIEBfKGEU1hSohLqubPnrKmxTk1Ar7z0smb8UcYDH8lEY2rWQs3p6pnXvE2OAVHc4owAXbgG/L2mqd2vq2+yrR0d8vThQQ5nPoSDPDd5J7Q2B4AfFGB1B0oBmZTGqUKHkSqXa6t2BDWu0LiEzWt6H8a6IUvOvEWYhktLitTCUjeRBwaFFAyDQ8MS3v+Bhx/SviC9+s43v+7wGjObGO57L4hAnm1p32oDPd06/KDIPCjQ/eUVQpZl1zIJcq0BjGsWyyEXh4ef2dShZzGw3ELs2TCZt0t/oVgCebsku+mcwgMxHkzoNcBKtkVyXI01lA4TuSWYM4hnCz21E2PMVdSA54INp46q/j6bGRt8m6Dyjg2zefmUteptqL/XKirKnMIxTLrcPJuZnLTXX31Vh2hkZEijxkiNPvPZn9IB/93f/T374PsfkwrRU089KYT9kccesw9++MMubUmlrGb/PvtH/+T/9f/Tf/rPkiaDEx+LMMm2UPk+4BDrRQiJ0QUUgmNeVl0tiihemLy9rLxSUQDYhyOqwL0vVuutWq7FbKMK4ABDQprCAjcNiLKZZMvR+/fMlpZXHf4gVZw8Gxwa0vvy+25iUTJQr/HUxMUzJ7ddXl6wmbk5pQsAiRiRky9817vzgUf9T37q02oaEso/PWPNzY322quvWee1a3ajs1PtvHfeebfSlHNnT1tpabk99MjD9pkf/zHrG+izf/+H/0EHv7ahQWxB9mHLli2a/YASNFdVQ5uo0eA2q4uOaFRSVe8zZHZyuM9bWV7yoa23b90u7gUHmQnQQvrfoeEnGS/WNuamBa0DiCpKQm3KEYre7vSjddrxW8JJxnwf3Ec8DJWqHRAKe3NtbVmaiDwH9DKkBpTlQEf+5xSN14T5JNfjAkJhNObBiixwYiRgAURF7+b6ni1HWWWNf/T2ewwppfsffNhq6+rtS3/xeeW4GXWMFai2zeKFwyE3D30wUYWuLo3g0vhlQBYn7xVOsw3HQXOFgImGX1AZUAmEbjLXaw/M5dSGEsrVIFAINNSob2eVwzluauBYWrThvh6bCUC+0GvgMfhzcUWtT0WDa4PBksO9Xn3rdodoY+yKioJZ9p4tzMwo7G1ualHP9/zstB297YTdc9+D9oXP/6nSG9IKp2yUbXfceZdV1tSrDLelpV6UV5hqNLb8+ef/zL74539ixRV1iow4ag54ckMiQ0Vep5tYKIyAUioHmQ1FRMC60LDkZLVJV7JlRFw92kVHfEiHLhfJKKbSCfHLq6sqBUYhyIlhJkUT8UoMS6fqlIDmimy3MA1X9ybqUmqyAVaxJtyGKIl+gUOHbrHCghz70Ic+ZFUV1ZrxWFNb5eSwc3Osu3/Azp85b+cunLPe7k51j27fuVuU56H+fovmxKy5scW6Oq/bWjJhfV2dEnOdGp+QstPWjm124dw5W5idsaXZCa+o3InU5hcWS+lnbnLcxoZ6PQhSlKGJnFjP1cUZb/f+o/6x2++0rGw6URdF6NIgD3H/6ZvIOPKPnICT/iYF4iJ9cf0ZjrJOjwI9MA50ZmSdawVeWlhUNBrqYPKMpH8pQ41EXVZA6nE0db5PmVmpB6pPxUXW1t5uA/19Vt/YrGnCn//Tz0lGnZRnYug9iQAoBc6rlPHMU08aU4G4e7YsdFZueG5mTiyn8tIy5TdOpcYBfdK310AJwnenVx/W/jm0WRk3tisc5USJC+EN85gYhEGArOHQWFUINJDTYQSuDz5l8aQzFuEoMDe5J2X9PV02PtDthVqBmiI0NeqxIUprGv2ahia1AAOajY8MikjCz44NdHnVjW2+1HW8iJWVl1tfd7cORWF2VNptbBIEI4rLKuz06dOWn19oPd1d4u3f/8D9VtPQLJos9zfPTHvbsN6+Qbtw8aIdPXrcPvqxH7Ghvm775le/5NW3d/jwv1G+WVtelafFNZPqsGaEimFkgyESiLeeFPBZUVYeTFmOKW1wxCA60DiyzoNjRFHh1fDOIG2Ik8tTnqORqwChzWCoasylJBwcohPA1tTysivhwk3Q1F/CWgewcn+w95anRrz07l3+P/jn/48mJVNqxE6w8Tu7uvVZqqor7bHHHrLdu3dpluQrr7xk4xNjwjF27Nxh+/bttl/5v/+JDHhzW5uVVlSqcYvoC5VpUpkEPIFZp5W/PDfpeZ7nc1hqYFm2ttn2XXv8G1cu2/hIn0fnJH0A2bm5/tWLb3nDQwP+kdtO2NHjt8tLE73wTJ2Wnwmj0Hj0gFmq1BLHg9y35iyimwj+BAnNGWgiVTYvgB1gKPtaYN4CsnE5cnKsAfoBbqpTOuDUUIb1JPzCHiMqg1LfmmmRsQRbYQKR55FmOG2Gd3N9zwZgfmbSm56a8ssqyuX5Hnv0ffbaa6/poeJxXZ+5r7AqrOfzgQlpw1FZOuDYVgQ0YWdtMGQjX6irykxBLzqXGwbtqh5M8oGUsZFx3HjpsaOFT5QgD+lQ1AKVX1bF/uKhoLQK33x5bkobpaSqzqfLan5y2CutrPP3HjpiufIaSR38zvNv/jXLOjXSr5wSeWinBe9r+Mno8JAMRXF5jb977wF745WXtTkI12Ccvf+DH9aAkvHRESHk27Zus0vPPWuPX76oppTmlmbrH+iVRNTP/52/Z5evdfrpDd+2tVdbX1+/xZhxB0KfybL4xqoqG4S5rIoOM+wyRmLROYhgaZaLjiDEeOksi6OOBLDHmqy7CoaMRsxsdW3JausaFAFgRErLy+VtAEYX5udUQuQkLMYTLtfn2eDhEDsJhl06rX6XMmA4l2bGvAcf/aCfSe/3d+w9JHCMig/ScJQFJ6fnxBZ9+ulnpBL8N3/807bvwF5raKy15tZW9Q6Q/YHqMxKrubVZlY74+or2SOfANWtqbVHoPDE+apOjjg0HN8U5hKiNj43q/pta2u3gseO2Y+8B6++67p89ddKmR/u98tpmH/2/2fEh7/knvmFDfX3+j3zqR23blq2a0VdeXuLEUzV6bEFDTUIpMPYm/9EbEgrAhuxSJ1+GEpBTCQ6lwamagBltMFl6fXWT6IahFj+FGRpR1wmpik5mw4qKuQeUhyHOpQUEwjAMpzdhVN7N9T2HDlW1DX5jW4ekstBX/8e/8o/tm9953M6fOaubQ0mHG0S6iQoAN8qiNDa1aPNy4Y3AMdiQpaXFtr6yrtIWTDcuQhwGZTiCTECE4SFkk9siTumUZUPxBlyVVIYkuphx/exw29dXbai/z8YDTw6Vls0I13x5dtLbd+wuH7UfXNO1Sxes5/oVRQT/o8+/55bbVF0n/CZVGOztMhiEFbVNflP7NhsfHpLWHESZ2ckRb//RE37Llp02MToqYUrKo4gQtDQ126c+/Wm14vb09Nj2jg6hvOcvXmJD6hA+/9wzAjlJIQgr0RJgJBcfeT2RdIpE0s1zE2rzc9AqLHR8CCjG8wuqvBAllZU5FWN45xhnhnTgVTiQeYGABoAT1RunYuyqOCIegQvMz2sE2+zcgkUAZL2McnnAQYz0+Pikra0s25uvPOv9o//nX/jw1//4T/7cKqoqFIHdcdttyvsLcvOtvqFOG/+3/93vSa4b8k9dXb1IP0Ru165e1fw/SpSMDwM45QA11DdIi4Gozryozc1O2OL0uEfaFvbWs4fYBxhFDGJpWYXdesddtmXHDnESLp561d589QX9DmVHynaLk27o5n2PfMC/+74HLBrL0QSp/Nw8W1lbdZEPXaXMSaAKJIaf42kAYmOg3Ni1QIgmQhcmg02WZChxZk6HAajLjahH2xHAkzSPyhhdnGBWDDAhLQ67BFtb20QJJr290dVpr73ysqIVjMH06Nv41Q8sAuAQEjbOzkzKkgOi4BngebPAgB+u3XFVwh6AdLDlqGe6MklMeWkiuW5ZKZDRuNMIwKOkXXdeGN7yQSkzsQGxtGJAeREdDg69Ywc60I8wlOhCY7wjsPkmrfPy2b8C8GFRAf3oB7/vUz/pl1XVWF9Pl/Veu2wj/V2bGAA0WOXGCyDJVb7Gd0U89ZIDehUWlyrHzU0mdfjJPWnlnZkc35zwm5+bbZ/957/pR7KyrampwSZGR2BR2plzZ23X3oN2y8H9dvXqZXv62eds966d0hxkA0CnffiRR6yvr1PsNzYNjDaVP2NZEsFgrQBa+3t7BegplVKfBAeAwgH8ChOqTkirspTnmn+cLmOWcAQ4AWxufomfxXiGcwUdH540yoW33Du0bh8Bi0Tc1qDKQvRhMGZBfiDzFZEAK0SdiZFRO7C7w3KY/pQds+dffNGamlusub7OZubmrbW1xX7pF/+O/Ytf/VX7+te+Yo8++pjUeAHKevr6VKEQSam80ioqqmx0ZEiR5GD3NW/34RM68KwXz0ddpNCXRZ92I96lhFxQaEsL8/aVP/0P3v4jt/lHTtxlD37w47Zl517/tWefsKH+bq+ivs2vbGj1ATaff+rb3ltvvO4/+v4P2rbd+yTQyYvFV12PP2uLM4NfQQMU1Q03+SlblZ+Qxap5kIihbmxYflCqZQ9thP0aGVM1gfCfigjriPgtlQbAVlGK4YIwM2BpwW50ddn7HnnIrly5okhaGgfwWd7F9T0bAJ0SDY0sNzjdeF4onj3dILMZee6DR47YTOD9sWRsiLq6hs3DzYOUxaaUtOZwATViBMq+eBQsnlO5DchDGuftmFJSbBG5x7XH8pBos0wHVnNydND6b1zZPPylNQ1+KBi66/Bt/sFbblPe9cZLz1vnxbf0c0Xl1T71bQmPClDzjYPN/SwHOoL83NLCgvJ8OvaWmXkQzJGnqrEIGp3JqFvvb/3yr/ieRkG7nPDYrcftqce/qdFWpA14tZWlRU207ekdtMrKGmtsyrf21iZ79eRrGg3NoZ2fW3BsMWi4hXmomYj5SDlOQFSgQc/a4NkB6lgSgEM3tnrekinGcgGQQjKi1JrvpMeoe0tWnA2bUCUAzAYwTAIdtHevO3VewLGpiVVVI9wAU19EJT7vxCRTfLNV1nr/+x6wH/+bn9azoDV5dNyNshoeHrXnXnzZzl+6bFdvdFl1ebn99Gd/Uv3ui8sr1tbeasMjEwK+zp8+JaIShp37qqyuteGhfhkFbT8vo2hSKH9lvU+EAy6gseWq+ECUcYcWoY/s3Fa/80aXDQ0O2/ETt9uBY7da/Wf+ll1466R/+tRr0kFCG6CsrtGnlP3FP/8jpTEn7r7fLly45JSfM/SbOB1F8BEGuvKVZiUlSkH1KSzpuaoXe9yJuVC3Z/8TDeFEYtmOvSkgPCgRcmlOAhL4SI2vrila4OcpnxLd4Xxh2BK1vScGINTiW15bs8qqKiGcNzqvi13GRmWwA6o6hD9YKWneW8bGx0YEsLFAIPLzC3NuHl4wDCOZRJXVUSZ5GPDLHYYQ5vkB2BeBFANekNRI63TKgX3zszPapCN93coL0f4TMJdXJO46xI/7H/2AVdQ02PWLZ+30G6/Z3MSwV1rd5JOvxROrwhc0UoxehkCRJyQlhVWC+akRr6mlxcdAiQ/PBOA1SDJ5lkmlbG521Nt96FY/Ozdf3pHBlOhqP/f003bp4nlrqK+3mSk3Lr0NQYgNX6IdE5PjdtvtJyy5vmZ7du+2dMa0vrTFehyEeML27t9vw0ODtsrMvBD30CQkNBbdlGH0AcAQwiEsyG5TEoQRGaOXAGTfY20xXPmSZ4eohGTWWq6Ty3IjsOJWUe74FWxsQmW47Pn5TsMQr08lgjZlogZ1TpYU2Wc+81m7ePmqFSGNtbwi1Z/CwnwrLSq0iopS++rXvy2Z7O75PomrHDt+qypHsGxbW1rstVdesuH+G97R2+/zqV6Mj01YQXGpVVTX2NTEuHJ9okYNnAm4+SHPg2jTRY+OM4KV00yGSEQiLhykp77xBa+r67p/7wOP2J0PPmoNrVvs5AtPW8/1SyoZwvZDq+GZJ77l9ff3+weP3WrZXjCLgf6SoMyXbdmaVs1/jl7NnIYQeI4IB8qnTR0CWjBPIGx1r8YQy0By0F2vAp+JKgF7mDKfNBZb2pTO9PZ0BzMrnAgtpeywSvYeYABNfmlFtbwP7Ky77zxhp069Zd3dPWr/JK/H+wDCoLqCB+XDgfwTqsJg0yShWET93JqPznAPkE2NQnZElpBUoZZhAR+AivZXyEBSswmGh8CffvWl55QrYzX5YQ4HeSCtqLfefZ8e3kvPPqnwNL+4WOh6OpXZzNE4NFLLoc0W+AGEW6qw2BIINZ5qzuR/bFoOBHru5PpUFQjV11eXpYy0a88BvR5Th6YmJiXVVVdTZ2vrKxppjp7+pQvn7Z77H5QI6VOPP2nVlWUizzS0tNqhQ4ftuWeesj/6/d/y6lt3+pT3jhw9JnIKnxHBzPLKaq2BWJQgzhtOmptBnsur9LnTKARZplJEIaTAYCnSJAQ5C10A1HIBCdvb2q27+4a4BWxmQnGM8fDIsEg3oTgl7w0Sj+Goqa2xx7/zHZsYGxHm8slPf9p++Zf/vvX09ulAUg1paWsVJRojWVVeahVV1XbpynV75bXXnFEor7LquhqVKrs6b9h3n3pCxqaxocGGR0ZUqoRZ6nQhE9bfecGDlu2UBWHTwfp0n9+h9E54VjMh2HuQeVCgTkMFpxLh2dyEe16Hjx23fbfcKo/bdeWinX3rDf0eHj+WRbo44N33yIf8O+57wPr6+yXkQRqklCnuOCw4Dbw3DmFxeUkOg9QXoyAsgOY4xs4XFATagQ4HcxGtK407RWXHSMRh8nk4M1DASXcpOx45ckTaCq++9IKeCdwBPscPPAJw/PqkUQWAJEHvOJs2S6wzGGGU95yekhRSNM8vZXHPdUdxoCQdXVionux4fDF4iK77j1oygJbC/Q0eWlwbmjCbsIryoqbSFrqxZCwei/uhD3/c4muL9sap0wK93Jhuz/YdOmx33vegnX7jpJ1965Q2ZsvWDtV12SA1teWq+yK2wc/TPUZ6oRl9bKREXJ+DbjyQdbwe1YPFWbOC8io/N7/IikorfXCBsopqGx5YV0346rWLOqAQThoam6Weg+c+3nGbGlQG+3vtk5/+UUmnnz591sqrKkUwSSRXFZZPTQzbj/7op21lftb/0uf/xCuvbvQnxscsmuNQd0pK7aUlCjMZdU7pDcPHoAy4BXkFeU6dGYbZ/IwVFpXaQG+3NPMAkGCTCeCi0SUFh39d90i6QPUBshS5LQxOPCqiHujZrcVXretap7oMd2T2aa3Ky0ps/+EjVt/cbv/6N/+tCFNMBcLIXL50VWE4AOa16912cP8+iaXAPIQXcObsW9axa7e1tm2x0bFRvX5FZYVagCl34WR5VjQMTfO1rtUnKpwa7fdA8oliiEacCrFTmA459hxMWHxEpuGzhdBTWt2AVpS9/PTj3sjAgH/0zvutrrnNmmcmrY8SJR2BVBYq6/0Td5zQ5CPmGmD46X4VwCyRWtfOzv+tJxc1MpzokX2KQduUt4tgEBKKnNEeAPNCP5K0AIPhSnquvCdqfDQYoMM0qBgy8kkbGhm29tZ2nQ3OU3bs3ekCviseAF6aPB5PCYWTji56t7GK3Tc6g3HSzP2Lu1ZUyXilzV+FI+0EPiFJiCGlVlUnlBDSMMMIQEUuiC5MilmhduokwWUoaDoJfh5ABfFIiBLnLl5Vtxp1VhYWkUXX1LGmnAoke2JiTAeAigIpy+wkWnZLCtWkn4HHV4euY2dlAm14N6Xn7dDL23Az8pYXZrz84lJ/dnZKBJyy0iq1GWPhqdmT96kDL+hE+84XvmbHb7vNzl+8KCHIppYmK41WWCadtPaaNuu8ctnefH3S3jz1pt39wIN2+s1T/sT0jDgRDMHQ1J2NDSHV1y5fVEAHMLWoybM0Yq3a+sqKDBEhOF6Kn0d9iOnNrD84At4+7CoLc1h6CKiwUGZTr4A61ZCoyrK56Rlra2sVn4H+gS3btstzgYnAQnzyW9+w/CIaq9I2OjIh5Z7sbM/GRsfU4srsge8++7z2wI3rV3WQKH9qdkE0W6O2KIlp/mIyJaPFhoc4RiRYUFRoi3PTGgkPqKvqEGrFYCD5+Zt0cr6fWV9TqsJayChotByRnQOmcUallfV+740r3n2PfsjvvHrJBvsHHGkH8lVegUWjvqoz3f2D2i/MuqBER3dlKPwJXsW+4tC7wbWOyRcqWIWSYuGFx5fISKAHwL/Qd5FOZmmtMQKkg/AxeJ2amjpR7HmPgYH+TcwnbD3+gRsAwnE+APV7GnGIAljksvJSS00lhB6zOcjRoXUSfon1FKVduFp1UEI1LKWadrKzLJUItPpcbO96zCUWitAEm9CpxKi+GvCqudyUVrqjsmWhd3R0OG42m1lTbHNsbnrKRvr71ZN/7q23NuuubCbeb3lxwVKJuCKOMKxks4VTgiVAohZlWofd0JHCsiqfpiFomoyInp8aUU6eW1Bok0M9XmFxqc/v9Xd1Wn1ji2iu3B/v9Z1vfsWOnbhTYpfMIGTdluYXbHp2RiUs9BUxXFMTEyoPDgwOqT++r/u6l0o0+YT4o6PztrNyj9GaTD88ungcqhXW1gP3QNuvRJ43HGphGuzpWV19vSXWE2KgYaiXQZQ1KARiCwIZhXquRCNESxhCnjGqwkRJLS0tOmDdV857y4vzUgmmHXl4oN9m5ufsyPE75P1npmfs6tWr1tICuapcnwGQFDrwt7/9bXWU3rh6yeprKuVNp6embX11Se/JZm/Zsl14h7fhJOjo4cjz8nT4ncGK6DlymMGSaKOW0AzlUlJP7SM3Bg71Y7VFb7heiA3y8kBernX7Xp/cnm48OAwoCElAJifHqmvrtIckCFNcJCeUTPpuxl/GjX0nCq0qqLJVCFsRN1wVHcPiYre/SAFCPYuwN0A9KuurSnkxxC5SyKg5jJ/l3DCTYMuWNh16fu5wzS3qLWE+I5uUz/WeGAC8Mfx0Wa68AhseGrY9e/fp0BQyGKTzukYX6cHE1yzfc5swnBvnmkto+GGzelKRdUw+h6CGU4MI42He0bQitBQednDwOZhEGy43d6IUlB+bmpqVl/LAVhYXLBPxbXVx2pubm/Fb2o9YaUmprSfWFVqxyTQSKwBtwhKOLGtQz+Uhi5wRKLVguPhzqG4LWFPX3KJ7YhNHspw+nYR5Mp5NDPV4E0M9eBWfvLa/q9sa29tty5ZtCp2zc7Pt2tUrqv+3bNlqF8+d0aSe6roGYQxwLYhcVtfXraGtw1+cm7eKWjeeCpR76MZFr3nbXk1oIm8ELBsZGrSGYDSVSFMBYk5JjHZewNSOnTvVTw+Hvbq2XuEnFNTCwFgvLSxLwAWeAEajrLTclQmZfgygReRgZv093ao6jC0vWUtrq/2TX/jbMtxQcQ8fvsWefeYZu371mjxx29YtMqAnX3vFtm5t16Sb207cKV4DSjfTU7M2NjRkRWWl0otYXZxXZIgjYbPNT89INy+8wsiQcBrAbXxyUl6YSEjaA8G4M40lX10XWQwcx0U6McvyfJsZnfF2HTgoXQfq9nR/YsSl1OO7A0nkRjTkIkCHS6k0ClUbIRQAbEuYRxrJawRgH4c97ELF6282TAWq1mBa0Xz2ugMEidbYT6g+k3LA/uu8dlXYTG93j14b2XciTiezGXlvDEAkFNxUUwjddgkbHuzXB6JBhOYg82mjjLmBmRsr8iBuUo/TWRe5JJD3YsGcrh91U2cIePB4Hi7NitMMQYd8hpEAEUg6aEVlAYeGh1XGaqyrtysLNwTAhS2yi3OzVl5RJY75wMCg1Te3uNJZTq6VlpcFHVz+5iDL/MAbKpIRVTZHjRsw4EgvEomkT0lKJbJAUJSv0H+5yMXBKhhGyjzCUy99V5+mY+8RH0AOghR1cLw8LLG777nLBgdHra2l1YrLyu2+Bx+069euWVFBnsaFLa2s2kvPfdcW5lYsMjMrsGhseNBq6lv9+x9+n42OTVhJaZEm/e7etVtc/LzcWNDWWyBKMTk7AqCevyHJLrTzYedRVcFgysCZb9NTE2qtJnVgranvI0qKgi2suHUAyFLAXaddx0GjN+LQsdtsbHRCeADKPKVFxXbw0AGNy3r++edtYGDAPvLxjygN2bVzuz73V77ydbt89bI8+MjQgHgWOYVFfiYdt57rF7wdh27z/dWMTc5MCXzjcxWV1frgG0ymIp+mygFjkMiIe/PTGaWcGLSyshLtT54t2BLPD+LS+vqqeAxc9Q2NzoEgrJKb5+YC5OcJF2lqbBTFWm3lGYyeo7H7G9mWSaXN489wYyJZTrashCGpLk11A1t9i6A8xMjwoNolqTGJidLP72lKNExMp7wE3kH7dLatr64Ib8grYKCOk1WHQIUh0zegh78XBkB9+bQ6aiqPy0n/4Ld/zWvfvheWgxRb8N6gzZoa5EH79RzCHrSZsuAo76Dai3fAsqr8l50VDGaIalNGY1QB8Dpu5JeaUIJ5AaWFJZaMJVSGIuyi7MhDbW9rs7MXL0mQAfou9zw5MaaJvE0tbWryqKlvcJY7nlBFApCJMdqkD1hcJr5Kuik7ahH+B0kp5RqU4OjjycA3NlIZG7xx2SurbtTknfX1lUA2PduqqmttfGT4r8xS3Ll3n5hvZ86c0VgxQk9JXFVU2fzckj380IMK85JrKzY7PWOT4yk7eOiQzc8v2Hrc9Y6PD3Z523Ye9LmHg0ePiY/x5ltv2fSka1vF23MwULURpXehV0Y7O5plU9NTmtv48PsetbOn35T3JnKifRuePR4yT80qSypPZjZSiiToRmtsabOy8iphFqXFrgbNujH34JM/8fM+1Fm6Qy9fvqx8/0Z3l6YlMavvwP499iv/9z+2v/zTz9ntd99rd959t6UT67Zr316rmJyyZ77zDR3+yrpmn3QkB6Wc5WoffglpUXxxxsutrPPhKxB+5+YVWFlZlTU1NwroIzIDoY8HRlhg3eqq1gCDzoGcmp50nXppuPmrQUt32m9uatUYeIw5UvbsLddgZZLiclOZI64fIu3Uqt04oUggOpPSEFJEZIpFJ09pj0h+3RjmOqdIM2zI0nQmjR5bV9UsvZhUFANXhj1fgRpRZYX2IOkTPQ9El+FAHac8/O6Hg37PBoDDCoMMDw09k2GgjW3bfRYbVJf6cXlFgZR0QaNZfLXuBiELh1giHamE60YDUJEqCwTToFKQSm/m9oSdkqvzaDZilFMwPESa9llv979nZckTbtu+zZUNEX4MLqz74uKsNbe12qlTr+lACXn1N2ygj8hlXaUb3n9woC+YO++aZdxQzLT0A1z76ExQHnTRQsgNoKcgVAtCDAMaK585v7jS5/PT5YZ8OPsHFiSzBkbhGMByjEbs3PkL1tvXY/ffd6888YH9u+3x7zxuT8/M25FjR+1jn/i0nX3zDXtzetQ15CTXrWPXLuXymmCc5dmoDI6v1mTfj1hHR4fKhnRlMnCCXQ0S3t3Vbb09PTJuPVfPiLfAezIJCc+XTGdsamJMwKgTDXH1ddozhgcHrOn2O/Q5eSbH7nzQ37P3gJpXWJNH3/eQnT1z3t588007+crrqiz8xE/+uH34ox+2P/x3/8Y7fuJ2f2R0RB10LS2tVlnbaDeuX8Oh+FW1DTY1MWpAawhhhg0yAH44kPlZVHPSNj8zbUuL89Z57bIVFBUH6Vswjj3Q6QM9J4LLDRvOIHcFGoUZKh8Yk4hnNXW11tt1Q6Si/IJin/WhFs88w7r6WnFaGIIKUxMImGgg3MvS5/dNHr0g3xF8wmGtlPDCrlbk1ijr5eU51WH2kWMM0hDk6MuwaCWcAt9iaE1AK+kH9GjSu8XFFbtx/Yb4LoqSg16ZH7gBcLp8UfW+E6LgVRqbW83fSFm+Rj8vqntPTT9CXp2Kipva60gZYAcb62u2nnbDIjn8blKs8yosJqmCci1mBVLbjUb/CvL/TqEFohIMT19fn91x61GFioRiEDsWp8e8ualRb2J81N+2fZcrjflo3TmjRDqSlxcRWQVuNveIKgvUTjEOmRJDPVlGj5/ND1qWV8UmhEFIk9E7JwARrolERAsopbSZMW95ccFnhNjM+LiNDQ9Z25ZtCuMJfb8+Nqr8nWkzX//KV2zrjp22rb3F/sHf+zv2a7/xO3b14gWrqKpSDkwk0dd5yatpbPXXV+NqTy4qKFQ+76YlwVhDMyAlfT021aF9e215ddUG+gfs0C1HNL9haXXVbly9bBU1TT5AIhWRudlp4SirSwvCGDDCRAEYa7CaNBiAT2PTsNXUt6j3YVvHDistLbTy8lLVyr924dvyYrv37VcaxYyEP/qjP7bqqmrbe/i4f/KlF3WAAdiGhobVr3H98iVN6UV9SCPkUuTbaVtZWhCozL5ApbmgsMSijJALOhUBellfpYWZtEV8V2ZbVN9ITHMWhOXkuYGjmhq9QQmOYSlxq69vlMDo8089qecGzZZ9w3vCCm1uabHzl68JyYdIhLhtOOkXEJF9gHF3bdMpy6uoEM7Ff5IXf8fwEMtz0ve+Odl6N5CFaMANiyW0x6khHEMlgjIpA2hJAcU3WVuxlsJm7V+MWeh8fuAGgIdBHZ8NRmccPdNbtnXYyPCgasaoqKYYXrC8IqSdA8XkmNBTA3JppFKg+uv6AyjtZansVlwEASX4gFQa6BYM5Jr4eV5HwqHSsHeGgDJfSUnERsfGrbioUAM6aKogNAwvqLc79+xXnoxaERuO1yUfFIIOYYN6PyIXi0syUiDK0g0UI9B1H0KcgUtPmU998P8NRpaUh0DWCUvXnXbbyRee8jKe55eVVdrBg4csp7BYYhikS8zHI6Xau2+fsIPLFy/YhbNvOe53Xq4UfxiIAbrdsXuf9XVesng8ZZcuXbCjt94u0UxKm3g/NhOSY3AbkvQC1NaIqMOsuUpKoOPTtnf/AasdGbbzby7b0tykV1pW6g8P9NrU2KDXf8NN/6TenkhB6oqpoWjn7h127do1UW5fff5p7wN/48f8TCSilOXM2bNqB7/z9hMi8Ej1Ke66MeHRQ8ZCq+/DH/uEvDbyaDP/FYmlsKjd51nyWZOBTiF/z4U/EcxQ9D3Pp1FH0SLR00aWrao3o9iVa0nRYKAGoblo3VJa3tDBTsTdSLjCogKbn1m3xsYG7b+hAWjsdEeuyGiABbHuyJQRVRJ9UB6FVZjcIHKNac4i6WQ8RbTI+LSU8AEqL6QplBIpXzIJWDMGRARas8z6hg4xWADYGIeeQ4Vj431ILePxLK3Z5QvntS+JfNn3/Fnj8mim40G/JxGAFxHZBFYSXrOspFjlHdcWipd03U/0NYdilOowk9VDc85ZLsofgBn0irvuLl8fXk03q048gbMlmSuGXAaHP0RUw+EMoWgFiwgfAAuNpBR5GLVhRxg16+/rV367rWO7jbz4suVvZFSWpCd9bZXwLM9WlhdlpfH2UneJx7WJwSz5DCz85NSk+A85wdRXDEOVvPHaZolqbnZW/Ho2KRsTEs/c1Ij3xvNPeo9+9FP+0tKqJecX1FBVXVNnFss1P72m0dVMWgIELa+ptxeff9HqGpskGOpFY0KBGxvq7c77HvFfef4p7+K5pN/U2KwNifGShj6RSzppNfVNOkDzi0uSMR8cGLTm5maVs2iwYqQ5k5ueffxrbi5gVpY1tW3zh/u7vfLqej+WZUQrTp+woNjv6ulVRNR3/YK388ARPweVXd+z/fv3WyziW3dvv/2HP/xDjbo+cvSIVVaUqRNPA0fXV+3BBx+0rt5e23fgsDW1ttu3v/41v/vqOa+0qs4nYoEg5ivnR447S9RkejAKi4u00yvrW0SvVgTo+2I3IqSCStDszLQwHw47GgwNdTWSa5uanLLRUVhzURkyQLoFf96VAjO+bdveoagDmm1RRa3vUj60E5MaPQ4QyvhzN2CUSGNjU6wWJ8Wep4TMEBOJiEjAdVXPnOgEcDJsBYYGT2QaXwdgRDAkrWgF4yGWYzql15Ehoj07FgtKius6+A0NAJLIkm24adNB5+wP3ACI6LC2ZsVlpTp0yEUh36QFkKdOaxHwbPQ0080UTk51s9Ow7gCCeHkYgNmW8WkSgjm4pjpndpQwnfyYOqubGGykEYHuGh4fDAIBDl0MwoxkqZwUT6dt144O6+7t0wYcC4QhWVRmsHd07LAzZ87a1q3bVTKkfRmkv7SYeXgx27CM1GEE9jGhJUXnoyOibCRTtq0jraYU8ktm3vHQseR8jogX8ZfmJjxXyci3kb7rHp4UfbuC0jJ/uOuyR9vxQx/8iObmgZ7jKXfs7HCVERRiFhfVnEKeWl5Zae979BENH7127araQvHm+UVltvvAUf/qhbe8pYU5f8fuPeo+/NpXvmLRLM9WFqa9ssoKf3FuQQNL9x88aKnEuozNg488IkPNM/z5n/9bdvHsm/7Ketzat2wRog9C5cWy7X2PPWZf/sIX/UOHDlhldZ0afi4NXrA7HnzMP3zshF27dFHRH9ftavVttgQbO5GwP/vTP1P7MQf9+PFj9pGPfkRGbH31kuS/AO8QuyiuavDLq2tFtPJpHAPX8QCZc3T4ee2h7msez4/SYtgtWF5RodQGRer6+gYdYsQ78CiAquTMcPobGhutY8c2p5tYVKrDC/Ho2rUrMpjbd+6y0aEhW5yb9DAwihhpM49GbceObTYxPStFJ3gPdGnSgCOeSBB9AkBDTw77VDCiMB7Zr2grSDQ1js5gtva+sAo3gF08i7C3H4k3olBSUHEeIARxLxnA81wrLc21bdu328jwiPt5xrl56ffGALhyWdxq6uqFICs/YWiCF7Hx0VF9JWQhdMb6trW0uDA9nngH2ceXuAdAnLrSNFmF3DXf1dDFpU65yUGwu+D1Z0DZ3XTWkGY8l0opP1NXHE08yaR19fTZ/v177amnn7dMxjP04dXjX9XgjwwN2/59eyw3FpMxQEZsZmZSHYncX9hNRqgvsoeabNYF/IFrsPiMPAfwAvhB5WZxdsILiUHhCqkNFyIN3rO42Dp27rbrVy5ZbdMWn1BfJBR67dMpq6hqVuXk/NnzChO3btumNt/JCUQw1m1kcFjfg6f/5smXrWVLh81NTSlXrm3Z7uM5i4oLLS+32T7y0Y/aX37uP3plVY0+jUh4bJquurq6raNju+3YtdveOnVKaDNlW1KlrTt2Wdf164p8pqfnNJUX8QnGm0HeOXrb7bq/L/3lF629rdX27Dtok+MTtqXd9Q5gkAaHBrWBuVe0Id//oQ/b6688Z9/64ue8htpqn5Tx+vUeO3TooMRPXnz+OeXgJYXFNjs1aRXVVVZUWmrzMzMSwyRyfOfFoBYvK+pTXoR0xGGOI41WUGT5BW58N9EjbeahCAcGldAbIw9uc/36Vc0u4DUW5mdVEiZSPPXaSb0Hh5i9DZdgYWlFaQ97G0JQepXGt0oBqjMzs06nkjSUki/y63lIni8K8Q+bggCeQ5VgokcEVUhF5hfnHA9A1HeizbjSJ/a7KO4wBwvgNzgxV5wiESEYhsqKpMcbAOPvkSKQ6p4xOPlLClNAz+eW5xWmAFQhSqmmh/i6NcBQi8VE0nDju3JlHCS8qEk+TmaJCUIOD6AbD8XbHAiWsrI00WC5QxVWvkq8QvLhQQswQCM5VDJpN7q67ZMf+UCggJvRJGNtoulRr6+ny2e4J2Hd8MiYaLOgzTx8KMGaU8BkHekMRJRSqLMrB2vNyCuESbMtIz7+iibQcL3z8HMRFoLgci3Nz0k/kc5BvAWI79e/9AUrqagUHkFrJ9EGgA+DRSbGx+U9wD4ymRp78aUXZYhok6U6QnmIjbhvz26NAWOzsvloxeX+KUmiBViQW6QOzVTal5AGHnxmccmuXuu0sfFx279vr6i3REnwBDBY0vTPjtnU9Ky1tzbb4OCANnoquSGcoa29zW38dMJu9Izb8sKSUdrs6uq0Pbt2CZnXyDfzrLFli9U0tPhPPPm0fg89gcS6mxpFqoNXHh5wGgyen/Fbtm61RNyV8DCEXIC4MPh4hmImSu2Y98+4UV55EMoylpufEyhFmSTUxBhlgCkGZmbO0ukplUcx7hjV2bFBb/eefb55WcJO8kugFWfEduQQRj1jepP1j8FOpOknKqAVei7gMKE8ZCxwBvY66sj0dHAPaCq6LlYnc8d/IpJlXDrrCEEpi/oMr/WVbhBJ41SdvHpc1SjWUZ8pnZZqcmFhgfaGw8vAnpwy8HtCBHLTS2MCAQHeLl24IEKDcnZN9Ilp0imWCrWT8NDy1ZVBHJjI4uDJOKxhbk+ozThrVAEUkmtKkNNdC1VXJdIQCodo7p4LsXgoIyOjyufrG+ptaGREBoiLHA+6KtNvGGqKKAWoL00vlNKknIv+oGavxVS3xQswMdYJazgcQuOhdTjTNj028N9kYxAVpJkWQbiYTgowjIsy68REp0cHvPzCIh/KJ2W1G5dOe21bd/nLSwu2bftOedEL587a5LjTx9vSvkW4wsTEuMVyVt3giPlFmxofty0dO218csr6e/sssbJk1dVVtrC0qho/ve+XL5yza1fO20/9zM/LK2JkCN2pg+fFzG45dptNjoDGr9vBWw4LK+BQ1NdWWWNjs2jFTMtBOixjERseHrb6hlqlZocPHLTa+hrrvtFlp8+cs4G+Xm3k6ZlpRRQloOflZdZzo0slwpraBttaX2/dnVelmYCMmqjWYCsTE8rb00FfPJfo2BHoy41yOGAwXhQBFJMuIxWA9eVVW5xlHL2T+pYUeiqp9ULOXa3kkHOyc1SVIULgYqgNgOHQ4KAa2uDgc7jAR6AyV1fX2MkzF5Wnq6tvddVSGjUet4rKcq0TXBcMJ4dejERxWdyedRiWA68BNM2c5Div6+Tfw4G4britU8kivU3KmbJXltegHicEdJI6YQSJRBNqVHmPiEASQsQqLcwrEjh04KAOMEo1fBj1COTkqTWSkDwEMjT5R5qAzgA4ocm00ggWX4sVDOBAdomDHQ5mcDoBrvYpVSBqsOgGRh11VfLfgaQ4BmBsctr27N5lYxOTAvFWK1H5cRLW6MXBqEq8uqbog1ITgCpryoPKz48ouiDnlNQ4cwdyszW4AZ68euzjqOaWmnltPp6Iv0u0g2lFPMCFaQmNcp9Lc1NeAfMFIzRF5cjIFJRU+fDK9x08LLBraXbc+nuueUsrK/7Bg4dtcnRYERRqteT03V03RFKBU49RaN26zanLZGWpVg3oWlRaLOPZWNVk3devWc9QlxdPHPV/4W//HfuD3/sdTWtiLBmRAtLa07Nz9uJLr9mPfeYz9vg3GZtWqDkF165ck3MhGqNMhhHctXuXnTt3UWPRW9vbJeAJPbi2rs5KSwoF4GHQIf6Yn7aGpjbLKyzSs62prpJBo2MRA3P+zFtWVAzhJqM1EfjHVJ3cXJGyhqeZeOSwnbnJYa+9Y58PwAcJBzyjuaXNqqurbXZ6WuF9fWODRT1Php3IjXZ0zYcIqOeE1Byc7p5eGxkctMnplCEismXrVpuenFAkF82GkpujKBKJ81uPH9MgWsJdIi/2DXJpdE8ynnsC+bNAFwCvzjnIKLrzNHOAEnG4dzFIQu/VfMag2SWlmACBrgIAB4YIwM0alBT5yqrCfvYWUSKfiygVo6fuQ6liR98bA7A0N+PV1DX7q0xm2UhLPpqyRnFpqTqXhocHbWKcGeeMXnKHn4NRVJS3uWgYgHTahUniVEhv3vWyU24JR12HHj5E21nQsN1TAy4CdhQeDfAE6g+G4EZ3j+3eucO+9e0nnFRzbr6l4mvK2QYHem3f3gNWV1tnpZU1VlhcaEX58L83dJDIsQj9YenxPQFdilQKpbOH/tsaxi1BhcBNknUjuqP6fcAtlIRQqGW9mrbu9OubWqy385ojqOSCJqOEtGpnz7xlY31uuktxebUPKEo/PK+zfft2lQlB07d37LC1BBWFjPVcu+CNjeb5rS3Z6rGH+84Aj+6uXistKVFKgMipZeXIms4urdljH/0Rhauw8/CCOXkx9SH0DwxaOrFmH/zwx5USUc255dgRrStR0o4dHVZaXChVG8BZymYvv/i8dV2/arW1Tfbk6rftZ3/mp0U4mpqes6qqGttIrtq5M29qrv0999yvNuWp8WG7cvGSnTr5qt3zwINWWJRviwszKsV6tFvH19RohHT46tqyQD0mJNNIhTHgvnj+q2t0m96wmdkZqyyvsJGRMVGUMSLwFHimWaSTHilhllR0eC4Dw6PCmogGCbEbm5slzEJfAnk+78F+lbrVRsp27eywCUZxsQ9SzpBoKjADUjZSjiuQn6dUhYhwdmFeKQ31LXAAp0/oGK5qUIpDOoo4LYaAD8PsR/J7pQqhjuAKkWiWqg+kyAUFjkeAhDuRBfiERpUrDUu+NwaAi3yJ8gae78qVawI5tm7dpnCZQ4/XAMQgPJqdy8gr0uxAbZ3xWNSOOfgsujMCSCIRtsY3wTZyODVMRBkMEjKo3EKFaUE4KQfLCohCvY6HiAzV/p07rLAAo4NeQJENjPR5JdWNfteNLrvr7vtVU7965ZKENTBgPDReF/AM5FUDLVFw5X3pqAN9hQDimS0HMtT/U1cmo8PPQ0uvrYv3LuYj2EfEs8bW7f7IQJdHpFBUUuWvryxZS9sWu3blsjrKmOzT3dUjQ0tr6vjQgD8xOuA1Nrf44BeXL1yw5i1brLKqQr0Yh/buV76ImgxdiJGIbxfOdlttg6PNVpSX2cT0tKIz+gQGhkbFaENhl3CXNSstr7Rbbztundev2/jwiG3t2GWF+YXWef2a9XX1qI8Aw3jwlqN27UaX0jzyekJycA5SgJ1799voUJ+98frrashiKX7ul/6RX1tfLxYke4j11n8Ao8G0J0JfGrVIydBYlMozPfR4W+kQ5lp+vFCkI6o3au7B+GuPZMTJV7oQzN4jtOYwER3RsYl3veXQIfOyojY00O9GzSv6dCU+9gU8jcmZOc0EmJ6dFsZUHDgAcfZTrvSsIZ3MyqDJbG1NUaFamdcdy1Aj8EqKde/SJigk5cwOBGxRWaJlnTKhi4II97kHDAZrsTBPtOvk3DEs1TU1ItxhkJ3n/N6vd/XbhDpQfdloenAMj8xBLNSNicI6UqclD+MAEGahCsNhhv6I+AeLkkw6QQRqoVQBgDWk3uI74gZ5FFaRBxqOC9NQiUCN1dFTnYCoBBQ0ssqzru5uHZjmpmbJS+PVpe+HsMXQkLxg+9atihZYcEA46LV0jxWXlmgjs8Y8eBGOJA/mKT3B8OWXOn3A/5lruO+GNzM+5NGhRhrBgwbYZLPC/8YLllTU6vWWF6c9GpjWVggTTQeRMPHaxTe9eCqlNAuRDa752VkNyYA3kBtl+m2x0rKXn/2u1qywrMy2bd1uBw8ctM/+9GcExEHpZd2OHT0qDgRKtBwoOvPuueM2+9mf/gn79Kc+Zffde49dPH/RXnzhJSH31KjLSkskQc5aUEWYmZ5UCE3l55knnkAu3ga6Ou3ymdc8VH+2bt1qly5e2Dz8W3Ye8Fn3l198UakfF8BccrOMltZrZtIbCnXBRzBqqiiB90ScJJf2gOrghMwOUwEYpPyGl+bwMeSEveMYfFVKLdR7D3swmmW79uzRcwDPYA+QehYVllh2Tp6MJk6hv39ABxjlZXUASmvQOZzl1RVpORIpcmkUOexB9poGs7q9SfoQzglkT9GrQTs2qZzYhI786ipbPtL4hYHicExAdUFxiVXV1Gi/1Dc0qAGKvQr4TET3nkUATmBCzRQyAjDP2ESARRxqgKOpxKQl1uIKyTj8boqPbVo8N/c9XwMTw5FVAGuwsRSuRbJsNY3QgsubXb709gy2cJhIKNQRijHyHmjRLa4s29atbdZL2yv67RioZMLm52clMLlv7147+eor8kThPEKH4jppbDYDQGBJWbkwArUfa5gjr5MUBRjaLfgHUQnG56+NFQuuojKnT7i6NO3xe+AFHIxEotXnvVRKLK30VxZmvLnpMS+VTPqRWJYtXjnvNW/b49Omyqavra5VIwz9BfSvs+mZVkMI2dzUaBMjg3bm5de9yckJ//DRW+1GZ5cArb/zCz9juzs6rOdGp3oAwEBO3HabvfD885YXi9gnPvHxzU63/v4h+8IXPm9PPv6k/fqv/5qGc3zj20+qVHX02BGxKOkOpIzJAYarsIIKLtFbLGof+cTf9Ecm6BxcFneDEunWjp3SLOju6rLR0TEZVQwpTEx68IvKqn1AVk3fyUF4E4nydZXcMHA1NTV6RlBxCYUJ+ek94X4Xl1b0Z8A8aUDmuk4+olOEUPvGx4U3EbEkIm40d0Njs127ckV8eyJQojPKvRaN2S0H9tnKWlzj3MUHWXJj03i+GHEEXpSOUnkKREi4wB44lBxmwnR4Jw50dJqBvC+OLBSVEU6g5iU3WFRS5um0jANfSYPY47wnrzU3PWl19XXa79k5cA3eMx6AuS4oqf2WWXlZmd24ds0am5qtpKxENWWALQUuUU/RACw5wrqSMsZUuXIH8wBRCBLfHkVXBisEFlSDPiV44Or9eGnXQ50lElA4MovD6AQpXYMGBgBLC8B28dJVO3LLQXvq2RdkaHLzC4V0ZyKmcVIf/8QnrKSo2FJMutWU24SVlpdaaTlnlQewZi2tLSrJQUBamptX3wMkFJX0wCDSG/JarAcPjKuwpNLXCLKAyMIF4l1WVe92CnhBEL6xQXbu2WNXzp0yDv/mAiPjNeMwBNBzxEOmJ8aMg4RHIGoi/6fllc3LAcFj3nbH7ZZXlO+feeMt++43/sL7xE/+Lb+lvd1eeOUN27293X79X/4z++a3n7C21mZbWFqzu+++0xobmlTHnpyZtW9861v25BNP2YU3X/aO3Hqnf9ddd+qAsX7wAmAMFhUVWG/3DRvp7/RKP/B+f2RkRJr+RAB4yC3bdtiVq18T9VfPLBKzjh077eqVy1qvFfr8MfjImQcVGrw4z7m1fUugz3fWq25sl9rvvv37jXLdG6+8JKmugqIS28iiHTxX6P3OnbvUuwE7lZZhlYPz8jWenc70A2LfxTVPAONXVVFu9XUN9uKzzzheCcNeYeJt+Laxtma3HT+qFIm6P06Ng0mKWVWEBoObAUjfCZLtYWVKKahao50kPEg+0QeRmBsm6jgJAq0DRSecnVMwcrk87FA2B6mya3bbkIFLe24MGEZpfm4+GGGGuMt7RAXm4iZ5/7GRMRupHbGC/FxZp4uXLll5ZZV+ho6v/BxXW4ZRB2uLEI2FYHFoXuEgCNkPpuJycZgwAmqiEP/bNYbgbRTCUUpjbBhRwcaGqgCuVp/jmoSYUpOba9e7e+z4kUNWXAjNdEMg3mjvNY8efeiigENbtm2zV0++qu4v+sJB1hES0XgmkZZISvgedNpheQMaWcIJsPSX8yDDiUNcKwH6T2urWoThfC/MeHg9ruWALszFSPITd95h5TWN/tzk29x4jEdFbbM/OzHkjfd3ea3b9/gYmrHhYUVcbESNl04m1MY6ODBsybRZW2uL1dbUWQGt1mZ28cIF1Z/vu+9+G5+c1ab60AceU+dZ90uv2S2HDlhrW4udPXvefu3X/pVYdfSic73v/R+wDYsI0B0fG7dXXn5ZcmCUIrnvnXtv8aPZ6BX0BpTWuN19zz32xqsv2ziiq4UFNj3S79161/2+hFgYdFleKfynvqnZBvrgAjgvtjTrjN3Vc9Obe0xzEDJmvf29YsRxSEkHeC9ybXJsjD+KRJPjaXUFEpWkk2mLRDds34GD4j4QTo6ujKhMB0+FSsXa2qq4CzgLIezZuQq58bRNDXV2/lq3U4XKigjcJndn4Ch7iKiPmRDh1KtwQg99A47QtiENy3BcOPfMgccgoiUBPsZnAQDk+/BmcCY8V5wh/BEiYv7N/UxyM03RtGJ4EPQkBLTh98QAhNN9oUZi/S5cuGiDo2PKX1gslTrQ/pPSjwu/nFiiO6ThjEA9ZA58MMrb4QKES1kC7nhoEHT4j1yV12IjKfzxfJXI6NoKB4jyQIgWBG71D8qYtDQ32rUbPerqK66s8zEmczPTtrywYLt27bJnn3vOMumMPLlamUvKNBCCQwblN9LbI08rDEJy02YL0+MK2fE2bJTwYkgFG4RSKHl/27bdftuW7bRF+wCk/zVjkFn2V69e9hubW2xuckTfKy6r9kk7oIne+dBj/vT4pKYJERpTn9++Y5e1btlmg703tDl6Lp/1tn7kk359fa0EUA7t329zU2PU1X10B1998UV5sra2djtx4oRSHoZaMJLs0uVr9tWvft1eePEFq29osgceetie+PqXdB/w+a913hC1lwar1rY2AU+3HDminB2aL9Ll5OtXL11SCXHrli12+vSbVtfUYMtzi1ZRVe8/9PBDduHiVUfeQdCjqFjYChOlZyZHvJLyGp/cGFUjevkhSOVmo7qbtIK8bOvpG1LJLwoltqJKB4VwewwHo4Eky24sGpYu4xrGZBwKCm1liZZchm9ma4/BAnzwgYfV8n357BteddMWn8MIAMyeRNsSTYPkhauilgP8gtwn1xOuBRu+PirWyt+dNB57Wl6fcerBLINw9LgYsJqzgKgH1So3PJWUhUNOBQdadmlZkbw9GBoOBUZsOo1IiDP2RGCu/OwqCCsrS+9C1/tdGgAUcPmK2iydT+rXZnRxHqGUCfyjtMJBk/AH4XcgIhrKfoXCnmrVFBHEefBQ40/DFmn+yc6RjDY8ew4wP6/mnKAJyM1qc5NXNA5cGoM87Ij19w1YZ1ev7djeYdc6ewS2qcNvFdHMZevruWF79h/QeDMMFowvQCUQbMhJBOlMzYmnU64jMU5Yhkqxm0ZD+64mzU6PewXFVX779h1WUVVp+YCdTEaem/NVSYhjKAtUNwcPGRke8tEKIAymb2B8ZMwOHT2GYq8PVkKUJB0/WqpTG3b/Y++3s6dO2fUrF62ktFifr7Ss3BbKqsTnFx6wsGAtLc02Pz1lc4sLtvvQMfvGV77o5eXm+nc/8D514MEj/8//+b/Y+x97VCO6Itm59vqpN+ylF563Rx55xOrqGm3n9nb7ciJlt5y4VzJZ6/GU1TTUWU4Og0cKVHe/5957bEvHLq3vKy8863okIhF74IH7pGfApoUGOz7S69W3bPORjCNEX0I0Y2VJRhuHQKS4dft2n0O94TPgNNfAPSorKu2WWw5LjIXhKAya7bpxzZ54/Ds2MtCjkjE0dN7HAanlm0o7PDPhKzRFcTgZg04cI6KHL+ODTPnJl54LdrObJSAJ+Yxve3busMGhMR1W0hcozwixxtUZGteZE+09aPHdtm2bXsV19q2pk5ChoKEBCEFqFwW4Qa1hGisNiqyIVddUBtOHHYZAgx0EuLw8NzRE2MHikrVvaZdRc68Zsfmp/w+VqO+nAdjkTedCeU2KWEKOCkEIoI3OqsW5OQktYBhWNzsCAUxcHo+aDeBI+H1JcTF3jck2QZ00luNYVETObIxQ+48rHP4A2U41VQ3JcEMa31bhzRft9fjhA/bNx59QflpSXm5rq0tSnzl9+k3/ofc9Zs3NLXb+/Hmh4nD8qdHzGuRdtHhiDLgnDJzAKx4sY9DzCqy4IM/27t3jHzx6q+S/AbF4iGNjY5q+Iwmx1RVn3NS1GFeNF3QXb700N2HDfZ3ekVtv87fv2msrC/N28JYjNjoyJivPhgIE4vPSz9Da2uY3NTdZdlbMpiYnbGlhVoaS0tbc9LQasCwSte3bW23Lzv1+5+XL9sFPfErU1tm5WTt09BY7efI1+8qXRu0DH/6gffanftLuuv2EjY9P2b1332EvPP+cdXf32k/95I85edRAbg1QNyuWLfkw2Hg8J8piREpQm1uaWqystExVi7yCUrtw9rTVNbb4iH6ePXNWhpUOPfgTh47ean39vba8uGzR3AJ1K8KOa92yVZWguppKDRUpLy1Sirll+zY7fMsh+8QnP2GDAwN27uwZ+/JXvmlFlZVKPfHS7EEOF6PqOViV1VWb4Xl/X68O9+zMlHVs3yXc4cL5c9pH0krMKxDZi/21Y/t26STMzjuhWH4fJ7eWcD0oeH7SyxWIOsyDEOjtGH68P+VQ9goGIVSvCkHrEKheX1pwsw5QAoastLwi4hIXTgiAFSr84uKcKzkSZgmjcBqFcBaCY2DviQFAAnuppMJXU0KeU8VxdU9TjsxiQrGFzovQoiM5OIQT8EyHOxbbBMJYMIl/BHxpp0PpRI/Dwx0Kf/BfWAHAcEgclAmrCIcwrCM313IL8tWDzRCLweER+9iH32elxUW2uIQaMZLQOZouw/x5mGptra3W1d1j1XV1lpfbJiMGck6uiXfgoQP+TY5P2vTUpDYcs/4Yftnb3Wv79u21sckpe/bpZ0TOqKypVrkM8gpVA4zkrt17dWBvXLssjjfGUnr2ZdU+uoR9Pb2S2H7xmSctOy9P8wS2bN9qE6NTahy67c47rPv6ZZ9wFDzjyNGj8myf/5M/Uvg7PT0lTnl5fqHlxLLspRdetvseeNDefP2kjY+OBeXVmL34wgs2PjysKbxf/sJf2Ne//CVjDh6suNVE3J59/nkrzM+1u+66y7HVEgmbSiQ0EwDG2noyYafPXpBkFT35Ozq2C33/+7/0f9mN3gEVlyFP0UwEAs8zpzpwx10nrLi41ObmZu3Vl1+26ZlZa2hsssbGJvvRH/2UvCfpgQRTpmftzdNnrGTvPgGwVD9wKuyz+rp6O/BTPymK8j/8R7+iuYM09Oi556Kpl9GeC/tG6NYk32emwNTYiB06fFA5d29PtxVWoC1YJBA1t6DA5qamFZozCdnfSFpdba3EOQnZ2aMYd/YVHYCbg2uYCkQ1gxKhBpG4kfWiAXOgE461Km6AFKYcoxXDsxCHALWuqAQCGFqA7G9YjnBlUqlGre3czIRlZztBnYXZWTVKgY6VVtb6CzPfexTw7iIAPLW6l7JEB33z1CnVlFUCyaF5JKkW2YKsguDQusEHhPHOKpLHuzl+IdtPk20y5KcO4EFGCTMQKgCFqYObxR4ou2ZF9dDCOQGhXpuTfUrbxNSULSys2F133G4vvMZQkIzNZ7sZ671d17zrV6/69957jz355JOStabPnLBeeSoN8YYXoVvL16w8lZY0I29cGAX3gQjKvt077cz6qr38wlvW1NJi7/8o4peN1tvVZc89zSSiITt2xx3qpAM/uXjhvIZd0ojDazC7gAEm/+zXf9N++zd/Q6Kd1bUNMga+l2W1tXX26R//rD3xnW9bU32dFeXl2rYdu2zvgcNqwW5oabMsJNAXF1QDp3vvzjtOyGh986tf1hgtwCf0ACtr6u0X/vbP26lTb9pAd7f98R//kWrlYAho83/mJ37Saqsr1ViD4eZwooHAWm/bulXeGgYcgCR4xC/+0i/JWJYvumEjGPCx4QHLLiqy1uZmCVesJTds6NJlO/Pm60ZrtJOVWxPn4uLFi2qyYRjJk089YzMzc3bv3XeqMlCQnWudnTeckGjHNnnk6529klf73d/5LfvDP/z39uLT3/Katu71MeAY9Jmpcevr7lQ0BH2XfhXo03wWuiFPv35SzVuMCGdvgS0l1pO2fRvqRh327AsvyQHQrQqeJWUrDuga6sDLThY9APsE1DEoB1A247AfQzkqkKxDaYmLfU1oz2QpuCTk8kTBlCwJ/QnpkZxjL5AGkuATeeqZIXJTXOZUpKkKMM9Rsw//asfkD9QASNNPBA763iNWW1ur0FcagIyd5gMwfRY9eTTWUVAJBjOg3Eppi4Mg8Y34eiAl7TrAFhbm9GEJKfAmXFIAUv3UFBbx847B5aiWeEFNVRWbK1tiI3rPlVUJVdxy6KA9/eKr8ij9PTfcWKbiSv+lF5+3O+++Sww7JrAiQgm/gV4AwlwMHGAhXohF37//gMptlKsO7D+ofO8v//LzduFcubVu3W6f+vGfEDZCGS6zkbQtHR328KPvt+9+5xv25//p9zw8/tZtOwSCMcoslHZOpxJ28fwZ+5FPfEItva+/ccr27Oqwc/EVfdYzZ85Za1Oj/cLf/bvKp5nDwFpifIcnpq2ltU1G68yZ0+qOg+Pw9a9+xZ595ru2tjjlve/Dn/R/+Zf/nv3Kr/xTu/2uO23X9g6p4/zCz/6c9fdct1/9tX+lkdwC9K5fswceut/KS0utUqPKyjRE9LtPPW1f//rX7Wc++1lrqK2x1pZmpQktzc1uZLeXsdnFRVtZXbSmti36t+a2NptfXFZKwMzCO+5/RCo6rzz3tE1OjtnExLTUkFvbW+W5I5m03XfPXVJGgpFZWV5k9bXHrLunz/7k81+QnmJ9XY0IQa2tzfZvf/d37fmn3+d/61vfMgRLUglGeG9IWhx1Hfae8JiFeWukyrORsbNn39LEHyfzHlU+Tjry0fc/LAHOkfEJa2tuUSkv1PQL51QQHUI9Zn/D3yAiQ3eAjeyGm7gho+A7vBYtx+xbjCgKQ3Be/ERGhKD8PIeRMZUYgyJ6PBOaGPs9RdcpgjcpkX7QNeAM0CbOuoKvvbsi4Ls0AAp5cnJEGwXNZaHKymA3UQNF9jhHvfLEJyL1wKRTvTRnk+UHiCOgL8+RfDi0+tBpuAAMdswyL+ppmgzWkrxLqqoC/tzkW3InqLlYUI0GxzAE48JZXCz4uYuX7PZbf1JpADmmRB9SnuXmxCQMQcMQ4iCo2dKAQUkQz889ggkA4BTV1dnxW08YmAF8fD2wiGdXrnfKi4NQM9CD4Z8PPvyw1dfX2KVLl61hPWGFJcX2yEc+bidffM7v67zsXXhryqqQ20rErZzJQYvzMpYXT73ife6//Gf/U3/zb9ryGuuYsr/3y79oX/zi14RiE3peu37dPvbRjyoPLUX7bnFBHAq0BGfnlqy9fYtFbMN++1//qs3OTtvOjm129q0p9fSjfHTb7bfboUOHbHU97lhtUbPb7rjDfuu3Ku1f/Kt/o6m8zz/9tNh9f/sXfl6TltraWmx0dFzhKJRc0HBETBkEGk9uCI2nfEox5MSxQ6rBv/rKa5bxIlZYUmpf/eJf6LkcvfUO5egXL55X/lxTU2t93TeE5KcSaxbLybNHH35Q5bj+wQErzMu3lfWkJeaXbG5h0bZtabPvPvuiTU2OS1Id/gFs1P23HLMTd9xlI8MDduPGDTXzXLxy3fr7e9Vkphbl1TXbvXe/RoX39w2Kboy0uPalvG2hdezaaZ1d3QKZ6Q6dX1wUdZi9idHSgVPDWLZov0urYFbZ6n7l+WQXMgdjXf+GtgQVLPYzjlEpqkhK+cKDVLpGZi6Ttmgqqr1MCVKlwDTydsXi0lBWxCFBb6MpqGzfPuvvcf0cRLnvmQGQVVt1QiC01YrJF3Ha/uaD6DMxaE3yUEx84UNwKMmDuHHH7U9bYQGTe9FF27BYTkzCHDwcFpQIQCKJcSykE1h0rZXwAFw3lVhY6YzCYKww/wunsdBRiEXu7Ox0/fZ1NdbTN2g1DU12+dRLyp3iiSq/p7vbWlqb9OCowTLUFHMci+aopZjut3seeEjiGUz6vd55XWFbW/sW27ZtuwzE8ECfhDFo7b3e2irtvfsfep+qAuMjA3b29DlVHPo6L1txRa2PYnEREVAkZjt27rWuzmtWVtvkv/bqS7Z91x7zMmm7caPbjh07Zn/r537GnnnmeSeNll8oQkhJUb5V11RpfJYf8W1+bkZNSJMjgzY7NW519U32T/7lb0gJ+P/3t3t9sIurXX3Wvp2mnQVbmFuQCg/vgXedGJuw++67137mpz8rvce+vl77/Oe/oPyTiKS2vsEK8pnenC1B0YqyUmttbbXf/b0/0Pivvfv22/btW1xba1ZSG3h+adm++OefV1SxY89B/RvqUXTkpZT/JkSZpdcBIGx5YsL+8A//QANUcRJ79u1ROnjm9FnhCZ/8xN+wv/93/5YtL63a3NKieBBdXT12/XqnPGpRQb7d/+AjwjsOHOyx3/qNf2UXzpzZzJEj0ZgP1jM7MeAVVzf5AM8AtXhmotHt23fY408/rzSiqqrS1f4Z2FlUqHSW8Vw0RPEcHDM0LjYrkQv1eQ0pCRrUwp6VtVVXLRCjL7OufRxiWK5Dlg5G9CVdmkk1ikiOn4FhuXvXLnstkHPfvrXdtmzvsC9/8S/d/pTK8XtkADhYhP70WJNHMdGEGwJ9BwEl5FKIL+IOHVaEUE58kxZQFhYOAdYRy6fyX4bXog3UQZxsUE1/CUZbaaRSkHthQFRdoPYfTGFxmgNuUiv4gJ+VEVLPVJeBwWE7cnCfPfnk03b7nbfb1rZWn2GhIwPd3p/9yZ/49z38kKS/VhZgN5ZbVW2NHbzluO6fuW0jw0NiKVJ/jkRjmpFHpQOEuufGdfvmFz7n3Xbvw35u/i67fum8lFw9/4vS9Kck+tbJlz3UgHYdPO6PjQxpw5ISMTcAb/bAI4/Yyy+8qB4ABpiK0+Bl2Suvvmbx+BE7dvyogL6XXz5pKwxHzSTt7Lnz6mEm7z758gs2MdCpzc4EIQxF55UrOkCU2c6ees06dnSoTt3dP+CqMWjvZZn19A/YwMCQbWlvtaqyYkmI04nY0tpsr7160v7s839pF956TbyH7Tv3C1vhOS4tLEnp97H3PazONiLCi1eu2sE9uzVj79nnX7KpqUl74JGHrbauViKtTEOGELY4Pxt0dCYlsEF5ywFsc/bWm68rbRka6PdRQWZYJwSeX/mVX7EH7r/XHnroQRscHrNdO7bbnj277fVTbwqjgNRElWA1weDMmP2zX/t1mxof85979hkbHhmV4nF/d6d17Nnv79izX8NImX/w9DNP2769d6jSQXhPxYLpO3RLUgZOAGwHyr+SoGPk2MaGHEI4+49RahoQGvD+ydNFYwu8dMgEDJmDEjvNdarUSOZRVQNHkUSYeDEMBk1J/IXfu3LxvI0MDUnLoabaCcASYbxnBkBeOJi409jUKIDDDV1wAB2kBrjSWEw8PqF+ljmhBIgOIPh4fui2IRswJPOEJRN6AjSdN2jE4cKocNjDuq9ERoKfcS3GTvBB48KDWQSkHecvXLa/8eFHrbS8xK5fuWr79u+zX/xH/5TX9a9du2zRaI79v//iX2nzb9m2ReOskK1m4mxtdZV1bGu3xx9/XKh6AS3ACwh6Ttupk69oUEdReZUfy6Ult8umR/o2vc6Lzz5p5bVN2gUc7jqmBJdXagO5clW12Gq79x+wj3/6x+wv/st/tNOvv2Ydew/oUD3z9FMSX73jxK3CIqqrKuRdNT+uIN8mx0etqrZOIXRVQ5tPBMXadHd32uT4iMJwhlWcevUFr7u3XwQjTwMpM1ZYVCb2ZnwVTkS3Pf3Et9SEkp2LpDtl2DxtSsqhDe07/NG+Tu/44X3+XSdus+6eHiuvKLaf+9mfsiLk1BeXbG5xUcpCjCC/fu2q9fa6hqwjhw5Li2BmalItuPABKCkiWDI3PS6wjo0/PzMlQI7Dr2ddUKD6d2llhRwKmM61q9ctv7RcfQXDYxM2OjxoF85fsKMn7rThsUlFXjgCSogcqtzWdvvFv/8PbXlpRQ1i6TtPaBZBOuPblcuX7a1Tb9jsxIQ9eO89dv36dc0q0DwH31PFgjMMBwQKOZwL9j1RInuNtCas8wNmQnP2S0sVfToei+MWhBOBwl6V0KFBkSYlBYAlAsZR8e+ooOPcmCFw4cI59U5QQbn1+HGL5lIx6lKVSSXf98oAiHKp8NzN2YOYgofUyKWVVYGDK/E1q5Fen++4+uokczrqLlzXmIagzOcUgJ06jNPlgxUWRhQiUATkIYAd0g1Cby4ekBNdXHOkkMDSkj5Ii8Dz5OUQKAVIG52etRdffMneOHnSdu3ebW3bOtwwRkKqzIadO33WkkHdt31Lmw319dof/8Fv27kzb0icEuRW90rnYdQps3qRqMJ4evyLSqv8d/YB0EPOxUYBjS6rrLZkgh6ItFRsKC9dOnfODh09anc/9D67cvGcvf7cd7xP/sTP+Uxe7r52xSZHR+yBBx8UAIqHYsLxtq1b7MK5MzY1v6gNcuyOuyTOSk6N8SUC4ADy50tnTkor4IH3PeYEM7OyBLI11Nfa4SPH7Pd/61/b4WOfUtg5MztvbS2NynnfPHXGtnVssyvn3rKv93XasdtuE0iGgUD0k+ccTGvUII3qygrJm0PcYbrR/R/7mFVWV9rS2pqQflic4CTsnwO3HLFzb52yudkpjcHiDdeWljb32PjIiLARDgehclbcs04OZ9C3MTU+YrUNTXpfSFJoF1RXlgmYK8hz/PyRsXFbW0+IFMTYLyol5y9esG98+Ys2s7ConPyWI0ftyC2H7Uvf+I7eh2oWe44Dz9qRynKYee5EFouLsFxdBOw6+lzKCWiIAcOYkQo4Z8d/TgrPHW6H+vN3uj2h92pmhp/QsyX6xeAKXKfNPS/fGurqVF249fbbtW7PPPG4LcyOe+hHvHcYgKyZCQGFk0wJrbKqWjdOiyvekRCFD8uAgxzGMTEYVO2PDqSLSgsgrOsz3rnAiW4yVokKgKawuJ7/kBHlrGeWgL8i2lOD6IE5bRxwDr8+HK9PKy8ThrKzZV3fPHPWPvyB99u/+d1/L2nwM6det+4rZ7zK+lZfAg4RhoMUWnZ+sdiCpSVFEqno67nutXfs8W+54wGfcJ8HBP4hBmROiei9SzPjXl5egc/7LiBA+o5raqjPq6xr8QGaauobYQhaMlCILSuvlKch8qDnf9fePcrvb1w6badef93+9t//h1aSn2MjYxO2a/cOAX+dN7rU9EIPP403y5cvW11Ds2b4VdXUiU6aXZBtn/7RH9W0YACp+NrP+M8/96waYeAtwM6rq6m2ksJCe/ONN6Sg/IEPfdR279mjuQjkoYTvZWUVqkt/+4t/YS3bdvq79+2TIEo7I7OCdlbyd4zOQs+iHTl0wP7sc5+zM6dOeg2t2/zjJ05or1SUldj09Ky98fprtra8aLccO665BzgRtA8opY71uxQmvBZnRr1YrNmnbx89Qrj0o/1d3tRYhY8wyNhgtze3sOhDG+/r7bLLF5psI+mUmurqGmxugdA6qtSjvb1de+z0m2+oiae0tMwYCYZgyF1332GTMzM2OjEpPj9hN1UPRZ3sN6Y+0x0ajUmejbbgjYDcwx4FrGUvVJRXBBLei4pAQ1o7ewoDIgahJmO5wTSkz7kMx11d1TqQCtCYxIuyZqTGWVHX3BbqR8wur1pxaZnNTLgJUO8dBhBYJ7jW1Kg5fJAb6FBWbTviWX4uDD83yhhvjScmRKfcp9HgKYeihtr/gIC+D+U0bzMNCMOssIfgnWQgSo6O6ukmpfKQNpJxF4pB1OBDRlx1AM28k6dO22d//NNWWlKsxhEO40Y67dPEogaLjCNuEHLT/w6yjXTVweN3+qNDrt35nY08CFZqoEPwYGH5vfPwQxeGcah/Q7EGPQBtFoxXuc3O3LD56TFjHBadaOSNTCsinC6pavT7b1zyLl+65B87dtS2tLVagdKqiEZGExqDcFdXltr46Ljt2rNXjTrDIyO2q2OrlJmWVmhjzbPmhnpbnDtoX/jT/+QNDw767Vu2usGo2cwvrLbOnl5X7kJmSiIVsBnTtri4KuoxugOj4+PWvm27vB86fyDk4C0MCwU1p5KybUu7Sqn/5jd/Q58dTgEA3qMP3y+w7Oq1G0aBmNenlDVw47JSJwwjk3D/Wxf9FBW1jdJKDIlj3dcveeW1jX5BSaW/PDvulVQ3+NTMyfExrGPjY3bm9Ze9qvoWzU/kACHMmp1XoDbhsspK4S+0GjO45dDhwzY0Mi6BVLgJpKZ8NpiqHHqqHtCTcRDZ8XXdOyVGhfaew4iilIsZhpJwytfs2zDkF2goLYmI+AJMu15dcY1t7GP2O0SnisoqpQNuvgYOxmEK6A1u27ZVhmRwaNhVTzovBfW1d3GG380v0ztNaMQGoWTCQ+SSNUMQMZACc2AW0kccstjmhyJcov4JIUittemUWISOcQWi6lB/SXThyYMcyo0Bc80WqhYEuIH41VJicTMLGdWM0WCRSVEguZy9cFFsQBqAoPriVbDUS7MT3tzEkIcq78rqmvFn3pfXRf0W0G5qbMgLDz+qu9VN7Ro5hmb8fDDhJuzmY46d1mJhWn3u/J2fJcWgk47PiXGra2i07msXvcnxcbfhSF3SaWtoa90UfHziq39pT3/3WYun6QRbFz8BEJWFzDBCey1u6Y2kSnELc/PWsXWbvfrKq7a+tmIHdu3QJGAwBiYjb+3Y4wN6zc3Pu42ak2sr6+tWWpRnt99xt1XW1NjI+JiGpFSVl1lFeanV1dTaAiE6gOX4pE1OzejZBoP4hOWMT06Li/DyyVP2c//X37GNSFRMNsL6ky+/aFNzC7YE97+8QiQdoou1dceQo+27tKTMeq9f/Gu7Gd0EdBRmJ0a8iaFeb2yge/NnhBEFXZeLU6PeCqBiMmE5HEZy8gonNlpWWWFNbe22YSDtRENr6vaMZkctlptttdXVtn3LVnvhldfUTnzgwAHbvXu3Gp+Yc0ClA/4A+5YIAglvwnvYeESXRFdEg5RowxCffct+FDgYOC6n5Q8WQJbpqmBybLnZAnc59Pzb/MK86MUhtkDUPD48ZInVVXvrrbN25tw5pbs6wO/VePDwIldCJPLI8dsFdnDwuWlCF/6ON9P04OVlbZSlOOi8y21yJI7p5rXDqHO5VFA+EQXVhZdEOfSgu0iBFsp15dSe74aIhAfFe0e6sBE2G+U4woSUg5icE0/Y2MSUhm5euHTp/0/cf4DpdR1X2midzjnnRjdSIwMEwAzmnIOSqWxZkiVZsmRbzjOyx/G/9ng8DmNbtpVzJsUcwEyAIAASJHLsBjrnnPO5z7vq7Cal0cy9/3Ae4+ihkLq//r5z9q5dtWrVWlIL6igpZYw1nhzpj6DxYrt14MUubeYwnffWq7S6XkafitAAe8ki1P1IBD2CKEjwDCytqoujwrIYbj+bh/d+4o1XopLK2risqj4GHKuoqbOVa9cIFJqfnhNjkROut6steuWFJ+NN61dZf0+HrV610pbXL9c8AQAdHgePPva4tTQ3GuTTLVu22JVXXyVaNfZXRUUFsreG5QZ7DpdkNjZml3gJMDGJuvCf/OkX5AkwPDomQQqCe1UlM/Yl9pMf/0jAJcBdR0eHhEcIZmQtbKhTJ0/Y4089awcO7EuEX3PUNgMPueqaq625rdNaz521k0ePWEvTiWjN5otipLjIEqiZBwffHAH+mSvJ+H7RNdL3pg8jlxyESspj1h2pNTwUCDlpUYqdO3N6yZGK7hB4VX5Bkc3ML9h1110tTgQZAR0JHKTRdeC0poQdXRjVaa9NrXkTDjAv33hNfAiC2K0UqRj7nZzUn7lEHpLBLbP9+Cy62SlZavCWBFegjRj8JjkMIKDRBUCxmp+/e/duq6iqEY6y75VdEpgheJ4/IhApui3YxrVbtOHonQJgyNtN7qiLFqVmSADE55qnlqIj7T9uDKPgTGmJ55/KWK1LgqPKQ5QD6AtGjEH2i0sa/jD5sGWan1f0JEvgPdE2pEXFwyLLkKIvmvK0Xmbm7JX9++0TH/2wffd7P9REYElZpdBpLlp3W+pWGLP3zaePaoGB4CtaJ84vQv+7Wn9h7vVWQQ/krjVMY2YD3W1vCRLlMV2E6pVrY+b8w9+fPHwgzs3LsosuukxtQE4WWksl4BOWYl/853+yW2+73ZgbIHNoOttiq5fXK3VGK54709XVYWdOH7ebbr7FqspKNWYKSej48VNC5+mR/+v/+DtNuN1wzZV2rqXVzp07axs3blAQ3rdnr23evNUmZgBO8cTrsgd/er89t/PxCAdg2IfoKYJGc//PtbXbxo3rbPfuV+yNgwetsLDUUlNGpbI80NUS1a1aG58+dcae3rnTujvaVcNzgR0UZAHS+TDM2V9w+nONJRoB/7sLNx++KK+ACdFEaXqBgyBTAiV9na3R5ouviun179/1TFRZtzrG9nwhcfq57eYb7fXDx7XZYVjS5kPkBpyGIAbeRAmBVJfm9medvq7UfnZ2adDNhUBdnp7fh5afCHNoDshF2LkBYS+wLskcUBtSlrsAhwIZM592nY4n5BM5NTGmoFNbl74kTU+go819XjEABCgl5jEzLcacRDQEnCwIwRcHPBFLkF5aMkLpTrRZYvkpCk5RR+VYQS4z8C4SGSJquHHBCThMVHERD0DqNVaJ7jvgYLxgKWmZMlaQIvHkpE2OT6qny+Y5euSYjY6M2VWXX2ZHTjWpfQNSPj7Ybb0d5yLbtj1es3GLDfT1JnPiiecAclLT0zY2+P/f8AWrMrzPcHGiE5h6WjyVhRDEzmUkeLivI3r2oR9ZysJC3HyuyabG+qP09KqYtJMOA7LRu19+We64W7dstqmxYWs6F1tFeYlVVFZYS3Or0sXHH3nY7r37Hp129Jl7e/rkiQh//8orLrdnn9lojz36qK1YXqdM7eyZE/bLH3wfHrW295U9lp2Xa1sv2CZJNdqMr+7dY3lFFTEqRB3t++2xR35q737XvXa2ucX279lt1cs+a40trZA2ZCXO6QmmwtV29nTUdvb0/3RvYFIO9fUbYid4Jv6v7mHtqnWSTgsttbH+7qiwtDIeSQJDUXlNzKQcNxFsApyJGp+NOtjl5djarZfGzFjsfOQBvaaQfCi8IyMyMmV0u+nsWQmp1FRXywJctN+kg+SlZppwGejHsDcDE9Vt7hy/CiPvfD2/hu9lDciJWDqOZDRvDrexrpctW6YMgkNuaHhATECyIqe94+o0ZKlpmRalICHu4LM7CLn61fnjAcjTzluBIjVk54j0QF1PfyM7L0fWVn5KeyTk4sMGhV9AFn6Ph4DbO3saJoXgRDAk2CsHCfDwe0kl53gbUOk+N5XTnxHjhFPg/GosyLKcipnN0jPb++prdsklF9ne11630pKSnzFYaGk6Yzuuv0125ycO7Y+Kymvj/t7epXrzrQvw5y9ERwk64CGUQ8pScnLjWGKj8177QeEtr4mH+zojsIeff42nH70/IlBQwwo0nWNoakadE2bpoS6Pjt9tzc3NyppKS69SWsn4bG5Bvqi2yKGVl9ZLUppsCYdaTno8/t773l+yz3zy07bw6V/TANfqFcttRV2tnTh9xh595BErq6i0yy6+1PoAq7IzrGdgxJatXGWNjactJx/15HSx/xhUAiR89ulnjftDxgZLkjKOzO1/dzFm29nSFFXWrUokMf/nq7jCufog3qTzPNPZypoYdafFVQ0xSD6zH+oMoQo1MmJDAz02PtQvxSdSZLwEtl10mXW2tlh/V1tENhcOkNnZWbvumiutuxtbuEmNbbNWsIBjQ1NeorRUWlKmtmKYZOWz0VXAuzAcUhxywbeC38uqThWM1/5hkC2MuQeTHDkGo4uZnW1nzpxx1+u0dGlWqpRBFCcvVzgJFHgCEIC7Ox6na7+cPwwAhl4yAnnBBVttz8t7bEqqNdQ+kRxqYYzxcGSNpLYJp7JLHvNfME0givvvGSwio5i1jDTslHN+hjgRAD9aOKRLkgnXSY9xR5Y2svTaE08+ygltnEQyDOScIPXKvv125eWflfrL9Oy8lZZXIfcU49ZD+zIzPc3WbLrA2lubYx6gZWZacVU944UqBWpXro21iKRZ6BJmpNqu5T5hE2PInsGWdAlpclOpuTBfTn0ZpYgrgDgIaHsILuHizwwqpaQu2sRb1IMIHHueeyJ69uKL4x2XX2pf+MIfqZW6dduFNjY8pJFW7glil7V1yyyLNHJqwnbvetGGh/rs3nvvEvttzfo19v1vfN1a21rtN37zcy5PhfcdrTZq0AwWXp698sorGtsNhpiFhSUqqxDLHElIK08++aS6NxOjk172mWNB/6uLAAomVFG3MgYrCKXWz19DvZ1RwFXATbiXtPRGh1zWjHuONJs0KJhpUDs43WpWrFWWBbtww5Zt0i/cc+p48pxSE5ZdmjWsWWvXXHutvbDrFWtuafZNOzSo05q0ngEnuhusRwUZlK00kp4q2XrGypkBYEaA76UMDgNqDIjxs4Jqrw8SvYn68zP4FUIXmIp3GxctXnTzW5ncJAY40JXlmA3mmmpWUipDFc0QOJPmvHUBZiQPrfn0uTlNA+LfRlQmBSNKsog0vshMPJODGBskhAj84XTSz0xrgk8iGXmM4GZKBAPsQHrx8wuK/hCIwlQWdRE/X/9O3U8UBokdHRbvABFG/mOyitYgr0224JrveWKFDQ2P2kUXXiSSSFFJsU7T3OLyeKi/Ozp57JAtX7nKlq9sUCpHmqhoT/cBQCf2lg5DL55tpGvmn5Om+dTRqK/zXERJRC2MSEf7uVNRd/u5CBkxxlAxDAGb4LOx2YPC0luvqdH+KGz+vJKKuKSyTupCBIEffP979tQTT+gzP/LQw74QFxfs0Ouv2Y+++W/RA/f/RBz/8Ylpe3HXbms/ezyidTQ2NmmdXb32nvveb488+MOoorrG6pevtt6+PhGlyI6o5Ts7e7TQ+nq6ZEixOOdj3AXw+wf6FSQ47THzoDsDGk5ZB1grPOh/U7tTqskpKTdf8lz/vy5wFYRQYOKxrpRmi+49ucQIVcCJ2Nyg45G1NR6P6PCsXrveBnt7rP3c6YhyK4pSJe7B0NIN11+rtfrcCy9ZWWmpMkEQ/mlIbUVFWqe0mIOab9Co5OChHAkZHmAewQGN8lDiujmoA4KBAkyGxNrjQGAd8jModzOzkRl3LouL4nvpCBdGGSyZAJhYWob1kq1IaCRbrx+mY89LAIDyqzbI7KyGMfhAUCSlFFxc7Co/nPIpqUIxQxrEB2Ph52bnOAGItD0lsv6+Xuvv79XXMUBES4y+J649hE6+LqiqujZ7ogEYeZdBOEDkdRXRFsaUTnxzH0PYgohUiGOwMK8BmPXrGmxuCh5DjcgjYcOdPnFcX7Nh8wUifsAWk2RZVq4+F6cRzLupsREBgkEOijBdUFYV55Ww2CLNnE+OkpLSCiyPAQbrVm+IC8ur4sGejggtQxSEEVj5RfcYFeHS6uVxfmGJpcgNJlMDUpwK9z/wgGpBGIJHDx20A6/us+MH90X1DevjvsFhUXGZltv94vNWVV0X33TLLVJJhovADP/6LRfFa9eusdLyUjt3rs06e/ulaf/q7uejhx95TCkpSjriC+TkCC84evB19dkZFmKsurDQdRgoUdyNd1GgLOl77v+CpTbY3REVllTEQwN9NtzvSD5tUkqe/9Va49/Y9Lg7IU3umZ6Du5Si+PHxvEmZEdjguvDSy7VOjr7xmv6stl+SKfCsr7vmajt06KjkwVivjY2NVlxUYOWlpdqMLS0tIvzQcRI/I2ntqX0qD0lS+5RkZBxVaX71LcVAj4/B+/yA3KxEnXcyUDAigbVZhsZhbr7elyy/pRjt7FLeLyPH+GhwoLqV/LRKKJ/H8K87LyUAp/tMf59438yFH3rjdaHRpCdEOWolFrjcduV1nuIEnSQiWiIHLdWUYJQ469jC4KBHRA38aO7de6IKHkmrkTAOis+liJvmrD9SbMlCq8W4qNNKTkLzRMtIPVx+1u5XXrHrr73SNmxYY6NTiG9UWUerE3d6O5ujsyeOxVsvu9z2vPyCakGot6PDY3LhtZTYUkjDYrPcYtB+7xGD+uPCg5AI6V9B+bJYQzIwGRcQhMh1Xfk+r/1pC1HfjY/0/8J7DDGHcdpsUaK9rhwbGZT70uTEgg10t+h1JsdrJJ9d17ApluS6zdp3v/UN+963v2FnTx2N3vvLn4rTsvNsomdYY7XL6+vsiit22MDQoB0+ftpmJieNejkjwVS+8ZV/s+986xui8NL6AxHX6cTnls1athZzV2e7xEosJd3Wbtwk2i72XJiFcLr/IrmKooqamFKi5czRiI2vlqly4FigqKjgkbsto50wPtQbcdKy+N0rYEyqS5STqqNTkUBLtcycdH2Oob6O6Kobb4+Xr15jp44dsTMnj+gepWckHaicXDH26pZV28OP7bS+HmTC1toll1yiNjEj54GxBw7App5KBD9npxyXkkLQ7IzWHb9PSfHhNOZeNCPDM08MSFnvZMl8LtZh0LHk4JSDtnwFHd1fnHQ3bHloJOWz3IMpASyWkQ2ZLGuaLKqo3M1kzksAIOXLzM4Vm4qbgpoJ7bjpmSkhqWpziO+covSJlBe9M24QNSWpDJHbT5B5N2DEb4+JP+awM3z+PdxENhjhIpCBCEDBh11USdbQ/IJAFIGTkVM1SfmC+CgKv0wlklnQCjt0+Kh94P3vs9/7z38i6mhZVS3kHf3ME8eP2s133mPbtl9qL73wjE58BncqSkutf3DA2lpabPmKVZpdx0pKMlDMfkM0mWDhpKodhCMwLVJUdQlgtHTCBTBFjfuL7q/UhRNFZaSzbr39Flu1fLnYgEeOnrCnnn7aTh47HJOSS7iivzN6a0L91s46Cjw7n3zKBodGrKS4RPyNtIwcy8vOs127dlvD6lV25PBBLbiCoop4KDmZ+zoxezVlNWGwBamEguIsKy4tsdtvvcXWbVgnjIMS8Fxbh+3Zs8f2vTLxM5/zrRc/g83P7wFnC+rXxF2t3hUpr10Vc7pOTE1YQXk19Z4VllXFpPYwCWuW1WnqFFwDLUiCEmm9UPX0tGQeZT6uql+hDtDpY7DlTGPWgHaFRSUKxNdfd7X19g/aoSPHBB42nW3SocHYOUNtAummM3SKC8NR6RlbfqmbwJIFui5/krglh1pJoU8HWrpTdxlBlww+azTFdS2gafOzkNBjI6M9QaDh70gg4L9weIbhONYwg0+YxBJUKG3JfACK7W1eb9MYBNQeiuu8nWW8dBFQzr3r2ZhEeXT06aViHEJaxEPiXXNKAPCRWrp3+pxcV5mcVH+TM0xCiwz/eJoTIqfceon8SoVnFFzeahIKIs4N0pgRDyapUSUvhVovUmaTUxrHferZZ+3uO/5GFFaGVVhAE7UrY8qC5jPHorNnTsU33HyzHXj1FaW3mF/wcMrLq6RbAOUZWicoMotBqq4abx1UxsFgFNiH9Ptn3qQJQ12FAJJizDv84udIJkL670SmbJ0K2KmtX7taVN9bbrrOnn1xt6GEc+LIYQhJ/8v0+cEf/9C1FTPSbdMFF9pCPC/dv4HBYevs7LA3Xtsnk5GethYbHX6T6hyu0UR3Dg4DDsVXXX2N3XLzLbZpXYOtXFalzOroyTOis7JAQcIpU37RBQuQ3TQ61Bf1d7dH9as3xlu2XxYfeWNfRJeDkeLsJNXFyJNsQ07SEp2Z8GzRUq22vsYmRkesbvkqCbMM9PQq/a9dsUrirL1dHXbyyAEvMfIKNEzDGuKZITry6huHJdk2X1FhTU34Lhb7dGZpiTanDEMSMJkhNsoL1iuBBQwq+FRykPlcDKQznx/ggNEwGlR2qV/NqwSFcMV9CSKi7CEvH6fMmDTMTBO4N6dSwAeMNAIP9wA68/CQFZWWqSwlu8XE9LwFAObMobWiCoNHW0d7m6SeAZu6uzqVTvEwEXLg1GVj0m/nVCOlZCCCm6xISkAxHF2hws5ZQYEHBm4WQRa/PtVT4lcvWMqskyn0fQlXQGIj065y48HC67TgRUCqxtRd6kyaADsWBDjAuXPn7PZbbrJ//OKXfEILh195uZs9/8xTdtFll9m2iy6xvXt2q+4CeAMTYDO1t7cqy4HmDHkExxeCDb1iyUOlpEoctbetyY1CalbEpeWVTiihNboYK5gwRNTd1vg/bTxaqsG//uiRo1ZadIUQeNx6i/LzbOvmDTqZamvrrPH0sfjVl579nzfvWwC5uob1MT+3u7VZ4CdZ2ejggDWePmETQ/970k1OYVlcXl0rVZ316zZq6i816b+PTk5bW1ePHT12zI4dPaquyy8KACUVtTHPLzM738oys+L+7raotel4VLW8Ia5ZuTbuPHc6ctbI/3xB1corrhS2ouGfM8zoZ9rw6CFNgDLijEbhHffcK1v3x+53bwOIPwR7Mikysztuv12zHjOz89L9O3jwDa1ZMozW8XHr6ekVhsR6Ipjx89j0oZ/Pr5zqymRRiU5qfNZj6EiFvr/s5qDFU+6iFTA17VlpJqxCbx/6c/asdnbWQdTQ7ub1NY24sOg4zNS0FQk/cNYroqznbxx4fkHsK+m+LV9hu156yU9BWS1na/Mjr5yWuiCnHv5MSsSNkEY6CGfw8uPDcmrL1+9NsI9JKP4ty7zfKvptIiuudkwa3oBeFgT1YF6bbIOPJwc2jRi/6f2HwAdfQ3eA+vvQkRN22y3X23e+/yOfXMSxaDKywrLK+Ngb+6Jjhw/Hl195jb1x4ICjzgtgCLFAJ1BkHmJuApKpB5ybp0woKCBBlQ0XZQF5HqkoLSZOGgA0av38oop47OdOXxZDatq8DfT32NNPPWkjQ8N22WWXWHVNlSTAJiamNcDS3tluE5OzEgLpOHcq+t+Vbddde71t2LBOct6t7R2iaz/ycIq1n8uKGYGmtvz576NlyfBSw9r1MtWk44AKFMxA0vDWtg7bu3evvfHaAQG58B7I3khT39ri9OGZyIZ62iPmKeobNsStjSei7pbGqKJ2ZVxSXh0PJhRfvpdgLMGXxCZeRBqNXzvyzxosyitQeTgw1CdA86LLdtiZUyeNZ8eUJqclmUNeXoGyidtuudEaz7XYD370I41FQ62tra3WYcEgDhvYZefchp7/CPo8S8pUn9PP/pk2toRsCwr0GhwsPCcu/h6AMdT6ISulZMuI3OoOzEydjLl5qSMtLvhn9V5/moIJJTOt7xUrVqpEJiMhq5me+sVl1n9IAMCUkjcuE4SUVPdq72zXyc/NWLV6tYhAREVwAk5FjQ+jBgTnGuAm09WEWBgDg4OiWxLVQ71PtgAoEuaqqbGJnAAw8A+oA8N0IFeYuuIk5wEtzLjDkGzF5lyElHTFQUQAxzR79vmX7LZbb5A2/jMv7pZ7zpFDBy0jw9O/F57ZaZ/73T+0Nes3yK67rLRCE4PLaqrlXANICQYAWLa6Id862lqlbcg7h/tAC4vXqa5bHQMS9XW2C0VGJoyfQd+Xmf95jCl/7gIIAzQj8xlfGJWX/YkTx23N2rU2kzDVxkdGpFYEC49y5+evgqIyqeVesP1iYSAnjh22e+6+3SananSyIZt+6Y4rZTw5Mz1pDC+9deJRlzC6RTvXdFpS59h7vXGgSGAnpVHT2WbRqUcG+hKpKyzVUWPKsbz8lXFP+zm9Hq/7zvf/Soxj0Z7nn4yKS7bGGy+8PD7++l4MCATolVTUxIO9nZFaY7T7kN3KhTaMehRGrcVqN9fX12mMehYexYS3zK64+WZlA2/sf0VvOzsP4RTeR6YVFJVYcWG+VVZV2JHjp6Wc3N7eJtAZvz0GpCgJ1F5eJIClL4FxavWmpGgMmmDkCtemzalRX3FV4iWrLjAWDoO3Tq66SpVzFVj/4BgcdgIA8RXUcNycSmO3xiN7des8AgFUZik7L6sV41aGNOOOkZ2XAAAqStsPhRokqJm+y8pE485vFO46jKQqRZK8ESe39zzRgktLx0TRa31PszJU8zkm4DVSzLDJ/KworbSoSFsVGPgaRjI1ILSYdBGwWXLAL4wNB6ZgeH04CYrYic88p3EfKXDTOZmIvvTKPisuqrbNFyxCArK+zmY7deKodXW02RVXXS0veQQzVq1ZIzR6bnrKLr9ih8Ap2phIdRUV8XDmbGR4xLq7u+mdx/SswQXCaHBRxbK4bvlKvQdEL7o72ww9gV90n7l/BJIoxYVSQd7hVcB9gHegyTzqRlpFP/cabGbUgkorqhBusA/+8q/Y6wcRLj1iGzau1/QbNtiYYIwNDUgrv6XxlI0NeeCgFCopLRNABSDLQiSYsyklAUddCmALaEaXhzKvoECEsJLiUp2kAscqa9X2XNGwKV65crXddsfdaB3Gzz33tCzNK6pq496OZr33hvVb4tz8/Bi5NSTFcRcmWwLEg7yTX+BeDeg7tJxr0sDT8PCE3KkvvvhSO3X8mL368vNyYEaklrFvaOlssltvvdnaO7rt2MnTVrNsmWy66cwgdY7qcuCZwDwUt4MZlpkZG0cGLnhVJKQdjbcnlF6nBZMRpArYDM5OYSiItQyHgnUd5vo1/hx5Lz89w+nGkh+nxEBZa86DjER05+asr69fWR/mqGBsiI9ixjMy4HMs/+EBgIkxIvLCAqSIOaVS6KiNT+CV5vURtEo2uI/lJqpA0CNFYnCqoxxVJAjCAqJ29z9LLnlhzrIJKhIW5HvcQDQAg061ZIF4jxaEVkMeCcmIiKr+rLqOafIDJJVST5bORBoDRGYPPrrTfve3fs0u2LjOjh4/aakZUDWzDapqT9vZ6JVdL8R3vvOXhHTDFCQy88CQM0MjoPlcsyu9UkKgIFxQKLNJAhI1/Es7H3lTI6CwPK6qqRZdemK438aGuqMV67ciKKLAIKJTv7PguFxfbt5ys3O1aAiwnOQcy2xusoOJ0cH/afNv2r4jxitPm5Q0cnDABofHNC2Itz2paW9vvwLZRRds1qn14q6XrbOl2YrKamIclBC9gJbKCYguQllZpTQRsUNHwEPuN9mZ8kgAz6AUBIjDEUrszvQ88jeDx5CbVxTPLsT27W99w+qWLbfrbrrJtl28w842NVpV3SpbTEmP+zubo8akbcfV2BTFYEgdpOcVlRLp4MTVhChCK7QbT4xIKu3GW2+xyppa+/63v6HvJftoWLdeTjpdnd3imuA1sPO5F6XEk5OdbZUVlcpgcUJSCi/5OOfhu8gtWUiqMqAFpgVnZ6V/EJSrCBDDMzOu75jMfQRxD74XEC/gBaw31ktwDGLWAgCZNvlo/7AGgsiqyS4QbKW8ZKNLfcjmbcP69Tog83NyRcDCfDUz8zxKgpE69Q8MKB1EOQYdNWolWnFsbp1M4kj7j2EzyhQkJVWIPEQf9wXwOp95AGog6QUlbTuin7uspOtGEljYELJLgnWWoK5ulYRnug/thNpMNX9aqkY81YVgqCY1Tb1eAgPKs4WFeTY9O20D/UN24/XX2YGDR6QuC/FEn8HM9u97xa656Ta7/qZb7cv/8k/uAjs3K0wDFYSxiQkNl/AekPxChpoFCqJB7bl6y8Vx0xFXp9122Q7hAq++9Iz+fOGVN8SAUrUNm2OGb1D2fVMUixa3z/7DO+jr6REfQWoxk9SlqZpt7+v00/OtF7ViBpZWdDzy83VyajEmC5puxsnjR62trd12XHKJFRfmiVRU17DOWhtP2F133W0//tEPtKnyC0ps3wtPRL3dnQIx5VCLWEZmlqyqYfVR209hEZeXZ10dw8JSELjobG8RYr9+w3qh9qMTk9IfRP24uLRCct2sA4JZFKXE2I4R8NjsUH/T0vB4MDH0ujo7l4ZwGG5iQ8Gdw9L9sst22OGDh2z/LgdCMRplrv6yyy8Xjn/FZRcJ7xgfx78vT/P83A/Wgtx3E49JWnI+0dene0eGwKbVms/IkPR9mPwj6IdWXegCsPEJJpTCzvbzw4yDCjZgAcNumISohRg7zyWFNelOwfw1gjlB+YoWcKoteokwPS0xWrcog1n79ohAbwtC1KYfHBDXmvl2RhgB1qhpZdk85acxH4gb7AM7zgrUD1eEdAGQYIXMw2BTBfkvViq/l80yiG5lpViCrhb0JhOKSAu1mAWJfBUPSp5uoKiJwirAJHgCdSMLDK9B7J472jtErNn53Au27YLNtmFtg3rFpL6AnAWl1XFXS1P06AM/ts2bN0t3ju4HdRrpJTRj6jvJN2H0EcUimiAiAU+C9zoxMqy+/gWXXhNDaWXzo+e2etOFcV9Pv9LbuuUrNPgCnTb0eJkHIJvgvpaUluhkpQWFpBan8+T4mObT84vL4vA91fWr4i0XXh4jdRbPL1hNTY2tWtWglHxtw2o5EFHbElh7+/tlGpqd44w6TkWITu957/tUIvS2n4uuv/YGWaCt3XJRzIJpOX0kQi67Ct5EeYUV0Dodx4492wqw155Azo2W6JjahYwXY/TClN6VV18jEPa2u+6yDRs3y2aNkub0icMKUKUV5aQ8xvgzFGT3cCB9DjXvuEg1fGhYjpzGna2t8gQga3vp2Se1HnD8YfMUFRQozableu3VV1hv36Aj71EkrIfXREyFgwfiFkGtvNyBwLLyMkmnrV61SuIg/D3ANQcamaBKSjFSvV/vALSXGrK6y0hX4CVTLpONGhqCkajk4FiUoWRfCOuwRzhw1ALNyRbYKKHQxQXV/ZiuIF4KuMm6bW1pVevTJwzPUwAg3SbdbWw6IwltFgUCobQEAVGkcy4CUFbS4vC2F3Uvaasz+oLGHx8GXjf9T7dpds306SUqJaksEZuUjcsVgH3aL3CuyT4CW1DgjNqLkYw0pT/ApFqSUiOzBH0XQI6hmF17XrGu7j6hxBrGSEuVYCftFy5MLifGRuzqG25SLc7JRDuRRcGDJZpTHmBVPTE9Y8MjozY80G8tZ5v0nsBHUPB9bdfTUXFZVVy/skH+AxXVVQI0ketmEUqMcqQ/WrZqQ6yyamxMn4PTDuUgwEX84IpLy8SH721vjsaG+iPuDxcp5UVXXGPV9WuYa7D0yGzFyuVqV8K1+O7Xv2LIoVPCEPjOnDpl5861qiy65x3vsMqKcrvpppvt9dcOWM2yVfGNN96kzwbTcMvWrbZ+09a4+dThCNARr73W5rMK5AQ/tCBTaduCUVgk1HrHVcht51o/OogLC3IlwpnpgR9+x86dOWFSVOrrjs4cP6b2MINgtXXLFYxQBcYeDg8BuBuMbrNWXFfAnXpqqqvs8iuvsuazjbbn+ad0+mswKC3VaurqJBd+1603qSR5Yfcr+reW5hbr7eu3/LxcW1ZbYzU1tVZUWqxgzklOwBE4ODSotJsTn9KH7JU6nA0um28ERnAWmplVVhoOHgBB1i9GoXwv/8Emdc4HnQAyAqcFQ1F2DYxUzVfAkRkZGpVqFAGyp6fLzjW3SOsACnNZebn4IIxGgyectwDACUxKzwAFG5vNRfTnoXBip6WnKNqTVtHGkIMKc88ziS4e35Ns7rCR3YONqPamlnpQASKdc4KJS4YJT0gAP6KnGIHprico0IjpQE5kyBZMYqVA0GC0MvJ6OiNLUR3UuBCZ79FR+8FPfmqbNqy3dQ2rxTcYGx4V/7ywvDrubDsXPfn444bI5cZNG7V5qDGRDueUXr5ihVVVL7O1+rsqq6qpMTTtQdjhESxbscJ62pqigpKqeNnKBjt6YE+0umG9XXjxpTIlxfm1r6vD0LjbcMFl8Y23363g1NfVEiFZXlFTY+VlZTbc4+Ii3Cfq/sKSynjDBZfGmImEv69bVmd33fsuBc3G0yetoqTQbrzhem2i3q6WKC/PnWlXrVxlI+NTWuj82eJ5W716tT7/a/v32r3vfIeGsggK3e1tSun//p//2cqr6+LGY69HsOiYQkTmncm8zRvW2W133Wt1Kxqsu+VM9Pr+fRpf/bVP/5qtW7PaujrarbCszK64/ha77sab1Q4cSUai6ZbMz05bahQb+n8MY733Ax+y6264SRnJ9TffbBdsu8guuWyHrVq5UiYeuDVfduVVCjAvPf+sPn9eKaPARZaTX6Dya6Cnx9atW2Mt7R06dZlj4PAag4shHCpTTs7IqfX29ApsG+gfdIWetDTr6OxU14lNXlCQJ0yBi3WWkqw9Tm3WNPeRywlsvjZ9YAlZOrf+clIYTkGueQk7ln3gnpOZTgmOF3XQcfhQqoL9UJoUFZVqpBxPTvQO36432NtjAibWy1hwUwfy4WBTYWeUAgNqakYyzK6r5/1+LmyR6d/6jUqQ1kQh1wk9CIAALpKSUcenJG1AaqkFr4WScUlprC2h/ImtMEAbHurpabLjBryhPZbGcM6EG5CkzHvU5s8gytRqnMBN55p1Ul1+yYX21M6dVloKbTZHKq9cLz6706678Sa7/e677V//5YuajOP0RkuPqyqXkwMrqBnVm0x/MZCEowwbfNWmi2JaQV1tzbZu68UxrUV6xpzOrWfPWEfzqQiQ8JqbblGGwjQh17aLLzasw1/f+zJpbwx/AGooV0FJuW3adpENJ2gwwQ8fg1UrV9ji/Kz94PvfseNHj8m3EFygoqY+bmtpk31WT2+35LPbOzulfUen5Y47b5NTD150977zHnnU33brzfaT735DvomXXnyJ/e3f/Z199tOfiYXnsMinJm1xocCuvuYKG51a0CAR1+OP/tRuvfMOY4a/u6tM2APA3djYtF158x2k+/EjP/jWEn6hmf3ymvjciYPRwtysPiclX1d3t5UWl1hWTq6wpPy8AomS4rp06Y4ddvzYEdv74k69DlgSBpyrV61WuVdWUiil3Vf2v+YoemaGzD3T09PFoeBAIKvglGZHAVBTGrB22a0A26lp3uEAeedZBmef2alZm46m3XFaYLOf6gEQpAslUhgeDnneNpe5iMqEaWWPjh0kFmKAisPDSTmRY6NDrkMg96Q5eCfQlDPVdSNooQx93gIAUUruPuWlUmFFn27d+g2SXWZSDMulyqpKqdGQMs/FAC1par2lZ6RItgkJ4WDeEZDTpZHLCLIP4KC3WWgp0V9Wr1uyXy7VxNcTZXlo/Epk5mECpIRSwy3JZnycl/aOeNwwDBcsLUIwY0DEHlLY/QcO2c3XX2mbN22U0i1UTzQOmOBj0OSxh34a/+bv/oFt2LDB3njjdWU4HZ1tqoPljJyWJlSYz8IpI0vnvh5NvpVVr4j7u5qjDVsviS+75jqlepBUGk8ct6YTr0vtZvvlV9vQ4LAWHX3ihnVb4h1XXauW1UBvj4xIIE2R4YwP9VpqtGgXbN1qjSd95p00kXSceYxLdlxprR3tcq+F5nz44EGJmx46eDAGBKNkGRodta9/9Su2ZdNmSYPBPmzt6LBPfPrXrayiVu3N4qJi4Qg41fb1D8o6/IMf+oD92z//Y1S7Yn2MWg4S5eOT8DOybMXqNbZs5bqYMeiR4QH5KGzYuMEOHjokQtUtt99hZ842W3Xtcvv45/4gfuLBHxkZFu9/sK9T3Afaai3NZ+306VNikJJNkjoDNjOVOTLUZ7ffeY948g/+yFl/TF3yDNEvVJuwpdX+6s//SIq/vf0DNj87I/4A4+DziYwdmR8bUveuuEi6CFFKln6ezxcUul8BnH4wrDyXo5PTFTTdxXnLyczxUgVR2mnv3QcBEEnWc3AlHTARecRbSajqSZYAczInxy3N+VrKa63X9DRlzuA2sGS7Ojucb/C2JwHeZgnApJ8LdKRKF57Tjg+3Zu06W7mqwVauWuW166RbdtNuIwUH2QUrwCmWkWKwAbjOgF8EFG5WUJQRgQfn1AUX04Ackfx03fDxidEls1BtvPz8RJopU6+XzrAJGyINt5tM9Wipm9js/LuIGkxfAd5kZmmxv/zKPqVnO3ZcLvXdZfXLpd2PSw5g26t7X7aTJ47blddel4x3ZqmEwLKJjc/AkPjdSIgl7ciSiiorr1mpzc+7L6uutdKiIuvq6rTjRw9r8/P3Gy/Ybg3rNloO4JUmINOtoLRMjrAdHW3q+wNO9ve0Rc4sc8HUKF60ho2bNVoMMw/2G2As92T5itVWU11rHW0d9sQjD1p2QWU8NT1nZ86eVUsUsK2l+Zzt37dXpx8yb+AVRYVFNjQwJGYjrajiihobHGCYat6Ghkbsvvd/0KrrVsVXXHGlpMVlpjk0Yk2NjZKwXr6qQe/vlZf32Lnmc/b4I4/Y/d//jj36429F3/vm18UfQa+gp6/fCkrK9LUAo4xMYw7LYmfDlpQU6eTj9ckcNYKcGilDueLqa+zIwUP2/FMP6/6RzfEZeNbo/gHYVldX2eFDh2xdwyor5jMNDftY7cyMAGO4LJza4C3Mb9COU42eAHUBj6IrwbMmK2RzcqIDXKJdwZ8BQTlcOAS4OOEDr4BMyTsFUIXTkilQB7KCnR3/FlSFgwCOdxWQGx9XcgsuAmmJ7JAM87zKggcV3pKyEqurR19uUhOBgCYFBUw9TcsHLjvLRRXElJqDPFSgtgenuFRU2NjQO5OpPpBQMggvBfxnKJLqhlA3QZ/09hhUXmkxJDRR95rzuQHxqKU1QCYRyTiEKE7ZwE2H7MHG5aGTtrN5WQTowz334st23zvvVS3M4gbDYCQ3wvSjvyt67KH7bfOWC9TaGhv3IIRLL60fOgKc/LAW+ay0JRkWcjEys7qV6+K1a9ba7l27bHxsxHKzPI1bue6CuKpuhSI8NTVBC7wElmB6dpZ1d/XI0AKQiIt0mAubckwvtmzaoN5+ZeUyy88rsiLmLhYWRKZBcXhgoNsOvronotxhko/++6GjJ7WhQKb//d++qAwLwgpuzzkIoSZ9cSTVd1yxQwahaSDWqalSJq6uqrK6+iq77LKLvG9dVOxeD2mpdvVVV+r94TJ86vQZO332rB0/9KpGgI8fOWhPP/qgxfOcdNnW2txi+SVVMcw9+AdFpaVqt5GGk3oDftIhgYTFdOf4yKjdfPPtlpOfb8/tfGLJo6G4uFwuzQBlqBnf96577cCBw3b46HHNUnR0dtjUBL6VwzYIlXlsTHMA3BMODQ4CTmBxRxjDZfwXEV9K3sgzurbWdj0HYQmTUzqNeR0RpaAuoxlAFsB9SkaC+X6CBLwMDjwUhZgR8WlPP7gCezUIkLDmGSBiPdNWJPiw1kn/KV9cUfs8goDUWpw042OTIoUgWkmfFlEDTj9MO7zPindAsfrC6JuhXsNDhA/PIneijs9AB0lvpsrE76ddR/nAENCsb1x6qW7R5N7voQTgxoVfeSCBf02aiwcAD4i/C2wr6jZZL+Vk2+TMlIAe/r2+ttb27N2voHDRhdusb2DQpaBEHMqSeMXrr+63s2dO27vfc58omkRqPVCZPOQouKi1yQxCFmPR2WI/ci1budpOnTotiWyUcmELchE80zNzFfkpCdhotNio1cdGxu2VXS9Ze3uLzcz568xOO+2U9iClDJ54V99wsxWWVlhXT7cWIdyEkvJyi9LS7aVnn9PXT06Nyo58586nxYwsqSiXR13jqaMRfX8s0swWBHjl5GaJ93+uudmWLau1S3ZcZV3dPZaTA/twVs47+YVlYtox8blyWY1chWbnF+2nDz2kn4d02OmTJxUEi8qqNf8/OtgTnThyxF585kmrrKqxdZs2W3FpqcZdOeURQc0rKFLInJtjeCbHqqoqdcLTKq5fsdI2bN0m6bNXktqfAJGelWmlZaUSTi0rKbZVK1ZYZ3e3TU5OK2Mg4A8M9stcpQAB28QJikygtKzMbeoy0rUmWNsEBgKi8yjyBBrjg0lrj00JLZnsBNxFrMJ8pwWzztFmZKOy8dnQmgjMyLKqSm8hkolySJD6s8k1IRjK02RUmuDC1/I+fP1nqnMhNaTZKZXh5w0DoB7KTs0VoIKVcltbi61du07DICCppHBS+i30CUAJeiiV8d+rF5+kRqHNxwdzlR/X/HdyRro2FCOShFJeU50DTvv5+aXBDK6wuYN6C5kFoBGlRfATDKmVeAf9/RYlOoVcpM30Xvu6u+yBR5+wD9z3Lmvr7rX9e/e53p2UfmcNk4/7f/j9+A//+E9kItHR1WvrNmzQdBw16NjYiPrXAICkbJzosA6rqytj2j8njx5WwMMUhRN4uLfd+vu6bHKaB57unn3Ll1vdilXW2nJOzrlnT58U8WNiqDeqWbY8/t0/+i/2yIP3x2wsVGP4TFdccYUGdCAgQdDiFOrjpBvqt8ce/KGnyWkZylQw94Rdhww27jhltSvjB+5/QN6BmIKAfdBqYwGiIQB+w/wDasDzza32yr5X9bwvvuRi0VFPTc9YYX6uXX/t1bZr9yvCXwrKamLcesuqqrVJIICFq6/bpdUPH9gfr1m7RvU4NuyUd2XllTqZ4ZhQh5cXF+tzHDr4hvr+191wvZyEdz37tF4LIRHamKw1QENap++842bbt2+vvfbaa7Zu/UZbhZV7wxqxIttaW3WKU84EtJ3TlBJBEneQytCqiEzlD+m8hGzn522gr1/4AIshW/U9EnWjSyKfb03bOVCkV5mI4IrEhKEOBKYFqN0oPnsbWZ4AUxOWkea0d+6/MC2AP7LZ9AwrLSux9uYW/SyR3M6nMcj0xITl5OVZWla29fT26obxgDLSGcNNWyLzwI9nAc/O4oOe6eDh7LTSIA2ZWADxAEeoBNIsopajBlaL0Kel2ETTUy4GKRxQZCJXVgldAb5OwSTpLiwmgIsLQTrwEsgTgV/AA5ya8uEPAg9pZ21trtyEb7vxOlu7aqXt37dfSD8KRHDUtXDfeNVOHD1it99xl/3pH/+xuPCcFPgG1Ncvs46ObgU5AgZRG889sglGpUnP+ZX6u6auXsXg2ZM/K46ZnZMVL1+11g6/tteGh2qcMZlYTW+98BLbsnWbguzU+LgwFU5GyDacFq1t7Vow3DMsrL/zta/o+zRYlAROlIbI0NJTZ3VvKIHIvHY+/qT9+uc+q0B+9lyrXXzhVmUbWRmAX/PCBmhL4TT0rl+6T+5K7R1ddu2NN9jo5Izci17ZvctNWVPMetoao562RrvgsmviMPr91uuFJx+M3vvLn4i3br/YhkeHLT83W/p8dIGQeiPbSEkpFT8AVgd9+wsvucxe27fHXt/7oqv9ZGUrY6irWy6PxNzsDJmXPPTIIdt24SUS3jx9+oxVVlZoPSCjPpMQ1ggI1PeAomxkSkxqctakJlJTUm1yetKKUgptbnJemSHBggOJe07rm7I1mN0GEJAMLKxD0eCZKYgXdSD5IZSs6WSEnZ8jdioYFYK3iwtWVVnpQ22LiwIjwXJ6u/uEKWRlZ6jLdd4CAKAHQwotZ8/a1s0bXSJsasKG+ycshiiTniYAhnScEwfJHubP0yFwzHjrg4hKdBP1lxdNNrDcdBcAYqjNC53jD12T6JiYK7Ah4ESnRzDF+JpptfqC9qDEPLGJysiwnFTvp8pbIMvFGuXzFkaERSfO1mlD7Qf4RHb10GNP2jvuvsNeO/iGvX7gdZ3W1J9Dve3qIf/gO9+2P/vrv7VrrrnKHnnkEW0KWpDIbevBZtLWTDzkMINMy1AmAKNN2UgqoqiuMffWq7C8Nu5qb9HIJ6UEdFlabTEFKTP+KAtNTtqqFatEFKFW7ZvrF/bS29er9HZ4dFy18E9/+G1rbz4dwe934xTAxRTp3LOheS60VpXm5hfZV77071ZWWWEffO99InNBaIJ8RD06wjh3Ysu1adN6W1iM5P3H6Z6TUyAnXjbbsWOHxVLk84art6NdPALmH37+2vvyLukvMhE5GS/avt0v2chQv8Wp6Zp7KMgvtLyiYutsb7d3vPNdAoqffOxhfW957Yq4uq7eikvLVR72dnfbJ3/l/SpDZ7FT6+peApVb29uFb8BSTE2GjCgrCIpM+4ksNUar2NvUcEHYfAB9rFc6E6ypYEU/M7egfUD5qI5TQg8OKD5rWs7WoqlnatqStJ97zuYHF+PiWRIAlFVkMw0YKetis9MZoCxYt3a9dbS1KVvg04gvcz4xAAkeMOmUQasiQyklohhsfEQ2uJFsYCIz9Rc0XfzqIA5BiuDUIpK6XxqK247Kc7OgPflEXySZbaVj0lGb1uQbCxcWFpE6mCyE1N4fnG9qABfpANLDFUNr8c0hIkDGRRddkHcBLZ05yBo+xspGfe6F3TY4NGxXX75DhCAAGICnsmUriHF26tRxe/HZZ+wd73q3Tpcg+4xzT119vV6P4OWClk4cYViGhYI1FX9GiYcgEK7C0po4OzvXUBDuaG1RYEIPIDU9RePBfA3CFjPhdTOzlO7DM+CUQeSiuKhQApezc9N2+I0Det3h/s5opL870j3SmPWimIj491ETe+di3EYGu6Jvf/Ob1t7Tq1NIKk3SpaNVhWHqonrwnIR4E7zw/HMGqxF9o3379llfd7u1nDoio5O3aiFwmgO44uRTWvmzZiAtTScjXINfeuqRiDby6cbTNjWzoHvGc0JsHLUgTv/LrrrGXnzmKZyUXFYsOzcRCM1QDV9XW20rVtRr5n/5iuUCaSsry216Bmp4lspTPktmRqbTghPuSMiwQkcpjKoTNP1A4aQm9faW3ujYiEo8xDrJFniGgdSm4Z+UyE/vpNzk53AA8nl4vxx8wqGSDJX7itYhZYC6XVGKVS+rEdmsvn6lnTp10tauW2e5ELaSKdGwns9PG1BRaFba+tIEkLGH6QYvq6nSBups71iiQxKtGHEk6tHyCDx+0th0KMHcWPU3HX0l6kGNhFiEbTIfmIcRJ6k/3nbcKEqGIBcWnFnCMBARldQOZJ4HwQMHEAy2TaToZAoov4hHMIVp6bwYYHAD+vp67OU9e+3m66+2utoaUXWLi0q1eSlh2JA7n3hIVOhrr7leM/kuVjFvpWUVCgLl5RUJTdQBNTIEQFHKIrgDUD6xAcvHJQjQbKAz4gRCgWdqGo3+DCfaJOkeo7UEVxx7WFDw8fsG+gXUccpIfy49XdnX2cbGn6kTATBDsKUjImo24pSTE6LXgh2UVtXHg71ddvCNNzxIGRkVeg3DAl6pkREAaWlrs862Vjt9/JitWrte5R9Mv+eefmZJ0Xj0LboC4yN90cgISlDZEub8+QvwccP2y2Mcm6E5c095zmXlVcoIh/oHpPYDr//5nTuXTv+8oiKbHJ+wVSuWq7S5+YZrrLunzxrPnrWTx4/7lCmbeBZhlYEkmM1K+ae9rUNMv+6+3kSdyg1BBCIncvUEgiA/Htp6pP6c4qxHDh6+JhwilBEAzpRXYsNGsX5VO5sDhvMtGUcXbySZhiWblumrJg3dc4K1SqBnMImp0zNNjRoGc86MD9WdPyZgeqqNIH88PWW7X3pBiHNxcZFafdlxpvV0d7mhJOOOw0NCqgNAAqDkgzMOpnCzFQXZ5MmgUBjgCSh/kAfj7IpnsdH2eslPXU41qgbPHPRgpNPuJ7KkvigbODFIzaTKMmdZKV4C0HICcBrExZaAMzJsdcuX62a/tHuPXXPlZfaOu263f/v6t6yqmmm4US06uHiHXtsbPfrQI/G1t9xmh48e9YW8eYNNjo5ZXS0nz6yGjk6cOKVMhk3KhkdDgH4wmAKLmhZUFFfF2ITxYTx9juSS7CRKf9gwFzKzc+zJJ54UxRiA6viJEwpO7Rnesjty5Ihtu/BCBWGQ6gVQ2Dgm/Y5wzFH9GZuN9bp9FrqB+UVlKiEgG3V3d0b7X94dX7DlAnkt8NqOuaTY4NCYnTrTaGvXNtjpprPqTBw9ctiYEmw7c2ypLge8Gvo5z09ce5A/+0V69iz02k2bxX2gz09LjawGnOTU0UO25rLL7YLtF9mDP/qetZw9GRVXLov5Wjj+F15yiYaBivPz7OLt2+yJZ16w4sJCB49nZ7XRuUQGA7jjdpgLwshT0kWJdQrT/xdBByGORL1X6z3Vma+BsSr57tQ5ZXE8czJZ1hodgiWmIDoOUriiDZitNiIgMD+Q7gMtcNHpMRfNyRP5S+C4/DaGhBOQYRTk5diWLReoo8XhgTvT7Jx7Zpw/b8BEqQRUtKa21prPntWE2qaNG+zw4UMa6ICuyoOUxx6EFZE1UDvxnj43I1Ao1b8njXuLD2CQ/nLJL+dSOzhDuscEYr5qPW4angAQhnhtPVFbXKpBQ+chLSdHr0XEhrkY6jUeDAMttHRoYwLslE9NaUBm7yuv2A9/stI+8bGPWMOqlWor8Z4gB81MTcT87MceesAu3XGFbd663e7/wXekKDyAzyB00KKKeHK4NyqsqKfyU4rHZ59vPKNTA8tsHiz3gs0vfXzVo5mqozVcA2stOU3ptzMMgu4eWAIz/stXrLRDB16zFlDnrAwT0efUGVu9Zp1m7qHETo+N2oG9L6qU4d5MS1zFLxSRN1+wXZjK/oEB+8Rnfzu+/vob7cjRo8piOJlqa8psZp6SyrUb8nJybXpi2AZ62qPuzvZ4dmHRnn7ioaUjCWJV7cqGuOPcz2odqmtBd6i0Ws5AyLiPDfVEcOKfeeR+2amz+UpLKqywpEjlJIq6n/jMZ629tdWeT5B/ghsbpaKy0rZfdJE9+8wz9udf+H3r6ukVpRvCTUlJsXV1dcuKXIaaId3n/xYWLTPHNfoBpsOsPsE3WHcFSzA3r0110HB0dOlQIbhw2NASJItkT3BqC3OICGoQwZzJytdSsiobgaI+NSnfPzAE+WYy+ZhY4rFX6ALQ0UDYbtnyVcrSIGJxBIjYBgCecEvOSwAg4nGKkqIypssNTs/MFKp99txZLRTnRPsHo+YJXGiKD2o213X3SOn6fv6BQl3P9VY6JOgnNwzEGv0+yokluTBESNKoBz2Nkm1XSmRZGV4WuJegtxDdcsmdhXhAQbpJvdmkA8HIJWk0Trsv791vv/6pj9n2LRtllbVp42ZNEM7PTFpvb7c1nTwSPfXIg/G73/tBa29utCPHTth1d74nBktYnJ+z2tqaeH4xtoG+vsTFeN5OHDthOPMwAMMpR/3NYI9OvZwcm56c1FRgekbNzwx9REycTU2KtEMaHqekaxO9ceA123bhxXbuXLMVFOVZSXmpFh2EpcWFWZsYGbJjx4+JVtzT22X7X3x6aWPefMfdVlFRZS+/+Jxde8sddt/7PqjXzMrhdJrSrMfw6Kg4HJrpiCO5JUHQqVq2IoYMdvKE8/+5Ckuq48EBuiWLll9SHo8NvmlvNj7cF0VpVXHDmnV6nl3dXZadnx8D9I3mF8gPkfUxOTNpOQt5KjPveMe7rKS8wv7tH/9Obr+MVnOfsD5fvmql7d29y+oqy+zibZvtwcee1iatqamUYC3vt7GpSSdubqa7Ebv+ROYSLwTAjv+cSp6zJOclIC/R5Q928GGojc3IW6VsgLzFQeTtOaefK0jgJpXupzrPApo2QCWAsEvkOZPU/TAZF3ZegqzEs5yHUF9fr4OgubVVWSouRio/xwe9zD1vPAAQe9oROdlLtRB94hMnT1kUpSlFhkUHuglrKpAh8qWpPuO+fUEQNHipa6Y/UCk9XeMh8bCksJuTmzj1TopWHLQAJ6dcIoZBm+AlyJ5BoZd+a2j5DQ4NaPb+TUNTN88MuAFlRkqK6wfCf+fP1Omk6eeaW+32m2+0XXv2S7KJrsfsgpcsxRW18eOPPqIUlWm4np5+K8PDDbOLgvI3pxgxdEDMcxLV2Fn5JxLZXaAjxUYGe6L80urYOyRzMhul/g7gH5dGkVNSNUQEyQoVIvgTtB9bWs6pbm9Yu1Y4ysTwoKVlZ1nDyrU6tTu7emx8ckpCHOGqqVsZA7adbmwUyHTzrbdYTlamNTe3yBwUdiEBuq2jU3wDAgzvl9ZvR3un8JXdLzxveTl5GjRCB4I1AQBIcGeTUHaMDfVFaPwDRDLK2pySFkORXr2qwVpbm9ViVe0LkGSoSC/YyFCm1dbW2i2332lv7N9vLz/3hA/8ZGWL4JSXUyAM5dihg/bNr37JDh47aS/selknfvF0sR08eEgdBGYn2KAAl0HMc3p6RsQaV3Wecrv7BR8nD2KcQR2Iv/PeM8AytHTHCjjpKecoN3lj4+N0TPyQgyugQxJTWv6VeQLQfqlQ4ZUJK7bQiotzrawcpiYp/5x1d3Ype4JmPDwwZBXlFUr5t2/fLgm3ocER55pMjJ5fPQCZI85M2/QEVlH9ViGmVqZILNR/9O85rRnkgC/A/eODQBUGQhc6Km+1OYFcaoUkJ3XQWQu1lEtS0YpxHzayDpkwDvQKXJme8kEL0FWotyH6BnAm/AqIFSSX+X2gcRLdQ0ZA2w1MgNFO0jlAzOraGnvq2ReVUt55+y3W0tqq07y6ZpkVFvt4KKnwD7/7bYlHXHLZZfbIgw+J7vvss8/ac88+a6+8vNtOnzopia2hgUE9PKTUCY6qidkoJRUxHQ4ZX6hsX/yZzc/JxwzFIjLpmRliFC5fXme9HW1KqwPYOohM2Zkzmpc4+Oqr1jcwJFHM+lWrJdOWk+0gHHLcl1xxtdqNVZUVdsUVV1kuba2ZWevo7LadTz+vzUAtCs9fYBhBo3aZ7Xz8YVGjATOxE2vrbLeisnK93572s1FWbp5qaJ47mx8VYCncrFwve7Sh3vYoMz3F1q5bY2vXb1BLDu3CnIJ8PfPyylprbzoW3Xzr7VonTz3xiN+D4vK4pKxcn3d1wyqRtu6643bR0Z95brcAPnQOYaXSq29uabGh4WGVc1xSberpUdnHWiIQk+qDYYURc86VvIKCJTUfssvM7CwFBIBc1pMmTpG0CzZ1KZjZ5mqWQPMBiWkNwYfv8/ahm+SAtcD8HJ8ctcGhfjt54pS+h2BK4PMOW46CE8xG7scVOy4z9BQpDThI1LF4m0Sgt/XdpLS0ADmJMVOgbjt8+MjS2GPNshq92faODqVGPDBONlIh6kfmAYKUUtBNl2gHQ0EJrTf0+x1ddSov1Flm8Tva2+XkMjo8msxTT6sOU4SW7oDXuMF4hI3uuIOn/CGvdq57jc93JypFcm9lUCM721atXiW12J3PPGdPPP2C3XnL9XbVjsuVBYD2wvcHPAJhP3PmlO3bs9uuvu5627Z9u94L6R7KQQQxwCKRpGbnhf5WVVfpc6smhHMeJe7IBLEE4JEkd2G50yQYT52elR0XXIWZ6QmJW3DaLyzOWmV1tVVWlNnhQ69LDmx8Yk7BGW85CC9XXXmlvfPd7/EZjsq6uLy82hZTkF9PsWuuutIR5rkFZTcoALe1dVhrW5ulZ2HBPW9PP7VTFFV29YF9e6y8otzqV/jQT393t2Vk5vpAT2lVzPAUz5+OSlllbSz/QE3cldjlV11rN959X1xSUW2nz5yx6ppqu/bGm3ztSFI805qOH4huuv2e+Iprr7NdLz5vx6Qc7KPebIC8vELQCImOfOzjH7UTp0+r7RtYn9U1ta73UFSkXzlAOIGZVWCmP0XTmmNSoyYb9ZFe7yghfNrf26dOEP/Bw+Bg4TAgq3QuCtkAbDyfQ2E4LjBNQ+8fwDkLLYwkgw3TrvAuSPNhJ1ISMKEIPsD7Imu+6OKLNF2ZX5hvl158kdYne422rl43CzGaNzGc81ICOB3XTQ+YJT906JAEQXPz0DZf0A0L+nVMMSGwAHCXjXHC+KgAOjdOmLcZUnVLvAHecrmnn/f0pbkTWTKFVaA2VjjdtYESqmUIIGj1y3ElIa74WKbzAd4EGL325+QMY8O8Hv+GwhEUWRabLMtmZ+yJnU/bLTdcYx//0Pvs9OlGLRykpatr6qyzrdlIb3/6kx/F6zZtkRAIBpOcrjlZGVa/fbskxjjdSzjloCnHKRK0ZGMT1PicOMDCmqRvPjwwYCP9nVGQ+6JtRBApKim3zrYWnbDKhlK8/fpL7/9lS7EFe3rnoJVXVkpRhlOCjGPH5ZerM27z4wAAr7tJREFUrr/yiiu0wXu7mu2iSy63NQ3rbN26teqgEPzKK8tl7sFE3o03X297du2xDdu26bVOnzhmV197nVqOIPCl5TXW29Ole8yQVGXtsrikvFLiIEhaYYuGrFjN8tVxf09HVFq1LG5rbrSJ0SFbsWa9BEoZ0jpx6rhmAm655SZ78oknJMixomFjfMud7xTw99hPf7y0JthwEJwQLqmrq7MtG9ZZUWG+7d67T5kZgTscQvBJ4PjTieF+si68z4/ArJcZBFxOX0paWsB8HzRkgX/Ikk+6MhUXr+veFLHWEZ2boEsZNn5aRoplLfqAGiUmGWqUEdn8LC7XNFpjaQpMzECUAm9Kly4jwDPlFq+HTgH7irZ5Z1e3rN2G+ofs2LFjypRgCqZmeOn6tvbw2/nm2Wn3TYOUkpIGG69ED4XI5MagsUAib+Xk6IaA2DJyKylkP/SV9nPSytRSJgmIjZD2e391Ie1NWrH3tFPU23/rTXcDjbSl018gWvLQgm0YD5uUSvTfJFiETkYoNQKTiwdB/Q4ARqZCKdOwukGn4Ut79tr1V++wD77vXbbn1UMKQo2nT8myaWyw15pPH4ueefzR+N77Pmgnjh2z48eP2uJclh1944DeI2SSmuoaDQqRmkKrpVYku4GYI0fldCTMZpRWUhaMDfbK3prclJqakeCS8iotwv7uLnvp6Ueiqvo18dZtW+3ZnU9ZW9OxKCczPWaGv+nUCRsdH9UYtsg+E5Ma7HnvBz5iWy/YbN3dzhzs7ulVdjI6Mm69fd2Wm59tV11xuT358AN22+23WUvTaWaPNcZ76NBBnVSk4LgKhauvq8vKqmps/aYL9DnZ/HgfwluoXd4Qd7Q0RuW1K+PR0XFp9/NZYQdysuIhcej1A/JYYBFcf8tt0sD/xr9/0ZAU5/WrV6yNYdLhpgspC8Du4ou2WW9Pn9qs42MoOGVpo6otl5FpjWebZNZJwAWt53mTTcbJwE1+oSv6To6hEeCSbOPjLukKUM0PVoYphymnAcvdiNFyZW9zlpIWSVBGmSxZDtOwiaIyr0T6z2ExNzUnTgP28gyPkRUxE1JUXaNMQ2In+QWaVEQKH9dqsi6GtghgYD1XXH21jQyNeMY8dx6pwNTPC2yS2Vl7+eU9VpCPUagpRWUaClUcygSmw0iV4QGw+AC3uNSzX5jX5oJAQ/0uVD5KjBfiaKnvyiUwEFAGn4BsR/PDsEVq4PTz9aj0IvKQKA7rgya937DhU7OylErSHiMNJEVkw6ek0h9f1MNgQowFQ6qPEIZ82mZn7MmnnrGVK+rs2quusDNn2/TQmNVH9yCnqCyeHO6Pnnj0YSHyd7/zXjt98qgND41aZnamLUyM6wRDjhsCDxcPE/BICsm4HUnnn4CULvIPnzkqr1Fjkw2DvwBeAq5UNGo9iSx8Xf1yKy0tF7jE9cbrr9n2S3bYmrXrbc+u56XyCwGHBQxgx9w/ABbPpbOzx3qRGl+Ys1oyh4EhOQD91//nL7URZuPIsrPwXEi1o8eO27NPPS5GZlFJqd4rF0SmQfEKFmNwCU7Oles2x7LJYvPkoJ8MMDZjRaXlyhC7ujqUbk+Oj6rmZhIQGzQA1B1XX2NIij37xINRIEDRAwejIaAcP37Kam+skjnJM8+9pHsDDsDrwfuX9oQGzKYSVipycVkiAAUviemsLJVIQWEaxJ2DQOpACQbD/eFAErNvZlagsh9g4FCOhTGpNzHv7V1KVzYvgQSwUsShsTEff5+bk66FRtdFDJrTGl+yGUfvcWhAxLjuzgGtZ0oOPtPmjRttIT1Tw0lMKMoa7xcYwfyHYQBEYlpubAoi3NM7d1pXZ5f+3NfXqwfiJhygogvOcU7APFJQxVj1X8fFpWbjOciUSCcmYGDACPh+bj49UOo4Lrj2oW0XHIODqALRXRZgeBIkmUBgAyo7wKUoKQX4uwAw6mHrZyIh7jZUtL+k2UYrM0qxJ59+Uenf1Tsu0aYCFJMLTq5beNO++/qX/k0U3Xve8W5RoJlJgBYNJVoSZPjKWayTjKhP/YqXgHgJ42MJIIRu4qKyEAFNzsvVKCgIO0QXFyTFp6FYdt9kDlxHDr6h9L9+9WrbsGmj/fkffUGquJz2zPH3d7dKvry8tFQ1KXf9peeftzcOHbI7775brL7HH/pxBBhFEKxfvlyfY2hkSHP5rWdPRwChGK5S93O/a1eulavPwdcOWMO6tZo2JKgFlHzDhZfHQ72dUUlS6/r9T9HrcRC4ffqo3XHnnVr83/mGDzFx4S3AJkStl8OjvrrMPvz+d9veVw/aE088aSdPnrCOjk5hOnD9kcziIBC9POHM+8Z2MdFMSj0cd3JylPFxCBCsWDNMuDY0NFhFZZnGvckE0GOkHcqhwPqSEA1cBAxocvNU54dsc2JiStRh0f7iN7EdQEK+3xXBnW/guACZp0uQcXHP8FhIS6W8c07IHEK74D5TM8oeWetBcv/88ADmFyS+wJqkDLjymmvt6OFDou3Sw+TU5/SS1tn8nA0N9mseemQY+WxHhxfnvCYK4AgtuTAezAMKmzbYg8thiLYK+n5jWDg52cd9BCHHjPtIJgQfsAPqswQp9QfjpQOvSbeCDe8tRmd5URvGCTWzqelsovySr6/lYYELwLLjtR96/El79z132t7XD9pAP+42+Mvx2vMxDK+mU4ejxx78cXzfBz9qBw8etDOnT1vV6gbZOq1YvlwTgliMk0Ft2bpZbsPoKgwO9sukg0UKQaivp1tjqbSOxvHZG8FmbHkMiw3G4sy04ybgK7QGV65eb2s2XxSfOLQ/Otd4KoYtSDZx6MDL0cP318fFH/+kb8oozYbHJy01M1dad+NDg5KdfuP1V+32u+62Jx55xCprlsfvfNe7rQJCDbr83V22D9bnsDsXNJ85KR8Ed9EVV9BqVqyLO5tPRft274ovv/YGGxkes662c9Z04mC09fJr49ve/cF4/57dEv3ksKAbw2bhuYwMDdmll+ywtRu32lf/9R+sr7PFNf5LK+MoNU3OUFLHWTT70Ic+YCdPn7OX9uyzrdu3CvFfSJ4x60Uz9Ak4HDo/kohPSdEGT5Et/ZxL2CMhL/dh1+YPMyIpKXnSOkAX0C3KXOadgy3o+hHIPVtIFehH0JXMlwaEvLPEAcnXhoyVi3XHJpCfYCIvzlplloMDjsOQ7JKDlEG4pjNnbN2GjdJ/mBgFpHavgPM3C0CaLpujNJFy0PMH8SaNIW3i5CBIECBkwyX6pbMBlarDA0h80LnhoQUSvADlxoI8WOTcduefuCc8N4YvSAdIJMuIOdknFAS4vNbFmnt6ydHVATTnEUibbdZtmtXmSU9XoJKYh07oYqurq3d1mESolJOCqLthw0Zt3p3PvSRew503XS9pak5AUjlEPEJi9tTjj6tHzbBQYUG+Jvd4TSbmaD0tY9ijYZUAS1hfGzeus+uvv15S4WAKIOYZtJUKi6SYtGLD1ri0ZlXM2CtDPB1tLUsClJQwgJUYZML+43rykZ/anj0v2+iYk1jeOLDfTp5psonJKQVqMjCCFXJbzz/7jLVhh9bdbb//W5+1g6/tiWA7xikZMgKlZ858Q0tLs112xVW2esOWuK2tTYsegJcTkWlQ5LjKq+ri44cPRI/+9H674qorLTvf0/9De1+MWAs33nqHTE4I+PAg+AyUNlkZqfbBj37MzjWetldffjFCgi2c/vTFc3PYgGYf/sAv2cb16+Tyi4rwm1Zw2GYViJjGc8M8RM7BASsCnEZQNWn99vX1qQSg7AD4XFKenp1ZsjmnfEDmnrUYQGb+E29h0dcdpCeCN2+OgTW0/CmRaUl6izlMBDr5LbgQaYQ4cbcKPX1mM3iOZENpeFfMz6mkhiMhqbIoReA69/vtyoK/vXHgBGWfmfHNzE2grnRZr3RtpHGIHbOYhRaqhuamiFKJ1n5C2FnSP8NKyjNuZQUECnkOJgQKVgLgGKkWkZTaKDix0KLKykB5J2tJEoyHJpxCU4MMBgEqZllBQaZusogayUQV3xOUWwLpCDYZpwh1I6k2AYefzdeXl5VLoutb3/+J/canfsV+cP+D+kyliQgHLL6M1LQYdd37f/g9++O//CvbcdVV9tCD9yesxEU7+MYBLVAZdPR06bPQLoTeSytMbsiah88RH5xRZKjGRw8esPa2Zm3WvHwmCj3oUXcOj47JpJO0vn7l+vjcmePR4NBAfPmV18nuq6O1KTp+5GDc3d1pp880SoMQws93v/V1a206GW3eemF89NDr0e4XnraSsspYfP7hEdu4frX1i1twPCoqLo9Rgub5AHJVVNdbX3enDfd1Su4rLy5RnUu/vrf9bHTwwGvxTXfcY88/+Vjc1dIYPf/Y/dHGi66IN27ZYt1d3TokMMjoa2+Kfu23/1MMDvCdb35Nnwm/A7AFQD0x5mxW5cydd91hnV29Nj41JYUdam+0/WTCSXm4iA6Ds+14tjJC0exJJICODZ5KN0AcE29lc4jxzIMEnQQ+E/1/vo/nENaKz6owyZemMkPzHZz2i3gWcJDN2aIOFxiBLHXnFkANXkz3EkRmIAkNXgNk80nrO0rR4dU2MamSBeMQnjBBDAwNx20OTA6+2Zm3hwG8vQKCs1rvHQAjw8bHhpfQ+tkpPuS8bhpYATeXzgAsPIKGWIFquSTCnIghZPB3OKTOS/FWllYFxZaRmSYUlwzBo6VTJhHNDElMqNnDia0bScsFEBIXYhBbtRER/PCyhbfO1wYlF2o00qsQkCgHuBCRZDADfXsWCtLSZAobNqy3I8dPWdO5Vnv/fe+yL3/ju5aeiJgQ+Ydpb46P2clTJ+25nU/aXffcK3HKc2ebrLikSHMMfb19lpmB7XSRzUEPTXzjyIQAtzidIfMMdrVEWRkZ8YnDh+zcySNRWdVySWtVVlbHaNJznTl5wtZv3OI96tRUW9nQYK3nTtpIf0908tiReNMF2+zl5zrt0Qd+YGPD/VH96o3xk489an293dr8vEZ7W/vS0x3s74lyC4pjdPRS4gUbH4WHbjY81Be9+OyzMb167m15SYmdSubaeU9FRcUxIN9QX586GAf374oa1m+If/kTn7GXnn4yRlAVP4E2EWxg4U3aQF+PXXPrPfFFl11pD/3ou4bFuboHw/2R23p7ZsZ9uvWGq620pNh+9MCjagf29fcveULwe0lxpWbqdIcyPSTKbopNYb4hUpN7R2ZItg3uSWKxnfj9ce8CdsCz4LQOWFHINMgU6NmTjYaJPs8oed0sZVdS/EkBn6LscEA7eGSGWZf0dM9E31QPXlySESfFJ7MkCDAnsuWCrdbT06csSLMvZM52HgOAuMwp2H2l2PoN63QzD77+htdUqAXl5GoyCvsmNtk4LTWAq0yskOckwUwrkdQslAIpqRlC/9lg3DRYa2ixsTEUXFLTbGYeIxIeFgudDMLre7nviGaMxtqsxdKSy9YtcqXhNBuDhjs2rpaYmAWyZHIlIOeCv1lTeaT3qS0UfOgaoHNYW1OtKUhOcXjZDz7xtP3uZz5u2zavtx8/dM61/dLT7Q25AfdrYz14/4/jy3ZcYR/44Ifsb//mr/SeOemw0uJ+0P6TOGmm4xndfR3KXFCgJV3lFAQs7Ww5o9fr7/baGD46pRYMwVNHX4+uvv7GGE1AAEsWcrhaGo9H01OTWi1sfn5tbToetTa5lHi4hgd/1hYcMZbZqXHLyM62E3uP6e8wBTlz7I2our4hlhuuhqrS8eOKxwa7o47mM9GO626NoSZTqvHefvKtL0XX3f6O+OIrr7baFSuVfeFF0Nx0RmUUdN93vOc+azx10h69//s++5iSYtCiWSdIyLNOIMxcd801duz4aevp6xOGs7y+XhsIwhlAHrx5fdAULwUp29iwXK7+5GsuTrwnCQ4MaMmwdh5Y1idUJc+dCMgGwpo7XLFGIoGMZB1yc4KUgwlOGB1OJL9Zo7OzaCKw6eGz0M16E5MIU5EhuwgZ7ZJXQFamlVWUa5q25Vyzy+2nQ4ybVZCCMn1epwEB/2SHPA6Kvqj+MpGXG7dl1Wrr6emUzvoMNzKTFp6nZgwNaYOlJnP74hVM63QGHCSS+umcpp6/hoWSHqujqh4wFmLmov3B0B1gwfFAPa0iHaPtBtDo3SpeL4ZtqJo/Q++d1+VnBTFRXs+Bmxxtep2oxIrUFImZwm4jdSMyk4YRII6dOmPvuvsOO3jslA30DajuQ60XNgQOOR3Np6Nvfe3L8Rf+5E/tphtvsiefelrOQXjG3XDrbZoPGB0e1H0h+JEa73r+Wf0dJ1V6DnqKo7Zqw7a4v7fTRgd8owICIS1eU7Pczgz32Wt7X7Z3vO+XbXRwwM4cP/Qzz6snsd/+f3NJN3FyWiaqrWeb9Hd9XW1RWUVdjO4hwf7o4Te0qehghGtyfMSuveFGe/hH345wVeLvDux7Rc47nPYMHi1GKVZaXiG7tFvuvEtt25/+8Dv6fjIHJMugWdOCbWw8a3X1K+2OW24SIn/y9Gl7bd8+eTRiGb527VpramoSQIicGOq7QcORjeeb2Ft3PLM5UdXnk7U2KyKQ1hBj6pKtn9amDmzScPoH4k1Ys2BdmgoEwxgZEREOchwdjdQclxXjtIaJ6Tmni9+yxoJlPZfLp6XoeaagnMWazEiXWrJ7bGRJ67F+eb0Ul72JECddqvM1DJTYa7Oh8cPr7urSTQOw0rDENJz8WKg9N53+NqUBZh/Uy9w4gDDYccH9l40H0ynQNAPAxaYm2oe/C61BbXRhKaEc8d6tazamiIZK1hBakCHyitwBm2tq2vKX6jCfUAwTiWQDMzOYn+ap3QlwSQbAQyUt5Odv2rLZerp77f5HnrQv/Pav283XXW1f+84PZRXF66CHMDUxHmPh9dqr+yVj9csf/bi1tLVbR2eX3X77h7R4B/t7LTt3k049uBP8rIqKcplqimoaLSprQSyzt8tn27kmmRZMq4xndMqYZL8/+Cu/Gre0Nlt76//7Df/zFwag2G51NDfb6685FVcXrsS9fVF52caYJUimU1ZdFxdX1Ijv39TYJMm0zRfuiI++/kpUVrNCxqIjQwMKpGzW2vp6y0xPs63bL7KtF15sP/rON+30sYM+7JOdazm5heLV8xzpiqxbs8ruvfNWO9veraBN6ZCZMCMpK/FlYEMQoEmfEdbkueGqI2KacV/dgQpi2gKdh4QbwhpmXXKvGYRiY+YtUpd7SRuMPsKJHYBj1qPcqvEFUGtwNpGiy0mUrhZtbmLOFaNhHgoTcDo83StKY9qgUgRWqzvbuwtTM+IMQJIaGOiTbgFzNmfPnrMLtm1X14WgcF4zAHYcgAU1Fvr4uMq8fuCApJ3pEIjXD7mG1Gph0eKZaVk5DQz0J7JfsdJuLmmgJ5Re6jZ2sHT9xdoi3Y4tIyVNm4DgwY3UphVF2NM1WiW8H23iBRiGXrcFURAicaj1wQS4HChC7YUH6rbTvI+Q8pFqjY8zvJFvqVA8E7Vhoj1BAJCQ1Aw1nZ888qS9+67bbd+BN+zUmbM2PUldx/vNlXAIwN43v/YN27rtEnvfhz5s3/zKV+373/2OhoEg5HAC1tbVWk9ntwLq3MyUlSWUVECy+hWrLSsjTeO0vPfK2hUancW0UiVVWbUCzYH9+6yubpn937g40bD1em3vLv25uLwqBqzF+xCAJTsvX/eQi9NSNS9aC9k5anGuXLvOVm3YGp89cShq2LAt5sScn5m2kooKdTHizCy76dY7bc+LL9jOh3/iXP/isrh6WZ0VFZVogxC8t110sX38lz9gDz/2pDU2t+qZLZNOQapAPdYXmz+Ydqqrk5lhg71O6OG5KktJOCMArTPU7MKKXElKlN7JScl8MVUaPClcWs43KH8OKL4LiLpxCOuUTe9ZbYoNDQ+6y7N69QjXYIzj2BJrh8wS3oevNU/7w8FGlsRnEgEJMDxK0f0uLijR+iBISZ5NXIa080gESku36blZKyortbysHKUmtC86uzpU/4PTwabjw9EVYHMOD+C/ZtKAn4eNNYlRqIMnkmRKXGV1QxK5riD1HRxaaLuw4Kdn5iRXRWR1ARD/RK6oErlsOI5Dom4mY8HJUJCknxMvdh7AkjEpIpDJ3IBQ+cTumZSfoLB+/Xq7/PLLRRJhQOP0Saa48mXGCRutqaXNPvLe91jq4qKtWLnCyisrrGH9JiuurhcVhbmCf/6Hv7UtGzbYlddcI2mt7Jx8q8e+u7zSpmcWLK+wWKXQmg1bRLIRCWlqRlOV7e2tS/cf27Cu9nMRNlmYhLD5+ftdLz4nG6//G5dEN1IWl7T3MzLxq+tVK49TF29EndDFlfHoYG+EShR0YepwygaGta689iYpDk1MTQhT4H2XlRTZ+MiwXX/bbWIBPvrQAwbox89A3BMchSCNpgGq01defrEe7pPPvmTPP/+SvbJ3n7NQl/CjFI0Fs54omWQqs/gmv0RTeUnQV88+mWXJTjJRLp/Y8z+7mhTcE98iIVUPWaS6UNh7o6qcnr50ePlEqbfrWEt0xiZCm3BkxPr7sSf3FixkpZBVBPA6HHpkSUwfkhHSZsUjsLqmSgzJ5cuXSV1ofKgnQmLs/BGBFhY0aTUyOKTNzGhoGFekfkEYs6O13ees6aMuxEq5GAeura5VGsiGRArKFXLdKwDkG+VaB2mcu8+NoTbjyUlKjP+JFEQ7xU96D2eOsEqRJdVHjudnMGTIUH0NOAbri2CE2aKjtH5ySCE2kRQPIBFjowGZB3Em6rNI2PTgGeOzs6KPwi3na771g/vtT3//N6VL98yLu6RKQ6CsX7HKWs6esXhu3va89Gz0o+9+K/6lD37Ejh87KpsxZUiLizY2ObGkXwD6z/tlIRWVFGuugHtVUlUXD3a3RQBYqOrMz03bcJ8PPaGmAwh36ODrccOGrXHjiUNvqwzghNzz4vP6/Yr1W2Im8Hrazyr9Jg3tam2KyiqrYmy709PTYibiSP2REZ8c64/aFi2+8tqrRUk++sar6qysXbPOzjaesA1bttiGDZvsy//yj8o0oFAXlFfFBInB/kG7+LJL1E0BG7rz1hvtxz99RIGXlJ6xcrQQwHR4XnAokP2KUtDfgzWZviQCG07tOTZ+0vYFMI60RKj5XXGK58waU3mZ4R2lUBpKsSc5JCQIkrQX/fcQdlyvUi3peajW+TaVgujMtM8cJNbhYrIm7FJwA/7satGOF6ChyfsHQI3DSHtGpo0MD0gWnCwbOTZG7QFXf15N+j80AEBOwOZYaQ6AWk6+5RcV2lwfCCUKsIty3GEuWjdoAbEPbMLm7cTxY/pwGHjSMQCw8dFZAoQ/lCCsEBhaqrVyvJZn/FXBQ+0Ud/gJisKwwQJHmvkCg07LkA/abbmekqnNR10/O6P6UoyshBkW/AV4+LTqKsrL9fAGk1Fj0n4iP+kp9FsyCrgCSHtB8Pnuj39qn/iVD9ipxjPaKB3tHSoFINF0tbfpfX37O9+ydRs32ac//Wn73d/5vHq95eWV1tCw2vILC4WOg40AGOHsC2UXLIXyRRlPEoA5HVxgclILgoU2NmT2/M4nPU1PLoRF+DyjiRX3L3yeheXxxMib2gNc/T1d1t7SpL+DvHP04EH9fee50zIy5fdDMCqTYSo6EgJw8a0bgxLdFz312CPx1osvEzCHPNfqNQV6Du/98K/Ygz/+sZ04uP9NvYO8QhHKUlIyrfH0aW2SP/ydz9vQyJj8BsZHYZGmaU3BCuTzsnFOnDjh/npYwMEFSCy2yBSDoo/4AMJz8A9M0fphUC0oURGEtQZmZwVY5+VnCMDmCmpAxIPpaezlnL/iXBZOcH82kq9fBFuaShiFvKa/J4J3CEiudQELFVJaylIQ4Wu9GwGl2PzAyc6SaQrlHkA3ysgcqBPDfVFmRc3b6gO+rfBBuqUaZmFBPvMbN22UFXd7W6tSKG4kenZsAinyAARKg91Tfh4Y6b+iocQTPdUKaCsnp+rfiYkleTD892jpyK8dgk8yBBRqMU19kRnMLWjBsVmC6hBpm0Zsh4fF8pJ12BSsrWGddHIKTl6P9xFkouDB8x8tTRhm/BtBhBPYJ76G1PtlyCQrI8MeeXynvX7kuP3+b31OBCiYaNR0DWs3WEVVjT7H6EBP9E//4x8sPy/bPvmJT6k9iVrNHXfda5dedrltu/hSuQKxWOpXLvf3lJ6h7GkpuGVw7wGU8JAjMKZYb4L093W1Rh0trVaUKA2D0CsYvuUCtAu/ZzNrTqOkIt500Y64qnal/i1s/ora5TFsRbwKymvq9W9M/XGxsGXjFc/r5KytWSbSDVdReW3MPeZZrmxYp8GwE8eO2s133muv7dtrLzzxQFRc5ou4YtmqmNIHBmZxaZHl5BfYe955r61cUW//9qWv6bMuq6+1FcvrrKigUBsCYkxA6OHLhxo/UHyhbgfVXoGFE3AO+m14cEgBnM4KwC5ybKwBfq9fh4a1+UPfPvBFdL8TyrFLuWMDliOWIiULxDWedfrSWLn7XYgDK27Hm+5BcAh06EVOC9bhl2Qg3qFY0LMliOVmZ1nTmVPiHJCVolDNFTKU82MPPr8gJhipMMqxvJe8PAQnnbmXnZ0pFVxSOJFVFhdsZGRC4p58MMAvGXVieqhISUAIhAh3eSVdD6/H3wd+gEt34b3nmoPeqktx5FeBY9Ey03Ae8um/oAlYVFiohxdAF3m0IUmWk7M0O5D1lrFi/p2sgxsN8UPSUcmC4P2sXLlCC6m1tdWHSkoqrLW1zf7m7/7JvvvVL9rvfPZT9rf//GUp/2CRxd6tXN4Q97Q0Rgzb/OWf/Kn9+V//N031fe1rX7e//LM/lXYA9TMmGLD7oALDaOR05WTo7m6NcAFOTfrSvgmnFVQoAdhEA12tcq8aSU78nOxMl7VKFIBx9yGYhs2fJaFQV3oGeR7scb/CcOGQ/NqrrwnwJd3nSs/IFD+BADDK3xeWqkQjU0rNyNDo7jhKO30d0eTYcExg+9I//HV030c+GZM9fv+bX2WkOcYOnFFn8A6UmJDv5hmlp6TYO+6+0+5/4EF77QD8kizdb3ClGUhhHBxsqjhd/f+g9fdWXUnx7SXVNWEF+XkKxuGwiZKNyFriUJJiFbLqCUM1/MpzDfqAQTciWH2xDlgT4YDCtVdko8UMy4CanJ2jQMEeYS0RaAQWJt2F/LwCxM9sfo52eJaNjQy7kWwCsEs1S52FGXvhxZds+8WXi2ZcUlohGbq3Kwv+9iTBkh9Oy4WUH/015sQB/OgC8MbZ+Jz8sMZAw3OzcwQQKmU3T3cgxMAIC1NPZAlKy5KyQJz/hI9P2iQeQTpAD5Rjn+n3EyDLcQLJNFOWZOoBqOZPSVHqLgOJLJ8CY7H4sI8LPxbk5Qu7CCIi/sAml4IBmYefJHlKzQJzDnMMFqVr/2dYTU21xmn/5cvfsu0XbLL3vutugwS048ordVoQ8EqqlonlduDg6/aD73zT7nnHO+ySi7fZwECvJNJnZud1YkG0YiIsTCjijFRZ1xATFDQPIUyE2nLOcosrYnQZQoYA5rHjulvigpKqmLlxNtiK9dvi/KISLbKRgZ6osLQqXrF6vTwUezrORbRMsTgDXHzrs2YgpqK8xMaG+yKMSn3xpGjjjQ71RaS+KOiMDQ/JJDYnr8BWrl5ruQX5Vl69Ij596oy98cZB23Lp1fHGCy60xx74iQ32tEWDfR6gKBl4fzwzsJayiip73y+9U3jQwPCw3X7brZKcp/Qj00LXEP0C7neQjgsl5Ftt4nmWrtrkTryUa6TTZJWDg4M6hACVQdRVYqkWf9PMAxzGW8ueQbJuwYq4AqMvAHgi9ghjcFTfZcGhFLvlPZs/mICiCIUhK6e/rMcZJ54YS8xZki5G0o4UMJmTbQPd7dErr+yx1PRMe2X3SzbU2xEFq7jzxARkDgAMIF+ySgxD0O/EyokahR68FH0F1pE2xUJ3+weYhS+3c01n1d9Mh/wD4JGZIQ45HwpGlgxDknqdFh1jtKGeIxiwkRFRnGdKULPZLpbB6cHPd4Bl0RbHOPFJCzES9RYiqjy8dpCI0tclU4gyH0kAH24+/7Fg+Hfqecob+sjyPZwYXzoNenp7tLjANkDHf3T/A3bVlZfaXbdcb+2d3fJSXL5ilYhSAJ6LC4sx2gY/+uH3bcPG9faJX/t1a2luk70W7rcLC8U6pVnMI4Nx4j+XYnFOjvX3dOpeEWT5bAQCghf3aInTkJUlZmRVXb2NDg3oGWTmYC46bsM9bfoievzllVV2aL9r+UMJListdTS+rCbOy8u2tuamqLyiyuYX5mQaQtAdHcL2u9VWrG6w4sq6eKinLSqvWRlT7qWlZcqqjUlFevl8H5OgPLM73/Eue+6px62tBdVov+AO0OPm4SHAWlpRaZds32bbLthqrx06ZqgHkw1t3LBR+g39A4NLKTmtZFp6UkWivZeQxoTlQDdPlKGCKCwg4JJr1NysRqmFuvOzk2esrlVGhl6Xzyrm4IwT07yWn3a131SfF2G9UFaqBE0+U+gS0BEJw0NqZatFjUBOnmcK83MqZxhICqQjyqiQ8RJs9H0Z6bZy7ZYYncPqqmrLLSgw60CH0oVSzpMzUOSnNgKJbJLxcclaEcW5Wc1NTboxXFBpqQtJ8ZlAIx193wfer/qGcUoWOalYiGikvFHS2hPSH4Q8kp6tUh8JrYYRz4SrzQNNdYMRVxByeyZHftH+H11qKXIahE4D6WXAEsLmZyHxPvk96T//MStQVVWlU5xeMLJX4AJcDKWsXt2gf7/0sku1kH7wk4dtaHTcbrvpWnm8rd+wyS659HKrX77KyiqrNewC0PX3//3vdP8+9/nfsaK8bElzUb/CMpRGPW1UWZ/Ny3thuLcjIg3mJgBoaUwY7HMhVkCub1gfw6cnQK9Zu9FqqqstRuyjulrIN+kj73nD5s02l5CIwkV/+t73fTT+xOd+0xDfrK1fFReXIV4SSdiDk3jtxm0aeQZnKSgslt1XcVmprVi7Xouf4SYYfzAZ4f0jJnL73fda89lGe2nnwxFZAz+rrHZFXFpRbXX1KzTFR9aXnZluv/FrH7fnX3zJXn75FXvggZ/a088+a6dOnxbyj2eeOBiJCY1wpfl5rT2JzCrw+3QpaxMpbu4hm4msKjzjrMysJd/GYN8W6LkaDae9p3kBbymnhDHywUFlg9q0iR+gNq/WDWtmVFOoSL+HLAGQz4NC4u04MiyrM16LiUoo70iC+ZSrjyLTyZAQcWwKjASzNatXW0WVjwtz5Set0/NUAqQuTcZ1dnTqQ61ft1a1CykmJ5YmAmVkSfqUojqbtCxsMNSCOQ3V74eoA4iXnqaUh1Sbi2yASM0pTRo1Pz+jMUkGJDz9d/QfYJBmOw+NmtZpny4PRQoIIOc+gU7fJOjwq+MA1Huu8xZ4AEGZmGCxpAsPhZMTIqElBwwhWEAztcd7Asi69NJLdRI++dweq6upsisuv0gpM8Hmgq3btOhLa5fHWI2Pjo3bf/vrv5Kg56/+2mfUI+eeTo5P6uHTO6aPTtk1TEuovFZOPzInSZxrUNQhGRhGlTk7z0oql8UZWTkiE/Eel9ctU8cmNVpU+sj38GeNsb7lmpiZs9q6OiuvrrWG9RutsLTcevsHpEOINh3ag1PIpY/0R2QWZB4pKRm2fsMWlSruNzgm+jSZHoSYO9/5HqXaLz//jIFf6P2WVMapaa6uS9CRdFZ2jn3+c5+xE41Ntve11627t0ciHIDM9XV1egbuyDth7e3tut/BjReQNJ5fSMq6PCvQxvdZ/0D1BrCVNf38vA4AKVXNzWu9EnS9h+8YjyzBkk4C6zgzCSLgCARngpDTxXMVWHjWrCOCCgNMcDf4GYHyy9cKqxlxAhFBRLMwkxPiW7g3puMOYT2pBI4ikaKQbOcZyxmY91JWJdbleSsBoD9yEd22X7RdPn7U7gyweCTzNoZ7oif6fCMjQoSJmE89+aTzsmfnNBMuxRtLEYLKqRgcWVipRFGCBKc7Xy9DkHkQexyH8GiCloxI6ZwNTfpGgXDC/QFclBhkmluNBbBIxpDJRGAACUnv+S/o+PPAg7YAXQLacgQTTlRJSpOCJ21DTXVNT6sVCO7AwsCplgVAKnvbjdfbqTPNiepQJOpq/2A/opjx/NyUNZ1tsu98/av2md/+XQmN/vCHP7TCwlIXMh0b1UMfn3WBCEC0tJQsi9JSVSvq3jKOCqU1kUcf7GmPsjJS4mW11bZncsLq65bbYD/Thxl20x33xM88/nDEKYZ+36H9zvTjQs+fRdzV1qENjfpyw5qNS6CXqN8JgMhMf8O6DdrEKenpNtDfK7IPbUmCFg5F77jvfdawZrX9j7/9G+vv8iEmLrQOKAlBzvv6BjTc8oe//ztWVVFuf/OP/2qD/d7t4d7CN+FERgSU+yvAOTdP/850Js9Em0zOTnMWzzt4R5Bnnh8HHq7Qt9fiT2MwzU9Z16z0dRAOiAAUhrSdK5zo07KwA3B04REZzmi6L13PXsNHYqk6nVhycvNz3vVKWs4yM026VEGOHLCvoCBPX097GpB7ZBjx0Ry74aYbFQDeeO0NDaP5q59HDCBokiP0CTmjrKpCNRm2YGxm3hyRE6OK4MTCaYHJIe1BGFssWNpHzM2vXb5SgYIPx+bhodCOkZ47qCjjuZB+5KBCqp9uKZqM4mF4NsCkYFpGmmVmINCYpggeiDVK7dOxw/b3TgRfpAWDJ3vSRtTfLcSWXQzxw9VluAJDK8wp9Pb16fME1Zlly5ZJ3PPkyVMiQrmXIelyiVK6p1/YrSGVe++8xb767R9Yy9kmKQjBIETDv+PsiaiorCp+7InHbfnq1XbPO94pq7WXX9krUI6OC6VVw/oN9vyjP4nqV66Q0CY1JCUUF5+V4MpcwMat2zCljA/s32szswuWmZ5txw8fsq6O5ujWu94ZX33N1fbM4w9rMUtsJLmuufnuGHORzvYWW7GqwQ4ffEO0WBh5BA8EXcmsyBxG0H8c6Y8G+nvjosJiDQDhYQcgTM06PDRhd73rl+yC7Rfad776JRsfgxDtFy2/mmUuuEJazybbcdmldvcdt9rnf/8/28CQA3V0GOB6cP8Xh4atvm6ZWm5Lbs7D9M6Zy/fWH7yM4PzknBDWl9f1lJhs2KXhs1n4+PgQUlpBHnOBT0nOAezJeoz0H8HZFNeWSLQAnfXH2pqznu6pBHd4c7w9pPoOTPrcAAcXpSnrmGyX9csgRRqcE74OTIbAhibExJR+ng6LNCeqHT9+XCPBkMvIRmTm+janPd5WCcANlkPJyJCtX7NGZgw8CEwxQPVB6mljwaN3SSSiuYNTmnBTWuSy3qTULGDUawORA6SUKE/kJJjQMiH1x2lVPfg5bJyy1UZxPoKrE3ktNu/+8LR4EtBH9N65+aVITalBfRUowR71Sde8CxG0BUknCwuLhAFw8Tr8HRuan8v3kY4ePXpMWRF8ASbYJCkVmYQ0EHX85vd+bJVlpXbLdddIFJMNXFhUYGvWr7e6NZvi4f7uiMX1vW99y841nrEPfvRXZTkuQ8u0VKtbviIRJsFqe9zmUVqamrLWM8cj0n2pFuXmWmZ6pj37xKNWXbdCOMOxo4fs6BuvRGx+vnfNpq1WUFim16GenpqZlFhI7fKV8bvf/U6bGBm1lMU5e/iBHxna/mRlLz+/07o72kQ+oab2cSoAvGVi/0HLPtt4VkpDYAMIf2zedqFdff319qPvfceaGs9IAJarYtnKuKwSExln2zFSvWL5Svv8Zz9tr+x7TTbj4AEVlRUCifl31gNsv7Pnzuneh6k8r+vzxJEnOPT29vppm9TdQ+r3TyQbn1FdL+f4t1mpRY2qs8BnJOshpZaI6OiYfBSctuulAq8rBuDstIDNsLEpbdVypKwsKFT5KQdkDfa4IY2y2TTWboZcnQjoZI6sRQ4O8DEMcni+ZM3Yu2/atCFx4F5IhoIGrL52mdYE5YLUgN6mKOjb4wHEsVBqJrpe3PWSQL/WljZ9UHr9bA6m2aQ3P+qqqPkWGT1oSV6j9DPtjCkyBgARj8ZegwOK6EEzzJMYiqilsrBo05PTat/xMHW6Z3haBWFH3IIsZutdpjkM9egDQ/tNBjNDCyfQf8PP9VTM31fQfAfMlM6bhCTc2x2RSF6H2i9Qlikd+HfMS/T6c/PSn5ucnpTyzoOP77QPvOdeO3DwsLW2Y7WVrc+H5n5xRV1MTcgG+rv/9tf2hT//a/vgBz9k/+Mf/kE/F2tr5v8LyqpiamuYcchocSmIzdEvJnUskLrOkdcz4vmZWevvaY1q6lfFBFwCIul638iIbbrg4pjgvKahwbZeuN2grGAyytc3rF4dE5Rfe/1123zBVnvhqYej+lUb4splq2LuZRjiUvnDr5Qiaak2PICY6bTVrd0cf+AjH7VD+18V8Ie3QdD2gzTETPzEeLswAtrEH/vIByxmirClzapkJxfJ8Zi0nyyLLhN0a9JrpNTJelhfQfqdfy+Q7XqRNkVA7EMrl+dI4JAQa+Lbl4Kab6IvyXDNlIw8vSTEedoBZE/NAZc43BiB5lTXYZGaovKDTJN7Cn7Nl8Lc4/MFubkwKBTmS3gG6UmPX+3LxAAneFOyd3JyEqxlbMLKKsvs0ssuttyCEjtx5owCkuNv3lU4bwFAbjujo3bDdddb/+CwbIuLR8flMIvNDTWzUuFpr+MA7aSNPgMJwls28mdjkGLOvfpSFlwe2Q0W/QFyspE6ERCCmaKXGCYwitlr5v5JwdBnZ3MSBNLSoWj6TXYK5rzrxTOAkfRtlX2AQ5AZaOYgR8zFMG7M6QKoGejBlAhO2fQHFqygg/FoCCLqaiSU0q7ubrMUFmWaHTvZaMdPNdnHPnSf/c0/fFGpNEFpzbqN+jydrc1K69s6uuybX/qiffa3f8/e+e532/e++12dOhiGjPZ3R30FxXEhWneYYBSVxZiL9rQ1RqD7gEp5ReWS0D51+NUIwPCWO+5R3dp65qQrMsexvedDH5FxByKUSJRPjk1IO/Dya2+N12zcZBdefLF95xtflurQXb/0oXjvSy8qa+tsPhNVVNfHReU18UBXS1RZvzYmEEkJCtZaXq597rd+1wZ6u+2ZnU/a1JhzJpALKy2rVFuPMg8PCQC9u++4xS68cLv98P6HFeSbz55TQCFrEtMz5qQvWhLsDNOa0uVLVHyppZEuGxweshwGqdY2aLOfO9eyxAwcH2cKL18lGid6ZWVF4gwcC3ykLcjmpLsgI5hpfBncA1MEsKTrFaYCF6YXl3gl0reUa1GBcxHmFtw4N/lal62DG+O+AFnpbroKSM3aZ22zrtH/BwD3QasB23bRhbZ2w3qByMcOH7GRsXG1QjU/kwSw8xYAoEqiejqFDrrcUvvVe2U6DURVm2VuzibSxnVqz9IimRjXJhQDi/HMNCe5zGN0zAyvoq63VEgRQfjZSJxGgZnlRA3nWHPKL0T0WRk2op0DJxtCEZF+XilklOJCjrwWmy20jQLtl4uZBCnoJGqwmkwUAciFGlzIIU+tn+AtgF7e1JLzEASQ/KXgw/t3sHJRYA4/j/vR2tJsTz37kn3wl+6yX3rnXfbkMy9oscPvpkXKZzq6/2WJYb6y9xUr/tbX7f0f+Zi1t7XY/n37tbhI93nwlBa9Heeikqr6GIuwcMGBgGTUk54Zw/IDa5g3n5abmJm3559+xmrr69TiKyjM12RdHKXZtksutd7uTrvlppulsYg+4aVX3xi/+PSj0a98+jfj4tISnT6Vy1bHPe1OEeYiWPOHsYlxS83Mtk//1ud1Un/ty/9u/b1d6hbwdWXl1Va9rF6qx7gAUctXVpTbHbfeaF/52je10anZmTDNTMEuq16cCdJoOhUcKARWne4E75xs27Jss+ZRCATYZgGLkSqnnnWsCMDQS08H72Lr0QHEZm5v79CJS8Ya9CA5CIIXRWBZwrdwHMGdsDihAR8J7prJlCips1QpQWn3ktIDbMvrIQH5WA8E8enZaUtPddk62uPcPzA0Wphjo47r8P2UFitXLhcA+uMf/9he3f1CdMPt98QQrJoaz2JCEyHHft4CAGCEWa41Np6x7RddKL2/nu5+1S8sZjwCiLJsLkZZG0+f0eaUyKWIE6TTsWsBZCXGjZz6ScuGh8xUWZjMCg+EU2FhwfEEiDQgKWF4x09zT+3l6joHpuD+AjwgteyStJ768a3z3BKSEOc+XWIhWjBKJ1P0OVRTwvvPzBSbETxBHoJJqhnHLuDpPn+JhFQUiSdA9GcOIX/FCvWzn3hml73n3jtkEPLozudFRWXSbvnKBpyI47bGE1FpZW38zNNPKbN634c/qk7E8089GpXXLI+lj2ix1axcJyuuo/tfchkt2W/3RwXF5bECz8K89XR32fGjh1yAZWjQJsfHrW+gT750C3Pce1xrzND+6+zoUtCcpI+dkmZXXHWN7d/1rLjzVTW1Nj/fZsVl5fgSxMO9ntYTyDOysg05sE99/j/HWy7YZv/9r/+rnXzjlaUgwQTjug0bbGR8zDJzcu1sU5NIUz/+/jft8SefttdfPygAj7RXQ0XpGQLiqmtqxM93iW7HXriv1NgE3bPNLTY+MvoWUM+n6pipD2SyYBUXDGZEIqM+z/QeP5fGhRN3Kv8aVwUC34CuV5BH5reg5zQ3FyljyM4GpZ/TAZiTAylswqb6epdcsTTgM+alsNrVmIdmutw7RiIcCN56DO/P5xnAjQgeleUVwgrWNqy27u3bKQFjDlcyiwBkBsn78+MMxAehn5+MMRKp5xn7jVKssqZOcwKgp6RnXe0dBlEk0Gk5IbhhbCL455I7TvqzMzMun0zE10k6/7McbRA7bh6XDD+SWkupFy09gJm0dPWFE/0wEYyCigs3nIcN5uCLyZWJAp7AZlW/nJos0QpU3xgtdjIZSUXN2mxOtiYAAQ5ZEBiEsuD4PSkmD6mkpEiWV/w9JQ8GIsXFhbbv1QOqcz903702OjllR0+esbinR6UOFmsAZdhqlVUti3/8gx8IbH3vRz5h3T3d8YmDr0l9l89SXl6xZATCNZj09+m8EIQ5qahPybSwoi7IGxLhyOYz7PTJE7rncPS5T3pWlmqvvfaqXXbJxTY1M29r17iuQFPTGbvqupvtXGOTntX27RfZ4TdS4oHe9oj7NNjVHN3+jvvia6+/0f7+v/2VHTn46tJ7ol9dU1cvTcixkTHJoCFY8td/+V8U1Jpb29UKBAClLODkF7N0eFiTgeH+85y4r/zKs3OhjUVhBKLuJiO9BIlw8nLPAw8glGfcIGbtU1Nd5Skw/9z5iZo/smm1dX3SVDgHLT2NnENzznXcIJGxJ8hDkAoag1IUTrQEg7lNGEkOZacUrBJ9QR1oCNbMUTK7bwBrtbe3x/bv3WNPPPGoLV++wm688WabYAoWEZskUBEEz6MmIBt3XguM/86dbZTMNVFtdCiRzsrPS1h347ph9KxJAennUqNNxZOJqJETdAjICip8PgAZfNTo+UucA5ERB09CD5++KOlwcBWmNKC/moX82NycSCSkeGxAUvMwHBKAmWAvFpSApA2Q6MGFia4g+0TXIBvkWm0pLJ+zhVfABgSDIKrPzrHo4Cvw0KdVx4ITzI3xXvJUW5LS8bMfe3KnANT3vecea/+Xr9jiYpkCQGVtrdqTs7MzcX93e8Qk3ne++Q371U9/2j740U/al/5pMm5tPB5By01Nz7Dh7s6lZ8Iw0NhQL0npkgZgXsG6mM+PjbZTTqfFvc/KztfvURtC5OSlXbuEevO5MQeZi1Ns+7YLUOyJ2zq6tVngxp87c9r9CnJyDRwAOfCrbrozfs8HftkeeuAntvvpx97s9ZdVxcuWr5KcFUDwls2bbHxi2n7zs5+0jes32L9/49sSORkYHLL+HjgE+TokCOI8Y+4dzyPU0trYyWwIWRgiH9Lcm5u1DMtS0A7OT6xP3nMwhA1AIBsWXMpiF+/0zdarwBC0KEU/Dwq+avH5kBqpEtONWq9kF0mmx5oNo+ThIqCE19KYcDKolpaWOAuri+VioPhlLCzOeAtT2Z3ZuKzFMm3t2vXqijCEhRUbMxdiOJZVxwTjt7WH3843i3ab7pskvwjTxUzr6uyQJj6bgwfAm2U6LDc/V/Ud7St+LMQPgA+lPvIOmFWEhYzB9wG+hKgdmFlBOSVhaCgSAtRw0gc1FYA2gSNCUrP1tUENSKypyOexORnY2JrbTjKI8BDJKigDgjBI6C7wdQQ12HycvCxOggyp8wz1e2TyOASgcdYiY9ALdvL0qcRjDitplxWjE4IS7mM7n7U3Dh21W2+4TrUpaXAW7MXcPCkEcfV2tEQEsa988V+s8XSj3fOe99nKtZvjge7WCMKNvATDA01Swomk506QKC6rkkMuuoOg5C7RtmCr1qxW6o4232sHDghggvKbk59vZ8+e1Vh3B5uyuFRg6LnGk6I5D/d3RvjXucZdbDtuuCP+yCd+zR5/9BF78tEHf2aNVNXWaSOR6dXU1trI+KRdc81VtnlDg337h/dbTg5z/bMKQqjfsvGhMlM28Z9niyWJPiPcill1Xfh7lHx7+/vEFoQG3N3ZqRLNuQVj+j0bVGWfaL1klfM2Oe3ak/OauV9UfR8wADgktFIBReFUAMwFGjr4QEDtWbv4BMJupG0XjD+C2Yzr/r9V8ts7TWOjw7KznxibEIbGuuAzUQ5ziDKVqnF4soXFRdu4abNdde11bqeXm2eZ2Rki3SF2o2z4fHoDqq6xxI9vMbaSUk/jzjads2kYXIkBaE52rjFBxslJ3UqbCDR20+YtS+0k1053B1c+LCOtAhQz6afmLPV+KQtI5zlhAVtI0djMIhkxIZh0DXyU0vkEAdRhYeBKG4A7fsWKin5vkI4Kooxvzmw7FuA0zRR5tnNCkZ529fYohSUIUScy4CEf+kQAhdSUlK6irFSZyLK6equqrNTrIWENq5D5gb/7ly/bqhXLbMfFW4UTlJWXWlFJkaL9mgsu8bn8ppMR9/SJh36iE/rmO++xmuVrY8hCcMq58oor4jD+OzLY48M+WW5qAlej+cyxiNHlhnXrhOajOLGyYbUW/NnmZv3svJxsqyovEzBFIIW22tzS4gMsBcUqfcJFtoaY582332l79+y2F3c+LoAsXFUr1sYAZ5Rja9auVXty+bIa+/iH32uvHTxpvX394k8UQr5aXFS7lBLAT00m6RzcY6NyX8U2TE5OMCUckt2uLV9j3uhNwtXwqUln2i1JeTEvQos3GQ9nvmRWXIHpJaIYfw+3I9C7NZEqdWjcpNz1ifXMwBWBgTXIM+QggEMQWsGsYflmygnap1XDQBBKUmSN3DzuizLNRCdDZjkJz4TMBcrxKRHLpqyvv8/aW1qstrrGSoryLZtgMtgTvV09gLcVACDqgGATsbE75tiWTFNGqqIzafKqlSu0KEA1xXOOedD1GhOmn8uDcncebMaSqanEK9BBO0f9ieZEU3r/bq6Iu6prsIXUndM2NXK6L6cGG5GvI3iEDIFsIQB1XDwk93jzFC8ARaHNJ42BhOvPzyU48TpSGILUQTcgL0eUXOpEXotTEoyDWpdFCy+c1JqH2dTY6IImM7MaIx4Y7NNi+OLXvm333nWb1dfWupBotvPZRSpatcGVd7rbI7Ko+7//LSkH33r3O2zT1q1aRKSDGEb8/IUeHafr5PiE5ReVx5ReHBwjwyPW1tqqTd/T3S0hE+pYcAHmB1hWlC+ZgGFTk/bG/l0RbSnm3bnQH0RK++obb5Yf5Ff/8b9G3JOxQR/ygelXUlahQaHVq1arFVpclGdf+P3ftl17X7XXDx3RpieQcsuRCWM9QNllTdPz5+I+cr9Jpzl1eU46WWdm5JwsdWdGbWmbDQ9rs/iamVka6w0dADazd4gyNa6+SFt1DsGNGb0+hwXgYf9An4xgyFZ9RHdCNmBao8m0qUbURSOmPPVef6CUcwjSgQgDQGHASO8D3oHmSUztvmA9DtWX+889BpxUEEr0BR57+FFRrguLC23P7t329W9816L0DCthoOttMgHfFgbASZubnycyEDRQvO+qa6ttdHQQvSorLSn1MWBMROmpy94pUxsAi2MiaG4B025O65T1Fm6ni86r5wTg89Fac2uvWLUbPxeQi9pwYgqONRbjbvkFEEfwYVEFElCY4+Z1KFlk/pCUFUJ6E+21MGosv4Bk3NM9A536GfQAfagD48dZdQQQsBidHrE43yXN1aorKUmUalJsYHjIKkpL/TTO8s/P59PpJE57ur3+xhH7yYOP2ed+7WP23/7xizr1cBnq7e3z11zREHc3N0ZBVoqhmmtuuc1Wrl6nDYxLL2nhW6/84kr6I9bd0arUXwMm2TmqdyHgQPopKixQi62+rl7ZEF6F9SvqLTM7X318Wp20YavqVsbd7a1a2FzL126Ob7nnXqnUPP/UYxIVCQNGTPjBQCwtLVP63NdPubBgn/7kx62nf8BeO3DQms4yCp6utjCtL+ZHuDdsup7Z3sRABiLZkAI5XH8Yc8i4u3Cro/vIzvF1ZCpsblptKYnxqY/5Avz6uG8QC5mfntca4IKOSx8eDQPWl/59dl4kNY15Iy8+Nys0XkBkkiHy4JSN0mrm61CplvZftjJU1gdZAL8PHQiJjKQyl4Jw6KKEcqRLseiBGuQ/Iz3VKqsqbHhkVEKilC3TM1PC0sCYFqXBUCqNQA7Kt2IO56ELMGPRpEt+Va9cKQdd+OIkFjxwePyQKuD0c3P4O04jEF6yg/T0LL/ZIvdgFEImAOlqXouBmx7smuLFaWUbnI70fVNSFpwfkJElYRFSTSJrZioTgMznJ5ptghgZGPJTwQG87CUBUuihZCVIkctKPFGIdVAwK2knghu4l1vwjgvEH4KUAEhcfgoKBGZlpI0q5ZVzCwsIddhBFnKeNh8Ln58lleNJlylDquqnjz5pqRnp9tEPv8/+4YtfUbqNjTbGKCwmnFExGSkoLoupwffuekkmnRdftsNefvFF6252e6+li7InST2bTx8TmAgYNTs1YfDwOW3Kq6ptuK0N903bcsEWO3XqhIgqFeUVOv2OHHpD4J2Q85wcaz50NFq7+eJ4++WXW29Xpz31yINLqkNc+AFWVte4/No4Mx1wP83+/E++oFT6yWdelN8B9/Bc8zkJcgQca3pySt0AlJPYVFB/CVqw7cBzOEAIctL5S/Cg4LArey5Yo5i6hFodLQCIP1MOCIYTODPFg3tqqst1M6rMKUzmwLNh2YCuE/wyFmJlemSxPC/pVWJmk+69fjIDtwBHbGTcXX4TkVEJuiY+ArwnqMfoMxRhHpt4P6SnQxfHaqxfWWtXR5vETVlsvKeZKLLyghJrOdekg5Y5garKCs3TILKblfMm/vMfXgI4f3ne0+3CIqW3RMZltbVC+YuKC5TiwcxCQps0hs1ElCRywwaDfYVSEKObrBTVpprsc7IO+Ki8P+Bbs2nncFsdFSWTNA4WYBYtHUX7UE54tNXghub2C7XJObG9n+wKQkRzlwV3TwC03gJmEOjDLCKAHrdsSv2ZyS0XmvToTpAj2HBKsQjOnDltAwN4urlICQsdUgoPlWDDfRFNdcqFH1g0WIE/+sQz1jswbL/yofeKaIKN+IpVqyQBVbt8ha1Yf0E8OtQf0crraW+1A3t3W3VtnV102WVWWLFMpQLioHq4iXcivAD+nJdfqGyJcgTpKdyHCS4oN69Zt1bAIRjBvj2v2OYLtogau//l3agAR5Mzbnhx4ZU3xFsv3WElBXm278XnlowyuCrrVselFVVK+4uKS/W5+Jw3Xnetbduyyb753e/b8ePHdB86uzr1XJAv37h5s43g1js5qQC5uAT6+hAPYKDjKY6SE0hFFZ+cFDUajTyeGVjQ0AD6ft7aE1A46T6UzveYsuKiAgVTxnczSLMpW0ZHXUgkced1fktki/Ox5dDpyczQxkOAlQwDwLGvt0uuRAQKDgVO66AfAWWbda1pUUqMpEMFTsCBgYU76wjsTP4WKb6XMIItKirV67Emef8kJhNTU1ZZs0zj4fLaRBiHJwtY+DbHgd9WAOBDOhUyS5rnpRV40nkLrWHtOkOGinqpb2BQBBBUTBDy1GQddMhsQJNUMa1AqbnR0nhP81YOwSDwozkpg+66EOFZDCAmpDSDAhG/cuIEY8WQ4rNpWSihHHBPgCHVW5xssjGXbgFkDW/nvNUHLmQnZDuknqSjgb8vLndCQPIUM9LDm6TNxmx6ZNbd26fMh0VID5uFTv0+TWBBuXZmVn8fwBwotT9+4FGrr6m1z3zqY9aL4i6AWlW1AFEUfKpXrovHh3qjqekJ2Vrveu4ZW71mvV1x7Q1WVL4sDuKffI6S8vKl55WdV5i4EWNsMuzaDJxgyGNnZduLzz9nfT3dCkZDQ4PS31tYmLWKuoaY4An4uGbDJovn52zn449ZP3VyYlJSXF4dp2dlKqhCPEpLjWxmcsou3X6BfeoTH7EfPfCQvfjCi9bf16+yhiyubtkyneqcvAz+eEaXoZ73qoYGq6quSvQYvOVLdka6jjIwNb8GcZJ2biDeBAZfmMYM4C+bpawUcBOKrgezWZD6xDZO5QKS5vMLIoQFZ6qurg4FZjI4AGSCBaWGC8y4DRiZDSc7smlBXYiL4A8w/VZjUeEIMc95WJ8FsRSCORZ5YEgIrFRWV+t1yCJh/dEuf2Pfrmj7RRfZqtUN+j66RHRjKCPOWwDwoZ8FazrTKD09FldvT7fGVqlbAcAkmJCdIyVWiXHqlGZqL91npdFIm55WC4cTnIvU29tZrsVG1HVTRaJ5+hKyzUZUMEnP0LRUSQmosFNxw3w+rwLKrEEMtYSgcjrzKnx4AUTJplcKl0hLBVkm/o16FrqmawqgsJsmiq9bnWcr/WewZtWqVZadmaVBIQIaqR44CKcP6SUZC10DMAtSwOUrlut7ORlqa5fppGtuPmv/+o3v2Ia1DXbzdVdZZ0eHgtPqhjVWw9hxdo6V166IxwZ6o4XZaetsa7HnnnzMNl+wzS67+jrd/4KSynhsqCciSIarID9HgbblzNGIbglTdk8//rDu7dmTp1SCwQvoaGu2F5991hp5roXF1tvWGOHxsOOa6/QZ9u150ZpOHonC2VNUXh2j4CtXpgwCKWlyhgDT3/zNz9nOZ16w/QcO2rp163X6IuklOe/ZWevv67Gujg6tD9qRpNI8B4KiTlFS+TlP9Qkuej7YdyV4DgEUUhCHjlR7ErFXNr/s6JOWHM8JQA1sCMNYKLspELiyslVeqJYmECY2crx3cJyqKvwbKzSFWlJcIFCSNUa3ob5+uUpcVKLKysssO8cFQ1z0hdd13kqo012clt+TceJAPKxDQnoHxYwxJ9qG0s6IVQbj+zg7t2AVtStidCfx3uTgxFiEi8z2vGEAPhcNAjtppxvPaJoMs8c1a9fIJ5A+csPa9dbb3WWLM2y+yNKyMpYIF1zU8NTi5EGkU15fm6F4m8rfxfOqi1l4cmtZDEpELAp3cMEhmAtqqXO237zhoQUTHkQQewg9fpBYEUOQrs7M1KYMo6Yabkk4AmodYl5CmydGhiuyWXEFMBh1H8DgNsRK6h8YSMCqeQGgnBD8HIguRPA4xUeNifgAoa487MwwAkFnV5f9+9e/Y7/16x+3Q0eO2cnTTVZeXqZTAcyF/4qr6uKh7raoqLQibm5usqcefdhuuv0ODQy9tvcVyy2pimcmJ2UeMjrQFfV0ddloIuh5wy23KasaHuiOcvIL4j27XtRJuGHjBjtz6ozNRhCnZq3pxJlo+ZrN8bW33GaTY2O269mdhtGp7vdQnyy8EQBF2cdP6yltoL7+Xvvrv/p/7MjxM/bAw09IIRpAkP94tqKGN56xs02NVoikGKq+iLbQApuZViAhUHKIRFNTCfbiCtAypRXJJiMp/96kggfWHRuU5+tTgV4SBrcelwvz9hu+AIEqDg8lPcWZegiezs3F+hqfAHVzUdYOo89SI+arUnz2QEYzsw5Qi3VKRhL0GtkrOXSacKpybQHge9YqBB/HArCIz7OpqTSbHBuR0Q6TtTI0zfSRenwe4FJQqr66f7/ll1XF6GyetwDAiuEUxaUF8g+oMTeSm6A6sKhUCDV0WaS/vDzAZSdbjEBumAwltNFmZIhIRFTaT78W5l0yvqk3C4ElMQshgjr5Ik6mBRGhyLQ48to/sAMh7/AQA8swMAF5qCKBsEmT1h9fyyJeUoRJygA255IRB+xBAhDTX6i+Tk2rbg09YE2rZefI6UatIFlRzyS+cZQu+BdGTi1VGTGv39O+StNnTvcBmMwMe+PQYfvqN39gv/GZT9of/NFf2rmmRuEBpaXluvfnms5oNBgdAVpCLWdP21MPT9st97xbakgH9uyWW1NuZraNDnSJhbh6/WYxo1evXmNf/rd/9vuaBu7C7xZtYGhUfIb0xXnrPHsquvTqm+Ltl+7QIt/z/E7rbGmMCksq4pHERjwnjwGoXIFjdHCqqmoVJH/90x+3gvwi+/rD37Xurs6lnjpYT3FhobIPwF7S66qgnUCAiGPVvGxuMACCKriJYzxB0cexHAKtbzq/72F8O4wA83xpHbott1O6fbMhKOsAL4CfBEAnJvQMycTAbnKzXSma9nOy1JW1wT3hc5L+M4K+sOAuVeGgkBmoxEScZuxUXWcuEvihETNo5dOnTlcvrCpUxhNaicWlZSLPkSGv37DBTp8+rdfDiRv9wLKKMmV5BCkvYM6XNdj8nM9+Z2aK4KLR0spq5zVT6+cwxTVkPT1dOj2pCQH85HAiFZcUBYTM1CylYqDARDsQXlI2QJkUGXqmJK0WR/IDUYOHBamCMWMfLZ5WVuCTgb7h+Y9Np6kvFIgT9R/eA6lG8Hbjz5r3TwaCROtMsgZOm1AK0Crj16xsugcwBjOXZsqlUptIpYlmTFDIyLAKzaj7e+FxTYyNa0EvSqXYFzLfg6kqpQYLXiXP9JS99PJeW9uwyv7qT//Qfv+P/0wnFnbYzBcgPgGKzVwAMwBIfIMJPPLD79mt73qXqMd7dr205AcAxZTUNmfdRjvX3CyTTi70/wAFx0aztWHGR4dVol1+/W3xxq3b1aV46alHrberNSEZ9UaMG2Pfjf4/tmXUxgtzC0Z34vO/9RtWkFdsf/Knf67PWV9bY8dPHNfQEXFGrj0zM+IisAl0zzAd6ewUXiO15VHX16eO1gaG6ou0nGp3p2J7jz15xgkfRPyA4AANkr7om99FOQgQ/OcKUjOzENJybXrGDU04hQkCcCL4oBwcBE09e4KAHIDc4i4cJNpESQACzwg233L/AXdC6Xoa4NCdfThE5IuBp2ZJmYBQymZASSYtYYISaMRihLU4PmbVlRX2q5/4VYvSMuzk8ePSjuC9OD3e1aDOSwAQ0Ca1Wh+xvWAbMlQeHZkeY4CFqAXCKdRbm3NR7Dn5BmjCD9aTyzGzyXUyizfgkmIL867kMj0FsksKj1ZgosDCUIXovSkuC41CbtK7Z1VI1ce1HFxGLGFmCSOgT56fb3PIl6N2SzDJzpKz0VttoOFfU4pIqEGDHD7ggZZcyD7it1BJvfXI8NGC2lektiINsXg55eXtnqdTUuOkqB8J0JyUAQiTenw9JCKGiqhJH935nH34vnfZX/zxf7J/+tI39PmWIfCZmy0kmcygIHEGRmK7u6/Lnvzp/Xb7O94jR6C9L79oi/GczD9e379PANvwQKY1nTgUFZfWxEwIksEpaxKoFNnmrdtt5bqNIgHtfm7n0uYPV0FRsdpktC8RLYXaTGfn9377N2zNmrX29//yJQVQgl39RRfZxZdfYgcOHLQMtc7GraurS8EOPYDurm5NhwYhzHAfJdjKBkoktkfHx60oYQ0iBioGIf30BMNxBeoE+0HDIaHvulP1tDAFBtPEN8kgcM9at4ReUrx/L48FH0wLPX+euzJLhQS3Fw+HGO8pOAK78Ee6lZRki0AVAOLFOWTJXG7M15C7VXGxDltbm7UOKJs045CapkCIejO4xuDQiG29YItlZGTb0Miobd++XTZo7CFR3t/Shfk/ud4Wj6i8ZkXMhq6orrGbb75ZCwiU1xVbW0V1ZDSYsWAeOlGbN6wbnpUpAghUWW2sRELJLZQ8g6DF6A8Lt1Q2Nqeu9/SJ1nKPUQ2e5bU/xKKcvCVAjyvUgWHiK/i1UXt7APHBkED11YBH7MYjSu7SIhk98tqqYWMCn1tRK8iAT2Q4doCwBovI9QJSrae3130HyQ7gOSQW0/LNQwwyNhtOBo1C/ZuakWbo6/HntWsb7OTJk0pJIfL81q9/gprBfv13/3MSHBy1RmMAi6tBZLj7u6L84nKwcLVm73nXe3Tv9+7eZUPYkM/NSrEmO7dAi6iwsECZEMM0o2Lhpdi2Cy8SmNh0+pS98tLzohrjOrT03OtWxllZHvBIpQlCY2MT9ge/+9t2043X2Z/8xV9ZN3yHRM2J+wHKvyzBNmAgEkQvvvgiO3z4SOIAvSDUn3ax5vmTNh/vkZKRbIZNX7usRo7DdDGUKYyPq9Wn583awExmbtYmJ/CswNSDKVPqc7ft9kzP9QHTGMyRmzEdBgxpoA672AjZAVmQW8/Rw09mRDAiSUeJyEuJQMYRIQwRmrR0N10ZGXYPy2lnI2otooydlqouAw5a/KzhwUEFAMDaQjgQZ5uEKdFWZnpTpY3UrhftvR/6oBS4jx47Yc8+/bSelwRiknLsPzwAlFTWx6SkN91yk+244kp79snHrauzR6cxVmH0lEHOqVmn5+dkacRJnBLB48fxdEzz1JzqPiyRoZQNsJCUjAAAEjqjlC/bH0Li/BKGXkJ7hTqWLMRVa11RmPqKBREeQqgzuZmS9ga0orOQTJoRBDRBCFCn1hGgVWyTE84ODLPoXJzo1O7OaaDudG1AEUJGx1QiUHr4wjRtbM8csjRPsEAggrSC2GfCYZBHAn6EyfsUgKhTpUgBq/Vcq/3B5z8rJeHf+cKf2dqGBi0cVHvZCMODfTY80C+hTph5nFpw1VHlTc3Itr0vvWDnmk5bf6dPCa5cv1UWXa1nm5QpDHS3RDtuuD2+ZMeVdvj1A3Zg3x4F22AYml9SFTM8VFLu3RaSHWpi3Ih+7WMfteuvvdqeePZF++lPHxIpkSwG1d8jR44oQ1qzZo2eAX+WGGlBgctkoxydCa06Qyg3mAldj6CkE0xfebasKYI2+pMattJkKKXAgjY9dTYtYp5DanqKZyiclgAfyYLn9dxxypZcqvxeZ0hfMpsuQRozJpPuNpXK/AGCnu7g7LRzP/XJCAj2rHkHgO0t79txKmUDcBqE2pO6u3+AjwqnWXFJsYRRRsd4r+MqCWDRMuNAMEPhie7CHffcq2fN3jr4+uvW1kIgXbCxxGPhvLgDk8YDBF207QLr7+m2yupuqb+ODOfba6+9JhMQHhzqMygBkx7FMSjqjAA9SXsJuXc9tdkZn5iLYx46rr6xFnEY1gjRNKT66LIRqck2pLuW9O61oTnJ05z7HxxZ2ewsjiBxDYYQpMfELCM4WKSoLATZoPWWaWEtBRa09WAU0kGAcJKTqY2rxZWcRMGzLQxr8b6ycnKUwYASy9VXnocTlgr/wSLLx5wkkT5jgSroMbTSM6dakBLiX770Vfv85z5pf/GFP7Cvf+9HKk9g7bnwaYqm+1LSKmNsvwpKymMwlp98/9v2rvd9yK654SYbHBogAFjVMlSFhwVSpiVuu9fd+qm4rm65vfzSC3bs8Ou6B4OD7fogRRU1sh2TCjLtQnN3HKY6f++3P2/XXH2F/fTRx+3YsZOWn5ejjVNZXSvmJ61RvBMhQ7ELGYgB5BLoFQQ+kvl9AqSj8l5Hh5KA0hCgjPudn5uvLgMBHtFPVI2HhuCAOCMTkC0oUpEpMslIRyEIt/AMFMQz3dHJ7bpmLD8/XWPkkv3KzLDCtDeFaDIzIpuNZ8XxmJ4mi4Xk41mjnmmCOcgdKDkkpibBXrx0IIvgpzqZKeNNQdM8mIpT6hoxHVhcXGql6zdobZBRwPprO3dOw2Hr1zZYW0uzgg7mLDAmva34f369rQxgecPmeGRs1O66+277wPvfby2trXr48JqxuCL6kfIdP3ZcG48H1N3doTpMunQJMBUINy4K4jHJiTwZehCBgcffhcEK9Vbx9sM5JztXmIFQ3MQ0VO2geUZ005I++5t/v/QapGM4HOMqS+qW1Jr+/BwUFPkkMTFR2zD5c0BsCwODMTPD2YsIhShT8drUp+5YAAt6qJolYPMnI8rIaAXVWEqaNIIX7wEvw3zm9WckQV6/rBblTQUWyqff/9ynbO/rh+2LX/66VVdV2OlTp5Vh0VJlJBl9guGe9qi0oibOzM1Xe+7jn/p1I7w98dBDNjSIei5AW6ZO6ZvvuMOKisvt4R9/144ceCUqrqyNhxLbKX6fxvx5QbHeF6npxOQ4ruv2yY991N77nnfav37lm/osp0+cVHbA53bRFnfo8UGeWS16J+C4niIZITiSWnwcFoC0CcuUZ8O9lUpUZqYIM4HoQ2AjcNE6I/vSeDflwPiYamcpASUeku4+7aQgAYeLvllTEhKQhGj183GwcmCTkgAwVnMGCTMvuEu7iy+3xjkhAXSWKIyG2di8lCETS61L7gfZg68vhGd9PavDoU5TpoA/PCERRIGERTeIUW8CQ1VNlV1+2Q4bHOjT9z/xxGN26iT3OtMG34Y92NvKAECgaeWwSBubmpTm/eRH9xvocGlpkd1+x122a9dLdvjQIX09wWEyv1AzA6RpYTIPNF0tOQF8PqUXtNUXEzslTgimtryWz9LDZTM44spwhY92kg2EyT6hxrM8BE/XSNu9bgutRqfLIiYpX8LJaZUgfB/9WQmPICmdIM2aKuQEsVgnhebL5+ctv8ilxXiflAUp6VCWndwh6eaElUdqywOnjqfPLTsq2GG0h7KzrHegXzLduaJB83kcM8BliHoY+TQIILRXv/LtH9qv/epHrK2j0374k/uFNRBYQK0VPBlHTUmL+7s83Wc096tf+nf75Y993O55z7vtJ9//vnW1nIlWrNsaX3rlVQqyP/zGv1vjySNReXVd3Nfl3oEIejDtSUbGTVBNSvdnetbed9977KMf/oB98Utf00g1Jx5EIxh0bGDGccVy5JmhGZFf4ANVubk+iJUYdOSm5C4BfWw40nrKIgIjeAA/sywrSz+XzRDs6IL8N1eQgWOa0Ls8ruyckT7rJKEFN1INdYDKsSwv2bQmUn0zQn+OJUnv2QHIvLcX39SKYN2nmtvfuTS34wq8rwXMQBNxUQhvrBuxQpMMgXUcPB7I6CgTuS8Dw6MuIpueYesaVtnQyJi1tnXIIZkMp2HVaiZsLDVKEw7CGDX3keGw80oE4mQHwT17rsVams/qpjMUAT33uWeetdGxEVE7qV2YBShPRB66OtsFinFa0IQGkWf4RBHS3N8PgMV1193gwWew05bMElih1H8CcKTO4wBOoOby0NAahDoa7LxZDKFNIwpwBnxr51TTIvNgsbCkMRCovkFZWAiuTiWGnYYUiNDCj0kJOeEKCvW+eeDQPSemXEiEk4XXpm4lqPAiylhQdUU0Yo7NnmF9/f3eMYDAk5dvk4m5SkDGKyuqNEPR2tlpP7j/Ifvl977bOlpb7Pldr1hldaVYaI3zczY6GltUnGZzi3PxSE9HNDE6bAVFpfa1f/1n+8RnPmsf+cQn7Cffz41XN6y1/Lxc++G3vi6B0aply+Pu9jfdeziBKMNIQSW3lZ9vaZkZ9vnf+qx94JfeY3/79/9kHZ09VlxSZKMjY3r+ZGVseCb7eJbyaRTDzqc+4VIA3HKaquWaoPY1dQwRod3gtF9q8ODY1NvTo8AcfPo4NVFWkktP0gL0DA05Nmi23uLj6+Tsk4h/chGoA3aUmigIKQuVxJin/Dxb3oOrUXHC+1AYnysyftaM2oVkeQwbgRkQxAQw80yFD+Uo25AwjX4O3S7yG/CJVMuKstRlGRl2zcOS4mp1YQDEGaEio6isqlIbnc8s2fJUZghydXiyRjhAx1wZ/j++BKhv2KRqCkNMRCawwRrBEik1sqbTjZaVlyO9OSnpzM7aoYN4vEPVnRdY5XrynkqHNF9vCnBMp6SzsISqJ0If0rVPNNnU9ktcU7jh5eWVVliU78MYci3Ok1IsCPLEGMo57vhKMJHFWGIsibFpsHniRrPp/WFD3kjGSxMgiqkzfpY4B2QUog7jZUj/2KWenY+QmbSXspYmEYPqEAtraTotUQmS5DiCF2I7up2UFHeSAMRiLiou1GsScKXClJ9vDatX2H3vvNe++e3v2Q9+8oCVlZYIdMWhaHCoTwg+zwRgkHtbubwhRhvgve/7gG3edrG9vOsFe/TB+13XICvTejt988PwIxXGY5D7yCCRZghGx+x9973bfvs3P2df/sb3pFRcUV7G3dN7wweCKTtqfGV3i7Dd8pcwG4IBuBGBglOe0o1MRxJXhQU+X5LqdG82pvz5Ek4//+G3wHOCfOaO0Z6FhaCvICsjEO/ZLw1r5eQIfWct8rzcPThFG+mt3oGh5ie7UAsw0e/TeHbCKoT7EngjsGCF/8QcUigE++HgZVyqOj3cA9rJ8o0Y94yCACJjL9qXI8NWXVWl7gLzHTNI5M/MamrSP8eiyFIXXnKpLauuUvnwX//6v6qDwP0b7u86PyUA4QOUdaC/xzZv2azFNj45rpOC9kpBbo4deO1VbRoWEaIPnZ0dNmcOiJB+B413QBI4BCVlpapjJdM179NgvkG8BmORyudPaH5ssxP+YHgYDLBkZmHqgOADRCUGLyB8zGqDIuFEJHfCjm8qUTaF8NIv9lkBUFo5HCf2zZxOrn7kGvISbCBVZbEEA9HJKTGz+HMgDck+Xf7yvoB8Isy17oINtYuUpEtQRDVu0nEmI/CF7sNW1NNsDKBkXIeod1lQp8+ctb//p3+1D7//PvXBn3jmORmGUkfqs2reXLZq8fhAT9TT0hiVL1sZ//T+H9npM412/NhRpZh4E4bNX1BaFbs0lhtRKgMoKtIs+7XXXGOf/dQn7K//9h/t2ImTtqJ+mbsR6XTm82Raf5+LWrDpgn2ai6sQ2FH5Ye6d7BFilhtckOVQtqTOpCZqQB4U2IhIp7GxmPqjDHNiE/X8hLfbgq/jW8RfUlKzloZ9aNmCy4Di8zOZ8gsBaW5uXgeEcINEuDMIezB/L2Q6oR97eer+DgKKpe/AoUI3Anu4OmEvHALCt6aZCPRyRDwTSsuCIpGmXEY8Wy7KsCO9mzHk/IWUVFuxdo0dPXRIswZlFVXSQaBEhlI+MDign+fdi/M4CyCXHZRR40jTgNm5eSKE0N8/29woEhDRfnR42LJGRvSQ8ZZDXjoqLdONZMrKATUQ/kUbHhxQnUQaJFroxOLSqSziDJsxoeiCkIc2kV4jLV1pN46gaq1ZLC65MgQkojIyLacc12Af9yTNp64MxAxpBNDSS5RexNDL8dFTB35IId1Pnk2p7EEilZYATygHj7rhaVIvunmpTyeG1iV/J4+CtHQtZqeuTif9as94RFqxyCrKyzX55ZLTfU6pTUgniGDwugMpKfYvX/qafeH3flNg5Esv7xOmUFiM559TU8WIsygeG+iO+trPRTUrGuKBgT6zxTnr6fhZks/oQHdUUrsiZvOHrgbyXZddepH99m9+xv75S18Tjz83O1P3jBORBc49kLhmFFntsmX6VQadCMFkZYnSSupP8HI6bqbSZwJiwAVkl5XiYB0Ac0Zaig3296jMwgOC1/MASuD2DUaJp7FrY+BnxK26yWJQqgKnwvJLgGGWcKT0XCcIpWhjur03zzTI04XxXZiWkIjAFZZUp6RN4XRudCCZKsUXQC1n0ZAdNCTz4FAjEPo9mpRhqgbeCFS5yIPT9s2x6qpqO3z4sNqmSKBDmGOt09lCpZnMEt2BjLR0aWwcO3pU7x9pcx8ceht7+O18MxuIFJcUrrWlVQaZTDh1drQp2oJ70yoj5eLDQQBxDrZP98nVJYdWovO4Q5rndFwcdN35hIVCcJDiL6dl4uirWo5x4mAPJnqwL7qZGfdimx7mAXkN76IjDhYFaSludGgFuQWUE43CgElQCdJpj7dbapreA++RBTGbna3PwSZ2vjdOx5NLnQKVNXDYE0NJrtBKZDPzflnsnFxgGcGjwEFKalRGd0fUOiP1488EtUBP5r/GxkZ979/8/T/bF/7g8xo4+fo3v2VXX3uNgi+CF/O5896NKCqP8ffrbG7kv1/4XCuXrYyRnOJnqY61FLvztpvtC3/42/a1b/3Ajp84pfe8bsN6Tf7BadDngf8xPLyURpOB8PHpYvD1PjTj/Gy+Xih3kgVyEQxcPyFS2aDNkJ2ntUV7M5NNm7g3w7XgYrPTCtWAVUxm6SQtggX8ETYnw2I+zow8G85Ak+79sOBj2gF8JL0CUA7zIGhOLLUJZ9xdmmyUnw9VWfqCZC2a8szRM1m/fq11d3cqiykpKZS02VxCRlObWVTjLOvv79VzIuvh/hAEyGbcIwAy2qJdfPkOazp1wk4cO2KX7dgh/wEbGpQBj9afDpTzmAFwU0lZmWFfVlerRU5kQnCxoWGNPlh2FnzqcUmAgSaz0B248VoIRJ9Uihvlo5ouxcyiWoh8UIV6Xosm8Wvj5wSAyPniPuUXgDoehNs6A9hAl3QU1zMJZw9qeOMtNMrgFReGejjdQ+uPVE3tIVqNGZkaZKKsoE4j/SzJJA30WYQwE0AHgIXBa/I6BAW+lhZpPj5yCFGMjWnhoXwTghMpJygxJxeLhTJnfHJCgZAygJOgqxtQaF7pIcw5FgHTb03nmu1P/uKv7U//6D/p+599YZdIJmRZpVmo8MAoy+N9xDAG3yolTrBhkpMLOirEo4wsauxMu/fee+y3PvMp+8H9D9uhw8esprpKpz0lCRkPG5vPGxR4OUkR6qirr3OCztS4yiA2dTDvCKUfRCIOCwJNwEikY4C9Osax2TmWm1fg4Feu+y0oRU/q+Dg5YCYnySro4bvGHqk2PwcAjXS7MC/HUoxJQSdX0Yadh3gFRwTJeAJ2kvoTo3g93q+zJXHvgSvgX8cFzT1Q4NGX4NnzuVl7vH/wDKy+gxy5W5BRgtBuRkiG51csDEEAZRTJZZv7097Wbj2dncI3+KwFxcW2eu1a27hpi7Wea5T4aVl5pY2igLz4pkjreZgGdPsugDwNecxM68bU1y+zjs4um6UGnhxXeUDtwuLGbgphT0ZTe6SVRk/fNzIgCHWzTBWojWV8mGqLKeLfamPgb7eY6dr/PJSMjDftubgCX4CLGo6U2GcAfEO7lTgPqEib1mWjch2hnscLwE9hvscnG50MwkIg5SopKlH9pYGdOLaKshIbGR23KC/S14RMhI4CmwSAkQ01MzktWrF4A8kIp9SD1VbDDmtcmYUC5Azvc9ZVlOEDlJZIY4C0EXUcWkDOaUiz7u4eN87ga+PYjhw9bh/71GfsK1/8RystLdYobsOaNdo4zBkg7gUJKS09I6ZXjaegi13iYoRa7pyNjgxZeWWFNt5HP/x+u+O2W+2f/+3LNjoxbZdcepGdPIHMeSx3nzB9h8ApQSCQbZw0tWBFhflJYEwVpZmM0Z14nZ+h4FFUrIyMUgEJLPCecy3Njl8kxhoL85H1jvcLMyDw8Jl1j5LxXkBKKQCRleblaL2ACXHi60RNWrS8F7AeZV/z84aICSUJ3BSfbfFBIJYQa4PJSN6PugEAuJmZykxYe2xgMi9an9zbIBnuegbDytT4jGA7YAYEQd4fwcvLStcR5JnzfbI3m52xUnCwxdji6Tnr6e0TsEvrXFJpGenW3HRWXy99S3CK8xUApHNPupWapj7wpq2VUjghwo0M9Hu6B3ca0AxKJa67E+PW0daaiCR4uicWH2lt0sNWP1UKruk2v8jARbZSLkaAlWHMuksvtTYRlj4qpJZQG4urn7TNeFCkapQr6tmz6ZKePOALJ7ImyJLpQoaPgjswDycgzDqZ4thaWpqXygXeK587LHoRiSgvklNODzlxN4KNFiWEEz6PEGmm3EjxlTY73VnilgKoKAMcKArDSdThbFYx9whaOdkSCwGnwPADxh219MlTJ+0f//XL9uuf+LgNj4zZnv0HNDyE8AbSVrTayMYEwjJ3n+AOmmSLUqxKPoWL9sH3vdc+9L777Hf+4I9tem5OHIWB/sHk5HJFnv6+Pr1fUOpQvsg2vrhYOAQuSFwnT57WM3AjC59+DEFASkwLPrXJAg8ZQDB/cf0H7nEgay1KQ4/SkxoeWq0TtwjYPochYRhk4adA+DP0nCj3xDadnbWJqXnLzSH4eckAqUmHR2JqS0YVug8MdSmjTEtXZsP74aCjj2/RuHAgWnw84/Ub19uJU6eEBQQ6s2zMwH04MAGI0RvMznKvQNrISJlhOZeY03JIAKzX1taLDgzrkdeiTd7aP2DHjh6zrNxkujHJSM5LAGCxkNaQvmdmpimC52Rm2qmTJ2x4ZFysprHxUfUzQU/5YEx/8SFJlVjEod5y1R8Cgm9A+fqNjWryig8JKObIpxt1ipyT5ZsQVLyvL2mrJVhCYAuGNmJov6n9lO4kDgJUObp4yTzA1KS/hqydEh2BYBce2IpB3SWAQoBzwWpc8uH4E2iMdGyJwkqayWfnFE/PS1faJ/dgdPYmmKQrVCuIryXddCFMn44jEIjBplYVgyhv9sUpAbxXvajXl/nHwIBt336h7Xp5nzKTP/7935Ii0zMv7bbVa9fYsSNHHOAqLFIfXb57aakyOkF9Bm78YkqK/d7vfMauvPwy+y9/8Tc2OTNnK1ctt/bW9qUOBvdT2UyKA8Do6VdVVSqr4hmygRzzpATyryWrE16QkH3C3Dxt3SxanonKLySxwMNgM7uvg+ster9/Rh4UlJURG2EBQM/xFjZY8IFEASgtNcenK5OZf43jmsu8R0wOojINtyQBgoOtOF8b7N4D+5PnA52bkk34F7iESrdZBRowk+PHTnh2ImNYH0ZzAJhukeMOZIXcJ8BzsRAXFlRiop1JR4aDAUyBgSNA7YrKKnU1NEw3P625DeZpKGuD3uN5CQAa2RVQtaCTgNrlkosvtuPHjklmOS/dzSmp4UmpRaNUr/ZNgIwbKdHPhPnnEs5vijQsjCfMtuTB+IDFjBBaFjCLhVOQn4PwSCBs+EnhpzfRGPoq/HBv48R6LzwcTqAg/hHMQuXkW1amAEEaHzZ+MHcIhJYgHOJ0Vx5MhqSqoLjyPfK2SzIEFJL42pCusyhZpMGMUq2wRB49eBkERSKXxx5x/TwQZ1prxd5aG5uc0MnOcAxjpJQpSGSlRrFOiv/xb1+3X//UR3UyPvvSHlu/fp2dOX1ai5GSDfMR2IOgy9CCC0pK7Tc+/UlbvbLefuc//bFVlpfbBRdssra2dqtfvsIBqCSoFhcW6b1ibgJIKWA1DxA2W6zMcLINDQ4rwBLQWehQf7NSmN1HULbYT+QJWoPpAsWycwutsKhAqTqtW9J4qLxqBy86uk/GV1xUIk4HeJBmAPAJLCzU++C5ubxbiqVSYycZG8BgeVG+jY2Meq8/OSy4wqEReAA8K+45rW5OHPlC5HvW0NY/oClVxwDwgcyWZiAnNfU/GRnvMcwy+Drg9HeMSvLzGgxzynGwqauuqZbzb21dvQJAT1+/pWem2eVXXCo24NNP8z532uI0qkdlFi0uxsND/+fTgG8rAIjwgrxWGjP2LoPc3NqsVIiTEWIOH5KyADNGpc5q4TEU4WIepLR19ct1ExgYoaYilZNHoGptH7hQTzfUZTnu7wZXfFKILifKvOpJ1/TPcZcVWkBq67gBBDU0fyYFVpRl/j7NXVt1JaOrIfiI7IGZyaKfGKFzEFJTVfLBCpzPBkocRepXh3JEnQv1i5MSiLQy0Ub0lJleNOQUR5dhk9FKI6vhxHeVYoKkL2CVFOmLNiyWnc9SIKbC55G7cQx7D1PSUtGHX9q9S+Ih/+n3PienXTCBlasarLWtVQuYgMVRRbpcW1tjf/h7v2ltLe32Z/+f/y5QqrzUuzcw7DjlGGPlNOZzDg4NiiGItDvPhYBXXV2lexM4DgpgCamH96RW6xx+kpmWnprcZ+iuBfkayw73D+Vf9fsXucULEsrg5CdwSycgwweBFpPgq0Cfnm6tbW0K/p4ZuZsvwp0cVqTbPKeBPvcgjCXlPbbEEhXPI7GHp7zklNYMfzIq7kzOieR1KD+mZVPGJF9T01mfH1ji+qdZTU2FFJAdo4Dbh+6Ec1FERdaEKV6I/SKvrV2zxkYpN2xRwYZ2IofFiroVoqqD/Rw6eMiwhKuoWRGjlcjnP3+CIIb2ugt4jI/0R5kZaTHpPqOMBfmFzrPOzBC5B/ICdT7qvSwkhBm52dJYm5q03j7MGX1ohld2Lf6kvSTbsKC26u3AwKxjdp/XTVlAgdVTLPjyXt+6XZNwBbaLgC7TzWWxgvTytSxQTtU1DWu1IFhAcg8SU9A94V0C3N9PkAYPrb7QtqMnO5pM5QUJay8BaEk5eYlTxWfcE9RfwCVZDfPrMzrRAk+e1w+EFU9BPeCScqutyPcnXQeXzHLCEZ+BwACY1NneJnHP3/2jP7O/+tP/YgV5ufbN7//YSopLZaAi2fPpGbv04ovtEx/9sJ06dcq+9LVv2Jq168XxILBQyrW2ntJi5eL1dQ9HhoWyu0lqpjQLeXbcO2puL6dc4LK4uMC6unqsGCkwnYKTjhExCyCZb4g1GdbbO2C5eciupVlJMVOYuOvM2NjEqE1POTCqTgD4j9J0nH5cVUn6EGkpViDfAdfxLyqgTMqw1o42Ace0lH2Ax2f3AVXJDPl9sIPTVB/BXgHZFYLBf5hv8OBPiVMsxiNYCspG3kb0LlRPT7fwAngwaBbmZHswg7NAyawpRMoMyc17N4Kfe/ZckzprgIcjhQOyc4P/f9HF2z2zmZ2TzkZ5VX1MYCKjQpfx7ezht/XNjJuK7miR6IhXXn9LfO31N+hEfv3VV62tvc1WNjRI1RWgDeEKflUqDUUUZ196u9LY9xrXZZ6QOspfoo76CQ3tEgTXdf9BwCWkyVSVWu0u353wVpZomzJ7yIB9R4+ZbkDa0iL2zefpvTjsuXlWWVmlk5NUlRMneA+G8eGwqQM5iI0ZfOXV4k7xdB4/xOAyFNhlgWkWNj6BjTqV0kN6idPTTllNeAF8r5uP+MyE01cRyvB0mWAbAhGfnffB5nB5qnwFE06rzvZWAU/pWTn2X//yT7Q4v/yN79qx48f1HG655SZ777vutZde2mM/efAhW7lypY2OYNkVK+Wl5iVjkJaD/BuDzv504sjEDMV80gYbFRYQjE/4la/FMbm7p0utPNd0zNT3uow77UAOBDaIwr9hj8z9mZjmsGAQCLxkWt0bOhXu3ZBM3SUS8gRGdCX5e00kpifjywtz1tLaYjXVtU68SscKfFRgNSUnm9YNPgGWM93iPQfBjgxhBEFPAj2/nq5O1eLS86MWTwHxH1VA5zXIXDhcnL7tXoZ+IAQswDO/gDUpyCfZRfCUBBf56Ed/RWuvrr5eeMJsoiz9F3/25w7aJh6HvYm2w3kJAEES2k9Yv373D/+zasrmc+esr6dfDx0TR4YmuHlsLnrpcKW9/eYjlCCczrnnxHNnFUf0Y6VdvFUWPwFB3mupb+rF0Z8PLC42O/UYLCwGhfxEcvEKR3SdecjNDlp5LDRqz+ABQFeCU0eyXxrvdN536PGHVqMQ2LfgA6odJ0bFSHO9ey8dgpiFz7q7U5GfAm+OqXpdSyvJ26KkmHxvZVWlSh0AQ9c7wBNxzgYxl0hAKzcvcd48i4fNwM8Knz0FgHN83M6ebbSszFz70z/6z5aZmWr/8qVv2AVbNtpVV1xujzz6lO3evUuGrRBlGN5iE/E5JJ0mZyQHQ7Wpyb4SYNXvizvmkJAODQ3Ypo0bFciam1vU9iWNpzwg3WUNoApM27Ovr1/fx2tyQgOQQqH1e4wu4oQEWaBUcxqrZElEONkInNSUDrSMRTqDmJRo/7OxKKXYkHwtRDXSaIxsyPwWFhasp6dX90m24/Tq+d6E9y/LsFTmH0aXysfJibGlFmewHAsagRxicpJOykefdHWJMn/ubwrYhAnVQAojaKEFMNDbY3n5uWoFZ6an2gc+/BFLzciyg4cO2dkzJ+3suealcoTP19N+7jwHgLLqmPqbXjeb/KO/+kl5zr322j5748CBZDNNq39LxHORRXr+CR8/H1txdPidEhsqGh6i18Z+6pA56GaJQOJaAbpxsij3Gk6bOY3NBxDkpozcKKKvWjFiE3rGEToNLEQirA9yeBeivKLchUvUG4rFc6B3zVVRUaYWGLLSfIYgXaUFQI0s49IUoetL5J6kJvbU04EmJMIkfJoIW2oMNuGau+KMA0Og1i415W1B7qOmCJPJQq7gakyQ4L2LjiyjE/+ctNzET0gUbAqLiu2jH77P1q5eYcdPNtp3fvBjpbJHj0BHLdfnkcDl5KTVVFfrPQRx1EDUYcMyeRhOYk5FTkCyPd5veVmpiEADA8PiCJCGE9BFp05GcQm8onNbZEVFKOOOqScPVoDEu9rMZq7Sm49seqpnJvjy0UJbpPMSLXlIhjFfssEgAa5MiYm58TGNzrp1FyXVrLMJYxe3df3AOXESILeBLzAHQiANw0Kc5vwQMCQOBzIXH1ry1+XQIRuQwE1iZMJz4v6FZ++qUP5spGiEMlGiPK0Ohn4Pys/Q16C9853vttRMzwq/+u9fNHQZRIdO2toD3T62fX6IQMloJRtlMTW2iZH+qLurKy7IL5Yo6CWXXKqH3trebgtYgGVmyk5JQQGSTF5eEkkzrKZ2mTwDucdQMHMLC/VQUOEF3NKth7s9x6lDWu2mJK7X7pgAKVeQigYzcBNGHwgKgiCeSnvaLEcZTlFOnuERLUwtljEmBudVhwKo0Yp0vjs+9hM+j5DIRGWnpS2xG2lracIQunAyRUbAIWiRPvPA/TSct6kRfh7P3k+KAD7y52BoQarP9ylQFRbq+6WDJ1FVJ64EOytPx7NVj3ICaZPmefotElOitFNQiIZ/ij334m4RTF7ctVtpNwt87br1kqMi+PL1wk/MbFiKv/NyPYZcw3vBpIKFDgAGU5EWMK0/go+m41IASymrsm3t2jU2NDSi7Ghxlqk5BxGnY+r7SbEdyQSCIlBHR7tvXunvJZOB464dCXgcqMa0GCXRlYDE3Lv8/FwdOFOTM4k0GBiQe1KGFJzXDtlfPqabzHCgzZgAswJzYZziDckag+k54cNXTkIiu1vQIcPhAKAI0M37B8wMWg50MDiQSovoCsUKDsG3gPJMRjEZmTYyOmRDAxPCFMg4a2rdjIRnW7N8ufAV6n3W2ej4hMoUnmXw1jivAYATcmK0P6IU4I/9vd0CkECNSWsZACGN3bN7l9XW1ll5VZXNzi4wSCCsID8nzXoHBuQOy+nmJ4qfzgz3aFqOk3RmWgMdzs2eTUBAxom9bOCiJNDwRzI5GNBq2UFzsmoE10EYPzVdqz/0o0O3gU2LXLOEJJMpNs2lL3rdy8KQJnsaHQVQbP9e6k1v3fn3hRYeJ0V6lrsMu8ipS0IFkQg2bJgglPAo+EoBhhFT6gwENZo3g4q7LfNnN6d0KjOlQX56nqUXFbmk9ITfA29b+twF47QEXsgrjefabXbegwhyXYMDQ+5+pPs8L4KS2pU5Oapxe3t7ksGrFBsZQZCSoFApXjoBgJKAjdXZ3aMyYllNrdp8bEg+FN0bTjdnwjHwNK/F3NnZuSSpziZ3HwXKDwJjmgvJpqQowwhtNQ4Hfq6eDdOmzP6rwzAngJmgH6YJw/x/mOtwEHdG90XrLZHnkrkHpRc4jZybU6y0gBbkrHgOrEN0Lrx17e1O3IHJmGBOwnFx2zBaxZSuk7ovzPQTWFlrMp0hcDNfkuJlnvQs0xANWbSMnGytdWjbK1es0EGKGczJE8dtTBL2ae4KFJuNvQ0x0P9rAYAInF9YHhPFuU6dPGVbL7zEyisq7NiRQzY1Myv9MoJBX3+fNbe0WsOaBmUDvf19VgJBJjvLTp04qUjKCVtWTj9/UTeQzcnDRbc+NT1DGQI3kGBAzag6NM9PK6HoGizytlTQAgzpNzdfET4IggrccRCPBRbQWN+gySBQYuyxuIAYqSvROJAJMxAQakYZQmoqf++z5wGU82yCtpWnfKH2CxyIAJAF/T82GljE+MiYTi/m/zlJXE3IgSPN7SfW5eTeOM2ymMLkXZiU8zl6//uFBS+vyChIcckgoJjiZMysQOPZJsO/QjWt2JpOmIG8E1iS4kYUFKjFC0efe00A4LQDJHS0HJwGXQFGceEBQKKhtma6D9Q/xSbjhcQmPkM4BoEXS/JQWgwMDGnTUioOj+IeTT3u1GIP7ki/uZU72AQBmJSfeykKLt2WZJYjKytP9wqUf2oqyRyQkE9A2SgZEnNXam+oBXBTHSZwqBRSflfxZaOLz68pTnc+Ju3ndQl0BQUw+HDHpgzNT1iq+XpmvE+0AAJTVdoTsFQlsVag9/n/be9Mf+S8rjN/il3VW+3N6p3NZnO1FmohZZGSHWuJZwBjgLECBAkcQ/EA8xcMBpn5C2bmeybzfYAgg5nMlziWFDmyM0GszRYpiqQoinvvW/W+VvVWg99z7i1Sgg3FEWlRQF1AINWsfut973vvuWd5zvMsLi7qT9CaqENJFn5v1/r7elWKXZgZT/QMHK5hwCkX3o/xpQ3AvUikfEd3bWr8dmJlab529PgjdurpJ+3WrVt2+/awDR0+YuOjw0qyjA4PO6BiG103b//N4po2NVk+59hxsc7WPDusJGDojKtUfSGBCYgio1J8kWAECSFw/HQCOgdhJHLwBhS03UkiOfgDVBXGh0pGUANzlqOky4axMDx55x1/+/aRcKtaU7JZpy1Gj5dOXKvuttkV217hBLob73Fvnsh0ncEI+PAkFjGmsw3fG1uL9LJcDvcOMeqe7QcYBPFIa8tdPoFgUBhUVDhmXRHYMeluAPbJAPN5XHIMGi59a0vKxsfH7OKlS3o+Tjnmk977j69ccSMD/2A7C3NJJVW8A+JoGIREaEFLbAi92Mz6HtqT5+ft0OBBAWSQIIffzjcbLnda98/zk1gjpHBgkc8J5UMMCO/bvUFq9S4LxkKL8ypKduk9Oos038vnyEewTiQCKkAQbbhVl4MD/IQoyZZzEzaFvJF4CgI/g/QD4WoMNPaRonwXFl+R1BJ6eaWJ+J1SIVgA73Sk9Owt3iQ7vcclZXdu3xaDL8lZr3bxrF5VcuyAE6QQVqGkhYFFFh6g1uEjh+38+XP23rvvWa6jp6b3vsd6cxn7rz4EEIFEby1i3xmAIoqlLuso5LR5C7mMXbiA0GTBRkbRO0NWa59KOiAD16hrtzZbPt9hbZmsLS4vawJcOoyGCXfXxQlAMk8yUFWdaJmmrBYXk45hIJklxOGeCXxErgAQBRuBz0BYwX2gWMTilrgHWPPQDEKttqmWtJZmYkcniXDjEZuPnHCEhamWZxpANj3mE/8bScgsGWOnA4869bxoTgxtwDVvmXX57MV65hgXNwpkxE5Ex5LDKgQ+wjviON35zPQMCjHu3vJsuNMeD29bqol21A7XKQhJRTwsnpO+AJJclAG5b5JuCTZ31bvXcHcpqXFqw+8QE6aLS0tCX7K5KDeiWNzanBIUXJUbjNFeTUw2ZM4pm3H6ohGAd4T3wIjS7TRBkdhjAyvDDkyb9lqRkHj45ixQ2/IUIjsPJ3O93foezUey+1vbm+C/rKXVKeN4X0u7i3cxFUF2PiIAV4nLQymQfyP7zqmOB+ZkL/6dpBy2d/Hw7orI4jOQiYitwOBKEIIR5Jm8VIUcx6rNzU6pGY61zFyqBNoO9HzTS47pjHIBGGwQkNw3aM0//OM/Voj2/nvv6X4SKC4LYQlK0TEZD4UBUPKKLGq1YpliTw0o8Esvvyz+uqEjlG/W7NbwsOWyaTv5+EkbGRt1XjeBL8y6enoVH1GDdyuesLHRMWW0RQMl5WBvxtDpSVsr+PA9T3AB1VSsDGmi4d7zkukv4LROuvSyGIe9jMcmJefAhqO1wLHmsAB5tl/AD/UkeImPf2PSHaDjNWMSbHU1V75HjR+o0FLnvwspxWipkSMwJWGgYkY4lgcZsW1UePOA74+sxJE9iGRULFEBYMHAjQyPOEJQidCKfp/sPB4Li5LEHXPBqcrCJ7P/ycx03WXmWiMjI/oeTn3db1OTPIGYw4gai3gZjkffDqAfgFg00yTlAmPEmBeGy1aFv9P2m3Z9xdHxMWtBzAXtg5Dr8a5Lb3yK3XSRHk4NOaoK+YbnfbLBuB8qCY64dMy+GHZ5X5RSQw6G3gjAXDKQ4lZsEigLdzulpF5SykwYz4Xl+SAkSgOat2xz2HgrdtZS4pnwZDKG1VWsdgSGilUpEd5Wq0L+4bWQ0CSZjFXCmGDQYsmx0FvQeucAKnZ0CKtBvoo8zdMDAwp/8E7OnzuveSHvtDg3kch2dNVgHnpoDMBeoLvCekKlxQR8dOFDGzx82I4eGlCfOoQg5ZlZe+rU05pwTsKtyoZYhJgsSmhr0CkhpLCzo2w5i5ITkJiHEyuZ8lKd4vqQHDP1cmOLYWVJiv0Fl3Z3l+SOEyvKxUwkNMmi6eazaBCq54AGE2JnOtVcI47fVw87MOBtTxzFHEPc2Cod7jhbEderBhwAG03AjZoTVcbTxjno95SlZ9PQEBLFRxmR6iqqFkf8AHG3ugGD0AnPhIdzuVwOKEn3ujxE8Q1F3Zv7jc1QeBksfhp92FfU0kWHFnILXJ/+AdFpharG3Pq6wjTJmQcRDa47V94WLJfv6+vr1Z98Bm8savCxuYhrZ2ddiYhNh4HKtKdtoK9fRoZrkUNxHUm4GSBn8ZyOKjTIa6fTKgeKeSmdloFhXXCyJvN5j+83vOkKb4Ukpaou0ov0sqkIXte8L4D7UGWBNnS9p6q1IS+GJ7e7o1wGRhTyTTyuOjXYjqMKHZXpFOR4dIU87wZuCwBcaeH/ea/kT5hPgdMkZ47B8IoUz04ugVzWoUOD8iTFLg2CdXnZrv7ifOLoiZM1vuv2yIjaioE3q614dc1QfWItzQXW5i877stFGJlCV41YmIXmmdiU/eBH/06AkMW5efurv/pf6g1ns3d292pR/eM//NyOHD9hPb19dvPadatsVyV31N3Tp8wnMaoaKVZWDP06x5W3ieWmPe3xPAtPmoE7bvUhkMAYKD4MQBUmXQ00hWIgf6DnHfRWW12umay0w1bd7fQuPD/JhFALp7VYgLaI11moe0oORRdcMNJ9ZPAL+l39nhqcml3mfJ+XeXBbo0EJuhEaEVXIJnX2YW8Kig1OnL6Uj+C0E9AlGKOobMvcYhyYM8IUkpPcl4cfTkGljRoMDicj91KhmSY0ObE4xWJM9l74/Q7PMyCESv5hfdVyaineFISXEIF5WVxedIRdgAA7Xp6qwIpcfwyx8jbp9no5DvefjcJcg9Yj4Yv7LnBRqAiAD2Aetiq8e+fWB6PhvIn0BkCiuaUwEaScOke3toNHsim4c9zMThjj0nRe0mvy8HF1TTkBfmdifNTW1l3txzH77oVR8pNBrZD8hDcCdmq8P5SkvEkIYyi4eDIpI8j77CyVlEzFOAgunDCbnJi0I0cOy/DRgIX4x8LyqnUU89bX221vvP6GZXJ5O/nkU/b+O+/YwlxZ4RIeFwcs9/xl6//31QNgxDKWTsuWlE2O3Un8/O/fqh07fFQJom99+1sSfmBRTs2WbXj4jqwbSSLpqZElTjoQAgDI3OysTn1ObR6+1NWln1EPjbVcdYHheewFaG1rm7MEB1ZeTg6VfVTTdQYavZyFef2clynm11aPqWVQoNrS9Xkm70yM7qxOWMVxJAuB3npNNyoG8fsAi/BkqBpwiiVaffESJ0rXMMiJcf8sVs9r3AUIkWSTdrwy+c3ef476kZKa7h7rVJEwikOZaQOWFwUhC224oTqjtuNcVm5uLFtJxARmorV1W5ldqTc5KekXTjv+zub38iOovZxNT81YyzY5FcchZHMZGQIn+twRnz0uOQnCpSWSjM16D8VCzhWaUhC1OucCXtb65rpVKwB43MMSpfvutk5QwgXYhyMYjJAKo00YxqZT0qyC6Kwb5EIbbeZwMbZYSzBO7q0l6p4WXooMxC75ixVvzU5570h3d6ctr67ZuBp3XO6M+NxLldu6TmQzsuY9y6SJ52u2sLSgA2W+XLZyeVqbmV25rG5X8i5b6uWHMwMFZTgtyuUZe+zkSfvuy79vH1++aB9dvGTjY2OiVUcEFPZgdB+GDh+W+ClrlVBvD7o0EqWViq0GhueHzAMo1WCXcS00XOkWW5wZT/zJq/++9q++9z1JH3EKsDDeeutnlit22Juv/VgvoO/AgBYL3WXUquGiL3V2Kd4SqSVSyiTuFhYlEMmBKa4ABDLFGuyutBN3JiVVphOC3gHhwr17jHKOCzU4M2/EZUeK7Vj+iUxALCIys7EGr7Jk2PCAXiJ+313QIHKKiyn5clc5yqiO7EIaXDeKk4AYdJWavc/AQjnNGQoZQgOQ+stDV2TEJcSEmOMdHE8QYaXxc3J3A9+CU5E74sw17VAccB4Dchqc9C6O6saMHIMWCEjLZJOIKagGYMTZ6IQBXAdZMuYUj4rNAJswVQzuEQO0sgp6EGRgl6jCafpSTz6eEeKxRXouKqEXg/wI9feaGmkwAPzHPVdolqpsiYRDnk/A++NRLMwtqLnH8SAwAdHH4LgIB824ph+5oujKM9KBjyKGShw8gwf67RuPPmqvvfaaEp3MRQR6RRCPE9A6DsFBUtt1oRvlDeT5OZgKD4aKCYOWbbFj0e+xvm4ljDVrhJZjlb9L9k//9I92aOiwvfjiS/b22+8Ivh0l0JmLhVmXartf475eLF3orDEJsaOKBUZZ5BuPPGpjY2P28u9/VzHP7OyctaWz9sH7b6t8cuDAwTpkMjbGnDp9WljskbERLVbcNbry6HAbH59QxlVU0iL2cESiWnXX18U6vFHZrDdaEIs5Eamr9KoWHMo1lOwUMoQGl5gdjhso5iHUjgzktRWCCecFwJ101RfYbCq2XXW9wAjL1cKtbAZCUu61OXQk+tzEE0jlJ0gm66zBdMtBOkkSkgw11GsOJGIeQEpiYMmW48KTv+A5IpSa63IfbDARr4a+dinZBKJTXFPuhVg8cigqbxCYgVQR2dt13b2FRTVRQRqiikpQP5ZSMipJba2K+b0asyrUnnTrMQwKCbxsxobiVFU3ZwUkqIPFnIOPvg0gvJ4IRakX6+3z7EQwqrTs26ffnSvPiBMC1WH4Bug/iAAs8jtO5Ok5GweVJUPW3Wm90C/YDfwTbW30IXgr794O3ZFeKmQIFLW9ZQODg563CJh+No7wIMDN6cVYd8CRcws467NwG6mk/j0Snfb29ik82K5S8YBUxjUvlhYQM8Hb2bZnz55RGPzX/+d/K5wkp0G5HAl3um7v5569rxdjpPOdtSjA6K5Xqx0aGlJZ79mzz+kF/fSN1+3W9U+tq7dfL9TLdjWFB/jXlY01e/zkSS0YKL7Z4DRxsEgICbDkgHLYGN6k4nxrZK9Z+ODFtTHZ8Li11JBDxtt5+rlsUvVWyYsQvgQVYcX5arbYkSsaM/AsCHHdqXrhrDyMaOzI9LMJPevvySLtEG6NDRx6JcRzF1x0klx4RQ4u8ZOA74lQXyEEQyWB7wESraRfkMCmCiHNgiY3VixINiOQ0ihRTgjAhmGI2Qas/q7HpsOjo6K1dqGKStjEjlD0k6/dkhBthmw81QV6IUikZoLAC3wAlFSlBJ0hJ5BTn0Sps6OOpaD1F94G5hzTB2IusjRFY+gb3Ru/eF5cdjfGzjiFJyR+hGpVYRq5CJK3g4cOyrhgaJmvMrLkAYTFtSk/qodh1wFlypmseUPPJtBsiZY4JT2bketglHgfuN9gRGheg8uQMiXXqnuHnSVhHdSXsbZS7zVB34JrqWzcSjswmApP0IKZwNgQdpTn5pXfghcBQRvWNk10x48ft7ffeVf3x7N4x+eWLZX/5QIgDzwHcHd4lxzwTJ0IoM6mp+ViEncS9wu3zSRuVezRx5+wG59+qkUaWVIrG2ZXP7mqzzBZnEBYz0IBCG5C5cQ18cmvW1tLyg4fOeY6cTABVfylYiQ4IUWwubsjjgLcRyW/mpzFxSWfd4TAY/Jh1BGKTaKeXs5DmltQVpUXXQmITYcVJ0aPqD42ISzALU1O2w2PfUSbufcgRoK63BhZ3SgXBgEIohKqK6ttEZBTux0cGNCpg6s5hwpM2DQYAaDWOuGam5xGrAWGXm/WEYBJSa5WNbx41cKbqfh+DAEhmUplkhD31uPYQShu/oA4zOcycrM5PSl59ff1CyzDZwST3d5Wkkv1+m3n2Of6y8skH106C7BWR3tR4QCfKxbxZlq0mXF9MToYN+/xcMUfJ1Vx0hbw+hHNCQsO4jLgDjJZfzck5WKHJnX42LrtSdm7oaEERyTWQj0/IeZgQge8LQ4SKgwM3i3fIxXfhEnezbkBkB/f1obmnUxOTYvj0tF9ipe0+TkMuKeBwUMyIgIQAUVPJuXBzs2R0N61Rx95VJ5fa7tTwpMA/w//8c/sf/zFn8uTYn3MzaKgBUT8vu99jft+VXTp+RO0XEwM8t/i7HjiidPP17555qxOsHwurQYQboGYkoUDpdiH58/J3WVR8vtM0MGDh4Lcc94XX+gARGtQwhPZrGqnff0D+i5iKTY+xoefRxIIXpQTeITsr2TCPAb3/v+KYw1SSVl7gCUkwSLww0EcnliM9NBxsTlLresdICgpuCoyUqErEUoyCZxWXfOgr7+/Ho/GXgCuQ4w4PzenkhSnNItV8TRhUCAKibkDuZuhHTmXzTghRuBUuPfeRGke+PcxjhGzXxc0CWhC5haKKtx9qMX4d3IvJAGh/OJzbA5abNW+m0oKNISBE+EJQqvLyzY7PWNIiTPPzDf5An7XwTKb8nq8dOY038S2nJYS/9wEy0B7s0us8a4xFkKEkh9JmCo3hBg8L/E13gElRsrLGBwCqbnynOZLXlzgn8CAso583jmAqvLaxAyF2vEuZVfgxRXnqaBM3NqiDU+1Ql5gwG2I4kut4u7xKREavBaRnVJVoDlqaVE9FlS4Uij+DA3ZyMioDQ4O2smTJ3W4be1U7dKFD+2bZ58XAO0nr/24HmJgwMTl0NxqM+O37/t+fSBmpevAoRrxuuIvAUW8CSefL9r3v/996+nrk/tEOYcGBxJCH54/b6N37tj8QtlaW5zIUUyrGaiV8+ojgHqsHRmnzXUtQAwAMT2up3gCsznRXmHN2YSEFr6BvB1XopWpFk82ihrbTwmIFyVaCf9/0WWauPfIDMspHMkaMAQs2pgzYKjBI8TukWY8JvPiJuSUZE44bXieQqFDjTwg9thsLKjYwoyvABaceFWnWqlUZyeOxBVsHhGnCje/KiASixrPQii6kOATwCd81htzKHF562vkOIyoOjwJ4lVClyLlN4GivEErkqDiqir7L34+T3iRIEQODBAQwBbKaq00ytS77yLOn6av/c64HDAQIi0hLAnJxzhvzCPzHEVDVMngmXZBY2Jc2dS7wdgROmzq/fG8kXOPnAxKun64jHnIt2+f+Cs9sVjR82HkouFmvan3A9VrNX61SHojem/MW0ykUtqTvgD9I/AygLZEsbda0ftbZ64TCa3dM2fOKtS5fuOGcg6gJTmYaJ5bXlyxZ587Y11d++0v/+dfOoeAEIngJLZ0H1SFVxamvx4GAI4A3CF1osHNx5LeR5xWtcceecR+8MNXbXJqSmooJGP+7o03lB0GgJNNt9vs9JRiSiwoE04mfnRsxJNhiDpItskhkxLSCDV6XDpOWKiqiCEFBMpkbOTOLe+zxqtIuZtJfMVnevp6bXF+MYhyeC0+bvyYlIvc9MKwVxzgg1t4L/zZF/aGTq9YMvLNj/fhWgMRCsrACJCsgqlImfdgTOgBh2wTFWU4Cqj9E7qwyTBeUUiChSsV4Qq4elcjwmuJsmR4VbiswpvTM5EC3tyiBBibBneU+8SgRIOgJiuSipsb+jsnIxua5yCH091FZWBPIQvGwrPoLQJgeZ9GxcbGRpUoBV4LOIaYmtPTKbYdd487CyaDUihJYU5hJNoZbJ6Iu4gUbEp+7kva8sqS4+sDhp4wIdKlxQQuG5F5wEXn93q6Om1pdVVGXlwQge4rhggVNVKhx8d9IfSRDExLzgaFcYpiJhhkHsLDLK/cROPqIKWM+BUxSLwTStI8GwxLEIWy5kEGYgnQauAdnHv/PYUKr7zyiv34b/7GLl6+LCk4VSYgi8GD3tmx5YWZB7JXH0xgobJgTy2ZcrFMSX0HNBzHcX9vn5188mlNKOjA8iwCiXnROU1NTWjyqYMi9kBC6+onH1uyKSEGW9SGIKpk0HzB5kD5BoOAweHUZ3NxBh4+PKSa7rlffeCWO5NVmRFzv7qy7BzsxYJcUDWBgPOmjZQGjTqLjyO/Ismly6G1q6kJAEpnqVMnFTVqFrWYEkOm2AlJdj+D8pMhJJaExZbFtO1lJjwV76IDm9+hbkoWERuQHn42eGwPJg4nFzE7M6usOa6n0GHz89qYkaqcBJNQj1CLpb3hSAYgiGPwWbyH7p5ej1slyuKchjwnJTrPGVAmddovWlHZIFB0o6/AUFtszURsyebF0APjZh7wnjhZMRzUsTEubAgMpSv4ZGVQKJUyMIrcE0YDYRKUpZBcpzkH4xBVmvF0xIS0tqZ8Du9MvBCBqFZsy5JkAyZc0aZirZAgFtFKUAZKSOMPdh1340lEy7sgKRhUqmMno5itQxKQoQoOJUnyPmJr2qceCJiOoqgtsPPIDKQmpxoM0TMCNZFgBapdzOftZz97y6YnhhOFzj6F0M5vSAXBy49Lc5NfMwOQL9XIrjMp1PU5heieEqlDZVPMtNRBXeYpZYX9eQFD3nrzDTWrkMFHQ40+apYZLwccPWUfBCoWFsoihyDxJYltmjLaCQ+cborMM7kA2o7HJ8ZDoi6lhBJxl+LmQt49AYhBhPd3LvrIsBNLSI7+23KuvgChVesw3Yqt7fUTltiRZh1Opuj+eiORlxLZHCIVid8DeVjQwsP7YVH6SduljcP3KbvPiR7kxmMrMok5eR0bNIY4XBgjxCYk1Ildb3AoelMNApkoEDv1GvG5sw854YY47+QWu+CKK/s2i0aLP7mfGGIo5Ggi9KEEG+6fpB6lVyTPoNzeoHc9UH6FzQUTEck7rh0JOSLkObZFs0lRX0KQU01XgTmHF8wBwZ+8G4w1+Q7gsWAQ0rlMvaFK7FRK9DlpBobeuf926x2UbLBNKMZCboF3CFaDje9AL8/0C0MC0pGkL1UUvIEAnoI0lfsj9BEdmkq6CIFuSnEID6hNZCLrLl2W9LmGhgzk4x/8wSv21FOn7L/91/9it69/ksBzJg/ilaiAOUg128LM/UH9/brxwC4cNedw29PZbB2Qwim5tOzYdNx1woCBgUHr7OkUWOT9d9/x5Nz2lp3/1TuJ3v6hWks6LcYglYMC0SQ5hI8ufKReAjL2gH5U0gl1bFhVJsYnRTnV1dUtlRrYVFSBCDgAtZSCFw9MtvF0kfw4iq7huziR2dScWJBsCNvO6b5DS2tWz/Xs2WfFf+c98EHT/h5PgAXGQmADS5lWABvXDuQ1eBsyJUJObLLkKXHhRQgrRkrx+Pq6+BMxoqJGa06JvhtvyIlUcE99IXNiRZeVxSs6dhkG716klEo1IbYpO+bB2ZZjLwHfD9iHuXKiFacyz+fJXLfZJpz5ImzdVDiihGhbu5R9VQHB8G17WAW7TsydRP0D5obWZ/Aj3GsltCULtwEUW9RenhvYqkB22u7CrcKYtAg/D5MUBphwBMOMd8cGxjMj1+JYDE5yJy5RKzf5hK0dwW9V/YF4BnYp+jqqkcyVje5qRQB68FQwAFR7ZJTkJSYlXCrqcLpR29PK7QCTZgBb5/6/ceK4vB1Yh0iQPvLYY7a8tGg//r9/bdeuXUlkCp1aLpmsaxVS7Ype0cqX4P3/Sg0AI10oeavwPs8sYxVFhKmTwwTNZSGwSQENdXSWhKyaGB+z8Ykp6+/r0wum4ahQZBHtCR6LC4rbvwz2vSmlhZNud+ENZbjV2muWKxRFjZ0FdJLNqzyn0hDEnKL78vZaxYKAaJqbdYpw0uOecy3EGFkQGKDmppSsOyfJ4tyCFfd36J44SagaTIxNqFuRRYoVJyShBp3LuwBGcwqNvHndu/MGePwvuedAke6imWkZy1W4EgNGAHgsN5nLZKW4JLKO2CkokdU2VR1wM1lM6ikIRBdsFgyH0JNBWFPAJhqEAjsyBgTiCudVjKSpXgHBs4HkA4+BJqAY33sc7RToUGVDDEJJl/CI5G8EAsEJoJ6BhUVBpR1bwQlLS/aezc2WXYRT9GDloCrkeQhccK5LhYLTVnoRcCdAuLKyqpwC9Ft08BGi8O71vsQr6J5FVFjCaHJdUZHt4gElVD5mA5NtF7dDskX5IjL5GB6ed2Z6SghDDC/vW4rCCukcls7aVYs4sg2Snw+eioH9H7e+3j7rP9BvT58+LRYhxD9+9tZPbWZyVGxazMfCzESio7tfXgCh6MoDivvvHQ/8Cxi5jm4lBSnJAAZxtVVPpJAVx8XCbUKm66XvflcECu++87YyqcS/3oCxJW2B/fu76gs1X+zQC1siXkw75h1sARaYv/OSvf5L+Y5F74m2KNHEpkB5VVlqmm3a23QfuMpkhlkcxHScrko2bm3b0WNHbGOzqs1BYoc+BzYdmeXnzp7VAicJiYFYDTJoO1CZ71IN8TZS4uCo+ceJJWZfTspdb5ul2Yj+8WQKbUEnCeH053nQQSBDjAHE26D2LlambN4BKmAOQnsxpTJ3sb05R6QhwSPQy1ezERUL5yrEMExNTSlMkkQYCsXKwqPdFzToRNLi3hJhCzkW5UXC8xDnuqbDluaOltb9nZ3Bq0paGf2HhNOzRUYeNhaeWwfGNLREr4emIpXrVB0xAaeoBHkpdiNwJDr+IJvJ6bReX1/RO6f7dG1l1Q1QkABzZSEn9cAjrFYhj3FyWpLRVIvI0GOMo9Yh+QDAVetrG+L7Z04RkGVUtzZDr0CTpdsgftlVM5XTua3puQ4dGtIuI3F5/NgJzcMv33vXbl37OBG95NUHeMJ/0fidfXG2o7vmNFhZuWvOUOP0yVHEk0X3yCOP6GQ8fvyo7ewl5LKC7oIoZHaa03VHTRUYBmJoAXgmJoQz12YL9WQ2k8f9NFDQYANJhMf1lHj4Lsg/WQBsfIZiRYLbffuEhUcGSxDUTSCfSJc3q08eY4a7SVaahBqdihgcNjN5heZQz2fQMcjLR0WGoVg31K7lwgcwkbyOTCZg+oNSbXNKC5DvwiUnFo8CGAsLc+oPdw8gYZ1d3c4GrPCDEhKJLBpt2NxZbR7vI4CIJa/TeXpmVuSm7C6Mqsf9DtAh/lbZS7G0ab4ZhA3a5CFJ6vdMicwZamD4oZwCUYh+R8/hbdHkA+bm55RPiI1MoAgxcLHUytoQUEc1+ZwtLC2qcQcjQ04HunbmFyMemXVdqtzBURgeOh6pngAGw5hIAoxTniQv4qBSpXJGaS/7VeqyZMwPgKVSqUOVF0BHJBLJKS0szsu4Ea5EsRcM4sknnrSxMeTZ8tbT22PXrl6R8X/hhRfs9q3bdvTYCUu1Ntu5X75vVz++orBmbvr+Yvr/peN3ehO5/d1C0EoRBuombUZnxiW+5GSjXs6i+9a3nrfvvPiy/eRv/9a6e3sVFpx65rQVcjmXSLp4US9KOHsgukBn11blJhPnsdCw5shmoaai+DYg4XhxYgSW5mCzONhYDBge8NicOuQRVHtHtipLRxs+tek+MBrU1IVOa2sVBTi1bz5/8NCgvIEIhZb30eydcMqEJ5N2++bNutKLklqtLCbHrXs8nlHOgbhZ/ezra/XkpLABu3Sk0TTl8TndbStrawo3MG7iUNCGTyp04oQUBl6kH05R5u2/cPq7d8TnnS6NeviS4mfRaAGTDcSihChsGFxvZ9BJusLNup96kKxEqS11WeKGh6YtXHUMM++OTU71xA0BmggZeQYkKvGeMIwwD1H1gAWHrjhCSEKDARLEQcmZAwSj4Mw7m15aBaachUdgSQaRLr+VJURmnWwE0hjWF95BvtihsJFDhhxNbGPmuUAlbmxUlXRG7BaAGB2MhJB4B3T1HUGNua3dhoYOq3W9s6fLjh89pjzNlSuf2DfPPKvwFS/op2++aRd+9c4X7jf6/Ve/pNrPbzN+51YIIxA715wfnRZU3GAy7bhTwCp3bXF2MvF7L/3rWu+BAZuemrBvf/s7dujQIWGuDwwMirduZHTULl74UO7Z773wgn388WWJcCppUyyIvRciRpJzLC5OQfIPOjGUBQdRSOzapQ0AWMQJSV1Rh9KX4n42sAxUVRsXLQNmLgJc2Ny+AHM69ehaBEEGUIRFCHEn7jIEnFQd+EzEk0MiefDgQbt185byGXc3pRNheqxe06IiI899LS0uqe0WT4VcAEIkcjsrDtiJYhacypEII5KSUpIjXMB1xzvAAJO7cB79HeVijhwZEg8dhgVPSqdtU0qlSe6fIx9Kceneh74J0IZ4KIRAMu7qBnSYrpqUgpcHYOfwkSNiIWY+8cQIpQDLQB3uuRNyBXNikXbC54Rl0xl5bPOLc7qWwrdAHU9iDuOCIXLjtiM0JdellIhhpFJUyLleBM8pOe4UtONNztW3WVU7el9fvw4QPKNtvDduIFGzpeUV5QE4ICDoPHP2jL384os2OjZhjz/xuERUJ6cmhWcgdL11e1jr6eonl+zWjZs2PnLroTjxPz++kptK50s1YedF3xQaZmoJ9Ynz/y62sGFL5cnE0LFHa7SG8mJY5FjyY0ePikaMBNYnVy7Z37/xukQlRBKaStkPfvhDe//9d+3kk0/Y6PCYzc6UBVJhgbowhkuSsejk9rc4scgG5S2Yf5th6HVVHCkZAz4BCtyUsP37O7Wg6D6jOoB7zdk+fPumNmdpf0mnBDE6i5OT2UVR8DrS+l3cdNp7STqB8sIDwivBaFDz5KQlF4BLOzc7o+y5SmlQU+UL6gyjMQegE4uM4fTowEa9YkASjrZcNh2tp4QmxMsKkba3VfvH0GAEmAu8HuJvDAN9E7wWDA3OGnmVYsd+xem8LDa7WqTVYg3ZqVN1YSw9FPKeAIwjLbDUQnD1vWzoXhFGaQHmIoham5uVrIVIkw5BL57g0a17YxdeEWQnK6j57ijcw4i5+hJtvutaG5OTU8IRuNKOY1BA/wHAKeSKalC6evVTPbPtbttLL70sg8u7b2/PikAEHkMyeefOfSAwFu/48uVLdvTYca2d69euqnx9+vRpO/vcGZuArq6pyZ568mndx7XrN2xqetp++d57dufWTZv+kso9D3p8ZTeXyXfC7+UncS1RBzqQFBExpLjjIa5wKmU2JgNUIK4XbvMzZ87Kfb/00Tn7+MpV6+09YE8+9bjaRCm34AUgcXXt2qd249btQOm9pbIPrjzIwR0ywnRdRfBGDX16Z3mhqYeFy+IWhj5knqnTI0lOrZv7ifLfnKT0cs/OzChGP3zkuF2/cV1IrkNDh0SZLh15qiKAQLq7bH5uVm2eK6vLVurqqSc8mQNIU6VTT1ZZGWwYiEAZIiIqrTObL89ZLp+11raMNgshVIQoi6lodVkuMNBcNh88BKj9XLt2XScfwq1AtGnKwfXHe9DzZ92lx5CAn8fVJRTi1GXzR06FZqk6hQ6+tlZtOiXxEFBRvsK77vhdwjNyCypzJRLi0gfw01VCYQh4MMi7LbXYUnWgh+Abx4/aP/z8/1mmUNA88jPcbR6Rk5wwoL2lVdiHmbmyQg0SdcwTdf1qdaOeD8KTGRw4YK+++qqSqcvLq1IdopU3D0y6UtV68cQsgKQ1m5oat7GREV1jd3fLevsPKi+E8ftP//nPbHh0TGvl5vXr9tpPfqJWd0KqTy6e+8K9lc6ViBNtffl35/J/fnzl1qnY1V/jVBJcGBd1fjpR7OytAYAgFkQKmc9lip011VnTGWXRaSIlaXRg4KA988w3VeLq7u2Tuo02ULJJiRyw3CD9/uLP/7tdvnhZ9dzjjz2qxFYmndNJzikGXwHu4/5iUXz5GAvUWVjUNBRBa05JEhoqjEL/gQH7xS9+oWwyC2J8fFKZ+u/9m+/Z6PCI+tUHBoe0wDuKRZUpqTCUOoqKGccmJ8VcjAtfnp5yfoN0RrVfYnygxixiiYfmcjYxNl4n9iSrDbKPRhy8mjvDo/IYnMkHNhyYcXdddZcM9/Ky/h3E2bHjJ9R5SNLRdfhccAWXOZJzgrZUIhEPZauq058yI54O3gINM3wvHgielTZ6wB+QC4HO7ejhQTv/wTlL5wraYMiEieBjr+Z6gdl2zQtIvj/6oz+01//uTRkiSp68jwsXLtqpU6fswIF+5Ws+/fSa3RkedjmsctlK3V32nW9/x1ZXF+z1N960E8dPKF9CpejmzRt6JhrCInCLpN1zzz9vP/rRn8qAAOBaX1+3y59ctQP9/XrntOfyrksdHWL7OfX003bj5i2r0NmZdAr0VDPYhzURzVCJunL5Y5uYmLTF8oSv00JnTTktuz/CHQ96fOU3mC10Cvq4ulROsMnXQgKEv2NZObGdg94/T3II6Ccn1WLwGtLFrlp3Z8kTbi0t9m+//4r1dHeK7pqEHQsatBhtybzgrt4+AZBI7IFvB0KL5WfBcyIcP3FCmfK5+QWdriTa+F5amanhY2BIdh08OCgNPH42gfspUE6PNjE5DbLCe7WEjYyNqSZ9aHBQibu+nh59J9loaNLh0B8ZHVayUGCQdFvA6a/azZswwuypPwCEI1jynu5uGRdP9CXsV++/Z0uEQO1p4RI4BT3BCf7feydADh4cOKAmn+E7I9JvjP3xkYWXOBcxEk5aPBGV51KOvSd3Ivmz7b2gQFyVAeJ7yK3w7FhV77bbtiNDA2J5xksCgDM6PmEtTUmBlm7fGbW2tmabnppUXqSYL9rSyrIdO3YsYANa7NqnN4TNx0ryHUCieTdT0zOWS6ftmTPP6Ps/+OCcXb923U6dPqWwCA9hbHxChi0jXEjGLl28JMotOuoGDvQpf4BATXNzswRSwGIR/pQ6u2Uo6MIcHR11xuFUs2L+ixfOW2t7VmK36ysrUhuevce9L3b21UT5pn4PB1CR2F2df/C1/C8zHqqba88DGvJY1mXDSdIRezsFE6d8FAZlATJ4wYBHOB1J2ECbPTAAxdimFi0Lnbgsk8mpDwFlHDahEHGibybRx3WdFBNASUchL4Qe9Xg2Ja22UqGtet23t6dPbjBZeoxC7JYrz85Yb98B3beISmqIpeyX4cHd5vQC90D4IpEP4s/VVevq6VGJDCNBxh4XFLwBmeeVlTVl4Q8e6LPq1o4twXxDfTpBKy819i55O8TnyLA5VdmW7YA7SCV1ukk9R2jEdnkvlC4Bt3CCQ+8tVeO1DZubL9vRI4e1Kai2kGsogaKEuZm8QlAyJnHLqRxBMQCxagmUdqdFFFIsltSFd/PGLfXDDw4N6ZQkBADB6T0IdOxt2tg4nk2bPXP6lF27cV2txswX6lFTU9N1fAGbXfgGnk3di94my70MD9+2vn4ay5Ytl3UwEfkBErCwJ5HHIbGnXn6qHdIyWLHF5RW57B0d3gWJAZmfLVtzS9J29vgu+ApWJZo6NTFpbRJZ3bbOLtiQl2xjFeZos4Xp8QSUeIjkkN8Syc3ibKI9j9eKeE45ATT+frP53I/x0N1QBA5hkdnQQlrBl64auMd9SibR1jk1mtjfM1Aj263+bAk5ehccT7Z5z4Rnil01UUC1tCoLzykdE2RO1lHzF7W/pwYME7eEpB2DzR+ZeTAMuOgk6shYT9y6msiVekXVzDVV2gsNpN4M4sSVxMa47sCJl2bGEjAnUeJaC25i98CxGghC4mXuR/z3NCNJdXfNVucnE+2F7pqabVbuPleu64A8KE5tTksxz0hj0Et0Xrd3tB3GhYQa83Z3XrprBhZgD6WdhBKv/LwtX6oxf139h2rIu4mqGyAXhKUIeShh2Ga1BHoEW8JkUGnBSBI2lTpKyt9U1errgqm0gZdny2rjFZEKqshtzUroqVoQAGHMJZuNZCrutngMMiTp1p0JiWej3auGCpA3LkkTAuTl2rpyJ7QN4/WR08H7oaaPEVjboHlsznZoRtr1fn7nG3AgDx4MuAOXPqs6Gy+xGmtir2aJwCXR3zcgIz8/P6uK1W9CwfInuQ1yCBv3vLeHZTx0NxQHsRQuIMANNs360lyCcIFX4Wy9Dl4B7MKGw01muNKM1+BZ/J9/OYgq4KJFwQ9v+HHCEjqxnAq6ZjEU4Wd+befvXp7znmyATer8qzkfgNqUafZRWy1uILj+hK3O36Vxynf2KY8BvROD+1AHYhQjqXH9ENYUSjU9c6mnBvqNa0qJOTznyvyMTh2evrkFQQ8REuhUXF2cSZR6B2uqawcEH7XoXCGn5ihKVZFAUySoqaQ0DsRglgBr4DTgwLUBP0ncVGpEKZGx8lkJewTX2XsbnKyUSgVZccpvcHxHV9ghuEQJe4L1AnBykFCz8gIxDImoPwwmnocqGAE5yjzBzAONGUm/7UrV1ja8qSiyL8U27kht5pJfboCZm5W5qQSlaHkKu3SPLsnLJBzDc6PSA28DpLV4kNVNl6WL6wEv1ROKQTl59rONOvz7xvKcwllRm++6eK49pOOhvbF7BwudW137XJ4AElKMAauV5CGnGQtYk/65zCq6BSyCSPPtopnwrFMy4kVxGjhtF0P8deHnrMjlezbyZ657z/382koHDMbhXtpznapwYGT0HQlHJfoCm60/0/rSF2eF4/diVDj9I5zUDVbYbPwXEHBcsy1b0vfzzyKjjI05UGqJUMTZjCPfwL6kU4mBONxHLkClyB2Bcyh5Uo93yi3maVtGur1QqoHZr1E7n52US4xsfFuuVHO5cQd9cR3/fatvrt80n1wzaifwD1wv/ls0lPbPHPmS4+4jU28ylbTV+elEoauvpt6PMI/teEZSZ6rpuSJIByOdZJ4sEN8GklU1SwXdQGX2v0J4728zvhY3+fmBOy+XmtOw5tLdnLycKtJ2D00fcRPXX1KAvLqH4BtkdWFGizbq0W0slROEIPARyuUT4Cd0ru2FMKHYLeUWriB0YSALFfpPiyqljDceAUlIXF55G/uabHVhOuGGy4lEXPPP48R7n4+FyOc4ldiQ2lzhdImb6jfNT/wcm44YlM3Npip2DWgbUWrTdWPSSgvZAomqi6KQH/G17J2KjlRMWkpALU5WGIX8972tGFwHPIoueEqIQD6FE5tnZE40p7t79ZBAgp7BsGYLXZo8UWAFDEFsx+ZZ7n0+nl+bLBwI3ChYjurmxhe62ffG4uliFwvDqx9id94TlX29f0Uj8RkmHgwOa6iuWxjyIp+/x6/L+Fre9OdHtsNLhGy2yNTCi/WXyjsOJ5U641AZdssdGXx9oaEE3OxtnRBBcKrtsBDpp/fQQv6BQg/1z2nh4wLrJNPPCB1mE3gbkRGJjcGQixt495VI4+c6OYleYbJpdhdeUalLoEe3GGMWTxtCARk3TuggfeUbmXtwV1iwZa4Nx0E4iQhZ2KDU5fkBsF9yGBguJ89wYFZs0OHfMAbRl9hWYtGRjzwT94BBAHgjvftgIDzv4F4ZHha9H8xtpFVnTlxxifvw3It36fn3MEdxLvW4hgqy/0zPyG8Eog48Eg4C6RGEnIJKysGQgPVQGBlWeewQzeaKARG4LVc+Cq5AEMo13YPyQwTDxXCufwxx8NRyHn49jHF9YzTGPzvP8ttMVTYkte4dkFjs7+yv/TpyWHI2nKT3fg8ncI6TN/z9C79Tn+/U78Tf0/fu764VSz2/1f3HUSw5605jNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNEZjNIY9TOP/A19e6RPahnjmAAAAAElFTkSuQmCC" class="w-full h-full object-contain" style="filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.6));" />
+        </div>
+        
+        <h2 class="text-white text-2xl font-bold uppercase tracking-widest mb-1 text-glow">Azathoth's Whisper</h2>
+        <p class="text-gray-600 text-[10px] uppercase tracking-[0.2em] mb-8">Version 1.2.2</p>
+        
+        <div class="space-y-4 text-sm text-gray-400 font-mono">
+            <div class="bg-black/50 p-4 rounded-lg border border-gray-800/50">
+                <p class="text-[10px] uppercase tracking-widest text-gray-600 mb-1">Created By</p>
+                <p class="text-white font-bold tracking-wide">iBridge Zhao</p>
+            </div>
+            
+            <div class="flex flex-col gap-3">
+                <a href="#" onclick="window.pywebview.api.open_url('mailto:toadeater731@gmail.com')" class="group flex items-center justify-between p-3 rounded-lg border border-gray-800/50 hover:bg-gray-900 hover:border-gray-700 transition-all">
+                    <span class="text-[10px] uppercase tracking-widest text-gray-600">Email</span>
+                    <span class="text-blue-400 group-hover:text-blue-300 transition-colors">toadeater731@gmail.com</span>
+                </a>
+                
+                <a href="#" onclick="window.pywebview.api.open_url('https://github.com/TK88101/Azathoths-Whisper')" class="group flex items-center justify-between p-3 rounded-lg border border-gray-800/50 hover:bg-gray-900 hover:border-gray-700 transition-all">
+                    <span class="text-[10px] uppercase tracking-widest text-gray-600">GitHub</span>
+                    <span class="text-blue-400 group-hover:text-blue-300 transition-colors">TK88101/Azathoths-Whisper</span>
+                </a>
+            </div>
+        </div>
+        
+        <button onclick="closeAbout()" class="mt-8 bg-white text-black font-bold uppercase tracking-widest px-10 py-3 hover:bg-gray-200 transition-colors rounded-full text-xs">Close</button>
+    </div>
+</div>
+
+<script>
+    // ... existing vars ...
+    // ... existing vars ...
+    const trackArtist = document.getElementById('track-artist');
+    const trackTitle = document.getElementById('track-title');
+    const lyricsBox = document.getElementById('lyrics-box');
+    const btnFetch = document.getElementById('btn-fetch');
+    const btnSave = document.getElementById('btn-save');
+    const btnBatchAlbum = document.getElementById('btn-batch-album');
+    const btnBatchDir = document.getElementById('btn-batch-dir');
+    const statusText = document.getElementById('status-text');
+    const linesCount = document.getElementById('lines-count');
+    const headerClick = document.getElementById('header-click-area');
+    
+    // Batch Elements
+    const batchView = document.getElementById('batch-view');
+    const batchList = document.getElementById('batch-list');
+    const batchPreview = document.getElementById('batch-preview');
+    const batchAlbumName = document.getElementById('batch-album-name');
+    const btnBatchFetch = document.getElementById('btn-batch-fetch');
+    const btnBatchImport = document.getElementById('btn-batch-import');
+    const btnBatchAll = document.getElementById('btn-batch-all');
+    const batchStatus = document.getElementById('batch-status');
+
+    let isBusy = false;
+    let lastTrackSignature = "";
+    let lastAlbum = "";
+    let batchData = [];
+    let selectedBatchId = null;
+
+    // View Switching Logic
+    function switchTab(tabName) {
+        // Update Nav Styles
+        const tabs = ['editor', 'batch'];
+        tabs.forEach(t => {
+            const nav = document.getElementById('nav-' + t);
+            if(nav) {
+                if(t === tabName) {
+                    // Active style
+                    nav.className = "nav-link text-sm font-medium uppercase tracking-widest transition-colors text-white border-b border-white pb-1 font-bold shadow-[0_4px_20px_-4px_rgba(255,255,255,0.5)] cursor-pointer";
+                } else {
+                    // Inactive style
+                    nav.className = "nav-link text-sm font-medium uppercase tracking-widest transition-colors text-gray-500 hover:text-white cursor-pointer";
+                }
+            }
+        });
+
+        // Toggle Views
+        const editorEls = document.querySelectorAll('.view-section-editor');
+        const batchEl = document.getElementById('batch-view');
+        
+        if (tabName === 'editor') {
+            editorEls.forEach(el => el.classList.remove('hidden'));
+            editorEls.forEach(el => el.classList.add('flex'));
+            batchEl.classList.add('hidden');
+            batchEl.classList.remove('flex');
+        } else if (tabName === 'batch') {
+            editorEls.forEach(el => el.classList.add('hidden'));
+            editorEls.forEach(el => el.classList.remove('flex'));
+            batchEl.classList.remove('hidden');
+            batchEl.classList.add('flex');
+            
+            // Auto-run load if data empty
+            if (batchData.length === 0) {
+                runAlbumBatch();
+            }
+        }
+    }
+    
+    function setStatus(msg, type = 'idle') {
+        if (statusText) statusText.textContent = msg;
+    }
+
+    function toggleBusy(busy) {
+        isBusy = busy;
+        document.body.style.cursor = busy ? 'wait' : 'default';
+        const btns = [btnFetch, btnSave, btnBatchFetch, btnBatchImport, btnBatchAll];
+        btns.forEach(btn => {
+            if(btn) {
+                btn.disabled = busy;
+                if(busy) btn.classList.add('opacity-50');
+                else btn.classList.remove('opacity-50');
+            }
+        });
+    }
+
+    function updateLinesCount() {
+        if (linesCount && lyricsBox) {
+            const count = lyricsBox.value ? lyricsBox.value.split('\\n').length : 0;
+            linesCount.textContent = count;
+        }
+    }
+    
+    if (lyricsBox) {
+        lyricsBox.addEventListener('input', updateLinesCount);
+    }
+
+    function updateTrackDisplay(payload) {
+        let trackStr = "";
+        let lyrics = "";
+        
+        if (typeof payload === 'string') {
+            trackStr = payload;
+        } else {
+            trackStr = payload.track;
+            lyrics = payload.lyrics;
+        }
+
+        if (!trackStr || trackStr.startsWith("No track")) {
+             trackArtist.textContent = "No Artist";
+             trackTitle.textContent = "No Track";
+             lastTrackSignature = "";
+             return; 
+        }
+        
+        if (trackStr === "Error: Permissions Denied") {
+             trackArtist.textContent = "Access Denied";
+             trackTitle.textContent = "Check macOS Permissions";
+             trackTitle.classList.add("text-red-500");
+             lastTrackSignature = "Error";
+             return;
+        } else {
+             trackTitle.classList.remove("text-red-500");
+        }
+
+        const currentSignature = trackStr;
+        const trackChanged = (currentSignature !== lastTrackSignature);
+
+        if (trackStr.includes(" - ")) {
+            const parts = trackStr.split(" - ");
+            trackArtist.textContent = parts[0];
+            trackTitle.textContent = parts.slice(1).join(" - ");
+        } else {
+            trackArtist.textContent = trackStr;
+            trackTitle.textContent = "";
+        }
+
+        if (trackChanged) {
+            lastTrackSignature = currentSignature;
+            console.log("Track changed to:", currentSignature);
+            
+            if (lyrics && lyrics.trim().length > 0) {
+                lyricsBox.value = lyrics;
+                setStatus('Lyrics loaded from music app', 'ok');
+                updateLinesCount();
+            } else {
+                lyricsBox.value = "";
+                // Only auto-fetch if we are NOT viewing the batch window
+                if(batchView.classList.contains('hidden')) {
+                     // Add small delay to ensure UI state is settled and prevent race conditions
+                     setTimeout(() => fetchLyrics(), 100);
+                }
+            }
+        }
+        
+        // Album Change Logic for Batch View
+        if (payload.album && payload.album !== lastAlbum) {
+            console.log("Album changed:", payload.album);
+            lastAlbum = payload.album;
+            batchData = []; // Clear old data
+            
+            // If we are currently looking at the batch view, reload it
+            if (!batchView.classList.contains('hidden')) {
+                runAlbumBatch();
+            }
+        }
+    }
+
+    async function hydrate() {
+        try {
+            const payload = await window.pywebview.api.load_track_state();
+            updateTrackDisplay(payload);
+        } catch (err) { console.error(err); }
+    }
+
+    async function pollTrack() {
+        if (isBusy) return;
+        try {
+            if (!window.pywebview || !window.pywebview.api) return;
+            const res = await window.pywebview.api.check_track();
+            if (res !== lastTrackSignature) {
+                hydrate();
+            }
+        } catch (err) { console.warn("Poll failed", err); }
+    }
+
+    async function fetchLyrics() {
+        toggleBusy(true);
+        setStatus('Fetching from Genius...', 'busy');
+        try {
+            const lyrics = await window.pywebview.api.fetch_lyrics();
+            if (lyrics && !lyrics.startsWith('No track') && !lyrics.startsWith('Lyrics not found')) {
+                lyricsBox.value = lyrics;
+                setStatus('Lyrics fetched', 'ok');
+                updateLinesCount();
+            } else {
+                setStatus('Lyrics not found', 'warn');
+            }
+        } catch (err) {
+            setStatus('Fetch failed', 'warn');
+        } finally {
+            toggleBusy(false);
+        }
+    }
+
+    async function saveLyrics() {
+        toggleBusy(true);
+        setStatus('Saving to Music...', 'busy');
+        try {
+            const res = await window.pywebview.api.save_lyrics(lyricsBox.value);
+            setStatus(res, res === 'Saved' ? 'ok' : 'warn');
+        } catch (err) {
+            setStatus('Write failed', 'warn');
+        } finally {
+            toggleBusy(false);
+        }
+    }
+
+    // --- BATCH LOGIC ---
+
+    function renderBatchTable() {
+        batchList.innerHTML = '';
+        if(batchData.length > 0) {
+            batchAlbumName.textContent = batchData[0].album;
+        } else {
+            batchAlbumName.textContent = "No Data / Album";
+        }
+        
+        batchData.forEach((track, idx) => {
+            const row = document.createElement('div');
+            row.className = "flex items-center hover:bg-white/5 cursor-pointer border-b border-border-dark/50 transition-colors group";
+            if(selectedBatchId === track.id) row.classList.add('bg-white/10');
+            
+            row.onclick = () => selectBatchTrack(track.id);
+            
+            const num = document.createElement('div');
+            num.className = "w-12 py-3 text-center text-gray-600 group-hover:text-white";
+            num.textContent = (idx + 1).toString().padStart(2, '0');
+            
+            const artist = document.createElement('div');
+            artist.className = "flex-1 py-3 px-4 truncate text-gray-400 group-hover:text-white";
+            artist.textContent = track.artist;
+            
+            const title = document.createElement('div');
+            title.className = "flex-1 py-3 px-4 truncate text-white font-bold";
+            title.textContent = track.title;
+            
+            const stat = document.createElement('div');
+            stat.className = "w-24 py-3 flex justify-center";
+            const dot = document.createElement('div');
+            
+            if (track.lyrics && track.lyrics.length > 0) {
+                 dot.className = "w-2 h-2 rounded-full bg-white";
+                 dot.title = "Has Lyrics";
+            } else {
+                 dot.className = "w-2 h-2 rounded-full bg-red-900";
+                 dot.title = "Missing";
+            }
+            stat.appendChild(dot);
+            
+            row.appendChild(num);
+            row.appendChild(artist);
+            row.appendChild(title);
+            row.appendChild(stat);
+            batchList.appendChild(row);
+        });
+    }
+    
+    function selectBatchTrack(id) {
+        selectedBatchId = id;
+        const track = batchData.find(t => t.id === id);
+        renderBatchTable(); // re-render to update highlight
+        
+        if (track) {
+            batchPreview.value = track.lyrics || "";
+            document.getElementById('preview-meta').textContent = `${track.artist} - ${track.title}`;
+        }
+    }
+    
+    function closeBatch() {
+        batchView.classList.add('hidden');
+        batchView.classList.remove('flex');
+    }
+
+    async function runAlbumBatch() {
+        toggleBusy(true); // Locks main UI
+        // Don't modify classes here, handled by switchTab or already visible
+        setStatus('Processing album batch...', 'busy');
+        batchList.innerHTML = '<div class="p-4 text-gray-500">Loading tracks from Music...</div>';
+        
+        try {
+             batchData = await window.pywebview.api.open_batch_album();
+             if(!Array.isArray(batchData)) {
+                 batchList.innerHTML = `<div class="p-4 text-red-500">${batchData}</div>`;
+                 return;
+             }
+             renderBatchTable();
+             setStatus('Album loaded', 'ok');
+        } catch (err) {
+            console.error(err);
+            batchList.innerHTML = '<div class="p-4 text-red-500">Failed to load tracks.</div>';
+            setStatus('Batch failed', 'warn');
+        } finally {
+            toggleBusy(false);
+        }
+    }
+    
+    async function runDirectoryBatch() {
+       alert("Directory scanning coming in v1.2");
+    }
+    
+    // Batch Operations Actions
+    if(btnBatchFetch) {
+        btnBatchFetch.onclick = async () => {
+             // Fetch missing lyrics for all tracks in batchData
+             const missing = batchData.filter(t => !t.lyrics || t.lyrics.length === 0);
+             if (missing.length === 0) {
+                 alert("No missing lyrics to fetch!");
+                 return;
+             }
+             
+             btnBatchFetch.disabled = true;
+             batchStatus.textContent = `Fetching ${missing.length} tracks...`;
+             
+             for (let i = 0; i < missing.length; i++) {
+                 const track = missing[i];
+                 batchStatus.textContent = `Fetching (${i+1}/${missing.length}): ${track.title}`;
+                 try {
+                     const lyrics = await window.pywebview.api.fetch_single_missing(track.artist, track.title);
+                     if (lyrics && !lyrics.startsWith("No track") && !lyrics.startsWith("Lyrics not found")) {
+                         track.lyrics = lyrics;
+                         renderBatchTable();
+                         if (selectedBatchId === track.id) {
+                             batchPreview.value = lyrics;
+                         }
+                     }
+                 } catch (e) {
+                     console.error(e);
+                 }
+             }
+             
+             batchStatus.textContent = "Fetch complete.";
+             btnBatchFetch.disabled = false;
+        };
+    }
+    
+    if(btnBatchImport) {
+        btnBatchImport.onclick = async () => {
+             if (!selectedBatchId) {
+                 alert("Please select a track first to import its lyrics (from preview).");
+                 return;
+             }
+             
+             const track = batchData.find(t => t.id === selectedBatchId);
+             if (!track) return;
+             
+             batchStatus.textContent = `Saving ${track.title}...`;
+             try {
+                 // Use current preview text
+                 const content = batchPreview.value;
+                 const res = await window.pywebview.api.save_single_track(track.id, content);
+                 if (res === 'Saved') {
+                     track.lyrics = content; 
+                     renderBatchTable();
+                     batchStatus.textContent = "Saved.";
+                 } else {
+                     batchStatus.textContent = "Save failed.";
+                 }
+             } catch (e) {
+                 console.error(e);
+                 batchStatus.textContent = "Error saving.";
+             }
+        }
+    }
+    
+    if(btnBatchAll) {
+        btnBatchAll.onclick = async () => {
+             // Confirm?
+             if(!confirm("Writes lyrics for ALL tracks in list where lyrics are present. Continue?")) return;
+             
+             const toSave = batchData.filter(t => t.lyrics && t.lyrics.length > 0);
+             if (toSave.length === 0) {
+                 alert("No tracks have lyrics to save.");
+                 return;
+             }
+
+             btnBatchAll.disabled = true;
+             batchStatus.textContent = `Saving ${toSave.length} tracks...`;
+             
+             for (let i = 0; i < toSave.length; i++) {
+                 const track = toSave[i];
+                 batchStatus.textContent = `Saving (${i+1}/${toSave.length}): ${track.title}`;
+                 try {
+                     const res = await window.pywebview.api.save_single_track(track.id, track.lyrics);
+                     // no need to update model, just status
+                 } catch (e) {
+                     console.error(e);
+                 }
+             }
+             batchStatus.textContent = "All saved.";
+             btnBatchAll.disabled = false;
+        }
+    }
+
+    // Event Listeners
+    if (btnFetch) btnFetch.addEventListener('click', fetchLyrics);
+    if (btnSave) btnSave.addEventListener('click', saveLyrics);
+    if (headerClick) headerClick.addEventListener('click', hydrate);
+
+    // Initial load & Polling
+    window.addEventListener('pywebviewready', () => {
+        hydrate();
+        loadSettings();
+    });
+    // Cmd+P: quit app
+    document.addEventListener('keydown', (e) => {
+        if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === 'p') {
+            e.preventDefault();
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.request_quit) {
+                window.pywebview.api.request_quit();
+            }
+        }
+    });
+    document.addEventListener('DOMContentLoaded', () => { 
+        setTimeout(hydrate, 100);
+        setInterval(pollTrack, 3000); 
+        loadSettings();
+    });
+
+    const settingsModal = document.getElementById('settings-modal');
+    const groupToken = document.getElementById('group-token');
+    const groupLang = document.getElementById('group-lang');
+    const inputToken = document.getElementById('setting-token');
+    const inputLang = document.getElementById('setting-lang');
+    const tokenStatus = document.getElementById('token-status');
+    const settingsTitle = document.querySelector('[data-i18n="settings_title"]');
+
+    function openSettings(mode) {
+        settingsModal.classList.remove('hidden');
+        settingsModal.classList.add('flex');
+        
+        // Hide all first
+        groupToken.classList.add('hidden');
+        groupLang.classList.add('hidden');
+        tokenStatus.textContent = '';
+        
+        setTimeout(() => {
+            if(mode === 'token') {
+                groupToken.classList.remove('hidden');
+                settingsTitle.textContent = "Token Settings"; // Temp override, ideally use i18n key
+                inputToken.focus();
+            }
+            if(mode === 'lang') {
+                groupLang.classList.remove('hidden');
+                settingsTitle.textContent = "Language Settings";
+                inputLang.focus();
+            }
+        }, 50);
+    }
+
+    function closeSettings() {
+        settingsModal.classList.add('hidden');
+        settingsModal.classList.remove('flex');
+    }
+
+    const aboutModal = document.getElementById('about-modal');
+    function openAbout() {
+        if(aboutModal) {
+            aboutModal.classList.remove('hidden');
+            aboutModal.classList.add('flex');
+        } else {
+            alert("About modal not found!");
+        }
+    }
+    function closeAbout() {
+        if(aboutModal) {
+            aboutModal.classList.add('hidden');
+            aboutModal.classList.remove('flex');
+        }
+    }
+
+
+
+    async function loadSettings() {
+        if(!window.pywebview) return;
+        try {
+            const config = await window.pywebview.api.get_config();
+            if(config.token) inputToken.value = config.token;
+            if(config.language) inputLang.value = config.language;
+            
+            // Apply translations
+            if(config.translations) {
+                applyTranslations(config.translations);
+            }
+        } catch(e) { console.error("Load settings failed", e); }
+    }
+
+    async function saveToken() {
+        const token = inputToken.value.trim();
+        if(!token) {
+            tokenStatus.textContent = "Token cannot be empty.";
+            tokenStatus.className = "text-xs mt-2 h-4 text-red-500";
+            return;
+        }
+        
+        tokenStatus.textContent = "Validating...";
+        tokenStatus.className = "text-xs mt-2 h-4 text-gray-400";
+        
+        try {
+            const res = await window.pywebview.api.save_token_only(token);
+            if(res.success) {
+                tokenStatus.textContent = "Success! Token is valid and saved.";
+                tokenStatus.className = "text-xs mt-2 h-4 text-green-500";
+                setTimeout(closeSettings, 1500);
+            } else {
+                tokenStatus.textContent = "Invalid Token: " + res.message;
+                tokenStatus.className = "text-xs mt-2 h-4 text-red-500";
+            }
+        } catch(e) {
+            tokenStatus.textContent = "Error: " + e;
+            tokenStatus.className = "text-xs mt-2 h-4 text-red-500";
+        }
+    }
+
+    async function saveLanguage() {
+        const lang = inputLang.value;
+        try {
+            const res = await window.pywebview.api.save_lang_only(lang);
+            alert(res); // Alert is fine for lang change as it requires restart
+            closeSettings();
+        } catch(e) {
+            alert("Failed to save language");
+        }
+    }
+
+    function applyTranslations(t) {
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if(t[key]) {
+                if(el.placeholder) el.placeholder = t[key];
+                else el.textContent = t[key];
+            }
+        });
+    }
+
+
+</script>
+</body></html>
+"""
 
 # Load environment variables
 # Priority:
@@ -38,19 +886,21 @@ import os
 
 import sys
 
-# Try standard first
-loaded = load_dotenv()
+# 1. Standard load_dotenv() (CWD / script dir in dev)
+env_path_dev = os.path.join(os.path.dirname(__file__), '.env')
+loaded = load_dotenv(env_path_dev)
 
+# 2. Path relative to executable (for bundled app)
+if not loaded and getattr(sys, 'frozen', False):
+    bundle_dir = os.path.dirname(sys.executable)
+    env_path_bundle = os.path.join(bundle_dir, '.env')
+    loaded = load_dotenv(env_path_bundle)
+
+# 3. Fallback to old path for compatibility if needed
 if not loaded:
-    # Try hardcoded path for the bundled app user
-    env_path = os.path.expanduser("~/Documents/Bjork/.env")
-    if os.path.exists(env_path):
-        load_dotenv(env_path)
-    else:
-        # Try relative to executable if in dist
-        if getattr(sys, 'frozen', False):
-            bundle_dir = os.path.dirname(sys.executable)
-            load_dotenv(os.path.join(bundle_dir, '.env'))
+    env_path_old = os.path.expanduser("~/Documents/Bjork/.env")
+    if os.path.exists(env_path_old):
+        load_dotenv(env_path_old)
 
 # Constants
 GENIUS_ACCESS_TOKEN = os.getenv("GENIUS_ACCESS_TOKEN")
@@ -62,7 +912,8 @@ else:
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
 
 # App Metadata
-APP_VERSION = "1.0.2"
+# App Metadata
+APP_VERSION = "1.2.2"
 APP_AUTHOR = "iBridge Zhao"
 APP_EMAIL = "toadeater731@gmail.com"
 APP_GITHUB = "https://github.com/TK88101/Azathoths-Whisper"
@@ -71,6 +922,8 @@ APP_GITHUB = "https://github.com/TK88101/Azathoths-Whisper"
 TRANSLATIONS = {
     "en": {
         "app_title": "Azathoth's Whisper",
+        "nav_editor": "Editor",
+        "nav_batch": "Batch",
         "source": "Source:",
         "fetch_btn": "Fetch Lyrics",
         "write_btn": "Write to iTunes",
@@ -78,7 +931,7 @@ TRANSLATIONS = {
         "pref_menu": "Preferences...",
         "menu_token": "Genius Token Settings...",
         "menu_lang": "Language Settings...",
-        "status_ready": "Ready",
+        "status_ready": "準備完了",
         "status_saved": "Saved to metadata.",
         "status_limit_msg": "Fetching...",
         "status_fetching": "Fetching from {}...",
@@ -107,10 +960,18 @@ TRANSLATIONS = {
         "manual_check": "Check Track",
         "menu_about": "About",
         "about_text": "Created by: {}\nEmail: {}\nVersion: {}",
-        "menu_help": "Help"
+        "menu_help": "Help",
+        "status_label": "Status:",
+        "lines_label": "Lines:",
+        "col_artist": "Artist",
+        "col_title": "Title",
+        "col_stat": "Stat",
+        "col_preview": "Preview"
     },
     "zh_TW": {
-        "app_title": "Azathoth's Whisper (阿撒托斯之低語)",
+        "app_title": "阿撒托斯的低語",
+        "nav_editor": "編輯器",
+        "nav_batch": "批量處理",
         "source": "來源:",
         "fetch_btn": "獲取歌詞",
         "write_btn": "寫入 iTunes",
@@ -147,10 +1008,21 @@ TRANSLATIONS = {
         "manual_check": "檢查曲目",
         "menu_about": "關於",
         "about_text": "製作人: {}\n郵箱: {}\n版本: {}",
-        "menu_help": "幫助"
+        "menu_help": "幫助",
+        "batch_fetch": "獲取缺失",
+        "batch_import": "導入選中",
+        "batch_all": "導入全部",
+        "status_label": "狀態:",
+        "lines_label": "行數:",
+        "col_artist": "藝術家",
+        "col_title": "標題",
+        "col_stat": "狀態",
+        "col_preview": "預覽"
     },
     "ja": {
-        "app_title": "Azathoth's Whisper (アザトースの囁き)",
+        "app_title": "アザトースの囁き",
+        "nav_editor": "エディタ",
+        "nav_batch": "一括処理",
         "source": "ソース:",
         "fetch_btn": "歌詞を取得",
         "write_btn": "iTunesに書き込み",
@@ -187,7 +1059,16 @@ TRANSLATIONS = {
         "manual_check": "トラックを確認",
         "menu_about": "アザトースの囁きについて",
         "about_text": "作者: {}\nメール: {}\nバージョン: {}",
-        "menu_help": "ヘルプ"
+        "menu_help": "ヘルプ",
+        "batch_fetch": "不足を取得",
+        "batch_import": "選択を保存",
+        "batch_all": "全て保存",
+        "status_label": "ステータス:",
+        "lines_label": "行数:",
+        "col_artist": "アーティスト",
+        "col_title": "タイトル",
+        "col_stat": "状態",
+        "col_preview": "プレビュー"
     }
 }
 
@@ -200,18 +1081,29 @@ class MusicController:
         """Returns (artist, title, album) of the currently playing track, or None."""
         try:
             # appscript.k.playing usually works, but sometimes checking state directly is safer
-            if self.music.player_state() == appscript.k.playing:
+            state = self.music.player_state()
+
+            if state == appscript.k.playing or state == appscript.k.paused:
                 track = self.music.current_track
-                return track.artist(), track.name(), track.album()
+                artist, name, album = track.artist(), track.name(), track.album()
+                print(f"DEBUG: Track Found - {artist} - {name} ({album})")
+                return artist, name, album
+            else:
+                print(f"DEBUG: Music not playing/paused. State: {state}")
         except Exception as e:
-            # If Music app is not running or other error
+            msg = str(e)
+            if "-1743" in msg:
+                print("Permissions requested and denied.")
+                return "Error: Permissions Denied", "Check Privacy Settings", ""
+            print(f"DEBUG: Error getting current track: {e}")
             pass
         return None
 
     def get_lyrics(self):
         """Returns the lyrics of the currently playing track, or empty string."""
         try:
-            if self.music.player_state() == appscript.k.playing:
+            state = self.music.player_state()
+            if state == appscript.k.playing or state == appscript.k.paused:
                 # Some versions/conditions might return k.missing_value which is None
                 lyrics = self.music.current_track.lyrics.get()
                 return lyrics if lyrics else ""
@@ -221,29 +1113,59 @@ class MusicController:
         return ""
 
     def set_lyrics(self, lyrics_text):
-        """Writes lyrics to the currently playing track's metadata."""
+        """Sets the lyrics of the currently playing track."""
         try:
-            if self.music.player_state() == appscript.k.playing:
+            state = self.music.player_state()
+            if state == appscript.k.playing or state == appscript.k.paused:
                 self.music.current_track.lyrics.set(lyrics_text)
                 return True
         except Exception as e:
             print(f"Error setting lyrics: {e}")
-            return False
         return False
-        
-# ... (skipping to UI section) ...
 
-        # Manual Check Button
-        self.btn_check = ttk.Button(controls_frame, text="Check Track", command=self.check_track)
-        self.btn_check.pack(side=tk.LEFT, padx=5)
+    def get_album_tracks(self):
+        """Returns list of {id, artist, title, album, lyrics} for current album."""
+        try:
+            state = self.music.player_state()
+            if state == appscript.k.playing or state == appscript.k.paused:
+                current = self.music.current_track
+                current_album = current.album()
+                current_artist = current.artist()
+                
+                # Use a specific filter: tracks of current album AND current artist (to avoid same album name collissions)
+                # Appscript filter:
+                tracks = self.music.tracks[(appscript.its.album == current_album).AND(appscript.its.artist == current_artist)].get()
+                
+                results = []
+                for t in tracks:
+                    try:
+                        results.append({
+                            'id': t.persistent_ID(),
+                            'artist': t.artist(),
+                            'title': t.name(),
+                            'album': t.album(),
+                            'lyrics': t.lyrics.get() or ""
+                        })
+                    except:
+                        continue
+                return results
+        except Exception as e:
+            print(f"Error getting album tracks: {e}")
+        return []
 
-        # Fetch Button
-        self.btn_fetch = ttk.Button(controls_frame, text="Fetch Lyrics", command=self.start_fetch_lyrics)
-        self.btn_fetch.pack(side=tk.LEFT, padx=5)
-        
-        # Write/Save Button (Moved here for better visibility)
-        self.btn_save = ttk.Button(controls_frame, text="Write to iTunes", command=self.write_metadata)
-        self.btn_save.pack(side=tk.LEFT, padx=5)
+    def set_lyrics_by_id(self, persistent_id, lyrics_text):
+        """Sets lyrics for a specific track by persistent ID."""
+        try:
+            # Finding track by ID is tricky in standard AppleScript, 
+            # usually we iterate or use a filter.
+            # Assuming 'library playlist 1' is main library.
+            track = self.music.library_playlists[1].tracks[(appscript.its.persistent_ID == persistent_id)].get()
+            if track and len(track) > 0:
+                track[0].lyrics.set(lyrics_text)
+                return True
+        except Exception as e:
+            print(f"Error setting lyrics by ID: {e}")
+        return False
 
 class LyricsFetcher:
     """Handles fetching lyrics from various sources."""
@@ -482,6 +1404,132 @@ class LyricsFetcher:
         return full_text if full_text else "Lyrics parsed empty."
 
 
+class DirectoryScanner:
+    """Scans local directories for audio files."""
+    SUPPORTED_EXTS = {'.mp3', '.m4a', '.flac', '.aac', '.alac', '.aiff'}
+    
+    @staticmethod
+    def scan_directory(directory_path):
+        """
+        Recursively scans directory for audio files.
+        Returns list of dicts: {path, filename, artist, title, album, has_lyrics}
+        """
+        results = []
+        if not os.path.isdir(directory_path):
+            return results
+            
+        for root, dirs, files in os.walk(directory_path):
+            for f in files:
+                ext = os.path.splitext(f)[1].lower()
+                if ext in DirectoryScanner.SUPPORTED_EXTS:
+                    full_path = os.path.join(root, f)
+                    try:
+                        # Attempt to read existing metadata
+                        # mutagen.File auto-detects format
+                        audio = mutagen.File(full_path, easy=True)
+                        
+                        title = "Unknown"
+                        artist = "Unknown"
+                        album = "Unknown"
+                        
+                        if audio:
+                            # EasyID3/EasyMP4 keys are usually 'title', 'artist', 'album'
+                            title = audio.get('title', [os.path.splitext(f)[0]])[0]
+                            artist = audio.get('artist', ["Unknown"])[0]
+                            album = audio.get('album', ["Unknown"])[0]
+                        
+                        # Check lyrics (requires non-Easy access usually)
+                        has_lyrics = DirectoryScanner._check_lyrics(full_path)
+                        
+                        results.append({
+                            'path': full_path,
+                            'filename': f,
+                            'title': title,
+                            'artist': artist,
+                            'album': album,
+                            'has_lyrics': has_lyrics
+                        })
+                    except Exception as e:
+                        print(f"Error scanning {f}: {e}")
+        return results
+
+    @staticmethod
+    def _check_lyrics(file_path):
+        """Deep check for lyrics in file tags."""
+        try:
+            audio = mutagen.File(file_path)
+            if not audio:
+                return False
+                
+            # ID3 (MP3)
+            # Look for USLT frames
+            if hasattr(audio, 'tags') and audio.tags:
+                if 'USLT::eng' in audio.tags or 'USLT:desc:eng' in audio.tags:
+                     return True
+                # Iterate to check any USLT
+                for key in audio.tags.keys():
+                    if key.startswith('USLT'):
+                        # Check if text is non-empty
+                        if audio.tags[key].text:
+                             return True
+            
+            # MP4 / M4A
+            # Look for '©lyr'
+            if '©lyr' in audio:
+                if audio['©lyr']:
+                    return True
+            
+            # Vorbis (FLAC)
+            # 'LYRICS' or 'UNSYNCED LYRICS'
+            if 'LYRICS' in audio:
+                if audio['LYRICS']: return True
+                
+        except:
+            pass
+        return False
+        
+    @staticmethod
+    def write_lyrics_to_file(file_path, lyrics_text):
+        """Writes lyrics to the local file."""
+        try:
+            audio = mutagen.File(file_path)
+            if not audio: return False
+            
+            # Handle formats
+            # This is a basic implementation. 
+            # Ideally we'd map this out more robustly for all formats.
+            # But simple MP4/ID3 covers 90% of iTunes/Music usage.
+            
+            if file_path.lower().endswith('.m4a'):
+                audio['©lyr'] = lyrics_text
+                audio.save()
+                return True
+            
+            if file_path.lower().endswith('.mp3'):
+                from mutagen.id3 import USLT
+                if audio.tags is None:
+                    audio.add_tags()
+                # Remove existing USLT if any to avoid duplicates with different lang/desc
+                to_del = [k for k in audio.tags.keys() if k.startswith('USLT')]
+                for k in to_del:
+                    del audio.tags[k]
+                
+                # Add new
+                audio.tags.add(USLT(encoding=3, lang='eng', desc='desc', text=lyrics_text))
+                audio.save()
+                return True
+                
+            # FLAC
+            if file_path.lower().endswith('.flac'):
+                 audio['LYRICS'] = lyrics_text
+                 audio.save()
+                 return True
+
+        except Exception as e:
+            print(f"Error writing to file {file_path}: {e}")
+        return False
+
+
 class ConfigManager:
     """Manages persistent configuration (Token & Language)."""
     _config_path = os.path.expanduser("~/.azathoths_whisper_config")
@@ -491,9 +1539,15 @@ class ConfigManager:
         """Loads full config dict handling JSON migration."""
         defaults = {"token": "", "language": "system"}
         
+        # Try env first (Primary source of truth for .app)
+        env_token = os.getenv("GENIUS_ACCESS_TOKEN", "")
+        env_lang = os.getenv("LANGUAGE", "")
+
+        defaults["token"] = env_token
+        if env_lang:
+            defaults["language"] = env_lang
+
         if not os.path.exists(cls._config_path):
-            # Try legacy env as fallback for token
-            defaults["token"] = os.getenv("GENIUS_ACCESS_TOKEN", "")
             return defaults
 
         try:
@@ -503,7 +1557,14 @@ class ConfigManager:
             # Try JSON
             try:
                 data = json.loads(content)
-                # Merge with defaults to ensure all keys exist
+                # If we have explicit env vars, they should override the legacy JSON file
+                # EXCEPT if the user explicitly set them in the JSON file... 
+                # Actually, for this app, .env via settings menu is the "Gold Standard" UI way.
+                # So we should probably let Env win if it is set.
+                if env_token: data["token"] = env_token
+                if env_lang: data["language"] = env_lang
+                
+                # Merge defaults for missing keys
                 for k, v in defaults.items():
                     if k not in data:
                         data[k] = v
@@ -511,7 +1572,9 @@ class ConfigManager:
             except json.JSONDecodeError:
                 # Legacy: Content was just the token string
                 print("Migrating legacy config file format...")
-                return {"token": content, "language": "system"}
+                ret = {"token": content, "language": "system"}
+                if env_lang: ret["language"] = env_lang 
+                return ret
                 
         except Exception as e:
             print(f"Error loading config: {e}")
@@ -532,607 +1595,558 @@ class ConfigManager:
         """Detects macOS system language, checking app-specific override first."""
         try:
             # 1. Check App-Specific Defaults (com.ibridgezhao.azathothswhisper)
-            # This is set when user changes language in System Settings -> Language & Region -> Applications
             try:
                 out = subprocess.check_output("defaults read com.ibridgezhao.azathothswhisper AppleLanguages", shell=True, stderr=subprocess.DEVNULL)
                 out_str = out.decode('utf-8').strip()
-                # If found, prioritize this
                 if 'zh-Hant' in out_str or 'zh-TW' in out_str: return 'zh_TW'
                 if 'ja' in out_str: return 'ja'
                 if 'en' in out_str: return 'en'
             except:
-                pass # No app-specific setting
+                pass 
 
             # 2. Check Global Defaults
             out = subprocess.check_output("defaults read -g AppleLanguages", shell=True)
             out_str = out.decode('utf-8').strip()
-            # Output format: ( "en-US", "ja-JP", ... )
             if 'zh-Hant' in out_str or 'zh-TW' in out_str:
                 return 'zh_TW'
             if 'ja' in out_str:
                 return 'ja'
         except:
             pass
-        return 'en' # Default fallback
+        return 'en'
 
-class LyricsApp(tk.Tk):
+class BatchProcessingWindow(tk.Toplevel):
+    """Window for batch processing (Album or Directory)."""
+    def __init__(self, parent, mode="album", data=None):
+        super().__init__(parent)
+        self.title("Batch Processing")
+        self.geometry("1000x700")
+        self.configure(bg="#000000") # Set background
+        
+        self.mode = mode
+        self.data = data if data else []
+        self.results_map = {}
+        self.app = parent # Assuming parent is the app instance
+        
+        title_map = {"album": "Check Current Album", "directory": "Scan Directory"}
+        self.title(title_map.get(mode, "Batch Manager"))
+        self.geometry("1000x700")
+        
+        self.create_widgets()
+        
+        # Start loading data
+        self.status_var.set("Loading data...")
+        self.after(100, self.load_data)
+
+    def create_widgets(self):
+        # Main layout: PanedWindow (List | Preview)
+        paned = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
+        
+        # Left Panel: List
+        left_frame = ttk.Frame(paned, padding=0)
+        paned.add(left_frame, weight=2)
+        
+        # Treeview
+        cols = ("Artist", "Title", "Album", "Status")
+        self.tree = ttk.Treeview(left_frame, columns=cols, show='headings', selectmode="extended")
+        self.tree.heading("Artist", text="Artist")
+        self.tree.heading("Title", text="Title")
+        self.tree.heading("Album", text="Album")
+        self.tree.heading("Status", text="Status")
+        
+        self.tree.column("Artist", width=120)
+        self.tree.column("Title", width=150)
+        self.tree.column("Album", width=120)
+        self.tree.column("Status", width=100)
+        
+        self.tree.bind('<<TreeviewSelect>>', self.on_select)
+        
+        scroll = ttk.Scrollbar(left_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scroll.set)
+        
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Right Panel: Preview & Actions
+        right_frame = ttk.Frame(paned, padding=10)
+        paned.add(right_frame, weight=1)
+        
+        ttk.Label(right_frame, text="Lyrics Preview:", font=("Helvetica", 12, "bold"), foreground="#d41132").pack(anchor=tk.W, pady=(0, 5))
+        self.preview_text = scrolledtext.ScrolledText(right_frame, width=40, height=20, bg="#050505", fg="#aaaaaa", 
+                                                      insertbackground="white", relief="flat", font=("Menlo", 11))
+        self.preview_text.pack(fill=tk.BOTH, expand=True, pady=0)
+        
+        # Action Buttons frame
+        btn_frame = ttk.Frame(self, padding=10)
+        btn_frame.pack(fill=tk.X, padx=0, pady=0)
+        
+        self.status_var = tk.StringVar(value="Ready")
+        ttk.Label(btn_frame, textvariable=self.status_var).pack(side=tk.LEFT)
+        
+        # Buttons
+        ttk.Button(btn_frame, text="Close", command=self.destroy).pack(side=tk.RIGHT, padx=5)
+
+        # Import Selected
+        self.btn_import_selected = ttk.Button(btn_frame, text="IMPORT SELECTED", command=self.import_selected, state="disabled")
+        self.btn_import_selected.pack(side=tk.RIGHT, padx=5)
+
+        # Import All
+        # Always enabled, or enabled checking if any have new_lyrics? For simplicity, always enabled but checking logic handles 0.
+        self.btn_import_all = ttk.Button(btn_frame, text="IMPORT ALL", command=self.import_all)
+        self.btn_import_all.pack(side=tk.RIGHT, padx=5)
+        
+        self.btn_fetch_missing = ttk.Button(btn_frame, text="FETCH MISSING LYRICS", command=self.start_fetch_missing)
+        self.btn_fetch_missing.pack(side=tk.RIGHT, padx=5)
+
+    def load_data(self):
+        self.tree.delete(*self.tree.get_children())
+        self.results_map = {}
+        
+        items = []
+        if self.mode == "album":
+            items = self.app.music_ctrl.get_album_tracks()
+        elif self.mode == "directory" and self.initial_data:
+            items = DirectoryScanner.scan_directory(self.initial_data)
+            
+        for i, item in enumerate(items):
+            uid = str(i)
+            self.results_map[uid] = item
+            item['new_lyrics'] = ""
+            status_str = "Has Lyrics" if item.get('has_lyrics') else "Missing"
+            values = (item.get('artist'), item.get('title'), item.get('album'), status_str)
+            self.tree.insert('', tk.END, iid=uid, values=values)
+            
+        self.status_var.set(f"Loaded {len(items)} tracks.")
+
+    def on_select(self, event):
+        selected = self.tree.selection()
+        if not selected: return
+        
+        uid = selected[0]
+        data = self.results_map.get(uid)
+        if data:
+            self.preview_text.delete("1.0", tk.END)
+            if data.get('new_lyrics'):
+                self.preview_text.insert("1.0", data['new_lyrics'])
+            elif data.get('has_lyrics'):
+                self.preview_text.insert("1.0", "(Existing lyrics present)")
+            else:
+                self.preview_text.insert("1.0", "(No lyrics)")
+            
+            if data.get('new_lyrics'):
+                self.btn_import_selected.config(state="normal")
+            else:
+                 self.btn_import_selected.config(state="disabled")
+
+    def start_fetch_missing(self):
+        missing_ids = []
+        for uid, data in self.results_map.items():
+            if not data.get('has_lyrics') and not data.get('new_lyrics'):
+                missing_ids.append(uid)
+        
+        if not missing_ids:
+            messagebox.showinfo("Info", "No missing lyrics to fetch.")
+            return
+            
+        self.status_var.set(f"Fetching for {len(missing_ids)} tracks...")
+        threading.Thread(target=self._fetch_worker, args=(missing_ids,)).start()
+        
+    def _fetch_worker(self, missing_ids):
+        token = self.app.token
+        for i, uid in enumerate(missing_ids):
+            if not self.winfo_exists(): break
+            data = self.results_map[uid]
+            
+            self.app.after(0, lambda u=uid: self.tree.set(u, "Status", "Fetching..."))
+            
+            lyrics = LyricsFetcher.fetch_genius(data.get('artist', ''), LyricsFetcher.sanitize_title(data.get('title', '')), token)
+            
+            if lyrics and not lyrics.startswith("Error") and "Lyrics not found" not in lyrics:
+                 data['new_lyrics'] = lyrics
+                 self.app.after(0, lambda u=uid: self.tree.set(u, "Status", "Found!"))
+            else:
+                 # Fallback
+                 lyrics = LyricsFetcher.fetch_darklyrics(data.get('artist', ''), LyricsFetcher.sanitize_title(data.get('title', '')), data.get('album', ''))
+                 if lyrics and not lyrics.startswith("Error") and "Lyrics not found" not in lyrics:
+                     data['new_lyrics'] = lyrics
+                     self.app.after(0, lambda u=uid: self.tree.set(u, "Status", "Found (DL)!"))
+                 else:
+                     self.app.after(0, lambda u=uid: self.tree.set(u, "Status", "Not Found"))
+                     
+        self.app.after(0, lambda: self.status_var.set("Fetch complete."))
+
+    def import_selected(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showinfo("Info", "No tracks selected.")
+            return
+        self._batch_import(selected)
+
+    def import_all(self):
+        # All IDs
+        all_ids = list(self.results_map.keys())
+        self._batch_import(all_ids)
+
+    def _batch_import(self, uids):
+        success_count = 0
+        for uid in uids:
+            data = self.results_map.get(uid)
+            new_lyrics = data.get('new_lyrics')
+            if not new_lyrics: continue
+            
+            ok = False
+            if self.mode == "album":
+                db_id = data.get('db_id')
+                if db_id: ok = self.app.music_ctrl.set_lyrics_by_id(db_id, new_lyrics)
+            else:
+                path = data.get('path')
+                if path: ok = DirectoryScanner.write_lyrics_to_file(path, new_lyrics)
+            if ok:
+                success_count += 1
+                self.tree.set(uid, "Status", "Saved")
+                data['has_lyrics'] = True
+                data['new_lyrics'] = ""
+                
+        messagebox.showinfo("Result", f"Updated {success_count} tracks.")
+
+class LyricsApp:
     def __init__(self, config):
-        super().__init__()
         self.config_data = config
         self.token = config.get("token", "")
         self.lang_code = config.get("language", "system")
+        self._force_quit = False
+        self._activation_observer = None
         
-        # Determine actual language
         if self.lang_code == "system":
             self.current_lang = ConfigManager.detect_system_language()
         else:
             self.current_lang = self.lang_code
             
-        # Fallback to en if not found
         if self.current_lang not in TRANSLATIONS:
             self.current_lang = "en"
             
-        self.title(self._get_text("app_title"))
-        self.geometry("700x600")
-        
         self.music_ctrl = MusicController()
-        self.current_track_info = None  # (artist, title)
+        self.current_track_info = None
+        
+        # Create webview window with embedded HTML and expose Python API
+        self.window = webview.create_window(
+            title="Azathoth's Whisper",
+            html=SPLASH_HTML,  # Start with splash screen
+            width=1200,
+            height=800,
+            resizable=True,
+            frameless=False,
+            js_api=self
+        )
+        
+        # Bind closing event
+        self.window.events.closing += self.on_closing
 
-        self._build_menu()
-        self._build_ui()
-        
-        # Handle window close button (red X) -> Hide instead of Exit
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
-        
-        # Handle Dock icon click (ReopenApplication)
+        # macOS: show window when app is activated (dock icon click)
         try:
-            self.createcommand('::tk::mac::ReopenApplication', self.on_reopen)
-        except AttributeError:
+            import AppKit
+            import Foundation
+
+            def _on_app_activate(notification):
+                if not self._force_quit:
+                    try:
+                        self.window.show()
+                    except Exception:
+                        pass
+
+            self._activation_observer = Foundation.NSNotificationCenter.defaultCenter().addObserverForName_object_queue_usingBlock_(
+                AppKit.NSApplicationDidBecomeActiveNotification, None, None, _on_app_activate
+            )
+        except Exception:
             pass
+        
+        # Load main content after a delay (Splash duration)
+        threading.Timer(3.5, self.load_main_content).start()
 
-        # Poll for track changes periodically
-        self.after(2000, self.auto_refresh_track)
-        
-    def _get_text(self, key):
-        """Retrieves localized text."""
-        # Safety
-        return TRANSLATIONS.get(self.current_lang, TRANSLATIONS["en"]).get(key, key)
-
-    def _build_menu(self):
-        menubar = tk.Menu(self)
-        
-        # Settings Menu
-        settings_menu = tk.Menu(menubar, tearoff=0)
-        settings_menu.add_command(label=self._get_text("menu_token"), command=self.open_token_settings)
-        settings_menu.add_command(label=self._get_text("menu_lang"), command=self.open_language_settings)
-        menubar.add_cascade(label=self._get_text("settings_menu"), menu=settings_menu)
-        
-        # Help Menu
-        help_menu = tk.Menu(menubar, tearoff=0)
-        help_menu.add_command(label=self._get_text("menu_about"), command=self.open_about_dialog)
-        menubar.add_cascade(label=self._get_text("menu_help"), menu=help_menu)
-
-        # macOS System "About" override
-        try:
-             self.createcommand('tk::mac::ShowAbout', self.open_about_dialog)
-        except:
-             pass
-        
-        self.config(menu=menubar)
-
-    def open_about_dialog(self):
-        """Shows the custom About dialog with clickable links."""
-        import webbrowser
-        
-        about_win = tk.Toplevel(self)
-        about_win.title("") # macOS About windows usually don't have titles or use the app name
-        about_win.geometry("400x260")
-        about_win.resizable(False, False)
-        
-        # App Name & Version
-        tk.Label(about_win, text=TRANSLATIONS["en"]["app_title"], font=("System", 16, "bold")).pack(pady=(20, 5))
-        tk.Label(about_win, text=f"Version {APP_VERSION}", font=("System", 12)).pack(pady=(0, 15))
-        
-        # Author
-        tk.Label(about_win, text=f"Created by {APP_AUTHOR}", font=("System", 12)).pack()
-        
-        # Email Link
-        email_lbl = tk.Label(about_win, text=APP_EMAIL, font=("System", 12, "underline"), fg="blue", cursor="pointinghand")
-        email_lbl.pack(pady=(5, 0))
-        email_lbl.bind("<Button-1>", lambda e: webbrowser.open(f"mailto:{APP_EMAIL}"))
-        
-        # GitHub Link
-        github_lbl = tk.Label(about_win, text="GitHub Project", font=("System", 12, "underline"), fg="blue", cursor="pointinghand")
-        github_lbl.pack(pady=(5, 5))
-        github_lbl.bind("<Button-1>", lambda e: webbrowser.open(APP_GITHUB))
-        
-        # Copyright / Footer
-        tk.Label(about_win, text="© 2026 iBridge Zhao", font=("System", 10), fg="gray").pack(side=tk.BOTTOM, pady=15)
-        
-    def _build_ui(self):
-        # Top Frame: Track Info and Controls
-        top_frame = ttk.Frame(self, padding="10")
-        top_frame.pack(fill=tk.X)
-        
-        self.lbl_info = ttk.Label(top_frame, text=self._get_text("not_playing"), font=("Helvetica", 14, "bold"))
-        self.lbl_info.pack(side=tk.TOP, pady=5)
-        
-        controls_frame = ttk.Frame(top_frame)
-        controls_frame.pack(fill=tk.X, pady=5)
-        
-        # Source Selection
-        ttk.Label(controls_frame, text=self._get_text("source")).pack(side=tk.LEFT, padx=5)
-        self.source_var = tk.StringVar(value="Genius")
-        self.cbo_source = ttk.Combobox(controls_frame, textvariable=self.source_var, state="readonly")
-        self.cbo_source['values'] = ("Genius", "DarkLyrics / Metal")
-        self.cbo_source.pack(side=tk.LEFT, padx=5)
-        
-        # Fetch Button
-        self.btn_fetch = ttk.Button(controls_frame, text=self._get_text("fetch_btn"), command=self.start_fetch_lyrics)
-        self.btn_fetch.pack(side=tk.LEFT, padx=5)
-
-        # Write/Save Button
-        self.btn_write = ttk.Button(controls_frame, text=self._get_text("write_btn"), command=self.write_metadata)
-        self.btn_write.pack(side=tk.LEFT, padx=5)
-        
-        # Center Frame: Text Editor
-        center_frame = ttk.Frame(self, padding="10")
-        center_frame.pack(fill=tk.BOTH, expand=True)
-        
-        self.txt_lyrics = scrolledtext.ScrolledText(center_frame, wrap=tk.WORD, font=("Menlo", 12))
-        self.txt_lyrics.pack(fill=tk.BOTH, expand=True)
-        
-        # Bottom Frame: Save
-        bottom_frame = ttk.Frame(self, padding="10")
-        bottom_frame.pack(fill=tk.X)
-        
-        self.lbl_status = ttk.Label(bottom_frame, text=self._get_text("status_ready"), foreground="gray")
-        self.lbl_status.pack(side=tk.LEFT)
-        
-        # Initial check
-        self.check_track()
-
-    def auto_refresh_track(self):
-        """Periodically checks specifically for track changes if connection is happy."""
-        self.check_track()
-        self.after(5000, self.auto_refresh_track)
-
-    def check_track(self):
-        """Polls the Music app for the current track."""
-        info = self.music_ctrl.get_current_track()
-        if info:
-            artist, title, album = info
-            if self.current_track_info != (artist, title):
-                self.current_track_info = (artist, title)
-                self.lbl_info.config(text=f"{artist} - {title}")
-                self.lbl_status.config(text=self._get_text("track_detected"))
-                
-                # Check for existing lyrics
-                existing_lyrics = self.music_ctrl.get_lyrics()
-                if existing_lyrics and existing_lyrics.strip():
-                    self.txt_lyrics.delete("1.0", tk.END)
-                    self.txt_lyrics.insert("1.0", existing_lyrics)
-                    self.lbl_status.config(text=self._get_text("status_loaded_track"))
-                else:
-                    # No lyrics found in iTunes, auto-fetch (Search only, no auto-save)
-                    self.start_fetch_lyrics()
-        else:
-            self.current_track_info = None
-            self.lbl_info.config(text=self._get_text("music_not_playing"))
-    
-    def start_fetch_lyrics(self):
-        """Starts the fetching process in a separate thread."""
-        if not self.current_track_info:
-            messagebox.showwarning(self._get_text("err_validation"), self._get_text("msg_no_track"))
-            return
-        
-        # Determine album info
-        info = self.music_ctrl.get_current_track()
-        if info:
-            artist, title, album = info
-        else:
-            if len(self.current_track_info) == 2:
-                artist, title = self.current_track_info
-                album = ""
-            else:
-                 artist, title, album = self.current_track_info
-
-        source = self.source_var.get()
-        
-        self.toggle_inputs(False)
-        self.lbl_status.config(text=self._get_text("status_fetching").format(source))
-        self.txt_lyrics.delete("1.0", tk.END)
-        self.txt_lyrics.insert("1.0", self._get_text("status_limit_msg"))
-        
-        # Run in thread to keep GUI alive
-        t = threading.Thread(target=self._fetch_thread, args=(artist, title, album, source))
-        t.start()
-        
-    def _fetch_thread(self, artist, title, album, source):
-        # 1. Sanitize
-        clean_title = LyricsFetcher.sanitize_title(title)
-        print(f"Original: '{title}' -> Clean: '{clean_title}'")
-        
-        result = ""
-        if source == "Genius":
-            # Use stored token, or empty string if None which fetch_genius handles
-            token_to_use = self.token if self.token else ""
-            result = LyricsFetcher.fetch_genius(artist, clean_title, token_to_use)
-        else:
-            result = LyricsFetcher.fetch_darklyrics(artist, clean_title, album)
+        # Menu Actions
+        def trigger_token_settings():
+            self.window.evaluate_js("openSettings('token')")
             
-        # Update UI safely
-        self.after(0, self._fetch_complete, result)
+        def trigger_lang_settings():
+            self.window.evaluate_js("openSettings('lang')")
 
-    def _fetch_complete(self, lyrics_text):
-        self.toggle_inputs(True)
-        self.lbl_status.config(text=self._get_text("status_complete"))
-        
-        if lyrics_text and not lyrics_text.startswith("Error"):
-            self.txt_lyrics.delete("1.0", tk.END)
-            self.txt_lyrics.insert("1.0", lyrics_text)
-        else:
-            # If error or empty
-            self.txt_lyrics.delete("1.0", tk.END)
-            if lyrics_text and "Lyrics not found" in lyrics_text:
-                 self.txt_lyrics.insert("1.0", self._get_text("lyrics_not_found"))
-            else:
-                 self.txt_lyrics.insert("1.0", lyrics_text if lyrics_text else self._get_text("lyrics_not_found"))
-            
-            if lyrics_text and lyrics_text.startswith("Error"):
-                messagebox.showerror(self._get_text("err_validation"), lyrics_text)
+        def show_about():
+            self.window.evaluate_js("openAbout()")
 
-    def write_metadata(self):
-        """Writes the current text content to the song."""
-        if not self.current_track_info:
-             messagebox.showerror("Error", self._get_text("err_no_track"))
-             return
-
-        lyrics = self.txt_lyrics.get("1.0", tk.END).strip()
-        if not lyrics:
-            if not messagebox.askyesno("Warning", self._get_text("warn_empty_lyrics")):
-                return
-        
-        success = self.music_ctrl.set_lyrics(lyrics)
-        if success:
-            messagebox.showinfo("Success", self._get_text("msg_success"))
-            self.lbl_status.config(text=self._get_text("status_saved"))
-        else:
-            messagebox.showerror("Error", self._get_text("msg_fail"))
-
-    def toggle_inputs(self, enable):
-        state = "normal" if enable else "disabled"
-        self.btn_fetch.config(state=state)
-        self.btn_write.config(state=state)
-        self.cbo_source.config(state=state)
-
-    def open_token_settings(self):
-        """Opens the Token settings dialog."""
-        dialog = tk.Toplevel(self)
-        dialog.title(self._get_text("menu_token").replace("...", ""))
-        dialog.geometry("450x150")
-        
-        tk.Label(dialog, text=self._get_text("token_label")).pack(pady=(10, 5))
-        entry_token = tk.Entry(dialog, width=40)
-        entry_token.pack(pady=5)
-        if self.token:
-            entry_token.insert(0, self.token)
-            
-        def save():
-            new_token = entry_token.get().strip()
-            if new_token:
-                ConfigManager.save_config(new_token, self.lang_code)
-                self.token = new_token
-                messagebox.showinfo(self._get_text("saved_title"), self._get_text("saved_token_msg"))
-                dialog.destroy()
-            else:
-                messagebox.showwarning("Warning", self._get_text("warning_token_empty"))
-
-        tk.Button(dialog, text=self._get_text("save_btn"), command=save).pack(pady=20)
-
-    def open_language_settings(self):
-        """Opens the Language settings dialog."""
-        dialog = tk.Toplevel(self)
-        dialog.title(self._get_text("menu_lang").replace("...", ""))
-        dialog.geometry("350x200")
-        
-        
-        tk.Label(dialog, text=self._get_text("lang_label")).pack(pady=(15, 5))
-        
-        LANG_OPTIONS = [
-            ("System Default / 默認 / デフォルト", "system"),
-            ("English", "en"),
-            ("Traditional Chinese (繁體中文)", "zh_TW"),
-            ("Japanese (日本語)", "ja")
+        # Define Menu
+        self.menu_items = [
+            webview.Menu(
+                'Settings',
+                [
+                    webview.menu.MenuAction('Token Settings...', trigger_token_settings),
+                    webview.menu.MenuAction('Language Settings...', trigger_lang_settings)
+                ]
+            ),
+            webview.Menu(
+                'Help',
+                [
+                    webview.menu.MenuAction('About', show_about)
+                ]
+            )
         ]
-        
-        # Calculate current index based on code
-        current_index = 0
-        for i, (d, c) in enumerate(LANG_OPTIONS):
-            if c == self.lang_code:
-                current_index = i
-                break
 
-        cbo_lang = ttk.Combobox(dialog, state="readonly", width=30)
-        cbo_lang['values'] = [x[0] for x in LANG_OPTIONS]
-        cbo_lang.current(current_index)
-        cbo_lang.pack(pady=5)
-            
-        def save():
-            selected_display = cbo_lang.get()
-            new_lang_code = "system"
-            for d, c in LANG_OPTIONS:
-                if d == selected_display:
-                    new_lang_code = c
-                    break
-            
-            ConfigManager.save_config(self.token, new_lang_code)
-            self.lang_code = new_lang_code
-            self.current_lang = new_lang_code # Update slightly for THIS session if easy, but restart handles it best.
-            
-            messagebox.showinfo(self._get_text("saved_title"), self._get_text("saved_msg"))
-            dialog.destroy()
-
-        tk.Button(dialog, text=self._get_text("save_btn"), command=save).pack(pady=20)
-
-    def on_close(self):
-        """Hides the window instead of quitting."""
-        self.withdraw()
-
-    def on_reopen(self):
-        """Shows the window again (invoked by clicking Dock icon)."""
-        self.deiconify()
-
-
-if __name__ == '__main__':
-    # Load config
-    config = ConfigManager.load_config()
-    
-    app = LyricsApp(config)
-    
-    # Check if token is missing and prompt user
-    if not app.token:
-        # Use simple english for fallback if not initialized in app yet? 
-        # Actually app is initialized so it can use get_text but maybe not fully ready?
-        # It's fine.
-        app.after(500, lambda: messagebox.showinfo(app._get_text("welcome"), app._get_text("welcome_msg")))
-    
-    app.mainloop()
-
-    def _build_menu(self):
-        menubar = tk.Menu(self)
+    def load_main_content(self):
+        # Inject APP ICON from bundle/source
+        import base64
         
-        settings_menu = tk.Menu(menubar, tearoff=0)
-        settings_menu.add_command(label="Preferences...", command=self.open_settings)
-        menubar.add_cascade(label="Settings", menu=settings_menu)
-        
-        self.config(menu=menubar)
-        
-    def _build_ui(self):
-        # Top Frame: Track Info and Controls
-        top_frame = ttk.Frame(self, padding="10")
-        top_frame.pack(fill=tk.X)
-        
-        self.lbl_info = ttk.Label(top_frame, text="Not Playing", font=("Helvetica", 14, "bold"))
-        self.lbl_info.pack(side=tk.TOP, pady=5)
-        
-        controls_frame = ttk.Frame(top_frame)
-        controls_frame.pack(fill=tk.X, pady=5)
-        
-        # Source Selection
-        ttk.Label(controls_frame, text="Source:").pack(side=tk.LEFT, padx=5)
-        self.source_var = tk.StringVar(value="Genius")
-        self.cbo_source = ttk.Combobox(controls_frame, textvariable=self.source_var, state="readonly")
-        self.cbo_source['values'] = ("Genius", "DarkLyrics / Metal")
-        self.cbo_source.pack(side=tk.LEFT, padx=5)
-        
-        # Fetch Button
-        self.btn_fetch = ttk.Button(controls_frame, text="Fetch Lyrics", command=self.start_fetch_lyrics)
-        self.btn_fetch.pack(side=tk.LEFT, padx=5)
-
-        # Write/Save Button
-        self.btn_write = ttk.Button(controls_frame, text="Write to iTunes", command=self.write_metadata)
-        self.btn_write.pack(side=tk.LEFT, padx=5)
-        
-        # Center Frame: Text Editor
-        center_frame = ttk.Frame(self, padding="10")
-        center_frame.pack(fill=tk.BOTH, expand=True)
-        
-        self.txt_lyrics = scrolledtext.ScrolledText(center_frame, wrap=tk.WORD, font=("Menlo", 12))
-        self.txt_lyrics.pack(fill=tk.BOTH, expand=True)
-        
-        # Bottom Frame: Save
-        bottom_frame = ttk.Frame(self, padding="10")
-        bottom_frame.pack(fill=tk.X)
-        
-
-        
-        self.lbl_status = ttk.Label(bottom_frame, text="Ready", foreground="gray")
-        self.lbl_status.pack(side=tk.LEFT)
-        
-        # Initial check
-        self.check_track()
-
-    def auto_refresh_track(self):
-        """Periodically checks specifically for track changes if connection is happy."""
-        self.check_track()
-        self.after(5000, self.auto_refresh_track)
-
-    def check_track(self):
-        """Polls the Music app for the current track."""
-        info = self.music_ctrl.get_current_track()
-        if info:
-            artist, title, album = info
-            # We ignore album for equality check to keep simple, or use it?
-            # Let's keep equality check on artist/title primarily or full info?
-            # If album changes but song same? Rare.
-            if self.current_track_info != (artist, title):
-                self.current_track_info = (artist, title)
-                self.lbl_info.config(text=f"{artist} - {title}")
-                self.lbl_status.config(text="Track detected.")
-        else:
-            self.current_track_info = None
-            self.lbl_info.config(text="Music not playing / paused")
-    
-    def start_fetch_lyrics(self):
-        """Starts the fetching process in a separate thread."""
-        if not self.current_track_info:
-            messagebox.showwarning("No Track", "No track is currently playing in Music.")
-            return
-        
-        # Determine album info
-        # If check_track hasn't updated album into self.current_track_info (depending on logic), re-fetch
-        info = self.music_ctrl.get_current_track()
-        if info:
-            artist, title, album = info
-        else:
-            # Should not happen if current_track_info is set, but just in case
-            if len(self.current_track_info) == 2:
-                artist, title = self.current_track_info
-                album = ""
+        def get_resource_path(relative_path):
+            """ Get absolute path to resource, works for dev and for PyInstaller """
+            if getattr(sys, 'frozen', False):
+                # PyInstaller: _MEIPASS if onefile, or sys.executable dir if onedir + datas in .
+                if hasattr(sys, '_MEIPASS'):
+                    base_path = sys._MEIPASS
+                else:
+                    # In onedir, datas are usually in the top dir or internal
+                    # For a .app bundle, sys.executable is inside Contents/MacOS
+                    # But datas are often copied to Contents/MacOS or Contents/Resources depending on spec
+                    # Our spec said datas=[(.., '.')] which means same dir as executable usually.
+                    base_path = os.path.dirname(sys.executable)
             else:
-                 artist, title, album = self.current_track_info
+                base_path = os.path.abspath(".")
+            return os.path.join(base_path, relative_path)
 
-        source = self.source_var.get()
-        
-        self.toggle_inputs(False)
-        self.lbl_status.config(text=f"Fetching from {source}...")
-        self.txt_lyrics.delete("1.0", tk.END)
-        self.txt_lyrics.insert("1.0", "Fetching...")
-        
-        # Run in thread to keep GUI alive
-        t = threading.Thread(target=self._fetch_thread, args=(artist, title, album, source))
-        t.start()
-        
-    def _fetch_thread(self, artist, title, album, source):
-        # 1. Sanitize
-        clean_title = LyricsFetcher.sanitize_title(title)
-        print(f"Original: '{title}' -> Clean: '{clean_title}'")
-        
-        result = ""
-        if source == "Genius":
-            # Use stored token, or empty string if None which fetch_genius handles
-            token_to_use = self.token if self.token else ""
-            result = LyricsFetcher.fetch_genius(artist, clean_title, token_to_use)
-        else:
-            # DarkLyrics / Metal Source (Replaced old Metal Archives call)
-            # We implemented fetch_darklyrics as a static method logic internally
-            # or we need to add the method.
-            # Wait, I haven't added `fetch_darklyrics` method yet!
-            # I should call `fetch_metal_archives` but I will RENAME/REWRITE that method in next step
-            # to be `fetch_darklyrics`. 
-            # Or I'll call it `fetch_darklyrics` here and ensure I add it.
-            result = LyricsFetcher.fetch_darklyrics(artist, clean_title, album)
+        # Try to load icon
+        icon_b64 = ""
+        try:
+            icon_path = get_resource_path("icon_128x128@2x.png")
+            # If not found there, try stripping the filename or checking Resources (common mac issue)
+            if not os.path.exists(icon_path):
+                # Fallback: Check if we are in dev mode
+                dev_path = os.path.join(os.path.abspath("."), "MyIcon.iconset/icon_128x128@2x.png")
+                if os.path.exists(dev_path):
+                    icon_path = dev_path
+                else:
+                    # Fallback: Check Contents/Resources if typical app structure
+                    # sys.executable is .../MacOS/Azathoths_Whisper
+                    # Resources is .../Resources/
+                    resources_path = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), "Resources", "icon_128x128@2x.png")
+                    if os.path.exists(resources_path):
+                        icon_path = resources_path
             
-        # Update UI safely
-        self.after(0, self._fetch_complete, result)
+            if os.path.exists(icon_path):
+                with open(icon_path, "rb") as image_file:
+                    icon_b64 = base64.b64encode(image_file.read()).decode('utf-8')
+            else:
+                print(f"DEBUG: Icon not found at {icon_path}")
+        except Exception as e:
+            print(f"DEBUG: Icon load error: {e}")
 
-    def _fetch_complete(self, lyrics_text):
-        self.toggle_inputs(True)
-        self.lbl_status.config(text="Fetch complete.")
-        
-        if lyrics_text and not lyrics_text.startswith("Error"):
-            self.txt_lyrics.delete("1.0", tk.END)
-            self.txt_lyrics.insert("1.0", lyrics_text)
+        final_html = HTML_CONTENT
+        if icon_b64:
+            img_tag = f'<img src="data:image/png;base64,{icon_b64}" class="w-full h-full object-contain filter drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] opacity-90 hover:scale-105 transition-transform duration-500">'
+            final_html = final_html.replace("<!-- APP_ICON_PLACEHOLDER -->", img_tag)
         else:
-            # If error or empty
-            self.txt_lyrics.delete("1.0", tk.END)
-            self.txt_lyrics.insert("1.0", lyrics_text if lyrics_text else "No lyrics found.")
-            if lyrics_text and lyrics_text.startswith("Error"):
-                messagebox.showerror("Validation Error", lyrics_text)
+            final_html = final_html.replace("<!-- APP_ICON_PLACEHOLDER -->", '<span class="material-symbols-outlined text-4xl text-gray-400">graphic_eq</span>')
 
-    def write_metadata(self):
-        """Writes the current text content to the song."""
+        self.window.load_html(final_html)
+
+    def on_closing(self):
+        # Intercept window close: hide instead of quitting
+        if self._force_quit:
+            return True
+        try:
+            self.window.hide()
+        except Exception:
+            pass
+        return False
+
+    def request_quit(self):
+        # Called from JS (Cmd+P) to quit app
+        self._force_quit = True
+        try:
+            self.window.destroy()
+        except Exception:
+            pass
+        return True
+    def fetch_lyrics(self):
+        info = self.music_ctrl.get_current_track()
+        if info:
+            artist, title, album = info
+            self.current_track_info = (artist, title)
+        elif self.current_track_info:
+            artist, title = self.current_track_info
+            album = ""
+        else:
+            return "No track playing"
+
+        token_to_use = self.token if self.token else ""
+        result = LyricsFetcher.fetch_genius(artist, LyricsFetcher.sanitize_title(title), token_to_use)
+        if result and not result.startswith("Error"):
+            return result
+        return "Lyrics not found"
+
+    def save_lyrics(self, lyrics):
         if not self.current_track_info:
-             messagebox.showerror("Error", "No track playing.")
-             return
-
-        lyrics = self.txt_lyrics.get("1.0", tk.END).strip()
-        if not lyrics:
-            if not messagebox.askyesno("Warning", "Lyrics are empty. This will clear existing lyrics. Continue?"):
-                return
+            return "No track playing"
         
         success = self.music_ctrl.set_lyrics(lyrics)
-        if success:
-            messagebox.showinfo("Success", "Lyrics written to iTunes track!")
-            self.lbl_status.config(text="Saved to metadata.")
+        return "Saved" if success else "Failed to save"
+
+    def check_track(self):
+        info = self.music_ctrl.get_current_track()
+        if info:
+            artist, title, album = info
+            if artist == "Error: Permissions Denied":
+                return "Error: Permissions Denied"
+                
+            if self.current_track_info != (artist, title):
+                self.current_track_info = (artist, title)
+            return f"{artist} - {title}"
+        return "No track playing"
+
+    def load_track_state(self):
+        info = self.music_ctrl.get_current_track()
+        track_label = "No track playing"
+        lyrics = ""
+        album = ""
+        if info:
+            artist, title, album = info
+            self.current_track_info = (artist, title)
+            track_label = f"{artist} - {title}"
+            lyrics = self.music_ctrl.get_lyrics() or ""
+        return {"track": track_label, "lyrics": lyrics, "album": album}
+
+    def get_config(self):
+        return {
+            "token": self.token,
+            "language": self.lang_code,
+            "translations": TRANSLATIONS.get(self.current_lang, TRANSLATIONS["en"])
+        }
+
+    def save_config(self, token, lang):
+        # Legacy support if needed, or redirect
+        return self.save_token_only(token)['message']
+
+    def validate_token(self, token):
+        try:
+            # Using verify=False or verbose=False to minimize output
+            genius = lyricsgenius.Genius(token, verbose=False)
+            # Try a lightweight API call, e.g. current user
+            # genius.account() returns user data dict if token is valid
+            user = genius.account()
+            if user:
+                return True, "Valid"
+            return False, "Invalid token"
+        except Exception as e:
+            return False, str(e)
+
+    def _update_env(self, updates):
+        """Helper to update .env file with a dict of {KEY: VALUE}."""
+        if getattr(sys, 'frozen', False):
+            # Running in a bundle
+            env_path = os.path.join(os.path.dirname(sys.executable), '.env')
         else:
-            messagebox.showerror("Error", "Failed to write to iTunes. Track might be read-only (streaming) or app unreachable.")
+            # Running in a normal Python environment
+            env_path = os.path.join(os.path.dirname(__file__), '.env')
 
-    def toggle_inputs(self, enable):
-        state = "normal" if enable else "disabled"
-        self.btn_fetch.config(state=state)
-        self.btn_write.config(state=state)
-        self.cbo_source.config(state=state)
-
-    def open_settings(self):
-        """Opens the settings dialog to configure the Token."""
-        dialog = tk.Toplevel(self)
-        dialog.title("Settings")
-        dialog.geometry("400x150")
-        
-        tk.Label(dialog, text="Genius Access Token:").pack(pady=10)
-        
-        entry_token = tk.Entry(dialog, width=40)
-        entry_token.pack(pady=5)
-        # Pre-fill with current token
-        if self.token:
-            entry_token.insert(0, self.token)
-            
-        def save():
-            new_token = entry_token.get().strip()
-            if new_token:
-                ConfigManager.save_token(new_token)
-                self.token = new_token
-                messagebox.showinfo("Saved", "Token saved successfully!")
-                dialog.destroy()
-            else:
-                messagebox.showwarning("Warning", "Token cannot be empty.")
-
-        tk.Button(dialog, text="Save Token", command=save).pack(pady=10)
-
-    def on_close(self):
-        """Hides the window instead of quitting."""
-        self.withdraw()
-
-    def on_reopen(self):
-        """Shows the window again (invoked by clicking Dock icon)."""
-        self.deiconify()
-
-
-class ConfigManager:
-    """Manages persistent configuration."""
-    _config_path = os.path.expanduser("~/.azathoths_whisper_config")
-
-    @classmethod
-    def load_token(cls):
-        """Loads token from config file or legacy locations."""
-        # 1. Try persistent user config first
-        if os.path.exists(cls._config_path):
+        # Ensure directory exists (mostly for dev mode)
+        env_dir = os.path.dirname(env_path)
+        if not os.path.exists(env_dir):
             try:
-                with open(cls._config_path, "r") as f:
-                    return f.read().strip()
-            except:
-                pass
+                os.makedirs(env_dir)
+            except Exception as e:
+                print(f"Failed to create config directory: {e}")
+                return False
         
-        # 2. Fallback to environment variables (.env file)
-        return os.getenv("GENIUS_ACCESS_TOKEN")
+        lines = []
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        
+        new_lines = []
+        found_keys = set()
+        
+        for line in lines:
+            line_key = line.split('=')[0].strip() if '=' in line else None
+            if line_key and line_key in updates:
+                new_lines.append(f"{line_key}={updates[line_key]}\n")
+                found_keys.add(line_key)
+            else:
+                new_lines.append(line)
+        
+        for k, v in updates.items():
+            if k not in found_keys:
+                new_lines.append(f"{k}={v}\n")
+                
+        try:
+            with open(env_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+            return True
+        except Exception as e:
+            print(f"Error writing to .env: {e}")
+            return False
 
-    @classmethod
-    def save_token(cls, token):
-        """Saves token to user config file."""
-        with open(cls._config_path, "w") as f:
-            f.write(token)
+    def save_token_only(self, token):
+        valid, msg = self.validate_token(token)
+        if not valid:
+            return {"success": False, "message": msg}
+        
+        self.token = token
+        # Save to .env
+        if self._update_env({"GENIUS_ACCESS_TOKEN": token}):
+            return {"success": True, "message": "Saved"}
+        else:
+            return {"success": False, "message": "File write error"}
+
+    def save_lang_only(self, lang):
+        self.lang_code = lang
+        if self._update_env({"LANGUAGE": lang}):
+            return "Language saved. Restart app to apply."
+        return "Error saving language."
+
+    def open_batch_album(self):
+        return self.get_album_data()
+
+    def batch_fetch(self, track_data):
+        # track_data is list of {id, artist, title, album}
+        # In a real app we might want to do this async or return a job ID.
+        # For simplicity, we process one by one and return results map.
+        # But this might block UI.
+        # Better: UI calls fetch for individual items or we do it here quickly if few.
+        return "Legacy batch fetch not used, use individual calls"
+
+    def fetch_single_missing(self, artist, title):
+        token_to_use = self.token if self.token else ""
+        result = LyricsFetcher.fetch_genius(artist, LyricsFetcher.sanitize_title(title), token_to_use)
+        if result and not result.startswith("Error"):
+            return result
+        
+        # Fallback to DarkLyrics
+        # Note: This assumes 'album' is available in the context where this is called,
+        # but the signature only provides artist, title.
+        # For now, we'll call without album.
+        result_dl = LyricsFetcher.fetch_darklyrics(artist, LyricsFetcher.sanitize_title(title))
+        if result_dl and not result_dl.startswith("Error") and "Lyrics not found" not in result_dl:
+            return result_dl
+            
+        return "Lyrics not found"
+
+    def save_single_track(self, pid, lyrics):
+        success = self.music_ctrl.set_lyrics_by_id(pid, lyrics)
+        return "Saved" if success else "Failed to save"
+
+    def get_album_data(self):
+        """Returns a list of tracks in the current album for batch processing."""
+        tracks = self.music_ctrl.get_album_tracks()
+        # Add a 'has_lyrics' flag for convenience in the frontend
+        for track in tracks:
+            track['has_lyrics'] = bool(track.get('lyrics', '').strip())
+        return tracks
+
+    def open_batch_directory(self):
+        # For now, just return a message
+        return "Directory scanning not implemented in webview yet"
+
+    def open_url(self, url):
+        webbrowser.open(url)
 
 if __name__ == '__main__':
-    # Try to load token but don't crash if missing
-    initial_token = ConfigManager.load_token()
-    
-    app = LyricsApp()
-    app.token = initial_token # Inject token into app instance
-    
-    # Check if token is missing and prompt user
-    if not app.token:
-        app.after(500, lambda: messagebox.showinfo("Welcome", "Please set your Genius Access Token in Settings."))
-    
-    app.mainloop()
+    config = ConfigManager.load_config()
+    app = LyricsApp(config)
+    webview.start(menu=app.menu_items, debug=False)
