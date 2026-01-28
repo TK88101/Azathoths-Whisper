@@ -65,6 +65,7 @@ HTML_CONTENT = """
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
@@ -127,7 +128,7 @@ HTML_CONTENT = """
 <header class="flex shrink-0 items-center justify-between border-b border-border-dark px-6 py-3 bg-black z-40">
 <div class="flex items-center gap-3 text-white">
 <span class="material-symbols-outlined text-[20px] text-gray-400">graphic_eq</span>
-<h2 class="text-white text-sm font-bold tracking-[0.15em] uppercase text-glow">Azathoth's Whisper <span class="text-gray-600 font-normal normal-case ml-2">v1.2.2</span></h2>
+<h2 class="text-white text-sm font-bold tracking-[0.15em] uppercase text-glow">Azathoth's Whisper <span class="text-gray-600 font-normal normal-case ml-2">v1.2.3</span></h2>
 </div>
         <nav class="hidden md:flex items-center gap-8">
         <nav class="hidden md:flex items-center gap-8">
@@ -304,7 +305,7 @@ HTML_CONTENT = """
         </div>
         
         <h2 class="text-white text-2xl font-bold uppercase tracking-widest mb-1 text-glow">Azathoth's Whisper</h2>
-        <p class="text-gray-600 text-[10px] uppercase tracking-[0.2em] mb-8">Version 1.2.2</p>
+        <p class="text-gray-600 text-[10px] uppercase tracking-[0.2em] mb-8">Version 1.2.3</p>
         
         <div class="space-y-4 text-sm text-gray-400 font-mono">
             <div class="bg-black/50 p-4 rounded-lg border border-gray-800/50">
@@ -540,6 +541,9 @@ HTML_CONTENT = """
         try {
             const res = await window.pywebview.api.save_lyrics(lyricsBox.value);
             setStatus(res, res === 'Saved' ? 'ok' : 'warn');
+            if (res === 'Saved') {
+                triggerConfetti();
+            }
         } catch (err) {
             setStatus('Write failed', 'warn');
         } finally {
@@ -694,6 +698,7 @@ HTML_CONTENT = """
                      track.lyrics = content; 
                      renderBatchTable();
                      batchStatus.textContent = "Saved.";
+                     triggerConfetti();
                  } else {
                      batchStatus.textContent = "Save failed.";
                  }
@@ -729,6 +734,7 @@ HTML_CONTENT = """
                  }
              }
              batchStatus.textContent = "All saved.";
+             triggerConfetti();
              btnBatchAll.disabled = false;
         }
     }
@@ -875,6 +881,27 @@ HTML_CONTENT = """
         });
     }
 
+    function triggerConfetti() {
+        if (typeof confetti === 'function') {
+            var count = 200;
+            var defaults = { origin: { y: 0.7 } };
+
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, {
+                    particleCount: Math.floor(count * particleRatio)
+                }));
+            }
+
+            fire(0.25, { spread: 26, startVelocity: 55 });
+            fire(0.2, { spread: 60 });
+            fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+            fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+            fire(0.1, { spread: 120, startVelocity: 45 });
+        } else {
+            console.log("Confetti lib not loaded");
+        }
+    }
+
 
 </script>
 </body></html>
@@ -914,7 +941,7 @@ USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
 
 # App Metadata
 # App Metadata
-APP_VERSION = "1.2.2"
+APP_VERSION = "1.2.3"
 APP_AUTHOR = "iBridge Zhao"
 APP_EMAIL = "toadeater731@gmail.com"
 APP_GITHUB = "https://github.com/TK88101/Azathoths-Whisper"

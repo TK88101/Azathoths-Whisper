@@ -48,10 +48,10 @@ app = BUNDLE(
     name="Azathoth's Whisper.app",
     icon='MyIcon.icns',
     bundle_identifier='com.ibridgezhao.azathothswhisper',
-    version='1.2.2',
+    version='1.2.3',
     info_plist={
-        'CFBundleShortVersionString': '1.2.2',
-        'CFBundleVersion': '1.2.2',
+        'CFBundleShortVersionString': '1.2.3',
+        'CFBundleVersion': '1.2.3',
         'NSHighResolutionCapable': 'True',
         'NSAppleEventsUsageDescription': 'Azathoths Whisper needs access to Music to detect the currently playing song.',
     },
