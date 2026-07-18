@@ -128,7 +128,7 @@ HTML_CONTENT = """
 <header class="flex shrink-0 items-center justify-between border-b border-border-dark px-6 py-3 bg-black z-40">
 <div class="flex items-center gap-3 text-white">
 <span class="material-symbols-outlined text-[20px] text-gray-400">graphic_eq</span>
-<h2 class="text-white text-sm font-bold tracking-[0.15em] uppercase text-glow">Azathoth's Whisper <span class="text-gray-600 font-normal normal-case ml-2">v1.2.3</span></h2>
+<h2 class="text-white text-sm font-bold tracking-[0.15em] uppercase text-glow">Azathoth's Whisper <span class="text-gray-600 font-normal normal-case ml-2">v__APP_VERSION__</span></h2>
 </div>
         <nav class="hidden md:flex items-center gap-8">
         <nav class="hidden md:flex items-center gap-8">
@@ -305,7 +305,7 @@ HTML_CONTENT = """
         </div>
         
         <h2 class="text-white text-2xl font-bold uppercase tracking-widest mb-1 text-glow">Azathoth's Whisper</h2>
-        <p class="text-gray-600 text-[10px] uppercase tracking-[0.2em] mb-8">Version 1.2.3</p>
+        <p class="text-gray-600 text-[10px] uppercase tracking-[0.2em] mb-8">Version __APP_VERSION__</p>
         
         <div class="space-y-4 text-sm text-gray-400 font-mono">
             <div class="bg-black/50 p-4 rounded-lg border border-gray-800/50">
@@ -2040,7 +2040,7 @@ class LyricsApp:
         except Exception as e:
             print(f"DEBUG: Icon load error: {e}")
 
-        final_html = HTML_CONTENT
+        final_html = HTML_CONTENT.replace("__APP_VERSION__", APP_VERSION)
         if icon_b64:
             img_tag = f'<img src="data:image/png;base64,{icon_b64}" class="w-full h-full object-contain filter drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] opacity-90 hover:scale-105 transition-transform duration-500">'
             final_html = final_html.replace("<!-- APP_ICON_PLACEHOLDER -->", img_tag)
