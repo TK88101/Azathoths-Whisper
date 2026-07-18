@@ -1,0 +1,14 @@
+# Runtime
+requests==2.32.5
+beautifulsoup4==4.14.3
+lyricsgenius==3.7.5
+appscript==1.4.0
+cloudscraper==1.2.71
+pywebview==6.1
+mutagen==1.47.0
+python-dotenv==1.2.1
+pyobjc-framework-Cocoa==12.1
+
+# Build / packaging
+pyinstaller==6.18.0
+pillow==12.1.0

@@ -941,7 +941,7 @@ USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
 
 # App Metadata
 # App Metadata
-APP_VERSION = "1.2.3"
+APP_VERSION = "1.2.4"
 APP_AUTHOR = "iBridge Zhao"
 APP_EMAIL = "toadeater731@gmail.com"
 APP_GITHUB = "https://github.com/TK88101/Azathoths-Whisper"
@@ -1923,35 +1923,48 @@ class LyricsApp:
         ]
 
     def setup_macos_hotkey(self):
-        """Ensure Cmd+Q quits via the native macOS Quit menu item."""
+        """Make Cmd+Q / Dock Quit / menu Quit actually terminate the app.
+
+        All of these send `terminate:`, which pywebview routes through each
+        window's `closing` event. on_closing returns False while _force_quit
+        is unset (hide-instead-of-close for the red close button), which
+        cancels the termination. Wrap the NSApp delegate so any terminate
+        request flips _force_quit first, letting on_closing approve it.
+        """
+        if self._quit_handler is not None:
+            return
         try:
             import AppKit
+            import Foundation
         except Exception:
             return
 
-        app = AppKit.NSApplication.sharedApplication()
-        main_menu = app.mainMenu()
-        if main_menu is None:
-            return
+        lyrics_app = self
 
-        app_menu_item = main_menu.itemAtIndex_(0)
-        if app_menu_item is None:
-            return
-        app_menu = app_menu_item.submenu()
-        if app_menu is None:
-            return
+        class _QuitAwareDelegate(AppKit.NSObject):
+            def applicationShouldTerminate_(self, ns_app):
+                lyrics_app._force_quit = True
+                original = getattr(self, 'original_delegate', None)
+                if original is not None and original.respondsToSelector_(
+                    'applicationShouldTerminate:'
+                ):
+                    return original.applicationShouldTerminate_(ns_app)
+                return Foundation.YES
 
-        # Find the standard Quit menu item (action terminate:) and remap it to Cmd+P
-        quit_item = None
-        for i in range(app_menu.numberOfItems()):
-            item = app_menu.itemAtIndex_(i)
-            if item and item.action() == 'terminate:':
-                quit_item = item
-                break
+            def applicationSupportsSecureRestorableState_(self, ns_app):
+                return Foundation.YES
 
-        if quit_item is not None:
-            quit_item.setKeyEquivalent_('q')
-            quit_item.setKeyEquivalentModifierMask_(AppKit.NSEventModifierFlagCommand)
+        def _install():
+            ns_app = AppKit.NSApplication.sharedApplication()
+            delegate = _QuitAwareDelegate.alloc().init()
+            delegate.original_delegate = ns_app.delegate()
+            ns_app.setDelegate_(delegate)
+            # NSApp holds its delegate weakly; keep a strong ref
+            self._quit_handler = delegate
+
+        # This method runs on webview.start's background thread; AppKit
+        # delegate changes must happen on the main thread
+        AppKit.NSOperationQueue.mainQueue().addOperationWithBlock_(_install)
 
     def install_cmd_p_monitor(self):
         """Install a local key monitor to intercept Cmd+Q."""
