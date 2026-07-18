@@ -26,7 +26,7 @@ pyinstaller Azathoths_Whisper.spec --clean
 osascript setup_dmg.applescript
 ```
 
-没有测试套件，也没有 lint 配置。README 提到 `requirements.txt` 但仓库中不存在；依赖以 `lyrics_fetcher.py` 头部注释与 README 手动安装清单为准（requests, beautifulsoup4, lyricsgenius, appscript, cloudscraper, pywebview, mutagen, python-dotenv, pyinstaller, pillow）。
+没有测试套件，也没有 lint 配置。依赖清单见 `requirements.txt`（版本锁定，2026-07-18 由 venv 实测生成）。开发环境另需 Homebrew 的 `python-tk@3.14`（venv 的 tkinter 依赖它，brew 升级 python 后容易缺失）。
 
 ## 架构
 
@@ -48,6 +48,10 @@ osascript setup_dmg.applescript
 ## 注意事项
 
 - 打包（frozen）状态下 stdout/stderr 重定向到 `~/Documents/Bjork/app_debug.log`，排查打包后崩溃先看此文件
+- UI 版本号由 `load_main_content` 把 HTML 里的 `__APP_VERSION__` 占位符替换为 `APP_VERSION`——改版本只动 `APP_VERSION` 与 `.spec`，勿在 HTML 里写死
+- 打包后补 lproj 会破坏签名 seal，必须 `codesign --force --deep -s -` ad-hoc 重签再 strict 校验
+- 打包/DMG 工作区放 iCloud 同步树（~/Documents）之外；DMG 版式复用历史 `.DS_Store` + 背景图 `chflags hidden`（详见 learned skill dmg-icon-and-layout-standards）
+- 退出逻辑：`setup_macos_hotkey` 用包装 NSApp delegate 的方式让 `terminate:` 生效；红色关闭钮＝隐藏（`on_closing` 返回 False），勿改回拦截 terminate 的写法
 - `.env` 存放 Genius token 等，已 gitignore，不要提交
 - venv 为 Python 3.14，路径硬编码在 `run.sh` 与 `.spec` 的 `pathex` 中，升级 Python 版本时两处都要改
 - 应用未做 Apple 签名，DMG 分发依赖用户手动 `xattr -d com.apple.quarantine`
