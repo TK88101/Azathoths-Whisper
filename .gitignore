@@ -7,3 +7,8 @@ build/
 dist/
 MyIcon.iconset/
 app_debug.log
+
+# Swift 重寫（2.0）
+AzathothsWhisper/Scripts/spike/music_spike
+**/xcuserdata/
+*.xcresult

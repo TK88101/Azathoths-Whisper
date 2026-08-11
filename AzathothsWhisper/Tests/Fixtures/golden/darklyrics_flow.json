@@ -1,0 +1,63 @@
+{
+  "source": "lyrics_fetcher.py:1286-1369 fetch_darklyrics（真實調用，session 打樁）",
+  "note": "requested_get_urls 鎖 URL 構造；posted_queries 鎖 DDG 查詢串 site:darklyrics.com \"artist\" \"title\"；expected 鎖成功文本與三種錯誤文案。案例 2/3 的 DDG 頁為真實存檔（指向 damagedone.html）",
+  "cases": [
+    {
+      "artist": "Dark Tranquillity",
+      "title": "Monochromatic Stains",
+      "album": "Damage Done",
+      "requested_get_urls": [
+        "http://www.darklyrics.com/lyrics/darktranquillity/damagedone.html"
+      ],
+      "posted_queries": [],
+      "expected": "There is this face in the still water\nI can't remember ever wearing\nLike fingerprints on your heart\nReading out the last lines of code\nTo the untrained eye a secret\nI bled away the last of you\n\nSought trust in shapes of combined results\nThat trickles from a less than solid case\nFought off attacks of resurfaced lust\nBurn the gracing grounds\n\nNo, what will give in first?\nThe body or the lash\nMonochromatic stains\nNo, who will cave in first?\nThe leader or the fake\nMonochromatic stains, oh!\n\nThis pile of ashes of a soul\nInformant pokes abound\nThese sickly little fingers\nGet away from me\n\nTread not the path of least restraint\nEach piece of evidence a lie, a lie\nThe body, the face all items in place\nI don't remember a thing\n\nNo, what will give in first?\nThe body or the lash\nMonochromatic stains\nNo, who will cave in first?\nThe leader or the fake\nMonochromatic stains\n\nA sacrifice made to the loss of mind\nFolly a man's demise\n\nTrack now the stains that allow my fall\nSickening, the sight of it all\nNever shall I claim my innocence\nI just was not there\n\nNo, what will give in first?\nThe body or the lash\nMonochromatic stains\nNo, who will cave in first?\nThe leader or the fake\nMonochromatic stains"
+    },
+    {
+      "artist": "Dark Tranquillity",
+      "title": "Monochromatic Stains",
+      "album": "Wrong Album Name",
+      "requested_get_urls": [
+        "http://www.darklyrics.com/lyrics/darktranquillity/wrongalbumname.html",
+        "http://www.darklyrics.com/lyrics/darktranquillity/damagedone.html"
+      ],
+      "posted_queries": [
+        "site:darklyrics.com \"Dark Tranquillity\" \"Monochromatic Stains\""
+      ],
+      "expected": "There is this face in the still water\nI can't remember ever wearing\nLike fingerprints on your heart\nReading out the last lines of code\nTo the untrained eye a secret\nI bled away the last of you\n\nSought trust in shapes of combined results\nThat trickles from a less than solid case\nFought off attacks of resurfaced lust\nBurn the gracing grounds\n\nNo, what will give in first?\nThe body or the lash\nMonochromatic stains\nNo, who will cave in first?\nThe leader or the fake\nMonochromatic stains, oh!\n\nThis pile of ashes of a soul\nInformant pokes abound\nThese sickly little fingers\nGet away from me\n\nTread not the path of least restraint\nEach piece of evidence a lie, a lie\nThe body, the face all items in place\nI don't remember a thing\n\nNo, what will give in first?\nThe body or the lash\nMonochromatic stains\nNo, who will cave in first?\nThe leader or the fake\nMonochromatic stains\n\nA sacrifice made to the loss of mind\nFolly a man's demise\n\nTrack now the stains that allow my fall\nSickening, the sight of it all\nNever shall I claim my innocence\nI just was not there\n\nNo, what will give in first?\nThe body or the lash\nMonochromatic stains\nNo, who will cave in first?\nThe leader or the fake\nMonochromatic stains"
+    },
+    {
+      "artist": "Dark Tranquillity",
+      "title": "Monochromatic Stains",
+      "album": "",
+      "requested_get_urls": [
+        "http://www.darklyrics.com/lyrics/darktranquillity/damagedone.html"
+      ],
+      "posted_queries": [
+        "site:darklyrics.com \"Dark Tranquillity\" \"Monochromatic Stains\""
+      ],
+      "expected": "There is this face in the still water\nI can't remember ever wearing\nLike fingerprints on your heart\nReading out the last lines of code\nTo the untrained eye a secret\nI bled away the last of you\n\nSought trust in shapes of combined results\nThat trickles from a less than solid case\nFought off attacks of resurfaced lust\nBurn the gracing grounds\n\nNo, what will give in first?\nThe body or the lash\nMonochromatic stains\nNo, who will cave in first?\nThe leader or the fake\nMonochromatic stains, oh!\n\nThis pile of ashes of a soul\nInformant pokes abound\nThese sickly little fingers\nGet away from me\n\nTread not the path of least restraint\nEach piece of evidence a lie, a lie\nThe body, the face all items in place\nI don't remember a thing\n\nNo, what will give in first?\nThe body or the lash\nMonochromatic stains\nNo, who will cave in first?\nThe leader or the fake\nMonochromatic stains\n\nA sacrifice made to the loss of mind\nFolly a man's demise\n\nTrack now the stains that allow my fall\nSickening, the sight of it all\nNever shall I claim my innocence\nI just was not there\n\nNo, what will give in first?\nThe body or the lash\nMonochromatic stains\nNo, who will cave in first?\nThe leader or the fake\nMonochromatic stains"
+    },
+    {
+      "artist": "Dark Tranquillity",
+      "title": "Monochromatic Stains",
+      "album": "",
+      "requested_get_urls": [
+        "https://lite.duckduckgo.com/lite/"
+      ],
+      "posted_queries": [
+        "site:darklyrics.com \"Dark Tranquillity\" \"Monochromatic Stains\""
+      ],
+      "expected": "Error: Could not search for song (DDG Lite Blocked)."
+    },
+    {
+      "artist": "Dark Tranquillity",
+      "title": "Monochromatic Stains",
+      "album": "",
+      "requested_get_urls": [],
+      "posted_queries": [
+        "site:darklyrics.com \"Dark Tranquillity\" \"Monochromatic Stains\""
+      ],
+      "expected": "Lyrics not found on DarkLyrics."
+    }
+  ]
+}

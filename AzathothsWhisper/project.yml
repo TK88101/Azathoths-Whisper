@@ -1,0 +1,105 @@
+name: AzathothsWhisper
+options:
+  bundleIdPrefix: com.ibridgezhao
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+packages:
+  SwiftSoup:
+    url: https://github.com/scinfu/SwiftSoup
+    from: 2.7.0
+
+settings:
+  base:
+    MARKETING_VERSION: "2.0.0"
+    CURRENT_PROJECT_VERSION: "2.0.0"
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+
+targets:
+  AzathothsWhisper:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+      - path: Features
+        optional: true
+      - path: Services
+        optional: true
+      - path: Infra
+        optional: true
+      - path: UI
+      - path: Resources
+        buildPhase: resources
+    dependencies:
+      - package: SwiftSoup
+    settings:
+      base:
+        PRODUCT_NAME: "Azathoth's Whisper"
+        PRODUCT_MODULE_NAME: AzathothsWhisper
+        PRODUCT_BUNDLE_IDENTIFIER: com.ibridgezhao.azathothswhisper
+        ENABLE_APP_SANDBOX: "NO"
+        ENABLE_HARDENED_RUNTIME: "NO"
+        COMBINE_HIDPI_IMAGES: "YES"
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: "Azathoth's Whisper"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSHighResolutionCapable: true
+        NSAppleEventsUsageDescription: "Azathoths Whisper needs access to Music to detect the currently playing song."
+        ATSApplicationFontsPath: "."
+        NSAppTransportSecurity:
+          NSExceptionDomains:
+            darklyrics.com:
+              NSExceptionAllowsInsecureHTTPLoads: true
+              NSIncludesSubdomains: true
+        NSMainStoryboardFile: ""
+        NSPrincipalClass: NSApplication
+
+  AzathothsWhisperTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+        excludes:
+          - "Fixtures/**"
+      - path: Tests/Fixtures
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - target: AzathothsWhisper
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Azathoth's Whisper.app/Contents/MacOS/Azathoth's Whisper"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  AzathothsWhisperUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: AzathothsWhisper
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_TARGET_NAME: AzathothsWhisper
+
+schemes:
+  AzathothsWhisper:
+    build:
+      targets:
+        AzathothsWhisper: all
+        AzathothsWhisperTests: [test]
+        AzathothsWhisperUITests: [test]
+    test:
+      gatherCoverageData: true
+      targets:
+        - AzathothsWhisperTests
+        - AzathothsWhisperUITests
