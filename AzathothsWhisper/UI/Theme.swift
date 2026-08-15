@@ -30,6 +30,7 @@ enum Theme {
     static let cardBackground = Color(hex: 0x050505)     // Now Editing 卡片 bg-[#050505]
     static let editorBackground = Color(hex: 0x020202)   // 歌詞框 bg-[#020202]
     static let danger = Color(hex: 0xEF4444)             // text-red-500
+    static let dangerDeep = Color(hex: 0x7F1D1D)         // bg-red-900（Batch 缺詞狀態點 py:591）
     static let success = Color(hex: 0x22C55E)            // text-green-500
     static let link = Color(hex: 0x60A5FA)               // text-blue-400
 

@@ -8,6 +8,10 @@ struct PlainTextEditor: NSViewRepresentable {
     let font: NSFont
     let textColor: NSColor
     let insets: NSSize
+    /// C-07：Batch 預覽面板唯讀（py:236 textarea readonly），仍可選取與捲動
+    var isEditable = true
+    /// 供 XCUITest 定位；NSViewRepresentable 不吃 SwiftUI 的 .accessibilityIdentifier
+    var accessibilityID: String?
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
 
@@ -20,6 +24,10 @@ struct PlainTextEditor: NSViewRepresentable {
         guard let textView = scrollView.documentView as? NSTextView else { return scrollView }
         textView.delegate = context.coordinator
         textView.isRichText = false
+        textView.isEditable = isEditable
+        if let accessibilityID {
+            textView.setAccessibilityIdentifier(accessibilityID)
+        }
         textView.allowsUndo = true
         textView.drawsBackground = false
         textView.font = font

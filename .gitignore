@@ -12,3 +12,6 @@ app_debug.log
 AzathothsWhisper/Scripts/spike/music_spike
 **/xcuserdata/
 *.xcresult
+# scheme 開了 gatherCoverageData，每次跑測試都會在 target 目錄留下覆蓋率原始檔
+*.profraw
+*.profdata

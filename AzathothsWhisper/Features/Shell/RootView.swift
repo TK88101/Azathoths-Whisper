@@ -27,7 +27,7 @@ struct RootView: View {
                 }
             }
 
-            ConfettiView(trigger: model.editor.confettiTrigger)
+            ConfettiView(trigger: model.confettiTrigger)
         }
         .background(WindowConfigurator())
         .preferredColorScheme(.dark)
@@ -113,13 +113,14 @@ struct RootView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             footer
         case .batch:
-            placeholder("Batch")
+            // Batch 自帶狀態欄與按鈕列，不套 Editor 的 footer（py:240-262）
+            BatchView(model: model.batch)
         case .coverFlow:
             placeholder("Cover Flow")
         }
     }
 
-    /// M6／M7 接手前的暫位（不進驗收表，僅避免空白窗口）
+    /// M7 接手前的暫位（不進驗收表，僅避免空白窗口）
     private func placeholder(_ title: String) -> some View {
         VStack {
             Spacer()

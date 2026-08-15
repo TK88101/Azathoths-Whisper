@@ -112,6 +112,11 @@ final class EditorViewModel {
         onRequestHydrate?()
     }
 
+    /// C-23：Batch 載入專輯的三態文案設在 **Editor** 的狀態欄（py:623/633/637 走同一個 setStatus）
+    func setStatusFromBatch(_ text: String) {
+        statusText = text
+    }
+
     // MARK: - 動作
 
     func fetch() async {

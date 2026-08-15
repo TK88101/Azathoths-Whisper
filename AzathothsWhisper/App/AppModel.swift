@@ -16,7 +16,11 @@ final class AppModel {
     private(set) var language: AppLanguage
 
     let editor: EditorViewModel
+    let batch: BatchViewModel
     private(set) var settings: SettingsViewModel!
+
+    /// Editor 與 Batch 任一存檔成功都要放紙花（py:545／701／737）
+    var confettiTrigger: Int { editor.confettiTrigger + batch.confettiTrigger }
 
     private let configStore: ConfigStore
     private let httpClient: any HTTPClient
@@ -45,6 +49,10 @@ final class AppModel {
             lyricsService: Self.makeLyricsService(client: httpClient, token: initialToken),
             music: music
         )
+        self.batch = BatchViewModel(
+            lyricsService: Self.makeLyricsService(client: httpClient, token: initialToken),
+            music: music
+        )
 
         self.settings = SettingsViewModel(
             validator: validator,
@@ -60,6 +68,16 @@ final class AppModel {
         editor.onRequestHydrate = { [weak self] in
             guard let self else { return }
             Task { await self.monitor.forceRefresh() }
+        }
+
+        // C-18：只有「載入專輯」會停輪詢，Fetch Missing／Import 期間輪詢照跑
+        batch.onBusyChange = { [weak self] busy in
+            guard let self else { return }
+            Task { await self.monitor.setBusy(busy) }
+        }
+        // C-23：載入三態文案寫在 Editor 狀態欄
+        batch.onEditorStatus = { [weak self] text in
+            self?.editor.setStatusFromBatch(text)
         }
     }
 
@@ -107,6 +125,7 @@ final class AppModel {
             guard let self else { return }
             for await event in self.monitor.events {
                 self.editor.handle(event)
+                self.batch.handle(event)      // C-17：albumChanged 由 Batch 消費
             }
         }
         await monitor.start()
@@ -126,6 +145,12 @@ final class AppModel {
     func select(_ tab: AppTab) {
         self.tab = tab
         editor.isEditorTabActive = (tab == .editor)   // py:481
+        // C-01：切入 Batch 且列表為空時自動載入當前專輯（py:396）
+        if tab == .batch {
+            batch.tabActivated()
+        } else {
+            batch.tabDeactivated()
+        }
     }
 
     func openSettings(_ group: SettingsViewModel.Group) {
@@ -146,8 +171,9 @@ final class AppModel {
     private func saveToken(_ newToken: String) {
         try? configStore.setToken(newToken)
         token = newToken
-        // D-08：保存後即時生效，無需重啟
+        // D-08：保存後即時生效，無需重啟（Batch 抓詞同樣走 Genius，一併重建）
         editor.lyricsService = Self.makeLyricsService(client: httpClient, token: newToken)
+        batch.lyricsService = Self.makeLyricsService(client: httpClient, token: newToken)
     }
 
     private func saveLanguage(_ newLanguage: AppLanguage) {

@@ -4,36 +4,15 @@ import XCTest
 // 紀律：不模擬全域按鍵（會誤傷其他 app），一律走 XCUIApplication 的定界操作；
 // 結束用 app.terminate()（PID 定界），不對 Music.app 或系統偏好做任何寫入。
 // 語言以 launchArguments 的 -AppleLanguages 注入，只作用於該次啟動，不改使用者設定。
-final class ShellUITests: XCTestCase {
-    private var app: XCUIApplication!
-
-    override func setUp() {
-        continueAfterFailure = false
-    }
-
-    override func tearDown() {
-        app?.terminate()
-        app = nil
-    }
-
-    @discardableResult
-    private func launch(language: String? = nil) -> XCUIApplication {
-        let app = XCUIApplication()
-        if let language {
-            app.launchArguments += ["-AppleLanguages", "(\(language))"]
-        }
-        app.launch()
-        self.app = app
-        return app
-    }
-
-    /// splash 3.5 秒後在同一視窗切主 UI（A-02）
-    private func waitForMainUI(_ editorLabel: String = "EDITOR", file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssertTrue(
-            app.buttons[editorLabel].waitForExistence(timeout: 15),
-            "splash 後應出現主 UI 導航",
-            file: file, line: line
-        )
+// 啟動／收尾／等主 UI 的共用紀律見 UITests/Support/AppUITestCase.swift。
+final class ShellUITests: AppUITestCase {
+    /// 菜單交互前先取回前台。連跑多個用例後焦點可能落在別的 app，症狀有二：
+    /// `MenuBarItem is not foreground and does not allow background interaction`，
+    /// 或點擊靜默落空——後者會讓 Quit 用例誤報「app 沒退出」（實測產品退出僅 0.02s）。
+    private func menuBar() -> XCUIElementQuery {
+        app.activate()
+        _ = app.wait(for: .runningForeground, timeout: 10)
+        return app.menuBarItems
     }
 
     private func containsLabel(_ text: String) -> Bool {
@@ -99,7 +78,7 @@ final class ShellUITests: XCTestCase {
     func testSettingsMenuOpensTokenModal() {
         launch()
         waitForMainUI()
-        app.menuBarItems["Settings"].click()
+        menuBar()["Settings"].click()
         app.menuItems["Token Settings..."].click()
 
         XCTAssertTrue(app.staticTexts["TOKEN SETTINGS"].waitForExistence(timeout: 5))
@@ -112,7 +91,7 @@ final class ShellUITests: XCTestCase {
     func testSettingsMenuOpensLanguageModal() {
         launch()
         waitForMainUI()
-        app.menuBarItems["Settings"].click()
+        menuBar()["Settings"].click()
         app.menuItems["Language Settings..."].click()
 
         XCTAssertTrue(app.staticTexts["LANGUAGE SETTINGS"].waitForExistence(timeout: 5))
@@ -124,7 +103,7 @@ final class ShellUITests: XCTestCase {
     func testHelpMenuOpensAboutModal() {
         launch()
         waitForMainUI()
-        app.menuBarItems["Help"].click()
+        menuBar()["Help"].click()
         app.menuItems["About"].click()
 
         XCTAssertTrue(app.staticTexts["iBridge Zhao"].waitForExistence(timeout: 5))
@@ -147,10 +126,7 @@ final class ShellUITests: XCTestCase {
         let window = app.windows.firstMatch
         window.buttons[XCUIIdentifierCloseWindow].click()
 
-        let deadline = Date().addingTimeInterval(5)
-        while window.exists, Date() < deadline {
-            usleep(200_000)
-        }
+        waitForWindowToHide(window)
         XCTAssertFalse(window.exists, "紅鈕應隱藏視窗")
         XCTAssertNotEqual(app.state, .notRunning, "app 不得因關窗而退出")
     }
@@ -159,7 +135,7 @@ final class ShellUITests: XCTestCase {
     func testQuitMenuItemTerminatesApp() {
         launch()
         waitForMainUI()
-        app.menuBarItems.element(boundBy: 1).click()      // 應用程式菜單
+        menuBar().element(boundBy: 1).click()      // 應用程式菜單
         app.menuItems["Quit Azathoth's Whisper"].click()
 
         let deadline = Date().addingTimeInterval(10)
@@ -179,8 +155,8 @@ final class ShellUITests: XCTestCase {
         XCTAssertTrue(app.buttons["一括処理"].exists)
         XCTAssertTrue(app.buttons["カバーフロー"].exists, "E-10 新鍵")
         XCTAssertTrue(app.staticTexts["ステータス:"].exists)
-        XCTAssertTrue(app.menuBarItems["Settings"].exists, "A-07 菜單硬編碼英文")
-        XCTAssertTrue(app.menuBarItems["Help"].exists)
+        XCTAssertTrue(menuBar()["Settings"].exists, "A-07 菜單硬編碼英文")
+        XCTAssertTrue(menuBar()["Help"].exists)
         attach("editor-ja")
     }
 
@@ -192,7 +168,7 @@ final class ShellUITests: XCTestCase {
         XCTAssertTrue(app.buttons["批量處理"].exists)
         XCTAssertTrue(app.buttons["封面瀏覽"].exists)
         XCTAssertTrue(app.staticTexts["狀態:"].exists)
-        XCTAssertTrue(app.menuBarItems["Settings"].exists)
+        XCTAssertTrue(menuBar()["Settings"].exists)
         attach("editor-zh-Hant")
     }
 }

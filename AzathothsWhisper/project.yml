@@ -101,5 +101,7 @@ schemes:
     test:
       gatherCoverageData: true
       targets:
-        - AzathothsWhisperTests
-        - AzathothsWhisperUITests
+        - name: AzathothsWhisperTests
+          parallelizable: false
+        - name: AzathothsWhisperUITests
+          parallelizable: false

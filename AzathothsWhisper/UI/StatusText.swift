@@ -32,6 +32,39 @@ enum StatusText {
 
     static func invalidToken(_ message: String) -> String { "Invalid Token: \(message)" }
 
+    // Batch（py:554-740）——與 Editor 刻意不同之處已標註，勿統一
+    static let batchReady = "Ready"                                    // C-25：Batch footer 初始值，硬編碼不隨語言變
+    static let batchTitle = "Batch Processing"                         // py:210，無 data-i18n
+    static let previewPlaceholder = "Select a track..."                // py:236
+    static let albumLoadingPlaceholder = "Loading..."                  // py:212 header 初始
+    static let noDataAlbum = "No Data / Album"                         // py:561
+    static let loadingTracksFromMusic = "Loading tracks from Music..." // py:624 列表區佔位
+    static let failedToLoadTracks = "Failed to load tracks."           // py:636
+    static let processingAlbumBatch = "Processing album batch..."      // py:623（設在 Editor 狀態欄）
+    static let albumLoaded = "Album loaded"                            // py:633
+    static let batchFailed = "Batch failed"                            // py:637
+    static let noMissingLyrics = "No missing lyrics to fetch!"         // py:653
+    static let fetchComplete = "Fetch complete."                       // py:677
+    static let selectTrackFirst = "Please select a track first to import its lyrics (from preview)."  // py:685
+    static let importAllConfirm = "Writes lyrics for ALL tracks in list where lyrics are present. Continue?"  // py:715
+    static let noTracksHaveLyrics = "No tracks have lyrics to save."   // py:719
+    static let allSaved = "All saved."                                 // py:736
+    // C-28：Batch 的存檔文案帶句點，Editor 的不帶——原版即如此，勿統一
+    static let batchSaved = "Saved."                                   // py:700
+    static let batchSaveFailed = "Save failed."                        // py:703
+    static let batchErrorSaving = "Error saving."                      // py:707
+
+    // C-27 進度文案
+    static func fetchingTracks(_ count: Int) -> String { "Fetching \(count) tracks..." }   // py:658
+    static func fetchingProgress(_ index: Int, of total: Int, title: String) -> String {   // py:662
+        "Fetching (\(index)/\(total)): \(title)"
+    }
+    static func savingTracks(_ count: Int) -> String { "Saving \(count) tracks..." }       // py:724
+    static func savingProgress(_ index: Int, of total: Int, title: String) -> String {     // py:728
+        "Saving (\(index)/\(total)): \(title)"
+    }
+    static func savingTrack(_ title: String) -> String { "Saving \(title)..." }            // py:692
+
     // 裝飾性靜態文案（py:183, 185, 200-201, 143, 145）
     static let txtMode = "TXT_MODE: UTF-8"
     static let lyricsPlaceholder = "// Waiting for input stream..."

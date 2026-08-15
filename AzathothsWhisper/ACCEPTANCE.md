@@ -49,36 +49,45 @@
 | B-18 | 假指標 "Mem: 64MB"／"Lat: 12ms" 靜態顯示（半透明） | py:200-201 | 同上 | ✅ M5 |
 | B-19 | Data Source 下拉三選項 genius(默認)/darklyrics/metalarchives，純裝飾無功能 | py:151-163 | `dataSourceSelectionDoesNotAffectFetchPath`（切成 darklyrics 後仍由 Genius 供詞） | ✅ M5 |
 | B-20 | Fetch/Save 按鈕 hover：白遮罩下往上滑入＋文字反色（blend difference），300ms | py:165-178 | 已按 HTML 參數實作（`.blendMode(.difference)`＋300ms）；hover 動畫需真人移入目視，M8 | ⬜ |
-| B-21 | busy 時全部按鈕禁用＋wait 光標（⚠️ 偏差：wait 光標） | py:406-417 | 按鈕禁用＝`ActionButton(isEnabled: !isBusy)`＋`busyStateIsPublishedAroundFetch`。**偏差**：AppKit 無公開的 "wait" 光標（網頁 `cursor:wait` 由瀏覽器提供，對應的系統轉輪由 WindowServer 控制），故不模擬；isBusy 語義與按鈕禁用 1:1 保留 | ⚠️ 待簽字 |
+| B-21 | busy 時全部按鈕禁用＋wait 光標（⚠️ 偏差：wait 光標） | py:406-417 | 按鈕禁用＝`ActionButton(isEnabled: !isBusy)`＋`busyStateIsPublishedAroundFetch`。**偏差**：AppKit 無公開的 "wait" 光標（網頁 `cursor:wait` 由瀏覽器提供，對應的系統轉輪由 WindowServer 控制），故不模擬；isBusy 語義與按鈕禁用 1:1 保留 | ⚠️ 已簽字（用戶 2026-08-15） |
 | B-22 | 狀態欄初始文案 status_ready（en="Ready"——修正⚠️數據錯，原值為日文） | py:196,962 | `LocalizationTests.englishDataDefectsAreFixed`＋footer 綁定（statusText 為 nil 時取本地化 status_ready） | ✅ M5 |
 | B-23 | Footer "Status:"/"Lines:" 標籤走 i18n | py:192-199 | `testLaunchShowsEditorShellAfterSplash`（en）＋ja／zh-Hant 冷啟動斷言 | ✅ M5 |
 
-## C Batch（21 條）
+## C Batch（30 條）
 
 | ID | 行為描述 | 依據 | 驗證方式 | 狀態 |
 |---|---|---|---|---|
-| C-01 | 首次切入 Batch tab 自動載入當前專輯 | py:379-383 | 操作 | ⬜ |
-| C-02 | 載入中 "Loading tracks from Music..." | py:624 | 目視 | ⬜ |
-| C-03 | 專輯過濾＝album＋artist 雙條件 | py:1154-1183 | 同名專輯曲庫驗證＋spike 已證 | ⬜ |
-| C-04 | 行格式：補零序號（padStart 2）/artist/title/狀態點 | py:556-601 | 對照 | ⬜ |
-| C-05 | 有詞＝白點（Has Lyrics）；缺詞＝暗紅點（Missing） | py:571-575 | 對照 | ⬜ |
-| C-06 | 行點擊→高亮＋預覽填充＋meta "Artist - Title" | py:604-613 | 操作 | ⬜ |
-| C-07 | 預覽面板只讀 | py:236 | 操作 | ⬜ |
-| C-08 | Fetch Missing：無缺詞項→提示 "No missing lyrics to fetch!" | py:648-654 | 操作 | ⬜ |
-| C-09 | Fetch Missing 串行逐條，進度 "Fetching (i/n): title" | py:655-668 | 目視 | ⬜ |
-| C-10 | 逐條 fallback：Genius→DarkLyrics，傳 album（決策 5 修正⚠️：原版不傳） | py:2229-2243＋Plan 決策 5 | 單測（G-10/G-12 golden） | ⬜ |
+| C-01 | 切入 Batch tab 且**列表為空**時自動載入當前專輯（py:396 判的是 batchData.length，非「首次」） | py:379-383 | `activatingTabWithEmptyListLoadsAlbum`／`activatingTabWithLoadedListDoesNotReload` | ✅ M6（邏輯層） |
+| C-02 | 載入中 "Loading tracks from Music..." | py:624 | `loadingStateIsObservableWhileFetching`（以閘門定格一閃而過的載入態，目視不可靠） | ✅ M6（邏輯層） |
+| C-03 | 專輯過濾＝album＋artist 雙條件 | py:1154-1183 | 真機實測（2026-08-15）：Music 暫停於 Allen-Lande《The Showdown》時切入 Batch，列表載入該專輯 12 曲且 artist 欄全為 Allen-Lande；`albumTracks(artist:album:)` 走 AE 雙條件過濾。**反向驗證**（庫中存在同名不同藝人專輯時只取當前藝人）需特定曲庫資料，未於本機構造，沿用 M1 spike 證據 | ✅ M6（真機正向） |
+| C-04 | 行格式：補零序號（padStart 2）/artist/title/狀態點 | py:556-601 | `rowNumberIsListIndexPaddedToTwoDigits`／`tracksKeepAppleEventsOrderWithoutSorting` | ✅ M6（邏輯層） |
+| C-05 | 有詞＝白點（Has Lyrics）；缺詞＝暗紅點（Missing） | py:571-575 | `whitespaceOnlyLyricsCountAsMissing`（判定層）＋`BatchRow.statusDot`；色值目視待 M8 | ✅ M6（邏輯層） |
+| C-06 | 行點擊→高亮＋預覽填充＋meta "Artist - Title" | py:604-613 | `selectingTrackFillsPreviewAndMeta` | ✅ M6（邏輯層） |
+| C-07 | 預覽面板只讀 | py:236 | `BatchUITests.testPreviewPaneIsReadOnly`（點入後鍵入，內容不變且不出現在畫面） | ✅ M6 |
+| C-08 | Fetch Missing：無缺詞項→提示 "No missing lyrics to fetch!" | py:648-654 | `fetchMissingWithNothingMissingShowsAlert` | ✅ M6（邏輯層） |
+| C-09 | Fetch Missing 串行逐條，進度 "Fetching (i/n): title" | py:655-668 | `fetchMissingRunsSeriallyWithProgressText`（閘門斷言串行性＋進度格式） | ✅ M6（邏輯層） |
+| C-10 | 逐條 fallback：Genius→DarkLyrics，傳 album（決策 5 修正⚠️：原版不傳） | py:2229-2243＋Plan 決策 5 | `fetchMissingPassesAlbumToSource`（決策 5 傳 album）＋M2 golden G-10/G-12 | ✅ M6（邏輯層） |
 | C-10a | **fallback 觸發條件（用戶 2026-08-10 拍板修正）**：原版 py:2232 只判 `startswith("Error")`，故 Genius 回「Lyrics not found on Genius.」時直接返回、不 fallback——DarkLyrics 實際只在 token 未配置/拋異常時才跑，決策 5 的 album 修正等同無效。新版改為 Genius 非命中即 fallback 到 DarkLyrics。可見變化：Batch 抓詞成功率上升，部分曲目改由 DarkLyrics 供詞 | py:2232（偏離） | 單測 `batchFallsBackWhenGeniusReportsNotFound` | ⚠️ 已拍板修正（M2 實現） |
-| C-11 | 命中即時重繪；選中項同步預覽 | py:669-676 | 目視 | ⬜ |
-| C-12 | 結束 "Fetch complete." | py:678 | 目視 | ⬜ |
-| C-13 | Import Selected 未選中→提示 "Please select a track first..." | py:684-686 | 操作 | ⬜ |
-| C-14 | Import Selected 用預覽框文本寫入→"Saved"＋confetti | py:688-706 | 操作 | ⬜ |
-| C-15 | Import All 確認框文案 "Writes lyrics for ALL tracks in list where lyrics are present. Continue?" | py:715 | 目視（NSAlert 同文案） | ⬜ |
-| C-16 | Import All 串行寫入全部有詞項→"All saved."＋confetti | py:716-738 | 操作 | ⬜ |
-| C-17 | 切專輯→列表清空；Batch 可見則自動重載 | py:488-498 | 操作 | ⬜ |
-| C-18 | Batch 作業期間 isBusy：按鈕全禁＋輪詢停（主防線 1:1） | py:406-417,508 | 操作 | ⬜ |
-| C-19 | Batch 作業中切 tab／專輯變更→session ID 校驗防過期回寫（縱深，修正⚠️） | Plan §4.10 | 單測＋操作 | ⬜ |
-| C-20 | 隱藏窗口不中斷 Batch 任務 | Plan §4.10（對齊原版隱藏語義） | 操作 | ⬜ |
-| C-21 | 表頭 #/Artist/Title/Stat 走 i18n（col_*） | py:219-224 | 三語目視 | ⬜ |
+| C-11 | 命中即時重繪；選中項同步預覽 | py:669-676 | `fetchedLyricsUpdateListAndSelectedPreview` | ✅ M6（邏輯層） |
+| C-12 | 結束 "Fetch complete." | py:678 | `fetchMissingRunsSeriallyWithProgressText`（結尾斷言） | ✅ M6（邏輯層） |
+| C-13 | Import Selected 未選中→提示 "Please select a track first..." | py:684-686 | `importSelectedWithoutSelectionShowsAlert` | ✅ M6（邏輯層） |
+| C-14 | Import Selected 用預覽框文本寫入→"Saved"＋confetti | py:688-706 | `importSelectedWritesPreviewTextAndTriggersConfetti` | ✅ M6（邏輯層） |
+| C-15 | Import All 確認框文案 "Writes lyrics for ALL tracks in list where lyrics are present. Continue?" | py:715 | `testImportAllShowsConfirmationWithExactWording`（sheet 內文案逐字比對＋Cancel 後狀態欄不變） | ✅ M6 |
+| C-16 | Import All 串行寫入全部有詞項→"All saved."＋confetti | py:716-738 | `importAllWritesEveryTrackThatHasLyrics` | ✅ M6（邏輯層） |
+| C-17 | 切專輯→列表清空；Batch 可見則自動重載 | py:488-498 | `albumChangeClearsListAndReloadsWhenVisible`／`albumChangeClearsListWithoutReloadWhenHidden` | ✅ M6（邏輯層） |
+| C-18 | **逐操作禁用範圍 1:1（原 Plan §4.10 前提有誤，2026-08-14 複核修正）**：載入專輯＝全部 5 按鈕禁用＋輪詢停；Fetch Missing／Import All＝只禁自己按鈕、輪詢照跑；Import Selected＝不禁任何按鈕、輪詢照跑。原描述「批處理期間按鈕全禁＋輪詢停」只對「載入專輯」成立 | py:621/639（載入調 toggleBusy）、657/678（Fetch 只禁自己）、723/738（All 只禁自己）、682-709（Selected 無任何禁用）、508-510（輪詢跳過只看 isBusy） | `onlyAlbumLoadSuspendsPolling`／`fetchMissingDisablesOnlyItsOwnButton`／`loadingStateIsObservableWhileFetching` | ✅ M6（邏輯層） |
+| C-19 | Batch 作業中切 tab／專輯變更→session ID 校驗防過期回寫（縱深，修正⚠️） | Plan §4.10 | `staleFetchLoopStopsWritingAfterAlbumReload`（閘門製造真實競態窗口） | ✅ M6（邏輯層） |
+| C-20 | 隱藏窗口不中斷 Batch 任務 | Plan §4.10（對齊原版隱藏語義） | `BatchLiveUITests.testHiddenWindowDoesNotInterruptBatchFetch`（預設跳過，需 AZW_MUSIC_TESTS=1——與 `LiveMusicTests` 同一閘門變數）：於 `FETCHING (1/12)` 時點紅鈕隱藏，35s 後 app 仍存活；os_log 顯示 12 條 fetch progress 全數產生（00:10:41.200→00:10:48.273），即隱藏後續跑完剩餘 11 首 | ✅ M6（真機） |
+| C-21 | 表頭 Artist/Title/Stat 走 i18n（col_*）；`#` 欄為硬編碼符號**不**走 i18n；預覽面板標題走 col_preview | py:219-224, 233 | `testBatchShellInEnglish`／`…InJapanese`／`…InTraditionalChinese`（三語表頭＋`#` 欄不 i18n） | ✅ M6 |
+| C-22 | Import All 無可寫項（全部缺詞）→ 提示 "No tracks have lyrics to save."，不進入寫入循環 | py:718-721 | `importAllWithNoLyricsShowsAlertAfterConfirmation` | ✅ M6（邏輯層） |
+| C-23 | 載入專輯期間 **Editor** 狀態欄三態："Processing album batch..." → 成功 "Album loaded"／異常 "Batch failed"（設的是主狀態欄，非 Batch 自己的狀態欄） | py:623/633/637 | `loadingPublishesPlaceholderAndEditorStatus` | ✅ M6（邏輯層） |
+| C-24 | Batch header 專輯名三態：初始 "Loading..."／有資料取**首曲的 album 欄位**／無資料 "No Data / Album" | py:212/559/561 | `loadedAlbumTakesHeaderNameFromFirstTrack`／`emptyAlbumShowsNoDataHeader` | ✅ M6（邏輯層） |
+| C-25 | Batch footer 狀態欄初始 "Ready" ＝**硬編碼英文，不隨語言變**（對比 Editor footer 的 status_ready 走 i18n——原版兩處不一致，照搬） | py:241 vs py:196 | `testBatchColumnsLocalizeButStatusStaysEnglishInJapanese`（ja 下狀態欄仍 READY，且畫面查無 status_ready 的 ja 值「準備完了」） | ✅ M6 |
+| C-26 | 載入失敗兩態在新版**不可達**（照搬原版語義）：py:1180-1182 的 `except` 吞掉全部異常回 `[]`，故 JS 的兩個紅字分支（非陣列／"Failed to load tracks."）實際到不了。Swift 同樣把 Music 層異常降為空專輯（header "No Data / Album"、Editor 狀態 "Album loaded"），但錯誤不靜默丟棄——落 os_log。`ListState.failed` 分支保留於 UI 但無生產觸發點 | py:628-637 vs py:1180-1182 | `musicFailureIsSwallowedAsEmptyAlbumLikePython` | ✅ M6 |
+| C-27 | 三操作的前置與逐條進度文案：Fetch Missing "Fetching {n} tracks..." → "Fetching (i/n): {title}"；Import All "Saving {n} tracks..." → "Saving (i/n): {title}"；Import Selected "Saving {title}..." | py:658/662/724/728/692 | `fetchMissingRunsSeriallyWithProgressText`／`importAllReportsPerTrackProgress`／`importSelectedReportsSavingProgress` | ✅ M6（邏輯層） |
+| C-28 | Import Selected 結果文案**帶句點**："Saved."／"Save failed."／"Error saving."——與 Editor Save 的 "Saved"（無句點）不同，照搬此差異 | py:700/703/707 vs py:543 | `importSelectedWritesPreviewTextAndTriggersConfetti`／`…ReportsSaveFailedWhenWriteReturnsFalse`／`…ReportsErrorSavingWhenMusicThrows` | ✅ M6（邏輯層） |
+| C-29 | **缺詞判定採 trim 語義**（⚠️ 已拍板修正 2026-08-14）：純空白歌詞（如 "   "）視為缺詞。原版三處篩選（狀態點/Fetch Missing/Import All）用未 strip 的 `length > 0`，而後端算好的 `has_lyrics`（strip 判空）從未被使用——屬原版內部不一致。可見變化：純空白曲目改顯暗紅點、會被 Fetch Missing 抓、不再被 Import All 把空白寫回音樂庫 | py:587/651/717（實際用）vs py:2253-2254（算了沒用） | `whitespaceOnlyLyricsCountAsMissing`／`importAllWritesEveryTrackThatHasLyrics`（純空白 fixture 三處斷言） | ⚠️ 已拍板修正 |
+| C-30 | **Batch 不把 Genius 錯誤訊息當歌詞**（⚠️ 與 B-11a 同源，按其先例修正）：原版 py:2232 只判 `startswith("Error")`，而 Genius 異常路徑回 "Genius Error: …" 不以 Error 開頭 → 直接當歌詞回傳；前端過濾只擋 "No track"／"Lyrics not found" 兩前綴亦放行 → 錯誤訊息入列表顯白點 → **Import All 會將其寫進音樂檔 lyrics 欄位**。新版 `LyricsResult` 為列舉，`.error` 不會被當 `.found` | py:2232、1283-1284、665 | `sourceErrorIsNeverStoredAsLyrics`＋`LyricsServiceTests`（已綠） | ⚠️ 按 B-11a 先例修正 |
 
 ## D Settings / About（13 條）
 
@@ -140,7 +149,7 @@
 | G-05 | DarkLyrics 未命中→"Song title not found on album page."；無 div.lyrics→"Error: Could not parse lyrics container." | py:1384-1412 | golden `darklyrics_parse.json`（miss 案例） | ✅ M2 |
 | G-06 | Genius 主管線（庫路徑等價）：4 真實頁 → data-lyrics-container 選擇器＋LyricsHeader 刪除＋br/文本遍歷＋段頭 `(\[.*?\])*` 剝除＋`\n{2}`→`\n`＋strip('\n')，最終文本相等 | lyricsgenius 3.7.5 genius.py:126-206（生產主路徑） | golden `genius_library_clean.json`（**主口徑**，Plan R3） | ✅ M2 |
 | G-07 | Genius 首行標題頭剝除：首行 strip 後 endswith("Lyrics") 整行刪 | py:1236-1241 | golden `genius_library_firstline.json` | ✅ M2 |
-| G-08 | Genius 手動 fallback legacy 參照（Lyrics__Container 選擇器，含頁面雜訊）——Swift 不以此為符合性目標，偏差已記錄 | py:1245-1276 | golden `genius_manual_parse.json`＋Fixtures/README 差異說明 | ⚠️（設計偏差，見 README；待用戶簽字） |
+| G-08 | Genius 手動 fallback legacy 參照（Lyrics__Container 選擇器，含頁面雜訊）——Swift 不以此為符合性目標，偏差已記錄 | py:1245-1276 | golden `genius_manual_parse.json`＋Fixtures/README 差異說明 | ⚠️ 已簽字（用戶 2026-08-15） |
 | G-09 | Genius search 選 hit＝hits[0].result.url；無 hits→notFound | py:1252-1256,1281 | `LyricsSourceTests.geniusMapsEmptySearchHitsToNotFound` 等 | ✅ M3 |
 | G-10 | DarkLyrics 直連 URL 構造：`http://www.darklyrics.com/lyrics/{norm_artist}/{norm_album}.html`，200 即解析 | py:1296-1315 | `darkLyricsUsesDirectAlbumURLWhenAvailable`＋線上測試 | ✅ M3 |
 | G-11 | 直連非 200 → DDG fallback（POST 先行，非 200 轉 GET） | py:1316-1336 | `darkLyricsFallsBackToSearchWhenDirectMisses` | ✅ M3 |
@@ -203,4 +212,16 @@
 | H-10 | 純展示：無雙擊播放、無任何播控動詞（決策 6） | Plan 決策 6 | 操作（雙擊無反應） | ⬜ |
 | H-11 | 穩定排序：disc→track number→AE 返回序 fallback（⚠️兼容修正，待簽字） | Plan §4.8 | 多碟專輯驗證 | ⬜ |
 
-**總計 114 條**（A12＋B23＋C21＋D13＋E10＋F9＋G15＋H11）。
+**總計 123 條**（A12＋B23＋C30＋D13＋E10＋F9＋G15＋H11）。
+
+## 附錄：M6 行為真源複核（2026-08-14）
+
+逐行核對 `lyrics_fetcher.py` 的 Batch 段（HTML py:205-263／JS py:554-740／後端 py:1154-1196, 2218-2255）後，對 C 段做三類修正：
+
+| 類別 | 處置 |
+|---|---|
+| **事實錯誤 1 條**：C-18 與 Plan §4.10 稱「批處理期間 isBusy 按鈕全禁＋輪詢停」為主防線，實際只有 `runAlbumBatch` 調 `toggleBusy`；Fetch Missing／Import All 只禁自己按鈕，Import Selected 完全不禁，三者輪詢照跑 | C-18 改寫為逐操作禁用範圍；**session ID 守衛由「縱深」升為唯一防線**（Plan §4.10 對應句同步作廢） |
+| **遺漏 7 條**可觀察行為（Import All 空集提示、載入三態狀態文案、header 專輯名三態、Batch 狀態欄不隨語言變、載入失敗兩態、進度文案全集、Import Selected 文案帶句點） | 補為 C-22 ~ C-28 |
+| **原版缺陷 2 條**：`has_lyrics` 算了不用導致缺詞判定語義分裂；`fetch_single_missing` 會把 "Genius Error: …" 當歌詞並經 Import All 寫入音樂檔 | 補為 C-29（用戶拍板採 trim 語義）、C-30（按 B-11a 先例修正） |
+
+由此產生的真實競態（原版存在，非理論）：Fetch Missing 進行中切專輯 → 輪詢照跑觸發 `batchData = []` 重載（py:492-497）→ 舊循環繼續往已被替換的陣列元素寫入並重繪新列表 → 進度錯亂、命中丟失。新版以 sessionID 守衛在每步回寫前校驗。

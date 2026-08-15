@@ -16,6 +16,8 @@ actor MockMusicClient: MusicControlling {
     private(set) var lyricsCalls = 0
     private(set) var writes: [String: String] = [:]
     private var albumTracksResult: [AlbumTrack] = []
+    private var albumTracksGate: LyricsGate?
+    private var writeGate: LyricsGate?
     private var artwork: [String: Data] = [:]
     private var setLyricsOutcome: Result<Bool, MusicError> = .success(true)
 
@@ -30,6 +32,16 @@ actor MockMusicClient: MusicControlling {
 
     func setAlbumTracks(_ tracks: [AlbumTrack]) {
         albumTracksResult = tracks
+    }
+
+    /// 卡住 albumTracks 的回應，直到測試放行
+    func setAlbumTracksGate(_ gate: LyricsGate) {
+        albumTracksGate = gate
+    }
+
+    /// 卡住 setLyrics 的回應：讓串行寫入的逐條進度文案可被斷言（C-27）
+    func setWriteGate(_ gate: LyricsGate) {
+        writeGate = gate
     }
 
     func setArtwork(_ data: Data, for persistentID: String) {
@@ -63,10 +75,17 @@ actor MockMusicClient: MusicControlling {
     }
 
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] {
-        albumTracksResult
+        // 可選閘門：讓「載入中」這個一閃而過的狀態能被斷言（C-02）
+        if let albumTracksGate {
+            await albumTracksGate.wait()
+        }
+        return albumTracksResult
     }
 
     func setLyrics(persistentID: String, lyrics: String) async throws -> Bool {
+        if let writeGate {
+            await writeGate.wait()
+        }
         switch setLyricsOutcome {
         case .success(let didWrite):
             if didWrite { writes[persistentID] = lyrics }
