@@ -101,6 +101,8 @@ final class BatchUITests: AppUITestCase {
         // 用 identifier 定位：按鈕的 accessibility label 會混入 MaterialSymbol 連字文本且隨語言變動
         let importAll = app.buttons["batch-import-all"]
         XCTAssertTrue(importAll.waitForExistence(timeout: 10), "footer 應有 Import All 按鈕")
+        // 專輯載入期間按鈕是禁用的（isLoadingAlbum）；點禁用按鈕不會報錯只會靜默無效
+        XCTAssertTrue(waitUntilHittable(importAll), "Import All 應在專輯載入完成後可點")
         importAll.click()
 
         // 確認框在 macOS 上呈現為 sheet（label 'alert'），文案落在 StaticText 的 value

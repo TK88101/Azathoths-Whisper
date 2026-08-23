@@ -20,7 +20,9 @@ struct CoverFlowItem: View {
         .drawingGroup()
     }
 
-    private var face: some View {
+    /// 正面與倒影共用同一份渲染——分開寫兩份的話，日後調整 interpolation／contentMode／
+    /// 佔位邏輯時漏改一處，正面圖與倒影會靜默不一致，而 View 層沒有測試會抓到
+    private var artworkOrPlaceholder: some View {
         Group {
             if let artwork {
                 Image(nsImage: artwork)
@@ -34,9 +36,13 @@ struct CoverFlowItem: View {
         // H-08：佔位與封面**同尺寸固定 frame**，佈局不得跳動
         .frame(width: size, height: size)
         .clipped()
-        .overlay {
-            Rectangle().strokeBorder(Theme.border, lineWidth: 1)
-        }
+    }
+
+    private var face: some View {
+        artworkOrPlaceholder
+            .overlay {
+                Rectangle().strokeBorder(Theme.border, lineWidth: 1)
+            }
     }
 
     /// H-08：無封面＝六角形 logo 暗紋
@@ -54,28 +60,17 @@ struct CoverFlowItem: View {
     }
 
     private var reflection: some View {
-        Group {
-            if let artwork {
-                Image(nsImage: artwork)
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                placeholder
+        artworkOrPlaceholder
+            .scaleEffect(y: -1)              // §4.8：上下翻轉
+            .frame(height: size * reflectionRatio, alignment: .top)
+            .clipped()
+            .mask {
+                LinearGradient(
+                    colors: [.white.opacity(0.45), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
             }
-        }
-        .frame(width: size, height: size)
-        .clipped()
-        .scaleEffect(y: -1)                  // §4.8：上下翻轉
-        .frame(height: size * reflectionRatio, alignment: .top)
-        .clipped()
-        .mask {
-            LinearGradient(
-                colors: [.white.opacity(0.45), .clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-        .allowsHitTesting(false)
+            .allowsHitTesting(false)
     }
 }

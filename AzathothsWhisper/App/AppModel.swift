@@ -199,9 +199,14 @@ final class AppModel {
             batch.tabDeactivated()
         }
         // H-01：Cover Flow 的懶載入同樣走「資料為空才載入」（tabActivated 內判定）。
-        // 由 CoverFlowView 的 .task／.onDisappear 驅動，此處只同步失活狀態，
-        // 避免 tab 尚未渲染就先載入。
-        if tab != .coverFlow {
+        // **單一入口**：與 Batch 同構，activate／deactivate 都由此處管。
+        // 原先把 tabActivated 交給 CoverFlowView 的 .task、只在這裡管 deactivate，
+        // 會讓同一次切 tab 觸發兩次 deactivate，且「tab 生命週期」變成兩處各管一半。
+        // （曾以「避免 tab 尚未渲染就先載入」為由——該理由站不住：Batch 同樣在此同步呼叫、
+        //   早於 View 掛載，而 tabActivated 只是起一個 Task 抓清單，不依賴渲染。）
+        if tab == .coverFlow {
+            coverFlow.tabActivated()
+        } else {
             coverFlow.tabDeactivated()
         }
     }

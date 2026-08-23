@@ -371,3 +371,94 @@ P1-3 ViewModel（三守衛）→ P1-4 View → P1-5 接線 → 全量測試 → 
 
 有輸有贏（13 採納／3 修改／1 條我方勝／1 條 Codex 勝）符合裁決有效性判準。
 
+
+
+## 附錄：M7 P1 的 Phase 3 裁決（2026-08-23）
+
+### codex review（`--base HEAD~2`）：1 條，**我方上調嚴重度**
+
+| 主張 | 裁決 |
+|---|---|
+| [P2] Cover Flow 不可見時仍會因 `.albumChanged` 觸發 `startLoad`，違反懶載入，且往共用的串行 AE 佇列塞查詢、拖慢 monitor／Editor | **採納，且嚴重度上調為 P1**。理由：它同時違反**已簽署的 H-01**（懶載入）與前三輪辯論的核心關切（AE 佇列公平性）——不只是效能建議。對照 Batch 的 C-17 本就有 `guard isTabActive`，Cover Flow 漏了。<br>修法：`.albumChanged` 無條件清空（C-17 同構），但 `guard isTabActive` 後才載入；不可見時把 albumKey 存進 `pendingAlbumKey`，切回 tab 時用它載入（而非重讀 currentTrack）。<br>新增測試：`albumChangeWhileHiddenClearsWithoutLoading`（RED 實測：不可見時確實發了 AE 查詢且列表被填回）／`hiddenAlbumChangeLoadsOnReactivation` |
+
+### simplify — simplification 視角：1 條 P1，採納
+
+| 位置 | 內容 | 處置 |
+|---|---|---|
+| `CoverFlowItem.swift` `face`／`reflection` | 兩處有 6 行**逐字重複**的 artwork-or-placeholder 渲染（`Image` ＋ resizable ＋ interpolation ＋ aspectRatio ＋ frame ＋ clipped） | **採納**。抽出 `artworkOrPlaceholder`，兩者各自只保留獨有收尾。**關鍵成本**：View 層沒有單元測試，日後調整 interpolation／contentMode／佔位邏輯時漏改一處，正面圖與倒影會**靜默不一致**且零測試訊號 |
+
+其餘檔案（`CoverFlowGeometry`／`CoverFlowStrip`／`CoverFlowView`／`CoverFlowViewModel`／
+`ArtworkMemoryCache`／`ArtworkService`／四份測試檔）**無發現**。
+
+
+### simplify — altitude 視角：2 條 P1，均採納
+
+**P1-A｜`isCenteringProgrammatically` 的保護窗口與它要擋的 echo 時間尺度不匹配，且測試無法證偽**
+
+審查者指出：該旗標的保護是**同步**的（set → 寫 `centerID` → clear，全程無 await），
+但 `.scrollPosition(id:)` 的回呼是**跨幀**的——滑動過程中會回報途經項目的瞬時 id，
+這些 echo 發生在旗標已清回 false 之後。
+
+**更關鍵的是它對測試的批評，我已親自核實屬實**：
+唯一驗證該旗標的 `programmaticCenteringDoesNotSetOverride` 裡，
+`model.scrollPositionDidChange(to: "T2")` 執行時 `centerID` 早已等於 `"T2"`，
+故是 `id != centerID` 這個條件擋下的——**該測試即使刪掉 `isCenteringProgrammatically` 也會通過**。
+旗標唯一該發揮作用的場景（途經 id ≠ 最終 centerID）完全沒有覆蓋。
+
+**採納**。處置見下方「實施記錄」。
+
+**P1-B｜tab 生命週期兩處各管一半，與 Batch 既有先例不一致**
+
+`AppModel.select(_:)` 對 Batch 是**單一入口**（同時管 activate／deactivate）；
+對 Cover Flow 只呼叫 `tabDeactivated()`，`tabActivated()` 交給 `CoverFlowView` 的 `.task`。
+結果 `tabDeactivated()` 在一次切 tab 中被**兩個觸發點各呼叫一次**。
+
+我原本給的理由「避免 tab 尚未渲染就先載入」**站不住**（審查者指出，我認同）：
+Batch 的 `tabActivated()` 同樣在 `select()` 裡同步呼叫、早於 View 掛載，從未出問題——
+它只是起一個 Task 抓清單，不依賴 View 是否已渲染。這是 P1-5 接線時沒把既有模式落實到底。
+
+**採納**：`select(_:)` 比照 Batch 成為唯一入口，`CoverFlowView` 拿掉 `.task`／`.onDisappear`。
+
+### 判定為層次正確（無發現）
+
+- `ArtworkService` 的 in-flight 去重放在 service 層——去重鍵是 persistentID、語義是「讀取冪等」，
+  下放到 client 會與非冪等的 `setLyrics` 混在一起，要嘛按方法名判斷（更醜的耦合）、
+  要嘛錯誤地合併寫入呼叫
+- `MusicAppleEventsClient` 的 per-call `aeTimeoutTicks`——`run` 每次新建 `SBApplication`，
+  timeout 只能設在該實例上，必須在建立處設定；機制留 `run`、政策（為何是 artwork／為何 90 ticks）
+  留呼叫端＋具名常數，分工乾淨
+
+
+## 附錄：UITests 首次執行的兩個失敗（2026-08-23，均非產品缺陷）
+
+環境恢復後首次跑 UITests：16 tests、1 skipped、**2 failures**。逐一查清如下。
+
+### A-10 `testQuitMenuItemTerminatesApp` —— flaky，非回歸
+
+首次失敗（app 停在 state 4 而非 1，日誌有 `Unable to monitor event loop`），
+**單獨重跑通過**（7.2s）。首次那輪是 16 個用例連跑 131 秒、機器負載偏高所致。
+
+### C-15 `testImportAllShowsConfirmationWithExactWording` —— **測試缺陷，非產品缺陷**
+
+穩定復現（兩次都失敗在同一行 `:108`「sheet 未出現」）。
+
+**排查過程**：
+1. 日誌顯示按鈕**存在且被點擊**（`Synthesize event`），但 sheet 沒出現 → 典型的「點了禁用按鈕」
+2. 按鈕啟用條件是 `!isLoadingAlbum && !isImportingAll`（`BatchView.swift:248`）
+3. **時序證據**：測試 5.02s 切到 Batch、**6.12s 就點擊**——只等了 1.1 秒，
+   而它只 `waitForExistence`（等按鈕**存在**）、不等按鈕**啟用**
+4. Music.app 當時處於 paused、有當前曲目 → 切入 Batch 會觸發專輯載入，
+   載入期間按鈕禁用；載入時長取決於當下專輯大小與 AE 回應速度
+
+**對照實驗的教訓**：先在 `26e9c30`（M6 收尾後）跑 → 同樣失敗；再在 `27db3e1`（M6 收尾前，
+ACCEPTANCE 記該條為 ✅）跑 → **也失敗，但失敗在不同的行（`:20`）、不同原因
+（AX 快照失敗）**。基線自身在此環境不穩定，故對照實驗**沒有給出乾淨答案**——
+不能據此斷言「M6 引入了回歸」。這一點值得記下：對照實驗的前提是基線可信，
+基線若以另一種模式失敗，它就不再是有效對照。
+
+**修法**（測試側，不動產品）：基類新增 `waitUntilHittable(_:timeout:)`——
+以 `NSPredicate(format: "exists == true AND isEnabled == true")` 做確定性等待。
+C-15 在點擊前先等按鈕可點。修正後**通過（18.45s）**。
+
+XCUITest 點擊禁用元素**不會報錯、只會靜默無效**，症狀表現為「後續的 sheet 沒出現」，
+極易誤判成產品缺陷——這是本次差點走錯方向的地方。

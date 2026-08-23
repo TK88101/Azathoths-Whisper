@@ -31,6 +31,11 @@ final class CoverFlowViewModel {
     /// 若不區分就會把自己的動作誤判為使用者滑動
     private var isCenteringProgrammatically = false
 
+    /// 不可見時收到的專輯變更：記住 key，等切回 tab 才載入。
+    /// 若在此期間直接載入，既違反 H-01 懶載入，也會往共用的串行 AE 佇列塞查詢、
+    /// 拖慢 monitor 與 Editor（對齊 Batch 的 C-17）
+    private var pendingAlbumKey: String?
+
     @ObservationIgnored private(set) var loadTask: Task<Void, Never>?
 
     private static let log = Logger(
@@ -48,7 +53,8 @@ final class CoverFlowViewModel {
     func tabActivated() {
         isTabActive = true
         guard items.isEmpty else { return }
-        startLoad(albumKey: nil)
+        // 有 pending key 就用它（不可見期間切過專輯）；否則讀當前曲
+        startLoad(albumKey: pendingAlbumKey)
     }
 
     func tabDeactivated() {
@@ -65,6 +71,11 @@ final class CoverFlowViewModel {
             items = []
             centerID = nil
             playingTrackID = nil
+            // C-17 同構：無條件清空，但**只有可見時才重載**
+            guard isTabActive else {
+                pendingAlbumKey = albumKey
+                return
+            }
             startLoad(albumKey: albumKey)
 
         case .trackChanged(let info, _):
@@ -144,6 +155,7 @@ final class CoverFlowViewModel {
         }
 
         guard generation == albumGeneration else { return }   // 過期載入不回寫
+        pendingAlbumKey = nil
         items = loaded.sortedForDisplay()                     // H-11
         if let playingTrackID {
             centerIfAllowed(on: playingTrackID)

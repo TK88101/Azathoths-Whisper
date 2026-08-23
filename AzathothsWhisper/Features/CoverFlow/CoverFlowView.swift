@@ -24,8 +24,7 @@ struct CoverFlowView: View {
             model.stepCenter(by: 1)
             return .handled
         }
-        .task { model.tabActivated() }
-        .onDisappear { model.tabDeactivated() }
+        // tab 生命週期由 AppModel.select(_:) 單一管理（與 Batch 同構），此處不重複驅動
     }
 
     private var strip: some View {

@@ -55,6 +55,19 @@ class AppUITestCase: XCTestCase {
         return app
     }
 
+    /// 等元素**存在且已啟用**再操作。
+    ///
+    /// 為何需要它（2026-08-23）：Batch 的按鈕在 `isLoadingAlbum` 期間是禁用的，
+    /// 而載入時長取決於 Music.app 當下的專輯與 AE 回應速度。只 `waitForExistence`
+    /// 就點擊，會在載入較慢時點到禁用的按鈕——XCUITest 不會報錯，只是靜默無效，
+    /// 症狀表現為「後續的 sheet 沒出現」，很容易誤判成產品缺陷。
+    @discardableResult
+    func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval = 15) -> Bool {
+        let predicate = NSPredicate(format: "exists == true AND isEnabled == true")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
     /// 等紅鈕點下後視窗真的收起來。紅鈕＝隱藏而非退出（A-08），A-08 與 C-20 都要先
     /// 確認視窗消失，才能斷言 app 仍存活——斷言留在各用例，這裡只負責等待。
     func waitForWindowToHide(_ window: XCUIElement, timeout: TimeInterval = windowHideTimeout) {

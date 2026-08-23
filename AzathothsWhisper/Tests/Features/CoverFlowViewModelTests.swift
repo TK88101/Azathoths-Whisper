@@ -97,6 +97,42 @@ struct CoverFlowViewModelTests {
         #expect(model.items.map(\.persistentID) == ["N1"], "過期載入不得覆蓋新專輯")
     }
 
+    /// H-01 的懶載入必須也擋住**事件驅動**的載入：Cover Flow 不可見時切專輯只清空，
+    /// 不得發 AE 查詢——那既違反懶載入，也會往共用的串行 AE 佇列塞工作、
+    /// 拖慢 monitor 與 Editor（對齊 Batch 的 C-17）
+    @Test func albumChangeWhileHiddenClearsWithoutLoading() async {
+        let (model, music) = await makeModel()
+        model.tabActivated()
+        await model.loadTask?.value
+        let callsAfterInitialLoad = await music.albumTracksCalls
+
+        model.tabDeactivated()
+        await model.handle(.albumChanged("Opeth\u{1}Blackwater Park"))
+        await model.loadTask?.value
+
+        #expect(model.items.isEmpty, "切專輯須清空列表")
+        #expect(await music.albumTracksCalls == callsAfterInitialLoad, "不可見時不得發 AE 查詢")
+    }
+
+    /// 不可見時記住的專輯，切回 tab 時才載入
+    @Test func hiddenAlbumChangeLoadsOnReactivation() async {
+        let (model, music) = await makeModel()
+        model.tabActivated()
+        await model.loadTask?.value
+
+        model.tabDeactivated()
+        await music.setAlbumTracks([.fixture(id: "N1", title: "NewOne")])
+        await model.handle(.albumChanged("Opeth\u{1}Blackwater Park"))
+        await model.loadTask?.value
+
+        model.tabActivated()
+        await model.loadTask?.value
+
+        #expect(model.items.map(\.persistentID) == ["N1"])
+        let (artist, _) = await music.lastAlbumTracksQuery ?? ("", "")
+        #expect(artist == "Opeth", "切回時須用當初記住的 albumKey，而非重讀 currentTrack")
+    }
+
     // MARK: H-04 切歌居中
 
     @Test func trackChangeCentersOnThatTrack() async {
@@ -182,18 +218,53 @@ struct CoverFlowViewModelTests {
         #expect(model.centerID == "N2", "切專輯須重置抑制")
     }
 
-    /// 程式化居中不得把抑制旗標設回 true
-    @Test func programmaticCenteringDoesNotSetOverride() async {
+    /// 程式化居中**落定後**的回呼（id 已等於 centerID）不得把抑制旗標設回 true。
+    ///
+    /// 注意這條**只驗落定態**：`id != centerID` 這個條件本身就擋下了它，
+    /// 不足以證明 `isCenteringProgrammatically` 有效。真正檢驗該旗標的是下一條。
+    @Test func settledProgrammaticCallbackDoesNotSetOverride() async {
         let (model, _) = await makeModel()
         model.tabActivated()
         await model.loadTask?.value
 
         await model.handle(.trackChanged(.fixture(id: "T2"), existingLyrics: ""))
-        // 模擬 SwiftUI 因程式化捲動而回呼 scrollPosition binding
         model.scrollPositionDidChange(to: "T2")
         await model.handle(.trackChanged(.fixture(id: "T3"), existingLyrics: ""))
 
-        #expect(model.centerID == "T3", "程式化居中的回呼不得被當成使用者滑動")
+        #expect(model.centerID == "T3")
+    }
+
+    /// **已知限制**（2026-08-23 altitude 審查揭露，如實記錄而非假裝已解決）：
+    ///
+    /// `scrollPositionDidChange` 無法區分「使用者拖曳」與「程式化動畫的途經回呼」——
+    /// 只要回報的 id 與目前 centerID 不同，一律當成使用者接管。
+    /// `isCenteringProgrammatically` 的保護窗口是**同步**的（set → 寫 centerID → clear
+    /// 全程無 await），擋不住動畫展開期間跨幀送來的途經回呼。
+    ///
+    /// **目前尚未爆出**：P1 的居中是同步賦值、沒有 `withAnimation`，不產生途經回呼，
+    /// 故只有真正的使用者拖曳才會送來不同的 id。
+    ///
+    /// **M8 導入平滑動畫（H-04「自動平滑居中」）時必須先修**：讓旗標的清除時機覆蓋
+    /// 動畫的實際持續期，而非函式呼叫的同步範圍。否則使用者從未碰觸捲動條，
+    /// 卻會因途經回呼被誤判為接管，此後自動居中永久失靈。
+    ///
+    /// 本條釘住的是**當前的實際行為**（不同 id 即視為接管），而非期望行為——
+    /// 修好之後這條會轉紅，屆時請連同上述註釋一起更新。
+    @Test func differentIDCallbackIsTreatedAsUserTakeoverEvenIfProgrammatic() async {
+        let (model, _) = await makeModel()
+        model.tabActivated()
+        await model.loadTask?.value
+        await model.handle(.trackChanged(.fixture(id: "T1"), existingLyrics: ""))
+
+        // 模擬動畫途經 T2（使用者其實沒碰過捲動條）
+        model.scrollPositionDidChange(to: "T2")
+
+        // 同曲 refresh 此時搶不回控制——因為途經回呼已被記為「使用者接管」
+        await model.handle(.trackChanged(.fixture(id: "T1"), existingLyrics: "refresh"))
+        #expect(
+            model.centerID == "T2",
+            "當前行為：途經回呼被當成使用者接管。修好動畫期保護後本條應轉紅"
+        )
     }
 
     // MARK: H-09 鍵盤步進

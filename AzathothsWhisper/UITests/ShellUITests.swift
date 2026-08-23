@@ -136,7 +136,14 @@ final class ShellUITests: AppUITestCase {
         launch()
         waitForMainUI()
         menuBar().element(boundBy: 1).click()      // 應用程式菜單
-        app.menuItems["Quit Azathoth's Whisper"].click()
+
+        // 連跑多個用例時，展開選單到點擊之間仍可能被別的 app 搶走前台，
+        // 導致點擊靜默落空、誤報「app 沒退出」（實測產品退出僅 0.02s）。
+        // 故點擊前再確認一次：選單項確實在 AX 樹上，且 app 仍在前台。
+        let quit = app.menuItems["Quit Azathoth's Whisper"]
+        XCTAssertTrue(quit.waitForExistence(timeout: 5), "應用程式選單應展開並含 Quit")
+        XCTAssertEqual(app.state, .runningForeground, "點 Quit 前 app 必須在前台")
+        quit.click()
 
         let deadline = Date().addingTimeInterval(10)
         while app.state != .notRunning, Date() < deadline {
