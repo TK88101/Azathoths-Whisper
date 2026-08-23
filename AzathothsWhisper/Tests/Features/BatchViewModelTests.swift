@@ -228,7 +228,7 @@ struct BatchViewModelTests {
 
         #expect(model.statusText == StatusText.fetchingProgress(1, of: 2, title: "Beta"))
         // 第一首卡在 gate 上；再讓出若干次確認第二首沒有並發插進來
-        for _ in 0..<50 { await Task.yield() }
+        await settle(50)
         #expect(await source.queries.count == 1, "第一首未完成前不得發第二首（串行）")
 
         await gate.open()

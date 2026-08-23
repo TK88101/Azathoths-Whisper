@@ -8,11 +8,11 @@ import Testing
 struct ConfigMigrationTests {
     // 每個測試自帶獨立 UserDefaults suite 與臨時目錄，互不污染
     private func makeEnvironment() throws
-        -> (store: ConfigStore, secrets: InMemorySecretStore, defaults: UserDefaults, dir: URL, suiteName: String)
+        -> (store: ConfigStore, secrets: EphemeralSecretStore, defaults: UserDefaults, dir: URL, suiteName: String)
     {
         let suiteName = "AzathothsWhisperTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
-        let secrets = InMemorySecretStore()
+        let secrets = EphemeralSecretStore()
         let dir = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("azw-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

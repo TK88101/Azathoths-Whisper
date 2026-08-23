@@ -39,6 +39,7 @@ enum StatusText {
     static let albumLoadingPlaceholder = "Loading..."                  // py:212 header 初始
     static let noDataAlbum = "No Data / Album"                         // py:561
     static let loadingTracksFromMusic = "Loading tracks from Music..." // py:624 列表區佔位
+    // 下兩條為 ACCEPTANCE C-26 要求保留的不可達文案，勿當死碼清理（詳見 BatchViewModel.ListState）
     static let failedToLoadTracks = "Failed to load tracks."           // py:636
     static let processingAlbumBatch = "Processing album batch..."      // py:623（設在 Editor 狀態欄）
     static let albumLoaded = "Album loaded"                            // py:633

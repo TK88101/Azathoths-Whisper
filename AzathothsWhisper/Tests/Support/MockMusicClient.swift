@@ -17,6 +17,11 @@ actor MockMusicClient: MusicControlling {
     private(set) var writes: [String: String] = [:]
     private var albumTracksResult: [AlbumTrack] = []
     private var albumTracksGate: LyricsGate?
+    /// 按調用序號分派的閘門：第 n 次 albumTracks() 用第 n 個。
+    /// 用途：重疊載入場景需要讓兩個載入**分別**完成（單一 broadcast gate 會同時放行兩者，
+    /// 觀察不到「第一個已完成、第二個仍在跑」這個 C-18 的關鍵區間）。
+    private var albumTracksGateQueue: [LyricsGate] = []
+    private var albumTracksCalls = 0
     private var writeGate: LyricsGate?
     private var artwork: [String: Data] = [:]
     private var setLyricsOutcome: Result<Bool, MusicError> = .success(true)
@@ -37,6 +42,12 @@ actor MockMusicClient: MusicControlling {
     /// 卡住 albumTracks 的回應，直到測試放行
     func setAlbumTracksGate(_ gate: LyricsGate) {
         albumTracksGate = gate
+    }
+
+    /// 逐次分派閘門：第 1 次 albumTracks() 等 gates[0]，第 2 次等 gates[1]，依此類推；
+    /// 超出陣列長度的調用不等待。
+    func setAlbumTracksGateQueue(_ gates: [LyricsGate]) {
+        albumTracksGateQueue = gates
     }
 
     /// 卡住 setLyrics 的回應：讓串行寫入的逐條進度文案可被斷言（C-27）
@@ -75,8 +86,13 @@ actor MockMusicClient: MusicControlling {
     }
 
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] {
-        // 可選閘門：讓「載入中」這個一閃而過的狀態能被斷言（C-02）
-        if let albumTracksGate {
+        let call = albumTracksCalls
+        albumTracksCalls += 1
+        // 逐次閘門優先於單一閘門
+        if call < albumTracksGateQueue.count {
+            await albumTracksGateQueue[call].wait()
+        } else if let albumTracksGate {
+            // 可選閘門：讓「載入中」這個一閃而過的狀態能被斷言（C-02）
             await albumTracksGate.wait()
         }
         return albumTracksResult

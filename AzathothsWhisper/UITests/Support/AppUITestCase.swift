@@ -46,6 +46,10 @@ class AppUITestCase: XCTestCase {
         // 用例間不繼承視窗狀態：任何以「視窗已隱藏」結束的用例（如 A-08 紅鈕、C-20）
         // 會把該狀態寫進 macOS saved state，令後續用例啟動後無視窗（實測會整批超時）
         app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        // UITests 要驗真實 Keychain 預填（A-05），故顯式聲明**不是**單元測試 host。
+        // scheme 的 test action 為單元測試注入 AZW_UNIT_TEST_HOST=1（見 project.yml）；
+        // 此處設回 "0" 阻斷任何環境傳播，讓 UITests 的取值與注入方式無關。
+        app.launchEnvironment[AppModelTestFlags.unitTestHost] = "0"
         app.launch()
         self.app = app
         return app
@@ -71,4 +75,11 @@ class AppUITestCase: XCTestCase {
             file: file, line: line
         )
     }
+}
+
+
+/// UITests target 不能 `@testable import` 產品模組，故此處複寫旗標名。
+/// 一致性由單元測試 `unitTestHostFlagNameMatchesUITestsCopy` 釘住，防兩邊漂移。
+enum AppModelTestFlags {
+    static let unitTestHost = "AZW_UNIT_TEST_HOST"
 }

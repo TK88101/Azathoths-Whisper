@@ -63,7 +63,7 @@ final class AppModel {
 
         editor.onBusyChange = { [weak self] busy in
             guard let self else { return }
-            Task { await self.monitor.setBusy(busy) }
+            Task { await self.monitor.setBusy(busy, source: .editor) }
         }
         editor.onRequestHydrate = { [weak self] in
             guard let self else { return }
@@ -73,11 +73,11 @@ final class AppModel {
         // C-18：只有「載入專輯」會停輪詢，Fetch Missing／Import 期間輪詢照跑
         batch.onBusyChange = { [weak self] busy in
             guard let self else { return }
-            Task { await self.monitor.setBusy(busy) }
+            Task { await self.monitor.setBusy(busy, source: .batch) }
         }
         // C-23：載入三態文案寫在 Editor 狀態欄
         batch.onEditorStatus = { [weak self] text in
-            self?.editor.setStatusFromBatch(text)
+            self?.editor.setExternalStatus(text)
         }
     }
 
@@ -86,14 +86,38 @@ final class AppModel {
         .homeDirectoryForCurrentUser
         .appendingPathComponent(".azathoths_whisper_config")
 
+    /// 單元測試 host 模式旗標。
+    ///
+    /// 由來（2026-08-23 A1 根因）：單元測試的 `TEST_HOST` 是完整 app，啟動即走 `live()`
+    /// 讀真實 Keychain。app 為 ad-hoc 簽名，**每次重建重簽後代碼簽名標識改變** →
+    /// Keychain item 的 ACL 不再匹配 → 系統彈 SecurityAgent 授權框 → `SecItemCopyMatching`
+    /// 阻塞 → app 啟動不完成 → `The test runner hung before establishing connection`，
+    /// 0 條測試執行。這使無人值守跑測試不可行。
+    ///
+    /// 本旗標補上 Plan §4.9「測試禁讀真實 .env／真實 Keychain」的實現缺口：
+    /// 由 scheme 的 test action 顯式注入（見 project.yml），**不**依賴 XCTest 內部環境變數推測。
+    /// UITests 不注入，故仍走完整 Keychain 路徑，A-05 的 token 預填驗收不受影響。
+    static let unitTestHostFlag = "AZW_UNIT_TEST_HOST"
+
+    static var isUnitTestHost: Bool {
+        ProcessInfo.processInfo.environment[unitTestHostFlag] == "1"
+    }
+
     /// 生產組裝：Keychain＋UserDefaults、legacy 一次性遷移、真實 Music/HTTP
     static func live() -> AppModel {
-        let store = ConfigStore(secrets: KeychainStore())
-        _ = LegacyConfigMigrator.migrateIfNeeded(
-            into: store,
-            envPaths: DotEnv.candidatePaths(),
-            legacyConfigPath: legacyConfigPath
-        )
+        // 單元測試 host：短路整個 secret 路徑——不建 KeychainStore（讀會彈授權框），
+        // 也不跑 legacy 遷移（它讀 .env 並**寫回** Keychain，寫入同樣觸發授權框）
+        let isTestHost = isUnitTestHost   // 每次讀都會從 environ 重建整份字典，綁一次
+        let store = isTestHost
+            ? ConfigStore(secrets: EphemeralSecretStore())
+            : ConfigStore(secrets: KeychainStore())
+        if !isTestHost {
+            _ = LegacyConfigMigrator.migrateIfNeeded(
+                into: store,
+                envPaths: DotEnv.candidatePaths(),
+                legacyConfigPath: legacyConfigPath
+            )
+        }
 
         let client = URLSessionHTTPClient()
         let music = MusicAppleEventsClient()

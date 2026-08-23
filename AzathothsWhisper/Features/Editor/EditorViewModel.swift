@@ -113,7 +113,9 @@ final class EditorViewModel {
     }
 
     /// C-23：Batch 載入專輯的三態文案設在 **Editor** 的狀態欄（py:623/633/637 走同一個 setStatus）
-    func setStatusFromBatch(_ text: String) {
+    /// 由外部特性注入狀態文案（目前只有 Batch 載入三態，C-23：py:623/633/637）。
+    /// 命名刻意與來源無關——狀態欄是 Editor 的展示資源，誰寫入不該編進方法名。
+    func setExternalStatus(_ text: String) {
         statusText = text
     }
 

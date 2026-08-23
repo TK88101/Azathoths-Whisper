@@ -58,7 +58,7 @@ struct BatchView: View {
             .padding(.horizontal, 24)                              // px-6
             .padding(.vertical, 16)                                // py-4
 
-            Rectangle().fill(Theme.border).frame(height: 1)
+            hairline
         }
         .background(Theme.background)
     }
@@ -73,7 +73,7 @@ struct BatchView: View {
         }
         .background(Theme.cardBackground)                          // bg-[#050505]
         .overlay(alignment: .trailing) {
-            Rectangle().fill(Theme.border).frame(width: 1)
+            columnDivider
         }
     }
 
@@ -107,13 +107,19 @@ struct BatchView: View {
             .tracking(1)
             .foregroundStyle(Theme.Gray.g500)
 
-            Rectangle().fill(Theme.border).frame(height: 1)
+            hairline
         }
         .background(Theme.background)
     }
 
+    /// 1px 垂直分隔線（欄間、面板右緣）
     private var columnDivider: some View {
         Rectangle().fill(Theme.border).frame(width: 1)
+    }
+
+    /// 1px 水平分隔線（區塊上下緣）
+    private var hairline: some View {
+        Rectangle().fill(Theme.border).frame(height: 1)
     }
 
     @ViewBuilder
@@ -173,7 +179,7 @@ struct BatchView: View {
             .padding(12)                                           // p-3
             .background(Theme.background)
             .overlay(alignment: .bottom) {
-                Rectangle().fill(Theme.border).frame(height: 1)
+                hairline
             }
 
             previewBody
@@ -210,7 +216,7 @@ struct BatchView: View {
 
     private var footer: some View {
         VStack(spacing: 0) {
-            Rectangle().fill(Theme.border).frame(height: 1)
+            hairline
 
             HStack(spacing: 0) {
                 Text(verbatim: model.statusText)

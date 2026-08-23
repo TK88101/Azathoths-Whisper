@@ -16,6 +16,11 @@ private let emptyPreviewMeta = "--"
 @Observable
 final class BatchViewModel {
     /// 列表區的四態（py:624 佔位／py:629,636 紅字／正常渲染）
+    ///
+    /// **`.failed` 是有意保留的不可達分支，勿當死碼清理**（2026-08-23 裁定，Codex 複審勝方＝保留）：
+    /// ACCEPTANCE C-26 明文要求「保留於 UI 但無生產觸發點」——py:1180-1182 的 except 吞掉全部
+    /// 異常回 []，故原版兩個紅字分支實際到不了，Swift 照搬此語義。這是**規格要求**的不可達碼，
+    /// 不是漏清理。要刪必須先修訂並重新簽署 C-26（同步 `StatusText.failedToLoadTracks`／`batchFailed`）。
     enum ListState: Equatable {
         case idle
         case loading
@@ -62,6 +67,10 @@ final class BatchViewModel {
     var lyricsService: LyricsService
     /// 每次專輯載入／切換遞增；串行循環每步回寫前校驗（C-19）
     private var sessionID = 0
+
+    /// 本輪作業是否已被專輯切換／新一輪載入作廢（C-19）。
+    /// 刻意回傳 Bool 而非直接 return——六個呼叫點的 early-return 語義各自不同
+    /// （有的 return、有的 continue），把控制流藏進 helper 會讓循環行為變得不透明。
     @ObservationIgnored private(set) var loadTask: Task<Void, Never>?
 
     private static let log = Logger(
@@ -82,6 +91,8 @@ final class BatchViewModel {
     func rowNumber(at index: Int) -> String {
         String(format: "%02d", index + 1)
     }
+
+    private func isStale(_ session: Int) -> Bool { session != sessionID }
 
     // MARK: - 導航與事件
 
@@ -130,7 +141,7 @@ final class BatchViewModel {
         //     session 值；靠下面成功路徑的遞增，先完成者作廢後完成者，只提交一次。
         let session = sessionID
         let loaded = await fetchAlbumTracks()
-        guard session == sessionID else { return }
+        guard !isStale(session) else { return }
 
         sessionID += 1
         tracks = loaded
@@ -153,9 +164,25 @@ final class BatchViewModel {
         }
     }
 
+    /// 在飛的 `loadAlbum()` 呼叫數。不變量：`loadsInFlight == 活躍 loadAlbum 呼叫數`。
+    ///
+    /// 為何不是裸布林（C-18 偏差，2026-08-23 修）：舊實作在每個 `loadAlbum()` 的
+    /// `defer` 裡無條件落下 busy，重疊載入時先完成者會提前解除——按鈕提前啟用、輪詢提前恢復。
+    /// 切專輯路徑在原版**不可能**發生（輪詢在 isBusy 時跳過 py:508-510，載入期間偵測不到
+    /// 專輯變更），故該空窗違反已簽署的 C-18，不是 1:1 保真。
+    ///
+    /// 不改為「取消舊載入」：tab 連點的重疊載入是原版可觀察行為
+    /// （py:396 只判 batchData.length，而該值在 py:626 解析後才賦值），
+    /// 取消會讓第二次載入不發 AE 請求，偏離原版（上游 §8.2 駁回項 1 已裁定）。
+    private var loadsInFlight = 0
+
     private func setLoadingAlbum(_ loading: Bool) {
-        isLoadingAlbum = loading
-        onBusyChange?(loading)
+        loadsInFlight += loading ? 1 : -1
+        assert(loadsInFlight >= 0, "setLoadingAlbum 的 true/false 未配對")
+        let busy = loadsInFlight > 0
+        guard busy != isLoadingAlbum else { return }
+        isLoadingAlbum = busy
+        onBusyChange?(busy)
     }
 
     // MARK: - 選中（py:604-613）
@@ -184,7 +211,7 @@ final class BatchViewModel {
         statusText = StatusText.fetchingTracks(missing.count)
 
         for (index, track) in missing.enumerated() {
-            guard session == sessionID else { return }
+            guard !isStale(session) else { return }
             statusText = StatusText.fetchingProgress(
                 index + 1, of: missing.count, title: track.title
             )
@@ -198,14 +225,14 @@ final class BatchViewModel {
                 artist: track.artist, title: track.title, album: track.album
             )
 
-            guard session == sessionID else { return }   // C-19：回寫前再校驗
+            guard !isStale(session) else { return }   // C-19：回寫前再校驗
             // C-30：只有 .found 算命中。原版把 "Genius Error: …" 當歌詞填進列表，
             // 再由 Import All 寫進音樂檔——列舉三態天然阻斷該路徑。
             guard case .found(let lyrics) = result else { continue }
             apply(lyrics: lyrics, to: track.persistentID)
         }
 
-        guard session == sessionID else { return }
+        guard !isStale(session) else { return }
         statusText = StatusText.fetchComplete
     }
 
@@ -233,7 +260,7 @@ final class BatchViewModel {
 
         do {
             let didWrite = try await music.setLyrics(persistentID: selectedID, lyrics: content)
-            guard session == sessionID else { return }
+            guard !isStale(session) else { return }
             if didWrite {
                 apply(lyrics: content, to: selectedID)
                 statusText = StatusText.batchSaved       // C-28：帶句點，與 Editor 不同
@@ -242,7 +269,7 @@ final class BatchViewModel {
                 statusText = StatusText.batchSaveFailed
             }
         } catch {
-            guard session == sessionID else { return }
+            guard !isStale(session) else { return }
             Self.log.error("import selected failed: \(String(describing: error), privacy: .public)")
             statusText = StatusText.batchErrorSaving
         }
@@ -275,7 +302,7 @@ final class BatchViewModel {
         statusText = StatusText.savingTracks(toSave.count)   // py:724，同樣即被覆蓋
 
         for (index, track) in toSave.enumerated() {
-            guard session == sessionID else { return }
+            guard !isStale(session) else { return }
             statusText = StatusText.savingProgress(
                 index + 1, of: toSave.count, title: track.title
             )
@@ -289,7 +316,7 @@ final class BatchViewModel {
             }
         }
 
-        guard session == sessionID else { return }
+        guard !isStale(session) else { return }
         statusText = StatusText.allSaved
         confettiTrigger += 1
     }

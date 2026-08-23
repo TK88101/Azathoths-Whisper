@@ -10,6 +10,12 @@ enum PlaybackEvent: Equatable, Sendable {
     case permissionDenied
 }
 
+/// 忙碌來源。輪詢只在**全部**來源都空閒時才跑。
+enum BusySource: Sendable {
+    case editor
+    case batch
+}
+
 /// 可注入的時鐘，讓輪詢測試零真實延時
 protocol PollClock: Sendable {
     func sleep(for interval: Duration) async throws
@@ -33,7 +39,7 @@ actor NowPlayingMonitor {
     private var lastSignature: String?
     private var lastAlbumKey: String?
     private var lastWasNotPlaying = false
-    private var isBusy = false
+    private var busySources: Set<BusySource> = []
     private var pollTask: Task<Void, Never>?
 
     init(music: any MusicControlling, clock: any PollClock = SystemPollClock()) {
@@ -44,9 +50,20 @@ actor NowPlayingMonitor {
         self.continuation = continuation
     }
 
-    /// py:508-510：批處理/抓詞期間跳過輪詢，避免打斷使用者操作
-    func setBusy(_ busy: Bool) {
-        isBusy = busy
+    /// py:508-510：批處理/抓詞期間跳過輪詢，避免打斷使用者操作。
+    ///
+    /// **必須帶 source**（2026-08-23 修）：Editor 與 Batch 是兩個獨立的忙碌來源，
+    /// 舊簽名讓兩者各自以裸布林覆寫同一個旗標——一方送 false 會清掉另一方仍需維持的 busy。
+    /// 實測可達：Editor 抓詞中切到 Batch（原版 toggleBusy 不禁 tab 導航，py:407）→
+    /// Batch 載入完成送 false → Editor 仍在抓詞但輪詢已恢復。
+    /// 由本型別自己記錄「誰還忙著」，而非讓組裝根替它記帳；新增來源（如 M7 Cover Flow）
+    /// 只需擴 `BusySource`，不必動 `AppModel`。
+    func setBusy(_ busy: Bool, source: BusySource) {
+        if busy {
+            busySources.insert(source)
+        } else {
+            busySources.remove(source)
+        }
     }
 
     func start() {
@@ -72,7 +89,7 @@ actor NowPlayingMonitor {
 
     /// 單次輪詢；測試可直接驅動而不經過時鐘
     func tick() async {
-        guard !isBusy else { return }
+        guard busySources.isEmpty else { return }
 
         do {
             guard let track = try await music.currentTrack() else {

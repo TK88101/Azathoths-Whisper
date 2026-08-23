@@ -104,11 +104,11 @@ struct NowPlayingMonitorTests {
         let music = MockMusicClient(script: [.track(.fixture(), lyrics: "")])
         let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
 
-        await monitor.setBusy(true)
+        await monitor.setBusy(true, source: .editor)
         await monitor.tick()
         #expect(await music.currentTrackCalls == 0, "busy 期間不得查詢 Music")
 
-        await monitor.setBusy(false)
+        await monitor.setBusy(false, source: .editor)
         await monitor.tick()
         #expect(await music.currentTrackCalls == 1)
     }

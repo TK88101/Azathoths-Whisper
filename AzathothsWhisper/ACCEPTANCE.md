@@ -75,7 +75,7 @@
 | C-15 | Import All 確認框文案 "Writes lyrics for ALL tracks in list where lyrics are present. Continue?" | py:715 | `testImportAllShowsConfirmationWithExactWording`（sheet 內文案逐字比對＋Cancel 後狀態欄不變） | ✅ M6 |
 | C-16 | Import All 串行寫入全部有詞項→"All saved."＋confetti | py:716-738 | `importAllWritesEveryTrackThatHasLyrics` | ✅ M6（邏輯層） |
 | C-17 | 切專輯→列表清空；Batch 可見則自動重載 | py:488-498 | `albumChangeClearsListAndReloadsWhenVisible`／`albumChangeClearsListWithoutReloadWhenHidden` | ✅ M6（邏輯層） |
-| C-18 | **逐操作禁用範圍 1:1（原 Plan §4.10 前提有誤，2026-08-14 複核修正）**：載入專輯＝全部 5 按鈕禁用＋輪詢停；Fetch Missing／Import All＝只禁自己按鈕、輪詢照跑；Import Selected＝不禁任何按鈕、輪詢照跑。原描述「批處理期間按鈕全禁＋輪詢停」只對「載入專輯」成立 | py:621/639（載入調 toggleBusy）、657/678（Fetch 只禁自己）、723/738（All 只禁自己）、682-709（Selected 無任何禁用）、508-510（輪詢跳過只看 isBusy） | `onlyAlbumLoadSuspendsPolling`／`fetchMissingDisablesOnlyItsOwnButton`／`loadingStateIsObservableWhileFetching` | ✅ M6（邏輯層） |
+| C-18 | **逐操作禁用範圍 1:1（原 Plan §4.10 前提有誤，2026-08-14 複核修正）**：載入專輯＝全部 5 按鈕禁用＋輪詢停；Fetch Missing／Import All＝只禁自己按鈕、輪詢照跑；Import Selected＝不禁任何按鈕、輪詢照跑。原描述「批處理期間按鈕全禁＋輪詢停」只對「載入專輯」成立 | py:621/639（載入調 toggleBusy）、657/678（Fetch 只禁自己）、723/738（All 只禁自己）、682-709（Selected 無任何禁用）、508-510（輪詢跳過只看 isBusy） | `onlyAlbumLoadSuspendsPolling`／`fetchMissingDisablesOnlyItsOwnButton`／`loadingStateIsObservableWhileFetching`。**2026-08-23 補修重疊載入偏差**：舊實作在每個 `loadAlbum()` 的 `defer` 無條件落下 busy，先完成者會提前解除（按鈕提前啟用、輪詢提前恢復）——切專輯路徑在原版不可能發生（輪詢在 isBusy 時跳過 py:508-510），故違反本條。改為 `loadsInFlight` 在飛請求計數，歸零才落下。另修 `AppModel` 讓 Editor／Batch 各自裸布林覆寫 monitor 單一 isBusy 的缺陷（一方送 false 清掉另一方），改為 `editorBusy || batchBusy` 聚合。新增用例：`overlappingLoadKeepsBusyUntilLastCompletes`／`overlappingLoadSuspendsPollingUntilLastCompletes`（整合層，驅動 monitor.tick 斷言輪詢確實停）／四條 `loadsInFlight` 不變量／`batchLoadCompletionMustNotClearEditorBusy` | ✅ M6＋M6收尾 |
 | C-19 | Batch 作業中切 tab／專輯變更→session ID 校驗防過期回寫（縱深，修正⚠️） | Plan §4.10 | `staleFetchLoopStopsWritingAfterAlbumReload`（閘門製造真實競態窗口） | ✅ M6（邏輯層） |
 | C-20 | 隱藏窗口不中斷 Batch 任務 | Plan §4.10（對齊原版隱藏語義） | `BatchLiveUITests.testHiddenWindowDoesNotInterruptBatchFetch`（預設跳過，需 AZW_MUSIC_TESTS=1——與 `LiveMusicTests` 同一閘門變數）：於 `FETCHING (1/12)` 時點紅鈕隱藏，35s 後 app 仍存活；os_log 顯示 12 條 fetch progress 全數產生（00:10:41.200→00:10:48.273），即隱藏後續跑完剩餘 11 首 | ✅ M6（真機） |
 | C-21 | 表頭 Artist/Title/Stat 走 i18n（col_*）；`#` 欄為硬編碼符號**不**走 i18n；預覽面板標題走 col_preview | py:219-224, 233 | `testBatchShellInEnglish`／`…InJapanese`／`…InTraditionalChinese`（三語表頭＋`#` 欄不 i18n） | ✅ M6 |
@@ -83,7 +83,7 @@
 | C-23 | 載入專輯期間 **Editor** 狀態欄三態："Processing album batch..." → 成功 "Album loaded"／異常 "Batch failed"（設的是主狀態欄，非 Batch 自己的狀態欄） | py:623/633/637 | `loadingPublishesPlaceholderAndEditorStatus` | ✅ M6（邏輯層） |
 | C-24 | Batch header 專輯名三態：初始 "Loading..."／有資料取**首曲的 album 欄位**／無資料 "No Data / Album" | py:212/559/561 | `loadedAlbumTakesHeaderNameFromFirstTrack`／`emptyAlbumShowsNoDataHeader` | ✅ M6（邏輯層） |
 | C-25 | Batch footer 狀態欄初始 "Ready" ＝**硬編碼英文，不隨語言變**（對比 Editor footer 的 status_ready 走 i18n——原版兩處不一致，照搬） | py:241 vs py:196 | `testBatchColumnsLocalizeButStatusStaysEnglishInJapanese`（ja 下狀態欄仍 READY，且畫面查無 status_ready 的 ja 值「準備完了」） | ✅ M6 |
-| C-26 | 載入失敗兩態在新版**不可達**（照搬原版語義）：py:1180-1182 的 `except` 吞掉全部異常回 `[]`，故 JS 的兩個紅字分支（非陣列／"Failed to load tracks."）實際到不了。Swift 同樣把 Music 層異常降為空專輯（header "No Data / Album"、Editor 狀態 "Album loaded"），但錯誤不靜默丟棄——落 os_log。`ListState.failed` 分支保留於 UI 但無生產觸發點 | py:628-637 vs py:1180-1182 | `musicFailureIsSwallowedAsEmptyAlbumLikePython` | ✅ M6 |
+| C-26 | 載入失敗兩態在新版**不可達**（照搬原版語義）：py:1180-1182 的 `except` 吞掉全部異常回 `[]`，故 JS 的兩個紅字分支（非陣列／"Failed to load tracks."）實際到不了。Swift 同樣把 Music 層異常降為空專輯（header "No Data / Album"、Editor 狀態 "Album loaded"），但錯誤不靜默丟棄——落 os_log。`ListState.failed` 分支保留於 UI 但無生產觸發點。**2026-08-23 裁決：維持保留**（Codex 複審勝方＝保留方；理由：這是規格要求的不可達碼，非漏清理；刪除須先修訂並重新簽署本條）。已於 `BatchViewModel.ListState` 與 `StatusText` 兩處加防誤判註釋 | py:628-637 vs py:1180-1182 | `musicFailureIsSwallowedAsEmptyAlbumLikePython` | ✅ M6 |
 | C-27 | 三操作的前置與逐條進度文案：Fetch Missing "Fetching {n} tracks..." → "Fetching (i/n): {title}"；Import All "Saving {n} tracks..." → "Saving (i/n): {title}"；Import Selected "Saving {title}..." | py:658/662/724/728/692 | `fetchMissingRunsSeriallyWithProgressText`／`importAllReportsPerTrackProgress`／`importSelectedReportsSavingProgress` | ✅ M6（邏輯層） |
 | C-28 | Import Selected 結果文案**帶句點**："Saved."／"Save failed."／"Error saving."——與 Editor Save 的 "Saved"（無句點）不同，照搬此差異 | py:700/703/707 vs py:543 | `importSelectedWritesPreviewTextAndTriggersConfetti`／`…ReportsSaveFailedWhenWriteReturnsFalse`／`…ReportsErrorSavingWhenMusicThrows` | ✅ M6（邏輯層） |
 | C-29 | **缺詞判定採 trim 語義**（⚠️ 已拍板修正 2026-08-14）：純空白歌詞（如 "   "）視為缺詞。原版三處篩選（狀態點/Fetch Missing/Import All）用未 strip 的 `length > 0`，而後端算好的 `has_lyrics`（strip 判空）從未被使用——屬原版內部不一致。可見變化：純空白曲目改顯暗紅點、會被 Fetch Missing 抓、不再被 Import All 把空白寫回音樂庫 | py:587/651/717（實際用）vs py:2253-2254（算了沒用） | `whitespaceOnlyLyricsCountAsMissing`／`importAllWritesEveryTrackThatHasLyrics`（純空白 fixture 三處斷言） | ⚠️ 已拍板修正 |
@@ -225,3 +225,39 @@
 | **原版缺陷 2 條**：`has_lyrics` 算了不用導致缺詞判定語義分裂；`fetch_single_missing` 會把 "Genius Error: …" 當歌詞並經 Import All 寫入音樂檔 | 補為 C-29（用戶拍板採 trim 語義）、C-30（按 B-11a 先例修正） |
 
 由此產生的真實競態（原版存在，非理論）：Fetch Missing 進行中切專輯 → 輪詢照跑觸發 `batchData = []` 重載（py:492-497）→ 舊循環繼續往已被替換的陣列元素寫入並重繪新列表 → 進度錯亂、命中丟失。新版以 sessionID 守衛在每步回寫前校驗。
+
+
+## 附錄：M6 收尾（2026-08-23）
+
+### A1 根因：`runner hung before establishing connection` 的真正原因
+
+上游 `docs/plans/2026-08-14-m6-batch.md` §8.3 記「`-skip-testing` 排除該用例後單元 target 恢復全綠
+（三次一致），故 destabiliser 確為該用例本身，非環境」——**此歸因錯誤，本次以實驗推翻**。
+
+真正根因：test host app 啟動時讀 Keychain 的 `GENIUS_ACCESS_TOKEN`
+（`AppModel.live()` → `KeychainStore.read` → `SecItemCopyMatching`）。app 為 ad-hoc 簽名，
+**每次重建重簽後代碼簽名標識改變** → Keychain item 的 ACL 失配 → 系統彈 SecurityAgent 授權框
+→ `SecItemCopyMatching` 阻塞 → app 啟動不完成 → runner 連不上。
+當時第一次跑觸發彈窗、人點掉後 ACL 恢復，之後三次自然全綠；與被排除的用例無關——把時間先後誤讀為因果。
+
+決定性證據：繞開 xcodebuild 直接啟動重簽後的 app，SecurityAgent 進程數 **0 → 1**。
+
+修法：scheme 的 test action 注入 `AZW_UNIT_TEST_HOST=1`（`project.yml`），`AppModel.live()` 檢測後
+改用 `EphemeralSecretStore` 並跳過 legacy 遷移（遷移會讀 `.env` 並**寫回** Keychain，寫入同樣觸發授權框）。
+UITests 在 `AppUITestCase` 顯式設回 `"0"`，仍走真實 Keychain，A-05 的 token 預填驗收不受影響。
+補上的正是 Plan §4.9「測試禁讀真實 .env／真實 Keychain」的實現缺口。
+驗證：同樣的重建＋重簽場景，SecurityAgent 0 → 0，全量單元測試綠。
+
+### 另一個獨立缺陷：`LyricsGate` 單槽 continuation
+
+兩個等待者時後者覆蓋前者，被覆蓋者永不 resume；`await` 該 task 的測試永久掛起。
+與上述症狀**獨立**——上游只看到 `runner hung` 的文字卻在此用例上找原因，故熔斷。
+已改為 broadcast 多等待者，並以四條語義鎖定測試釘住。
+
+### UITests 未驗（環境限制）
+
+本次無法執行 UITests：runner 在初始化階段即報
+`Failed to initialize for UI testing: Timed out while enabling automation mode.`
+該階段早於任何測試代碼加載，與本次改動無關；`automation mode` 需 GUI 層授權
+（系統設定 → 隱私與安全性 → 輔助功能），無人值守下不可為。
+**A／C／D／E 段中依賴 UITests 的條目本次未重跑**，留待有人值守時驗證。

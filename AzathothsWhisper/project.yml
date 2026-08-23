@@ -100,6 +100,12 @@ schemes:
         AzathothsWhisperUITests: [test]
     test:
       gatherCoverageData: true
+      # 單元測試的 TEST_HOST 是完整 app，啟動即走 AppModel.live()。此旗標讓它跳過
+      # 真實 Keychain 與 legacy 遷移——ad-hoc 重簽後 ACL 失配會彈授權框並阻塞啟動，
+      # 使無人值守測試不可行（2026-08-23 A1 根因，見 docs/plans/2026-08-23-m6-closeout.md）。
+      # UITests 的被測 app 由 XCUIApplication 啟動，在 AppUITestCase 顯式設回 "0"。
+      environmentVariables:
+        AZW_UNIT_TEST_HOST: "1"
       targets:
         - name: AzathothsWhisperTests
           parallelizable: false
