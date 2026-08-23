@@ -203,7 +203,7 @@
 | H-01 | 第三 nav tab（Editor｜Batch｜Cover Flow），激活時懶加載 | Plan §4.8 | 操作 | ⬜ |
 | H-02 | 3D 形態五要素：中心正面／兩側 ±55° 斜角／負間距覆疊／倒影漸變／viewAligned 吸附 | Plan §4.8 | 目視 | ⬜ |
 | H-03 | 中心下方標籤 "ARTIST // TITLE"（mono 排版語言） | Plan §4.8 | 目視 | ⬜ |
-| H-04 | 切歌 ≤3s（一個輪詢週期）自動平滑居中 | Plan §4.8 | 計時操作 | ⬜ |
+| H-04 | 切歌 ≤3s（一個輪詢週期）自動平滑居中——**條件式保證**（2026-08-23 拍板）：在正常 AE 回應與已定義的 timeout budget 下成立；若 Music.app 超過 AE budget 無回應，本輪允許延遲或缺少封面，但**不得**造成後續輪詢無界餓死。理由：`SBApplication` 的 AE 呼叫同步佔用串行佇列，Swift 層 timeout 無法撤回已送出的 Apple Event，client 端只能保證 bounded wait | Plan §4.8 | 計時操作 ＋ 慢請求 bounded-wait 測試 | ⬜ |
 | H-05 | 用戶手動滑走後不搶控制；下次真實切歌才拉回 | Plan §4.8 | 操作 | ⬜ |
 | H-06 | 切專輯→重建條目＋中心向兩側預取 | Plan §4.8 | 操作 | ⬜ |
 | H-07 | 封面緩存：冷啟動磁盤即顯；損毀檔容錯（刪除重取） | Plan §4.8 | 重啟＋損毀注入測試 | ⬜ |

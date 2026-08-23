@@ -68,15 +68,34 @@ Features/CoverFlow/
 | **P2** | 磁碟 LRU ＋ metadata 恢復 ＋ 低優先級可取消預取 | H-06／07 ＋ 效能 |
 
 **分階段直接緩解了 Codex #6（AE 餓死 monitor）**：P1 無預取，AE 上最多 1 個 artwork 在飛。
-但**「in-flight ≤ 1」不等於「不阻塞 deadline」**（Codex 複審重提且論證成立，已採納）——
-單一慢請求同樣會讓後續 `currentTrack()` 排在它後面。故 P1 仍須：
-- artwork 請求**有界 timeout ＋ 可取消**
-- 切歌／monitor deadline 到達時，中心 artwork 請求**可放棄**，不得阻塞下一次 `currentTrack()`
-- 測試：單一慢 artwork 請求進行期間，monitor 仍能在 H-04 deadline 內完成
+但**「in-flight ≤ 1」不等於「不阻塞 deadline」**——單一慢請求同樣會讓後續 `currentTrack()`
+排在它後面。
+
+> **實施中的事實修正（2026-08-23，第三輪 Codex 拍板）**
+>
+> 我與 Codex 一度共識「P1 補上有界 timeout ＋ 可取消即可」。**該前提不成立**：
+> `MusicAppleEventsClient.run`（`:143-163`）是 `Self.queue.async { try body(app) }`，
+> `body` 是**同步**的 AE 呼叫；Swift 的 Task cancellation **不會**中斷已開始執行的
+> dispatch block。Swift 層的 timeout 只讓**呼叫方**放棄 continuation，
+> **無法把該 AE 操作從串行佇列上拿走**，後續 `currentTrack()` 照樣排在它後面。
+>
+> **正解（Codex 給出、已核實 API 存在）**：`SBApplication.timeout`
+> （`SBApplication.h:251`，`@property long timeout`，單位 ticks，
+> 「The period the application will wait to receive reply Apple events」）
+> 才是 **AE reply 的實際等待上限**——它讓 AE 呼叫本身逾時返回，從而**釋放佇列**。
+
+故 P1 的約束改為：
+- artwork 的 AE 呼叫設定 **`SBApplication.timeout`**（AE 層），而非只包 Swift concurrency timeout
+- 保留**單一 AE executor**，維持既有互斥安全性——Apple 未保證 `SBApplication` 可跨執行緒
+  並發使用，兩條 queue 同時對 Music.app 發 AE 的安全性未經 spike 證明，不在 P1 引入
+- artwork 為 **best-effort、可丟棄**：未開始的請求可取消，逾時不寫 cache
 - 斷言：無預取時 AE 上 artwork 在飛請求數 ≤ 1
 
-AE 優先級佇列**留 P2**（與預取同時落地）——在 P1 就改造 Editor／Batch／monitor 三者共用的
-關鍵路徑，是為尚不存在的負載付出風險（Codex 接受此判斷）。
+**誠實邊界**：client 端只保證 **bounded wait**，不保證遠端操作被撤銷——
+Music.app 可能仍在服務端處理已送出的 Apple Event。
+
+AE 優先級調度**留 P2**（與預取同時落地）。註：單一串行佇列是 FIFO，
+QoS 不改變執行順序，真正的優先級需要重新設計 executor——這是 P2 的工作。
 
 ---
 
@@ -109,17 +128,21 @@ spike 失敗 → 停下重評估渲染方案（對齊 M1 的 AE spike 先例）�
 **職責**：`ArtworkProviding` 協議——查記憶體 → 未命中走 AE 取 raw data →
 `CGImageSourceCreateThumbnailAtIndex` 解碼 ≤512px → 存記憶體 → 回 `NSImage`。
 
-**有界與可取消（Codex #6 複審重提，採納）**：
-- 每次 artwork 請求包在 `withThrowingTaskGroup` 的 timeout 競速中（上限 **2 秒**，
-  留 1 秒餘裕給 H-04 的 3 秒預算）
-- 中心改變 / 切專輯 → 取消尚未完成的舊請求
+**有界與可取消（第三輪拍板後的正解）**：
+- artwork 的 AE 呼叫設 **`SBApplication.timeout`**（AE 層真正的等待上限，能釋放佇列）。
+  預算 **1.5 秒**（90 ticks）——與 `currentTrack()` 自身耗時合計須留在 H-04 的 3 秒內
+- **不**用 Swift concurrency timeout 冒充：它只放棄 continuation，不釋放 AE 佇列
+- 中心改變 / 切專輯 → 取消**尚未開始**的請求（已在佇列上執行的無法撤回，靠 AE timeout 收斂）
 - 同一 persistentID 併發 miss 只發一次 AE（in-flight 去重，Codex #18 採納）
 
 **DoD**：
 - ①逾時回 nil 不崩 ②取消後不寫快取 ③同 ID 併發 miss 只觸發一次 AE
 - ④解碼失敗回 nil 且不寫快取 ⑤縮圖 ≤512px
-- ⑥**慢請求 deadline 測試**：注入一個 5 秒才回的 artwork 請求，斷言期間
-  `NowPlayingMonitor.tick()` 仍能在 3 秒內完成 `currentTrack()`
+- ⑥**慢請求 bounded-wait 測試**（措辭按第三輪拍板修正）：注入一個 5 秒才回的 artwork
+  AE 操作，驗證 artwork 的實際 AE 等待**在 budget 內結束／失敗**，且 monitor 的
+  `currentTrack()` **不會無界等待**。
+  **驗收同時記錄**：Music.app 可能已在服務端繼續處理已送出的 Apple Event，
+  client 端只保證 bounded wait，不保證遠端操作被撤銷
 - ⑦斷言無預取時 in-flight artwork ≤ 1
 
 ### P1-3 `CoverFlowViewModel`
@@ -257,7 +280,7 @@ safeAreaPadding (viewWidth−itemWidth)/2、倒影 scaleEffect(y:−1) ＋ Linea
 | V3 | H 段無 ⬜（目視項標「M8 並排對照」並註明理由） | ACCEPTANCE 複查 |
 | V4 | 快取單測不碰真實檔案系統 | 全部走臨時目錄，跑完清理 |
 | V5 | Editor／Batch 回歸 | 既有用例全綠 |
-| V6 | **monitor deadline 不被 artwork 阻塞** | 慢請求測試（P1-2 DoD ⑥、P2-2 DoD ⑥） |
+| V6 | **artwork 不得造成 client-side 無界阻塞**（不寫成無條件的「deadline 不被阻塞」——見下） | 慢請求測試中 artwork 於設定 budget 內失敗或被放棄，monitor 輪詢可繼續。H-04 的 ≤3s 僅在「AE client budget ＋ `currentTrack()` budget 合計 ≤3s 且 Music.app 可回應」的條件下成立 |
 | V7 | 非 live UITests 全綠 | **前提：automation mode 授權可用**（M6 收尾時受阻，見該 Plan 附錄） |
 
 ## 7. 測試策略

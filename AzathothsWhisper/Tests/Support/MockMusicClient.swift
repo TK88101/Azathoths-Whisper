@@ -24,6 +24,12 @@ actor MockMusicClient: MusicControlling {
     private var albumTracksCalls = 0
     private var writeGate: LyricsGate?
     private var artwork: [String: Data] = [:]
+    private(set) var artworkCalls = 0
+    /// 目前在飛的 artwork 請求數——驗「P1 無預取時 ≤ 1」
+    private(set) var artworkInFlight = 0
+    private var artworkGate: LyricsGate?
+    /// 覆寫整體結果（優先於 artwork 字典）：用來製造 AE 失敗
+    private var artworkOutcome: Result<Data?, MusicError>?
     private var setLyricsOutcome: Result<Bool, MusicError> = .success(true)
 
     func setSetLyricsOutcome(_ outcome: Result<Bool, MusicError>) {
@@ -57,6 +63,15 @@ actor MockMusicClient: MusicControlling {
 
     func setArtwork(_ data: Data, for persistentID: String) {
         artwork[persistentID] = data
+    }
+
+    /// 卡住 artwork 的回應：製造併發／在飛數量可斷言的窗口
+    func setArtworkGate(_ gate: LyricsGate) {
+        artworkGate = gate
+    }
+
+    func setArtworkOutcome(_ outcome: Result<Data?, MusicError>) {
+        artworkOutcome = outcome
     }
 
     private func next() -> Response {
@@ -112,7 +127,16 @@ actor MockMusicClient: MusicControlling {
     }
 
     func artworkData(persistentID: String) async throws -> Data? {
-        artwork[persistentID]
+        artworkCalls += 1
+        artworkInFlight += 1
+        defer { artworkInFlight -= 1 }
+        if let artworkGate {
+            await artworkGate.wait()
+        }
+        if let artworkOutcome {
+            return try artworkOutcome.get()
+        }
+        return artwork[persistentID]
     }
 }
 

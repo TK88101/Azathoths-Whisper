@@ -90,7 +90,8 @@ struct MusicAppleEventsClient: MusicControlling {
     }
 
     func artworkData(persistentID: String) async throws -> Data? {
-        try await run { app in
+        // 封面是 best-effort：逾時即放棄，不得拖住 monitor 的輪詢（見 artworkTimeoutTicks）
+        try await run(aeTimeoutTicks: Self.artworkTimeoutTicks) { app in
             guard let track = Self.findTrack(persistentID: persistentID, in: app),
                   let artworks = track.artworks?(), artworks.count > 0,
                   let artwork = artworks.object(at: 0) as? SBObject
@@ -140,13 +141,31 @@ struct MusicAppleEventsClient: MusicControlling {
         return object as MusicTrackProto
     }
 
-    private func run<T: Sendable>(_ body: @escaping @Sendable (MusicAppProto) throws -> T) async throws -> T {
+    /// AE reply 的等待上限，單位 ticks（1/60 秒）。
+    ///
+    /// 為何需要它（2026-08-23 M7 P1-2）：`body` 是**同步**執行在串行佇列上的 AE 呼叫，
+    /// Swift 的 Task cancellation **不會**中斷已開始的 dispatch block——Swift 層的 timeout
+    /// 只讓呼叫方放棄 continuation，那個 AE 操作仍佔著佇列，後續 `currentTrack()` 照樣排在後面。
+    /// `SBApplication.timeout` 才是 AE reply 的實際等待上限，能讓呼叫本身逾時返回並**釋放佇列**。
+    ///
+    /// 誠實邊界：這只保證 client 端 bounded wait，**不保證**遠端操作被撤銷——
+    /// Music.app 可能仍在服務端處理已送出的 Apple Event。
+    static let artworkTimeoutTicks: Int = 90    // 1.5 秒；與 currentTrack() 合計須留在 H-04 的 3 秒內
+
+    private func run<T: Sendable>(
+        aeTimeoutTicks: Int? = nil,
+        _ body: @escaping @Sendable (MusicAppProto) throws -> T
+    ) async throws -> T {
         let identifier = bundleIdentifier
         return try await withCheckedThrowingContinuation { continuation in
             Self.queue.async {
                 guard let app = SBApplication(bundleIdentifier: identifier), app.isRunning else {
                     continuation.resume(throwing: MusicError.notRunning)
                     return
+                }
+                // 每次 run 都新建 SBApplication，故此設定是 per-call 的
+                if let aeTimeoutTicks {
+                    app.timeout = aeTimeoutTicks
                 }
                 do {
                     let value = try body(app as MusicAppProto)
