@@ -37,6 +37,13 @@ actor LyricsGate {
     /// 取消語義：等待中的 Task 被取消時，其 continuation 仍留在 `waiters` 裡，
     /// 由本次 `open()` 一併 resume（`CheckedContinuation<Void, Never>` 對已取消的
     /// Task resume 是安全的）。此替身僅供測試，不實作可取消的等待機制。
+    /// 已開啟的閘門：佇列中不需要卡住的那幾格
+    static func opened() -> LyricsGate {
+        let gate = LyricsGate()
+        Task { await gate.open() }
+        return gate
+    }
+
     func open() {
         isOpen = true
         let pending = waiters

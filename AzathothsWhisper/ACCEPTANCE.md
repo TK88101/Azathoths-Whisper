@@ -200,17 +200,17 @@
 
 | ID | 行為描述 | 依據 | 驗證方式 | 狀態 |
 |---|---|---|---|---|
-| H-01 | 第三 nav tab（Editor｜Batch｜Cover Flow），激活時懶加載 | Plan §4.8 | 操作 | ⬜ |
-| H-02 | 3D 形態五要素：中心正面／兩側 ±55° 斜角／負間距覆疊／倒影漸變／viewAligned 吸附 | Plan §4.8 | 目視 | ⬜ |
-| H-03 | 中心下方標籤 "ARTIST // TITLE"（mono 排版語言） | Plan §4.8 | 目視 | ⬜ |
+| H-01 | 第三 nav tab（Editor｜Batch｜Cover Flow），激活時懶加載 | Plan §4.8 | `activatingTabWithEmptyListLoads`／`activatingTabWithLoadedListDoesNotReload`（判定同 Batch 的 C-01：資料為空才載入，非「首次」） | ✅ M7-P1（邏輯層） |
+| H-02 | 3D 形態五要素：中心正面／兩側 ±55° 斜角／負間距覆疊／倒影漸變／viewAligned 吸附 | Plan §4.8 | **幾何參數**已由 `CoverFlowGeometryTests`（15 條）釘住：旋轉 ±55° 含 clamp、縮放 1.0→0.82、負間距 −0.42×itemWidth、zIndex −\|d\|、perspective 0.55、首尾可達中心的 edgePadding。**觀感**（實際吸附行為、3D 疊放、resize）待 M8 並排目視——同 A-01／B-20 先例，依 Plan §1「視覺盡可能貼近（非像素級）」不做截圖比對 | ⬜ M8 目視 |
+| H-03 | 中心下方標籤 "ARTIST // TITLE"（mono 排版語言） | Plan §4.8 | 已實作（`coverflow-center-label` 帶 accessibility label，mono 字體＋大寫＋tracking）；文案格式的 UI 斷言待 UITests（automation mode 受阻，見 M6 收尾 Plan 附錄） | ⬜ |
 | H-04 | 切歌 ≤3s（一個輪詢週期）自動平滑居中——**條件式保證**（2026-08-23 拍板）：在正常 AE 回應與已定義的 timeout budget 下成立；若 Music.app 超過 AE budget 無回應，本輪允許延遲或缺少封面，但**不得**造成後續輪詢無界餓死。理由：`SBApplication` 的 AE 呼叫同步佔用串行佇列，Swift 層 timeout 無法撤回已送出的 Apple Event，client 端只能保證 bounded wait | Plan §4.8 | 計時操作 ＋ 慢請求 bounded-wait 測試 | ⬜ |
-| H-05 | 用戶手動滑走後不搶控制；下次真實切歌才拉回 | Plan §4.8 | 操作 | ⬜ |
-| H-06 | 切專輯→重建條目＋中心向兩側預取 | Plan §4.8 | 操作 | ⬜ |
+| H-05 | 用戶手動滑走後不搶控制；下次真實切歌才拉回 | Plan §4.8 | 四條測試：`manualScrollSuppressesAutoCenter`／`sameTrackRefreshDoesNotClearOverride`（**真實切歌＝persistentID 變更**，forceRefresh 對同曲重發事件不算）／`realTrackChangeClearsOverrideAndCenters`／`programmaticCenteringDoesNotSetOverride`（程式化捲動回呼不得誤判為使用者滑動） | ✅ M7-P1（邏輯層） |
+| H-06 | 切專輯→重建條目＋中心向兩側預取 | Plan §4.8 | **重建**：`albumChangedQueriesUsingEventKeyNotCurrentTrack`（用事件 albumKey 查詢，不重讀 currentTrack——後者在快速切歌時會拿到下一張專輯）＋`staleAlbumLoadDoesNotOverwriteNewer`（albumGeneration 守衛）＋`albumChangeResetsOverride`。**預取屬 P2** | ⚠️ 重建 ✅ M7-P1；預取待 P2 |
 | H-07 | 封面緩存：冷啟動磁盤即顯；損毀檔容錯（刪除重取） | Plan §4.8 | 重啟＋損毀注入測試 | ⬜ |
-| H-08 | 無封面占位＝六角形 logo 暗紋，佈局不跳動 | Plan §4.8 | 無封面曲目驗證 | ⬜ |
-| H-09 | 左右方向鍵步進（窗口內按鍵，無全局監聽） | Plan §4.8 | 操作 | ⬜ |
-| H-10 | 純展示：無雙擊播放、無任何播控動詞（決策 6） | Plan 決策 6 | 操作（雙擊無反應） | ⬜ |
-| H-11 | 穩定排序：disc→track number→AE 返回序 fallback（⚠️兼容修正，待簽字） | Plan §4.8 | 多碟專輯驗證 | ⬜ |
+| H-08 | 無封面占位＝六角形 logo 暗紋，佈局不跳動 | Plan §4.8 | 已實作：佔位與封面**同尺寸固定 frame**（`CoverFlowItem.face` 的 `.frame(width:height:)` 在兩個分支之外），六角形 logo 走 `BundleAssets.aboutLogo` opacity 0.12 暗紋；目視待 M8 | ⬜ M8 目視 |
+| H-09 | 左右方向鍵步進（窗口內按鍵，無全局監聽） | Plan §4.8 | 已實作 `.focusable()` ＋ `.onKeyPress(.leftArrow/.rightArrow)`（**窗口內**，無全域 hook——全域監聽會誤傷其他 app）；`stepMovesCenterByOffset`／`stepIsClampedAtBothEnds`（兩端不越界）／`keyboardStepSuppressesAutoCenter`（步進與拖曳同樣算使用者接管）／`stepOnEmptyListIsNoOp`；焦點行為待 UITests | ✅ M7-P1（邏輯層） |
+| H-10 | 純展示：無雙擊播放、無任何播控動詞（決策 6） | Plan 決策 6 | 已實作：`CoverFlowView`／`CoverFlowItem`／`CoverFlowStrip` 全無 `onTapGesture`／播控呼叫；`CoverFlowViewModel` 只依賴 `MusicControlling` 的讀取與 `albumTracks`，不呼叫任何播控 API。UI 層的雙擊無反應待 UITests | ⬜ |
+| H-11 | 穩定排序：disc→track number→AE 返回序 fallback（⚠️兼容修正，待簽字） | Plan §4.8 | `itemsUseStableDisplayOrder`（多碟亂序輸入 → disc→track 排序）；排序函式 `sortedForDisplay()` 為 M2 既有實作 | ⚠️ 已實作，待用戶簽字（兼容修正） |
 
 **總計 123 條**（A12＋B23＋C30＋D13＋E10＋F9＋G15＋H11）。
 

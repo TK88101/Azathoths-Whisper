@@ -17,6 +17,7 @@ final class AppModel {
 
     let editor: EditorViewModel
     let batch: BatchViewModel
+    let coverFlow: CoverFlowViewModel
     private(set) var settings: SettingsViewModel!
 
     /// Editor 與 Batch 任一存檔成功都要放紙花（py:545／701／737）
@@ -52,6 +53,11 @@ final class AppModel {
         self.batch = BatchViewModel(
             lyricsService: Self.makeLyricsService(client: httpClient, token: initialToken),
             music: music
+        )
+        // 封面快取隨 AppModel 生命週期存活：切 tab 不清空，冷啟後首次進入才付取圖成本
+        self.coverFlow = CoverFlowViewModel(
+            music: music,
+            artwork: ArtworkService(music: music)
         )
 
         self.settings = SettingsViewModel(
@@ -166,6 +172,7 @@ final class AppModel {
             for await event in self.monitor.events {
                 self.editor.handle(event)
                 self.batch.handle(event)      // C-17：albumChanged 由 Batch 消費
+                await self.coverFlow.handle(event)   // H-04／H-06
             }
         }
         await monitor.start()
@@ -190,6 +197,12 @@ final class AppModel {
             batch.tabActivated()
         } else {
             batch.tabDeactivated()
+        }
+        // H-01：Cover Flow 的懶載入同樣走「資料為空才載入」（tabActivated 內判定）。
+        // 由 CoverFlowView 的 .task／.onDisappear 驅動，此處只同步失活狀態，
+        // 避免 tab 尚未渲染就先載入。
+        if tab != .coverFlow {
+            coverFlow.tabDeactivated()
         }
     }
 

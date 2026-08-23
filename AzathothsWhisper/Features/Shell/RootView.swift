@@ -116,22 +116,8 @@ struct RootView: View {
             // Batch 自帶狀態欄與按鈕列，不套 Editor 的 footer（py:240-262）
             BatchView(model: model.batch)
         case .coverFlow:
-            placeholder("Cover Flow")
+            CoverFlowView(model: model.coverFlow)
         }
-    }
-
-    /// M7 接手前的暫位（不進驗收表，僅避免空白窗口）
-    private func placeholder(_ title: String) -> some View {
-        VStack {
-            Spacer()
-            Text(verbatim: title)
-                .font(Theme.Fonts.display(14))
-                .textCase(.uppercase)
-                .tracking(2)
-                .foregroundStyle(Theme.Gray.g700)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: 頁尾（py:190-203）

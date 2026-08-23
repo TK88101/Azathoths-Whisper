@@ -16,12 +16,14 @@ actor MockMusicClient: MusicControlling {
     private(set) var lyricsCalls = 0
     private(set) var writes: [String: String] = [:]
     private var albumTracksResult: [AlbumTrack] = []
+    private(set) var albumTracksCalls = 0
+    /// 最後一次 albumTracks 的查詢參數——驗「用事件的 albumKey 而非重讀 currentTrack」
+    private(set) var lastAlbumTracksQuery: (artist: String, album: String)?
     private var albumTracksGate: LyricsGate?
     /// 按調用序號分派的閘門：第 n 次 albumTracks() 用第 n 個。
     /// 用途：重疊載入場景需要讓兩個載入**分別**完成（單一 broadcast gate 會同時放行兩者，
     /// 觀察不到「第一個已完成、第二個仍在跑」這個 C-18 的關鍵區間）。
     private var albumTracksGateQueue: [LyricsGate] = []
-    private var albumTracksCalls = 0
     private var writeGate: LyricsGate?
     private var artwork: [String: Data] = [:]
     private(set) var artworkCalls = 0
@@ -43,6 +45,11 @@ actor MockMusicClient: MusicControlling {
 
     func setAlbumTracks(_ tracks: [AlbumTrack]) {
         albumTracksResult = tracks
+    }
+
+    /// 換掉腳本：製造「事件發布後 currentTrack() 已是別張專輯」的情境
+    func setScript(_ responses: [Response]) {
+        script = responses
     }
 
     /// 卡住 albumTracks 的回應，直到測試放行
@@ -101,6 +108,7 @@ actor MockMusicClient: MusicControlling {
     }
 
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] {
+        lastAlbumTracksQuery = (artist, album)
         let call = albumTracksCalls
         albumTracksCalls += 1
         // 逐次閘門優先於單一閘門
