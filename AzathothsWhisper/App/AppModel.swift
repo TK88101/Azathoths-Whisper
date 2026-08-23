@@ -38,7 +38,10 @@ final class AppModel {
         validator: any TokenValidating,
         initialToken: String,
         initialLanguage: AppLanguage,
-        splashDuration: Duration = .milliseconds(3500)     // py:1896
+        splashDuration: Duration = .milliseconds(3500),    // py:1896
+        /// 封面磁碟快取的目錄。**nil＝純記憶體**——單元測試預設走這條，
+        /// 絕不碰使用者真實的 Caches 目錄
+        artworkDiskDirectory: URL? = nil
     ) {
         self.configStore = configStore
         self.httpClient = httpClient
@@ -55,10 +58,14 @@ final class AppModel {
             music: music
         )
         // 封面快取隨 AppModel 生命週期存活：切 tab 不清空，冷啟後首次進入才付取圖成本
-        self.coverFlow = CoverFlowViewModel(
+        let artworkService = ArtworkService(
             music: music,
-            artwork: ArtworkService(music: music)
+            disk: artworkDiskDirectory.map { ArtworkDiskCache(directory: $0) }
         )
+        self.coverFlow = CoverFlowViewModel(music: music, artwork: artworkService)
+        // 退避到期後重取成功時，讓已顯示佔位的那一項重讀
+        // （屬 H-07 的「損毀/失敗容錯」語義；H-06 是重建＋預取，勿混）
+        self.coverFlow.observeArtworkStores(from: artworkService)
 
         self.settings = SettingsViewModel(
             validator: validator,
@@ -86,6 +93,11 @@ final class AppModel {
             self?.editor.setExternalStatus(text)
         }
     }
+
+    /// 封面磁碟快取的位置。放 Caches 是刻意的：內容可再生，系統空間吃緊時清掉不損失資料
+    static let artworkCacheDirectory: URL = FileManager.default
+        .homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Caches/com.ibridgezhao.azathothswhisper/Artwork")
 
     /// py:1563 的舊配置檔位置（遷移期唯讀，不刪除）
     static let legacyConfigPath = FileManager.default
@@ -150,7 +162,8 @@ final class AppModel {
             monitor: NowPlayingMonitor(music: music),
             validator: GeniusTokenValidator(client: client),
             initialToken: store.token,
-            initialLanguage: store.language
+            initialLanguage: store.language,
+            artworkDiskDirectory: artworkCacheDirectory
         )
     }
 

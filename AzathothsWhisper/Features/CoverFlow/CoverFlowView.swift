@@ -78,8 +78,19 @@ private struct CoverFlowItemContainer: View {
     var body: some View {
         CoverFlowItem(artwork: image, size: size)
             .accessibilityIdentifier("coverflow-item-\(track.persistentID)")
-            .task(id: track.persistentID) {
+            // key 帶版本號：取圖失敗時先顯示佔位，退避到期重取成功後 service 會通知 VM
+            // 遞增**該 ID** 的版本，只讓這一項重讀（命中記憶體，不驚動其他可見項）
+            .task(id: ItemTaskKey(
+                persistentID: track.persistentID,
+                revision: model.artworkRevision(for: track.persistentID)
+            )) {
                 image = await model.artwork(for: track.persistentID)
             }
     }
+}
+
+/// `.task(id:)` 的 key：ID 或版本任一改變都重跑
+private struct ItemTaskKey: Equatable {
+    let persistentID: String
+    let revision: Int
 }

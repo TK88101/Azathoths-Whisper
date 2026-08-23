@@ -130,6 +130,22 @@ func settle(_ iterations: Int = 100) async {
     for _ in 0..<iterations { await Task.yield() }
 }
 
+/// 反覆讓出直到 **async** 條件成立（跨 actor 的斷言用）。
+///
+/// 為何需要它而非 `settle(N)`：`settle` 是固定次數的 yield，等的是「讓一會兒」。
+/// 一旦被等的工作含同步耗時段（例如 `CGImageSource` 解碼），固定次數就不夠——
+/// 實測 `settle(300)` 只推進了三張預取中的兩張，斷言因此偽紅。
+/// 有可輪詢的條件時一律用本函式：條件成立即返回，不成立就一直讓，不賭次數。
+func waitFor(
+    _ condition: @Sendable () async -> Bool,
+    iterations: Int = 20_000
+) async {
+    for _ in 0..<iterations {
+        if await condition() { return }
+        await Task.yield()
+    }
+}
+
 /// 反覆讓出主執行緒直到條件成立（供不確定調度時點的非同步斷言使用）
 @MainActor
 func waitUntil(_ condition: () -> Bool, iterations: Int = 200) async {

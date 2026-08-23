@@ -30,6 +30,7 @@ actor MockMusicClient: MusicControlling {
     /// 目前在飛的 artwork 請求數——驗「P1 無預取時 ≤ 1」
     private(set) var artworkInFlight = 0
     private var artworkGate: LyricsGate?
+    private var artworkGateQueue: [LyricsGate] = []
     /// 覆寫整體結果（優先於 artwork 字典）：用來製造 AE 失敗
     private var artworkOutcome: Result<Data?, MusicError>?
     private var setLyricsOutcome: Result<Bool, MusicError> = .success(true)
@@ -80,6 +81,18 @@ actor MockMusicClient: MusicControlling {
     func setArtworkOutcome(_ outcome: Result<Data?, MusicError>) {
         artworkOutcome = outcome
     }
+
+    /// 依調用序分派閘門：第 n 次 artworkData() 等第 n 個。
+    /// 用途：預取排程要能觀察「第 1 張卡住、其餘尚未送出」這個區間
+    func setArtworkGateQueue(_ gates: [LyricsGate]) {
+        artworkGateQueue = gates
+    }
+
+    /// 每次 artworkData() 進來時的在飛峰值——驗「單槽：任一時刻 ≤ 1」
+    private(set) var maxArtworkInFlight = 0
+
+    /// artworkData() 的實際調用順序，供「explicit 插隊在預取之前」斷言
+    private(set) var artworkOrder: [String] = []
 
     private func next() -> Response {
         guard !script.isEmpty else { return .notPlaying }
@@ -135,10 +148,15 @@ actor MockMusicClient: MusicControlling {
     }
 
     func artworkData(persistentID: String) async throws -> Data? {
+        let call = artworkCalls
         artworkCalls += 1
+        artworkOrder.append(persistentID)
         artworkInFlight += 1
+        maxArtworkInFlight = max(maxArtworkInFlight, artworkInFlight)
         defer { artworkInFlight -= 1 }
-        if let artworkGate {
+        if call < artworkGateQueue.count {
+            await artworkGateQueue[call].wait()
+        } else if let artworkGate {
             await artworkGate.wait()
         }
         if let artworkOutcome {
