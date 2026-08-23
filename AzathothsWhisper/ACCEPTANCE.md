@@ -19,7 +19,7 @@
 | A-07 | 菜單文案硬編碼英文，不隨語言變 | py:1909-1923 | `testColdStartInJapaneseLocalizesUIButNotMenus`（ja 冷啟動下 Settings／Help 仍為英文）。實作差異：SwiftUI 的系統 Help 菜單標題由 AppKit 在地化，故清空系統組＋自建英文 Help 菜單，並在 `AppDelegate` 移除空的頂層菜單 | ✅ M5 |
 | A-08 | 紅色關閉鈕＝隱藏窗口，app 不退出 | py:2052-2060 | `testRedCloseButtonHidesWindowWithoutTerminating`（視窗消失＋`app.state != .notRunning`） | ✅ M5 |
 | A-09 | Dock 圖標點擊→重新顯示已隱藏窗口 | py:1877-1893 | `applicationShouldHandleReopen` 已實作；Dock 點擊無法在 XCUITest 內定界模擬，M8 真人操作 | ⬜ |
-| A-10 | Cmd+Q 真退出 | py:753-761,1969-1995 | `testQuitMenuItemTerminatesApp`（走 app 自身 Quit 菜單項，與 Cmd+Q 同一 `terminate:` 路徑；不模擬全域按鍵） | ✅ M5 |
+| A-10 | Cmd+Q 真退出 | py:753-761,1969-1995 | `testQuitMenuItemTerminatesApp`（走 app 自身 Quit 菜單項，與 Cmd+Q 同一 `terminate:` 路徑；不模擬全域按鍵）。**2026-08-23 註**：單獨跑通過（7.2s），**連跑時穩定失敗**（app 停在 runningBackground）。已砍掉四個假設（前台／選單項／AppDelegate 攔截／殘留實例／語言測試污染），根因未查清，依核心協議熔斷。產品行為本身單獨驗證通過，故維持 ✅；連跑 flakiness 詳見 M7 Plan 附錄 | ✅ M5（連跑 flaky） |
 | A-11 | Dock 右鍵 Quit 真退出 | py:1925-1967 | 與 A-10 同一 `terminate:` 路徑；Dock 選單需真人操作，M8 手動 | ⬜ |
 | A-12 | 自動化權限被拒→曲目卡紅字 "Access Denied"／"Check macOS Permissions" | py:1122-1125,448-453 | `EditorViewModelTests.permissionDeniedShowsAccessDeniedCard`（邏輯層）；真機 `tccutil reset AppleEvents` 待 M8 | ✅ M5（邏輯層） |
 

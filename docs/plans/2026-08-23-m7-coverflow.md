@@ -462,3 +462,52 @@ C-15 在點擊前先等按鈕可點。修正後**通過（18.45s）**。
 
 XCUITest 點擊禁用元素**不會報錯、只會靜默無效**，症狀表現為「後續的 sheet 沒出現」，
 極易誤判成產品缺陷——這是本次差點走錯方向的地方。
+
+
+## 附錄：A-10（Quit 必須真的終止）的連跑 flakiness —— **已熔斷，未查清**
+
+### 事實表
+
+| 條件 | 結果 | 次數 |
+|---|---|---|
+| 單獨跑 A-10 | **通過**（7.2s） | 1 |
+| 連跑全套 UITests（16 條） | **失敗** | 2 |
+| 只連跑 `ShellUITests`（10 條） | **失敗** | 2 |
+
+失敗形態一致：Quit 選單項**被點擊**（日誌有 `Synthesize event`），
+但 `app.state` 停在 **3（runningBackground）**，等滿 10 秒不變（期望 1＝notRunning）。
+
+### 已排除的假設（均有證據）
+
+| 假設 | 排除依據 |
+|---|---|
+| 測試點擊時 app 不在前台 | 新增斷言 `XCTAssertEqual(app.state, .runningForeground)` 於點擊前，**通過** |
+| Quit 選單項不存在／文案隨語言變 | 新增 `quit.waitForExistence` 斷言，**通過**；XCUITest 是以 `terminate:` 這個 identifier 匹配，與語言無關 |
+| `AppDelegate` 攔截 terminate | `App/AppDelegate.swift` 只有 `applicationShouldTerminateAfterLastWindowClosed`（回 false）與 `applicationShouldHandleReopen`，**無** `applicationShouldTerminate` |
+| 殘留的舊 app 實例被 `launch()` 激活 | 新增 `terminateStaleInstances()`（以 bundle ID 定界的 `NSRunningApplication.terminate()`，不模擬全域按鍵），**無效** |
+| 前序的兩個語言冷啟動測試（`-AppleLanguages`）污染狀態 | 以 `-skip-testing` 排除那兩條後再連跑 `ShellUITests`，A-10 **仍失敗**（21.3s）→ 假設被砍掉 |
+
+### 尚未查清
+
+為何**連跑**時 Quit 不生效、而單獨跑生效。
+
+原先懷疑是前序的語言冷啟動測試（A-10 緊跟其後），**該假設已被實驗砍掉**——
+排除那兩條後 A-10 仍失敗。
+
+剩下的唯一已知區別就是「單獨跑」與「連跑」本身：連跑時前面每個用例都會啟動並終止一次 app，
+第 N 次啟動的 app 對 Quit 的回應與第 1 次不同。下一步可下探的方向（本次未做）：
+在 A-10 之前只跑**一條**任意其他用例，二分找出「連跑幾條之後開始失敗」，
+再看 app 在該狀態下的 `sample` 堆疊。
+
+### 熔斷聲明
+
+同一目標連續 6 輪未有進展（含 4 個假設被逐一砍掉），依 slipknot 核心協議停手。
+**這不是本次 M7 改動引入的**——M7 P1 完成當時、尚未動 tab 生命週期之前的第一次全套 UITests，
+A-10 就已失敗。它是既有的連跑 flakiness。
+
+**保留的改動**：`terminateStaleInstances()` 雖未解決 A-10，但「啟動前清掉殘留實例」本身
+是正確的防禦（macOS app 單實例，`launch()` 對已執行的 app 會激活舊實例而非啟動新的），
+故保留並註明它未解決 A-10。
+
+**ACCEPTANCE A-10 狀態**：維持 ✅ M5（產品行為單獨驗證通過），
+但加註「連跑時 flaky，原因未查清」。

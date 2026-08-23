@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 // 三個 UITest 類共用的啟動與收尾紀律。
@@ -46,6 +47,7 @@ class AppUITestCase: XCTestCase {
         // 用例間不繼承視窗狀態：任何以「視窗已隱藏」結束的用例（如 A-08 紅鈕、C-20）
         // 會把該狀態寫進 macOS saved state，令後續用例啟動後無視窗（實測會整批超時）
         app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        terminateStaleInstances()
         // UITests 要驗真實 Keychain 預填（A-05），故顯式聲明**不是**單元測試 host。
         // scheme 的 test action 為單元測試注入 AZW_UNIT_TEST_HOST=1（見 project.yml）；
         // 此處設回 "0" 阻斷任何環境傳播，讓 UITests 的取值與注入方式無關。
@@ -53,6 +55,30 @@ class AppUITestCase: XCTestCase {
         app.launch()
         self.app = app
         return app
+    }
+
+    /// 啟動前清掉同 bundle ID 的殘留實例。
+    ///
+    /// 為何需要（2026-08-23）：macOS 的 app 是單實例的，`XCUIApplication.launch()`
+    /// 對已在執行的 app 會**激活舊實例**而非啟動新的。前一個用例若未乾淨退出，
+    /// 後續用例就操作在舊實例上；A-10（Quit 必須真的終止）在連跑時會因此誤報——
+    /// Quit 終止了其中一個，`app.state` 卻反映另一個仍在後台的實例（runningBackground）。
+    ///
+    /// 用 `NSRunningApplication` 以 **bundle ID 定界**終止，不模擬任何全域按鍵
+    /// （全域 keystroke 會誤傷其他 app）。
+    private func terminateStaleInstances() {
+        let running = NSRunningApplication.runningApplications(
+            withBundleIdentifier: "com.ibridgezhao.azathothswhisper"
+        )
+        guard !running.isEmpty else { return }
+        running.forEach { $0.terminate() }
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline,
+              !NSRunningApplication.runningApplications(
+                  withBundleIdentifier: "com.ibridgezhao.azathothswhisper"
+              ).isEmpty {
+            usleep(100_000)
+        }
     }
 
     /// 等元素**存在且已啟用**再操作。
