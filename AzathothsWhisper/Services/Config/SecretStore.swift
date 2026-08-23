@@ -71,6 +71,9 @@ struct KeychainStore: SecretStore {
     }
 }
 
+// 測試基礎設施，不得進入 Release 成品（見 AppModel.unitTestHostFlag）
+#if DEBUG
+
 /// 記憶體內的 secret 儲存。生產路徑一律走 `KeychainStore`——本型別有兩個用途：
 ///
 /// 1. **單元測試 host 的 app 啟動**（見 `AppModel.isUnitTestHost`）：TEST_HOST 是完整 app，
@@ -99,3 +102,5 @@ final class EphemeralSecretStore: SecretStore, @unchecked Sendable {
         storage[key] = nil
     }
 }
+
+#endif

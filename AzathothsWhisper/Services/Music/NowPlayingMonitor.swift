@@ -11,7 +11,11 @@ enum PlaybackEvent: Equatable, Sendable {
 }
 
 /// 忙碌來源。輪詢只在**全部**來源都空閒時才跑。
-enum BusySource: Sendable {
+///
+/// 顯式聲明 `Hashable` 是防禦性的：無 associated value 的 enum 本就自動合成它，
+/// 但日後若有人給某個 case 加上 payload，合成會**靜默消失**、`Set<BusySource>` 才報錯。
+/// 寫出來能讓那一刻的意圖清楚。
+enum BusySource: Sendable, Hashable {
     case editor
     case batch
 }

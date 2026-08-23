@@ -63,7 +63,7 @@ final class AppModel {
 
         editor.onBusyChange = { [weak self] busy in
             guard let self else { return }
-            Task { await self.monitor.setBusy(busy, source: .editor) }
+            await self.monitor.setBusy(busy, source: .editor)
         }
         editor.onRequestHydrate = { [weak self] in
             guard let self else { return }
@@ -73,7 +73,7 @@ final class AppModel {
         // C-18：只有「載入專輯」會停輪詢，Fetch Missing／Import 期間輪詢照跑
         batch.onBusyChange = { [weak self] busy in
             guard let self else { return }
-            Task { await self.monitor.setBusy(busy, source: .batch) }
+            await self.monitor.setBusy(busy, source: .batch)
         }
         // C-23：載入三態文案寫在 Editor 狀態欄
         batch.onEditorStatus = { [weak self] text in
@@ -97,21 +97,37 @@ final class AppModel {
     /// 本旗標補上 Plan §4.9「測試禁讀真實 .env／真實 Keychain」的實現缺口：
     /// 由 scheme 的 test action 顯式注入（見 project.yml），**不**依賴 XCTest 內部環境變數推測。
     /// UITests 不注入，故仍走完整 Keychain 路徑，A-05 的 token 預填驗收不受影響。
+    ///
+    /// **僅 DEBUG 存在**：這是測試基礎設施，不得進入 Release 成品。否則只要成品 app 啟動時
+    /// 讀到 `AZW_UNIT_TEST_HOST=1`（使用者 shell 誤帶入、外部工具注入），生產路徑就會靜默
+    /// 跳過 Keychain 與遷移，退化成「token 存記憶體、退出即丟」且不落任何痕跡。
+    /// 單元測試固定跑 Debug（scheme 的 TestAction buildConfiguration = "Debug"），故不受影響。
+    #if DEBUG
     static let unitTestHostFlag = "AZW_UNIT_TEST_HOST"
 
     static var isUnitTestHost: Bool {
         ProcessInfo.processInfo.environment[unitTestHostFlag] == "1"
     }
+    #endif
 
     /// 生產組裝：Keychain＋UserDefaults、legacy 一次性遷移、真實 Music/HTTP
     static func live() -> AppModel {
         // 單元測試 host：短路整個 secret 路徑——不建 KeychainStore（讀會彈授權框），
         // 也不跑 legacy 遷移（它讀 .env 並**寫回** Keychain，寫入同樣觸發授權框）
+        // Release 恆定走 Keychain：測試短路的分支在 Release 下**編譯不到**，
+        // 物理上不可能被任何環境變數觸發（見 unitTestHostFlag 的說明）。
+        #if DEBUG
         let isTestHost = isUnitTestHost   // 每次讀都會從 environ 重建整份字典，綁一次
         let store = isTestHost
             ? ConfigStore(secrets: EphemeralSecretStore())
             : ConfigStore(secrets: KeychainStore())
-        if !isTestHost {
+        let shouldMigrate = !isTestHost
+        #else
+        let store = ConfigStore(secrets: KeychainStore())
+        let shouldMigrate = true
+        #endif
+
+        if shouldMigrate {
             _ = LegacyConfigMigrator.migrateIfNeeded(
                 into: store,
                 envPaths: DotEnv.candidatePaths(),

@@ -108,13 +108,13 @@ struct BatchOverlappingLoadTests {
         let (model, music) = await makeQueueGatedModel(gateA, gateB)
         let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
         model.onBusyChange = { busy in
-            Task { await monitor.setBusy(busy, source: .batch) }   // 與 AppModel.swift:76 同構
+            await monitor.setBusy(busy, source: .batch)   // 與 AppModel.swift:76 同構
         }
 
         model.tabActivated()
         let first = model.loadTask
         await waitUntil { model.isLoadingAlbum }
-        await settle()     // 讓 setBusy(true) 抵達 monitor
+        // 不再需要 settle()：onBusyChange 已是 async，setBusy 在同一條 await 鏈上完成
 
         model.tabActivated()
         let second = model.loadTask
@@ -122,7 +122,6 @@ struct BatchOverlappingLoadTests {
 
         await gateA.open()
         await first?.value
-        await settle()
 
         // 第一個已完成、第二個仍在飛：此時驅動輪詢，必須被 busy 擋掉
         let callsBefore = await music.currentTrackCalls

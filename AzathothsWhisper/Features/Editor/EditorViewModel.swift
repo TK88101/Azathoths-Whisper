@@ -26,7 +26,7 @@ final class EditorViewModel {
     /// Editor tab 是否在前景——只有前景時才自動抓詞（B-05）
     var isEditorTabActive = true
     /// 忙碌狀態外溢（→ NowPlayingMonitor.setBusy，B-02）
-    var onBusyChange: ((Bool) -> Void)?
+    var onBusyChange: ((Bool) async -> Void)?
     /// 卡片點擊＝強制重讀（B-06）
     var onRequestHydrate: (() -> Void)?
 
@@ -127,14 +127,16 @@ final class EditorViewModel {
         let myGeneration = generation
         let myTrackID = boundTrackID
 
-        setBusy(true)
+        await setBusy(true)
         statusText = StatusText.fetchingFromGenius
 
         let outcome = await resolveAndFetch()
 
-        // 已被更新一輪的抓詞取代：狀態交給對方，本輪靜默退出
+        // 已被更新一輪的抓詞取代：狀態交給對方，本輪靜默退出。
+        // **刻意不套 withBusy scope**：釋放是有條件的——被取代的舊 fetch 不送 false，
+        // 由最後擁有序號的 fetch 釋放，否則兩輪抓詞會提前解除 busy。
         guard mySeq == fetchSeq else { return }
-        setBusy(false)
+        await setBusy(false)
 
         // 世代守衛（B-14）：抓詞期間切歌 → 結果不套用到新曲
         guard myGeneration == generation, myTrackID == boundTrackID else { return }
@@ -179,28 +181,49 @@ final class EditorViewModel {
     }
 
     func save() async {
-        setBusy(true)
-        statusText = StatusText.savingToMusic
-        defer { setBusy(false) }
+        await withBusy {
+            statusText = StatusText.savingToMusic
 
-        // B-13：寫入畫面綁定的曲目，而非當前播放曲
-        guard let persistentID = boundTrackID, !persistentID.isEmpty else {
-            statusText = StatusText.noTrackPlaying     // py:2101
-            return
-        }
+            // B-13：寫入畫面綁定的曲目，而非當前播放曲
+            guard let persistentID = boundTrackID, !persistentID.isEmpty else {
+                statusText = StatusText.noTrackPlaying     // py:2101
+                return
+            }
 
-        do {
-            let didWrite = try await music.setLyrics(persistentID: persistentID, lyrics: lyricsText)
-            statusText = didWrite ? StatusText.saved : StatusText.failedToSave
-            if didWrite { confettiTrigger += 1 }
-        } catch {
-            statusText = StatusText.writeFailed        // py:548
+            do {
+                let didWrite = try await music.setLyrics(persistentID: persistentID, lyrics: lyricsText)
+                statusText = didWrite ? StatusText.saved : StatusText.failedToSave
+                if didWrite { confettiTrigger += 1 }
+            } catch {
+                statusText = StatusText.writeFailed        // py:548
+            }
         }
     }
 
-    private func setBusy(_ busy: Bool) {
+    private func setBusy(_ busy: Bool) async {
         isBusy = busy
-        onBusyChange?(busy)
+        // await 而非 Task{} 跳板：讓「isBusy 變更」與「monitor 記帳」嚴格有序。
+        // 舊寫法是 fire-and-forget，測試只能靠 settle() 讓步 N 輪賭它送達，
+        // 實際存在 polling window（2026-08-23 Round 2 altitude 審查）。
+        await onBusyChange?(busy)
+    }
+
+    /// busy 區間的作用域封裝：取代 `defer { setBusy(false) }`。
+    ///
+    /// 為何不用 defer：defer 裡不能 await，而 setBusy 已改為 async。
+    /// scope 保留了 defer 的**全路徑保證**——closure 內的任何 return 只離開 closure，
+    /// cleanup 仍由此處統一執行；throw 亦然。手工在各退出點散落 setBusy(false) 會讓
+    /// 未來新增的 early return 漏掉釋放，後果是 busy 永久卡住、輪詢再也不恢復。
+    private func withBusy<T>(_ operation: () async throws -> T) async rethrows -> T {
+        await setBusy(true)
+        do {
+            let result = try await operation()
+            await setBusy(false)
+            return result
+        } catch {
+            await setBusy(false)
+            throw error
+        }
     }
 }
 

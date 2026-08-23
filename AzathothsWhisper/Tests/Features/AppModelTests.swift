@@ -154,11 +154,10 @@ struct AppModelTests {
         model.editor.handle(.trackChanged(.fixture(), existingLyrics: ""))
         let editorTask = Task { await model.editor.fetch() }
         await waitUntil { model.editor.isBusy }
-        await settle()   // 讓 setBusy(true) 抵達 monitor
+        // 不再需要 settle()：onBusyChange 已是 async，busy 在同一條 await 鏈上抵達 monitor
 
         // 使用者切到 Batch → 載入整輪跑完 → 送出 false
         await model.batch.loadAlbum()
-        await settle()   // 讓 setBusy(false) 抵達 monitor
 
         // Editor 仍在抓詞：輪詢必須仍被擋住
         let before = await music.currentTrackCalls

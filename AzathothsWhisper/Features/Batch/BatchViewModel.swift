@@ -58,7 +58,7 @@ final class BatchViewModel {
     private(set) var isTabActive = false
 
     /// → NowPlayingMonitor.setBusy；只有載入專輯會外溢（C-18）
-    var onBusyChange: ((Bool) -> Void)?
+    var onBusyChange: ((Bool) async -> Void)?
     /// 載入三態文案設在 **Editor** 狀態欄，非 Batch 自己的（C-23，py:623/633/637）
     var onEditorStatus: ((String) -> Void)?
 
@@ -129,26 +129,26 @@ final class BatchViewModel {
     // MARK: - 載入專輯（py:620-641）
 
     func loadAlbum() async {
-        setLoadingAlbum(true)
-        onEditorStatus?(StatusText.processingAlbumBatch)
-        listState = .loading
-        defer { setLoadingAlbum(false) }
+        await withLoadingAlbum {
+            onEditorStatus?(StatusText.processingAlbumBatch)
+            listState = .loading
 
-        // C-19：載入本身同樣要守，擋兩種重疊。
-        // (a) 切專輯：handle() 已先遞增 sessionID，先發的舊載入回來後不得把已切走的
-        //     專輯重新填回列表與 header。
-        // (b) 同代重入：tabActivated() 不碰 sessionID，連點分頁會讓兩個載入捕獲同一個
-        //     session 值；靠下面成功路徑的遞增，先完成者作廢後完成者，只提交一次。
-        let session = sessionID
-        let loaded = await fetchAlbumTracks()
-        guard !isStale(session) else { return }
+            // C-19：載入本身同樣要守，擋兩種重疊。
+            // (a) 切專輯：handle() 已先遞增 sessionID，先發的舊載入回來後不得把已切走的
+            //     專輯重新填回列表與 header。
+            // (b) 同代重入：tabActivated() 不碰 sessionID，連點分頁會讓兩個載入捕獲同一個
+            //     session 值；靠下面成功路徑的遞增，先完成者作廢後完成者，只提交一次。
+            let session = sessionID
+            let loaded = await fetchAlbumTracks()
+            guard !isStale(session) else { return }
 
-        sessionID += 1
-        tracks = loaded
-        // py:559-561：有資料取首曲 album，無資料為 "No Data / Album"
-        albumName = loaded.first.map(\.album) ?? StatusText.noDataAlbum
-        listState = .loaded
-        onEditorStatus?(StatusText.albumLoaded)
+            sessionID += 1
+            tracks = loaded
+            // py:559-561：有資料取首曲 album，無資料為 "No Data / Album"
+            albumName = loaded.first.map(\.album) ?? StatusText.noDataAlbum
+            listState = .loaded
+            onEditorStatus?(StatusText.albumLoaded)
+        }
     }
 
     /// py:1154-1182：原版 get_album_tracks 的 except 吞掉全部異常並回 []，
@@ -176,13 +176,32 @@ final class BatchViewModel {
     /// 取消會讓第二次載入不發 AE 請求，偏離原版（上游 §8.2 駁回項 1 已裁定）。
     private var loadsInFlight = 0
 
-    private func setLoadingAlbum(_ loading: Bool) {
+    private func setLoadingAlbum(_ loading: Bool) async {
         loadsInFlight += loading ? 1 : -1
         assert(loadsInFlight >= 0, "setLoadingAlbum 的 true/false 未配對")
         let busy = loadsInFlight > 0
         guard busy != isLoadingAlbum else { return }
         isLoadingAlbum = busy
-        onBusyChange?(busy)
+        // await 而非 Task{} 跳板：讓「isLoadingAlbum 變更」與「monitor 記帳」嚴格有序
+        await onBusyChange?(busy)
+    }
+
+    /// 載入 busy 區間的作用域封裝：取代 `defer { setLoadingAlbum(false) }`。
+    ///
+    /// defer 裡不能 await，而 setLoadingAlbum 已改 async。scope 保留了 defer 的
+    /// **全路徑保證**——closure 內任何 return 只離開 closure，cleanup 仍統一執行。
+    /// 這對 `loadsInFlight` 的不變量（== 活躍 loadAlbum 呼叫數）是必要的：
+    /// 手工散落釋放會讓未來新增的 early return 漏掉減一，busy 永久卡住、輪詢不恢復。
+    private func withLoadingAlbum<T>(_ operation: () async throws -> T) async rethrows -> T {
+        await setLoadingAlbum(true)
+        do {
+            let result = try await operation()
+            await setLoadingAlbum(false)
+            return result
+        } catch {
+            await setLoadingAlbum(false)
+            throw error
+        }
     }
 
     // MARK: - 選中（py:604-613）
