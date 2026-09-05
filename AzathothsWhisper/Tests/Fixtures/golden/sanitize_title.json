@@ -1,0 +1,94 @@
+{
+  "source": "lyrics_fetcher.py:1201-1219 sanitize_title（真實調用）",
+  "note": "三條 IGNORECASE 正則依序替換後 strip；含大小寫/多重/Unicode/不匹配保留案例",
+  "cases": [
+    {
+      "input": "Master of Puppets (Remastered 2009)",
+      "expected": "Master of Puppets"
+    },
+    {
+      "input": "The Trooper (Live)",
+      "expected": "The Trooper"
+    },
+    {
+      "input": "Aces High [Live]",
+      "expected": "Aces High"
+    },
+    {
+      "input": "Painkiller (Remix)",
+      "expected": "Painkiller"
+    },
+    {
+      "input": "Battery (Demo)",
+      "expected": "Battery"
+    },
+    {
+      "input": "Creeping Death (Version 2)",
+      "expected": "Creeping Death"
+    },
+    {
+      "input": "Duet (feat. Someone)",
+      "expected": "Duet"
+    },
+    {
+      "input": "Duet [ft. Someone Else]",
+      "expected": "Duet"
+    },
+    {
+      "input": "One - 2015 Remastered",
+      "expected": "One"
+    },
+    {
+      "input": "Fuel - Radio Remix",
+      "expected": "Fuel"
+    },
+    {
+      "input": "Plain Title",
+      "expected": "Plain Title"
+    },
+    {
+      "input": "MONOCHROMATIC STAINS",
+      "expected": "MONOCHROMATIC STAINS"
+    },
+    {
+      "input": "Song (remastered)",
+      "expected": "Song"
+    },
+    {
+      "input": "Song (LIVE)",
+      "expected": "Song"
+    },
+    {
+      "input": "Weird (Live) (Remix)",
+      "expected": "Weird"
+    },
+    {
+      "input": "Trailing (Remastered) ",
+      "expected": "Trailing"
+    },
+    {
+      "input": "Mötley Song (Live)",
+      "expected": "Mötley Song"
+    },
+    {
+      "input": "曲名 (Remix)",
+      "expected": "曲名"
+    },
+    {
+      "input": "Song (Acoustic)",
+      "expected": "Song (Acoustic)"
+    },
+    {
+      "input": "Song - Live at Wembley",
+      "expected": "Song - Live at Wembley"
+    },
+    {
+      "input": "Song (feat. A) - 2021 Remastered",
+      "expected": "Song"
+    },
+    {
+      "input": "(Live) Opening",
+      "expected": "Opening"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "source": "lyrics_fetcher.py:1305-1306（內聯表達式逐字拷貝）",
+  "note": "手工部分（評審 H6 允許）：表達式為 re.sub(r'[^a-z0-9]','',x.lower()) 的逐字拷貝；關鍵語義＝先 lower 再刪除一切非 ASCII 小寫字母數字（變音符號/CJK/標點/空格全刪）。Swift 側必須用同語義（NSRegularExpression 對 BMP 外字符的處理需對照本表驗證）",
+  "cases": [
+    {
+      "input": "Dark Tranquillity",
+      "expected": "darktranquillity"
+    },
+    {
+      "input": "Mötley Crüe",
+      "expected": "mtleycre"
+    },
+    {
+      "input": "Iron Maiden",
+      "expected": "ironmaiden"
+    },
+    {
+      "input": "AC/DC",
+      "expected": "acdc"
+    },
+    {
+      "input": "Blue Öyster Cult",
+      "expected": "blueystercult"
+    },
+    {
+      "input": "Motörhead",
+      "expected": "motrhead"
+    },
+    {
+      "input": "Dr. Feelgood",
+      "expected": "drfeelgood"
+    },
+    {
+      "input": "36 Crazyfists",
+      "expected": "36crazyfists"
+    },
+    {
+      "input": "Sigur Rós",
+      "expected": "sigurrs"
+    },
+    {
+      "input": "上海 Band 123",
+      "expected": "band123"
+    },
+    {
+      "input": "Damage Done",
+      "expected": "damagedone"
+    },
+    {
+      "input": "Master of Puppets",
+      "expected": "masterofpuppets"
+    }
+  ]
+}

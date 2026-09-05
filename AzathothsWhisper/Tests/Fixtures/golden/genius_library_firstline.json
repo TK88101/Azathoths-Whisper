@@ -1,0 +1,30 @@
+{
+  "source": "lyrics_fetcher.py:1236-1241（真實調用，search_song 打樁返回 input）",
+  "note": "首行 strip 後 endswith('Lyrics') 則整行剝除，其後 '\\n'.join 再 strip",
+  "cases": [
+    {
+      "input": "Master of Puppets Lyrics\nEnd of passion play\nCrumbling away",
+      "expected": "End of passion play\nCrumbling away"
+    },
+    {
+      "input": "No header here\nJust lyrics",
+      "expected": "No header here\nJust lyrics"
+    },
+    {
+      "input": "Something Lyrics\n\nBody after blank line\n",
+      "expected": "Body after blank line"
+    },
+    {
+      "input": "  Padded Lyrics\nBody",
+      "expected": "Body"
+    },
+    {
+      "input": "Lyrics\nOnly-header-word line dropped",
+      "expected": "Only-header-word line dropped"
+    },
+    {
+      "input": "Body without trailing newline",
+      "expected": "Body without trailing newline"
+    }
+  ]
+}

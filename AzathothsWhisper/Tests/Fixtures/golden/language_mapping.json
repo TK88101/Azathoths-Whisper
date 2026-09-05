@@ -1,0 +1,56 @@
+{
+  "source": "lyrics_fetcher.py:1621-1644 detect_system_language（真實調用，defaults 輸出打樁）",
+  "note": "app 域判定順序 zh→ja→en；app 域無匹配則落到全局域（zh→ja，無 en 分支→默認 en）；Swift LanguageManager 的 legacy 兼容讀取以本表為準（Plan §4.6）",
+  "cases": [
+    {
+      "app_defaults": "(\n    \"zh-Hant-TW\",\n    \"en\"\n)",
+      "global_defaults": null,
+      "expected": "zh_TW"
+    },
+    {
+      "app_defaults": "(\n    \"ja-JP\"\n)",
+      "global_defaults": null,
+      "expected": "ja"
+    },
+    {
+      "app_defaults": "(\n    \"en-US\"\n)",
+      "global_defaults": null,
+      "expected": "en"
+    },
+    {
+      "app_defaults": "(\n    \"zh-TW\"\n)",
+      "global_defaults": null,
+      "expected": "zh_TW"
+    },
+    {
+      "app_defaults": null,
+      "global_defaults": "(\n    \"zh-Hant-TW\",\n    \"en\"\n)",
+      "expected": "zh_TW"
+    },
+    {
+      "app_defaults": null,
+      "global_defaults": "(\n    \"ja-JP\",\n    \"en\"\n)",
+      "expected": "ja"
+    },
+    {
+      "app_defaults": null,
+      "global_defaults": "(\n    \"en-US\"\n)",
+      "expected": "en"
+    },
+    {
+      "app_defaults": null,
+      "global_defaults": null,
+      "expected": "en"
+    },
+    {
+      "app_defaults": "(\n    \"fr-FR\"\n)",
+      "global_defaults": "(\n    \"ja-JP\"\n)",
+      "expected": "ja"
+    },
+    {
+      "app_defaults": "(\n    \"zh-Hant-TW\",\n    \"en-US\"\n)",
+      "global_defaults": null,
+      "expected": "zh_TW"
+    }
+  ]
+}

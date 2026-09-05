@@ -1,0 +1,76 @@
+{
+  "source": "lyrics_fetcher.py:1565-1609 load_config（真實調用，臨時目錄＋假 token）",
+  "note": "優先級 env > JSON > defaults；裸 token 檔走 JSONDecodeError 遷移且 language=system；Swift LegacyConfigMigrator 首次遷移的讀取語義以本表為準（遷移後改 Keychain 真源，Plan §4.9）",
+  "cases": [
+    {
+      "desc": "無檔無 env",
+      "file": null,
+      "env_token": null,
+      "env_lang": null,
+      "expected": {
+        "token": "",
+        "language": "system"
+      }
+    },
+    {
+      "desc": "無檔，env 雙鍵",
+      "file": null,
+      "env_token": "fake-token-env",
+      "env_lang": "ja",
+      "expected": {
+        "token": "fake-token-env",
+        "language": "ja"
+      }
+    },
+    {
+      "desc": "JSON 檔無 env",
+      "file": "{\"token\": \"fake-token-file\", \"language\": \"zh_TW\"}",
+      "env_token": null,
+      "env_lang": null,
+      "expected": {
+        "token": "fake-token-file",
+        "language": "zh_TW"
+      }
+    },
+    {
+      "desc": "JSON 檔＋env token（env 應覆蓋 token、保留檔內 language）",
+      "file": "{\"token\": \"fake-token-file\", \"language\": \"zh_TW\"}",
+      "env_token": "fake-token-env",
+      "env_lang": null,
+      "expected": {
+        "token": "fake-token-env",
+        "language": "zh_TW"
+      }
+    },
+    {
+      "desc": "舊格式裸 token 檔（JSONDecodeError 遷移路徑）",
+      "file": "fake-legacy-raw-token",
+      "env_token": null,
+      "env_lang": null,
+      "expected": {
+        "token": "fake-legacy-raw-token",
+        "language": "system"
+      }
+    },
+    {
+      "desc": "舊格式裸 token＋env LANGUAGE",
+      "file": "fake-legacy-raw-token",
+      "env_token": null,
+      "env_lang": "ja",
+      "expected": {
+        "token": "fake-legacy-raw-token",
+        "language": "ja"
+      }
+    },
+    {
+      "desc": "JSON 檔缺 language 鍵（defaults 補齊）",
+      "file": "{\"token\": \"fake-token-file\"}",
+      "env_token": null,
+      "env_lang": null,
+      "expected": {
+        "token": "fake-token-file",
+        "language": "system"
+      }
+    }
+  ]
+}
