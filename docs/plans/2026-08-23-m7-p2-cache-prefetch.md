@@ -526,3 +526,40 @@ simplification 兩條全採納：
 
 有輸有贏（三輪合計：codex 5 條全採納且 3 條由我方上調嚴重度；simplify 17 條採納、7 條駁回；
 其中一條由我方**推翻自己上一輪的裁決**）符合裁決有效性判準。
+
+---
+
+## 附錄：`overlappingLoadSuspendsPollingUntilLastCompletes` 的掛起 —— 事實落檔（2026-09-05 補記）
+
+此前這條事實只存在於 session memory，**不跟著倉庫走**；M8 三角評審把它揪出來（評審者據 memory
+主張「全量跑必然掛起」，被實測推翻），故落檔於此，供後續接手者查閱。
+
+### 觀察歷史
+
+| 時間 | HEAD | 條件 | 結果 |
+|---|---|---|---|
+| 2026-08-23 | `503d620`（M7 P2 之前） | **單獨跑該 suite** | **永久掛起**（永不 resume 的 continuation；`sample` 顯示主執行緒停在 NSApplication run loop、無同步阻塞） |
+| 2026-08-23 | `503d620` | 全量 220 條 | 綠 |
+| 2026-09-05 | `cc88a53`（M7 P2 之後） | 全量 298 條，**未加任何 skip** | **綠**，3.434–3.678s。該用例**實際執行並通過**（非靜默跳過，已 grep 用例名確認）。獨立複跑 3 次一致 |
+| 2026-09-05（同日稍後） | `cc88a53` ＋ M8 工作樹 | 全量，未加 skip | **掛起→超時失敗**，總耗時 138.9s。`Test run with 220 tests in 28 suites passed` ＋ `** TEST FAILED **`，`Failing tests:` 指名該用例。**同一命令復現兩次** |
+| 2026-09-05 | 同上 | 全量 ＋ skip 該用例 | **綠**，304 tests / 34 suites，3.35s |
+
+### 當前結論
+
+- **修正（2026-09-05 當日稍後）**：早先寫的「在 `cc88a53` 上不復現」是**錯的**——那三次全綠只是撞上 flaky 的好運那一面。同日後續以同一命令復現兩次，**全量跑確實會觸發**。
+- **它是 flaky 而非確定性掛起**：同一 HEAD、同一命令，三次綠、兩次掛。因此「跑一次綠」不足以證明它已消失——這也是「不預先加 skip」那條原則的代價：不加 skip 能追蹤事實，但**必須配超時上界**，否則追蹤的代價是一次永久掛起。
+- **「單獨跑該 suite 會掛」未在 2026-09-05 重測**——該分支仍為未知。
+- 三次假設未定位根因，依熔斷紀律停手（同 A-10 的「單獨跑 vs 連跑行為不同」形狀，是否同源未驗證）。
+
+### 處置紀律
+
+**不預先加 skip**：預先繞行會讓「這條 flakiness 是否已隨時序變化消失」變成不可證偽，
+等於用永久繞行替代事實追蹤。改為：
+
+1. **跑全量一律同時帶 skip 與超時上界**（skip 讓它不擋路，超時上界讓它萬一從名單漏掉時以有界失敗暴露而非永久掛起）。超時上界——`-test-timeouts-enabled YES -default-test-execution-time-allowance 120`
+   （本機無 `timeout`／`gtimeout`，此標誌已實測可用）。萬一復發，失敗形態是 hang 不是紅燈，
+   而 M6 的 `kill -9 testmanagerd` 事故正是從「hang 之後徒手救火」長出來的；
+   超時同樣把事實暴露出來，只是不讓它拖成清場作業。
+2. 真撞上時才加 skip 並記錄：
+   `-skip-testing:AzathothsWhisperTests/BatchOverlappingLoadTests/overlappingLoadSuspendsPollingUntilLastCompletes()`
+   （**括號不可省**——不帶括號時過濾靜默失效，該測試照跑）。不重啟調查（已熔斷）。

@@ -58,10 +58,7 @@ struct CoverFlowView: View {
     }
 
     private var centerText: String {
-        guard let centerID = model.centerID,
-              let track = model.items.first(where: { $0.persistentID == centerID })
-        else { return "--" }
-        return "\(track.artist) // \(track.title)"
+        CoverFlowCenterLabel.text(centerID: model.centerID, items: model.items)
     }
 }
 

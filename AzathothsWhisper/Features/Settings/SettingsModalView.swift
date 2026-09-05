@@ -62,7 +62,12 @@ struct SettingsModalView: View {
     private var tokenGroup: some View {
         VStack(alignment: .leading, spacing: 0) {
             fieldLabel("token_label")
-            TextField("", text: $model.tokenInput, prompt: Text(verbatim: "Enter your token..."))
+            // 用 SecureField 而非 TextField（2026-09-05 使用者拍板）：token 是憑證，
+            // 明文渲染會經由兩條路外洩——肩窺，以及 XCTest 的**失敗自動截圖**
+            // （後者會繞過「不主動截圖此 modal」那條人工紀律，見 memory
+            // no-credential-fields-in-ui-screenshots）。SecureField 讓明文不進畫面、
+            // 也不進 AX 樹的 value。保存邏輯完全不變，仍綁同一個 `model.tokenInput`。
+            SecureField("", text: $model.tokenInput, prompt: Text(verbatim: "Enter your token..."))
                 .textFieldStyle(.plain)
                 .font(Theme.Fonts.display(14))
                 .foregroundStyle(.white)

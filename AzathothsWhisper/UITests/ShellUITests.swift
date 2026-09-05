@@ -87,6 +87,28 @@ final class ShellUITests: AppUITestCase {
         // xcresult 附件（證據包會被分享）。全局 CLAUDE.md §7：輸出分享前查敏感資料。
     }
 
+    /// D-01a：token 欄必須是遮蔽的（`SecureField`），不得是明文 `TextField`。
+    ///
+    /// 為何需要**這一條**：D-01a 的改動目的是遮蔽，而遮蔽在此之前**零回歸保護**——
+    /// `SettingsViewModelTests` 驅動的是 ViewModel，全倉沒有任何測試實例化過 SwiftUI view，
+    /// 把 `SecureField` 改回 `TextField` 那些測試照樣全綠（M8 對抗驗證實測結論）。
+    /// 本條只斷言**控件型別**、不讀取任何值，因此不會把憑證帶進證據包。
+    /// 它同時把「SecureField 在 macOS AX 樹上確實註冊為 secureTextField」
+    /// 這個改動賴以成立的前提，從代碼註釋裡的斷言變成可證偽的測試。
+    func testTokenFieldIsMasked() {
+        launch()
+        waitForMainUI()
+        menuBar()["Settings"].click()
+        app.menuItems["Token Settings..."].click()
+        XCTAssertTrue(app.staticTexts["TOKEN SETTINGS"].waitForExistence(timeout: 5))
+
+        XCTAssertTrue(
+            app.secureTextFields.firstMatch.waitForExistence(timeout: 5),
+            "D-01a：token 欄必須是 SecureField"
+        )
+        XCTAssertEqual(app.textFields.count, 0, "D-01a：modal 內不得有明文 TextField")
+    }
+
     /// A-05：語言設定組（兩組互斥）
     func testSettingsMenuOpensLanguageModal() {
         launch()
