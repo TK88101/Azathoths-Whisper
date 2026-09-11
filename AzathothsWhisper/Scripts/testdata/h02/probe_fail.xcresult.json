@@ -1,0 +1,39 @@
+{
+  "devices": [],
+  "testPlanConfigurations": [],
+  "testNodes": [
+    {
+      "nodeType": "Test Plan",
+      "name": "AzathothsWhisper",
+      "result": "Failed",
+      "children": [
+        {
+          "nodeType": "UI test bundle",
+          "name": "AzathothsWhisperUITests",
+          "result": "Failed",
+          "children": [
+            {
+              "nodeType": "Test Suite",
+              "name": "CoverFlowUITests",
+              "result": "Failed",
+              "children": [
+                {
+                  "nodeType": "Test Case",
+                  "name": "testReenteringTabKeepsCenteredCardCentered()",
+                  "nodeIdentifier": "CoverFlowUITests/testReenteringTabKeepsCenteredCardCentered()",
+                  "result": "Failed",
+                  "children": [
+                    {
+                      "nodeType": "Failure Message",
+                      "name": "CoverFlowUITests.swift:150: [PROBE-AX] readStable 逾時，AX 讀不到中心卡"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

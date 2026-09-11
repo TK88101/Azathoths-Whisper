@@ -1,0 +1,43 @@
+{
+  "devices": [],
+  "testPlanConfigurations": [],
+  "testNodes": [
+    {
+      "nodeType": "Test Plan",
+      "name": "AzathothsWhisper",
+      "result": "Failed",
+      "children": [
+        {
+          "nodeType": "UI test bundle",
+          "name": "AzathothsWhisperUITests",
+          "result": "Failed",
+          "children": [
+            {
+              "nodeType": "Test Suite",
+              "name": "CoverFlowUITests",
+              "result": "Failed",
+              "children": [
+                {
+                  "nodeType": "Test Case",
+                  "name": "testReenteringTabKeepsCenteredCardCentered()",
+                  "nodeIdentifier": "CoverFlowUITests/testReenteringTabKeepsCenteredCardCentered()",
+                  "result": "Failed",
+                  "children": [
+                    {
+                      "nodeType": "Failure Message",
+                      "name": "CoverFlowUITests.swift:120: SIG{T4.s2|C1-OFFSET|label=T19|centered=T16|strides=+3}"
+                    },
+                    {
+                      "nodeType": "Failure Message",
+                      "name": "CoverFlowUITests.swift:121: SIG{T4.s2|C2-STACK|G=T16|over=T15|side=L}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

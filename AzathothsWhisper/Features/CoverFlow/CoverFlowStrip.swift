@@ -1,5 +1,13 @@
 import SwiftUI
 
+/// 條帶自己宣告的座標空間名。
+///
+/// **為何不能用 `.scrollView`**：`.scrollView` 不跟隨 `safeAreaPadding` 造成的內容位移，
+/// 與外層 `GeometryReader` 的尺寸失去可比性，兩端相減得到的 d 會整體偏移
+/// `edgePadding / itemWidth`（1192pt 視口、260pt 卡片時實測 1.792），
+/// 超過 clamp 邊界導致中心那張也吃滿斜角。修法＝距離的兩端讀**同一個**空間。
+private let coverFlowViewportSpace = "coverflow.viewport"
+
 /// Cover Flow 的捲動條帶：負間距覆疊 ＋ 逐項 3D 變換 ＋ viewAligned 吸附。
 ///
 /// 幾何全部委給 `CoverFlowGeometry`（純函數、有測試）；本視圖只做 SwiftUI 接線。
@@ -27,8 +35,8 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
                             .frame(width: itemWidth)
                             .visualEffect { effect, proxy in
                                 let d = geometry.normalizedDistance(
-                                    itemMidX: proxy.frame(in: .scrollView).midX,
-                                    viewportMidX: outer.size.width / 2
+                                    itemMidX: proxy.frame(in: .named(coverFlowViewportSpace)).midX,
+                                    viewportMidX: outer.frame(in: .named(coverFlowViewportSpace)).midX
                                 )
                                 return effect
                                     .rotation3DEffect(
@@ -50,6 +58,7 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
             .scrollPosition(id: $centerID, anchor: .center)
             .scrollIndicators(.hidden)
         }
+        .coordinateSpace(.named(coverFlowViewportSpace))
     }
 
     /// 離散疊放：距中心愈遠愈下沉。中心未定時全部同層（首次佈局的一瞬）

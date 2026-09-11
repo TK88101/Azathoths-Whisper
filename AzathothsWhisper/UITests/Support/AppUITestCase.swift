@@ -38,8 +38,9 @@ class AppUITestCase: XCTestCase {
     }
 
     /// 語言以 launchArguments 注入，只作用於該次啟動，不改使用者設定。
+    /// `environment` 追加到 launchEnvironment（H-02 UI 測試閘門的組裝旗標、軌跡路徑等）；預設為空，既有呼叫不受影響。
     @discardableResult
-    func launch(language: String? = nil) -> XCUIApplication {
+    func launch(language: String? = nil, environment: [String: String] = [:]) -> XCUIApplication {
         let app = XCUIApplication()
         if let language {
             app.launchArguments += ["-AppleLanguages", "(\(language))"]
@@ -52,6 +53,9 @@ class AppUITestCase: XCTestCase {
         // scheme 的 test action 為單元測試注入 AZW_UNIT_TEST_HOST=1（見 project.yml）；
         // 此處設回 "0" 阻斷任何環境傳播，讓 UITests 的取值與注入方式無關。
         app.launchEnvironment[AppModelTestFlags.unitTestHost] = "0"
+        for (key, value) in environment {
+            app.launchEnvironment[key] = value
+        }
         app.launch()
         self.app = app
         return app

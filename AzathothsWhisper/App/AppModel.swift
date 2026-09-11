@@ -135,7 +135,12 @@ final class AppModel {
         // Release 恆定走 Keychain：測試短路的分支在 Release 下**編譯不到**，
         // 物理上不可能被任何環境變數觸發（見 unitTestHostFlag 的說明）。
         #if DEBUG
-        let isTestHost = isUnitTestHost   // 每次讀都會從 environ 重建整份字典，綁一次
+        let environment = ProcessInfo.processInfo.environment   // 每次讀都會從 environ 重建整份字典，綁一次
+        // H-02 UI 測試閘門：只換 Music 的真實組裝（見 AppModel+CoverFlowUITest.swift）
+        if let uiTestModel = makeCoverFlowUITestModelIfRequested(environment: environment) {
+            return uiTestModel
+        }
+        let isTestHost = environment[unitTestHostFlag] == "1"
         let store = isTestHost
             ? ConfigStore(secrets: EphemeralSecretStore())
             : ConfigStore(secrets: KeychainStore())

@@ -4,8 +4,9 @@ import SwiftUI
 struct CoverFlowView: View {
     @Bindable var model: CoverFlowViewModel
 
-    /// 單張封面邊長。負間距與邊距都由 `CoverFlowGeometry` 依此推導
-    private let itemWidth: CGFloat = 260
+    /// 單張封面邊長。負間距與邊距都由 `CoverFlowGeometry` 依此推導。
+    /// `static`（非 private）是為了讓 H-02 UI 測試閘門的 fixture 以單元測試釘住同源，見 `CoverFlowUITestFixtureTests`
+    static let itemWidth: CGFloat = 260
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,16 +31,24 @@ struct CoverFlowView: View {
     private var strip: some View {
         CoverFlowStrip(
             items: model.items,
-            itemWidth: itemWidth,
+            itemWidth: Self.itemWidth,
             centerID: Binding(
                 get: { model.centerID },
                 // 經 VM 判定是否為使用者滑動——程式化居中的回呼不得被誤記為使用者接管
-                set: { model.scrollPositionDidChange(to: $0) }
+                set: { newValue in
+                    #if DEBUG
+                    // H-02 UI 測試閘門的軌跡旁路：記 SwiftUI 原始回寫值（未安裝時為 no-op）
+                    CoverFlowUITestTrace.recordBinding(newValue)
+                    #endif
+                    model.scrollPositionDidChange(to: newValue)
+                }
             )
         ) { track in
-            CoverFlowItemContainer(model: model, track: track, size: itemWidth)
+            CoverFlowItemContainer(model: model, track: track, size: Self.itemWidth)
         }
         .frame(maxHeight: .infinity)
+        // H-02 UI 測試閘門的 AX 探針：strip 外框＝視口，其 midX 是「居中」的基準
+        .accessibilityIdentifier("coverflow-strip")
     }
 
     /// H-03：中心下方標籤 `ARTIST // TITLE`，mono 排版語言
@@ -55,6 +64,11 @@ struct CoverFlowView: View {
             .frame(maxWidth: .infinity)
             .accessibilityIdentifier("coverflow-center-label")
             .accessibilityLabel(centerText)
+            #if DEBUG
+            // H-02 UI 測試閘門：以原始 centerID 供 UITest 比對（C1／C3）。
+            // 只在 DEBUG：Release 曝光會讓 VoiceOver 把 persistentID 原串讀出來
+            .accessibilityValue(model.centerID ?? "")
+            #endif
     }
 
     private var centerText: String {
