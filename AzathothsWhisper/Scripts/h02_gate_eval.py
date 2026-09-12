@@ -23,6 +23,7 @@ docstring 裡，此處只列索引）：
   7. GATE／SIG 交叉核對錯誤與 table_valid 的關係 —— 見 `h02_gate_table.py`／`h02_gate_rules.py`。
   8. 單一 device／test plan configuration、多個相符節點只取第一個 —— 見 `h02_gate_parse.py`。
   9. `C2-NA` 為資訊性代碼，絕不是失敗 —— 見 `h02_gate_model.py`。
+  10. R4-F 凍結表相符（只對 M0 確認性運行；F(step) 表與偏離記錄）—— 見 `h02_gate_model.py`／`h02_gate_rules.py`。
 """
 from __future__ import annotations
 
@@ -36,6 +37,8 @@ from h02_gate_model import (
     DEFECT3_CODES,
     DEFECT3_STEP,
     ENDPOINT_STEPS,
+    FROZEN_ALLOWED_CODES,
+    FROZEN_REGISTRATION,
     FailureEntry,
     GateInputError,
     GateLine,
@@ -88,6 +91,7 @@ from h02_gate_rules import (
     _kill_outcome,
     _passes_endpoint_subcontract,
     _step_status,
+    evaluate_frozen_conformity,
     evaluate_v3,
     evaluate_v4,
     evaluate_v5,
@@ -109,12 +113,12 @@ from h02_gate_cli import (
 __all__ = [
     "TEST_LABELS", "STEPS", "UI_TEST_CLASS", "PRODUCT_CODES", "INFORMATIONAL_CODES",
     "DEFECT3_CODES", "DEFECT2_CODE", "C2_REGISTERED_STEPS", "DEFECT2_EVIDENCE_STEPS",
-    "DEFECT3_STEP", "POSITIVE_CONTROL_STEP", "ENDPOINT_STEPS",
+    "DEFECT3_STEP", "POSITIVE_CONTROL_STEP", "ENDPOINT_STEPS", "FROZEN_REGISTRATION", "FROZEN_ALLOWED_CODES",
     "GateInputError", "GateLine", "FailureEntry", "Cell", "IterationInfo", "GateTable",
     "strip_swift_prefix", "failure_message_body", "parse_gate_token", "parse_failure_message",
     "parse_log", "load_xcresult_json", "parse_xcresult",
     "build_table", "format_table", "table_to_json",
-    "table_valid", "evaluate_v3", "evaluate_v5", "evaluate_v4", "verdict",
+    "table_valid", "evaluate_v3", "evaluate_v5", "evaluate_v4", "evaluate_frozen_conformity", "verdict",
     "main",
 ]
 

@@ -218,10 +218,11 @@ def build_table(
     test_labels: Optional[Dict[str, str]] = None,
 ) -> GateTable:
     test_labels = test_labels or TEST_LABELS
-    log_data, orphan_gate_lines, closed_counts = parse_log(log_text, test_labels)
+    log_data, orphan_gate_lines, closed_counts, pairing_errors = parse_log(log_text, test_labels)
     xc_data = parse_xcresult(xc_json, test_labels)
 
     errors: List[str] = [f"GATE 行出現在任何測試案例範圍之外：{l}" for l in orphan_gate_lines]
+    errors.extend(pairing_errors)
     iteration_count_mismatch: Dict[str, Tuple[int, int]] = {}
     iterations_by_test: Dict[str, List[IterationInfo]] = {}
 

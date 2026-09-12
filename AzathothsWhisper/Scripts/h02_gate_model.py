@@ -56,6 +56,25 @@ DEFECT3_STEP = ("T4", "s2")
 POSITIVE_CONTROL_STEP = ("T2", "s1")
 ENDPOINT_STEPS: Tuple[Tuple[str, str], ...] = (("T2", "s2"), ("T2", "s3"), ("T4", "s1"))
 
+# R4-F（計劃 §6，2026-09-12 R5 辯論定案，變體 N′）：§11 凍結預登記表（M0，T7 首跑後凍結）
+# → 每個登記步驟的登記碼集合（報告偏離用）與允許碼集合 F(step)（判定用）。
+# T4.s2 的 F 另含 DEFECT3_CODES：§6 V3 明文接受以 C1／C3／C5 之一抓缺陷 3，凍結表相符不得縮掉它。
+FROZEN_REGISTRATION: Dict[Tuple[str, str], FrozenSet[str]] = {
+    ("T1", "s1"): frozenset(),
+    ("T1", "s2"): frozenset({DEFECT2_CODE}),
+    ("T1", "s3"): frozenset({DEFECT2_CODE}),
+    ("T2", "s1"): frozenset(),
+    ("T2", "s2"): frozenset({DEFECT2_CODE}),
+    ("T2", "s3"): frozenset({DEFECT2_CODE}),
+    ("T3", "s1"): frozenset(),
+    ("T4", "s1"): frozenset({DEFECT2_CODE}),
+    ("T4", "s2"): frozenset({"C1-OFFSET", DEFECT2_CODE}),
+}
+FROZEN_ALLOWED_CODES: Dict[Tuple[str, str], FrozenSet[str]] = {
+    key: (codes | DEFECT3_CODES) if key == DEFECT3_STEP else codes
+    for key, codes in FROZEN_REGISTRATION.items()
+}
+
 
 class GateInputError(Exception):
     """輸入格式或解析錯誤——CLI 對應 exit code 2。"""

@@ -103,6 +103,44 @@ enum GateSettleOutcome: Equatable, Sendable {
     case axUnreadable
 }
 
+/// 落定輪詢的狀態（§3.6）：連續 `required` 次相同讀數＝落定。
+/// **讀取失敗即清空 streak**（R5-4 Round 2 P1 ①）——否則「成功×3＋失敗＋成功」會被當成連續四次而提前落定，
+/// 繞過逾時分流。逾時分流另看**全部**成功樣本（不清空）：一次晚期讀取失敗不得把真正在動的產品 C6 降成探針碼
+/// （2026-09-12 對抗核查）。不可變：每次觀察回傳新值
+struct GateSettleTracker: Equatable, Sendable {
+    let required: Int
+    /// 連續成功讀數（讀取失敗即清空）——只決定「是否落定」
+    private(set) var streak: [GateReading] = []
+    /// 全部成功讀數（不清空）——逾時分流用
+    private(set) var samples: [GateReading] = []
+    private(set) var lastReadFailed = true
+
+    init(required: Int) {
+        self.required = required
+    }
+
+    func observing(_ reading: GateReading?) -> GateSettleTracker {
+        var next = self
+        guard let reading else {
+            next.streak = []
+            next.lastReadFailed = true
+            return next
+        }
+        next.streak = streak + [reading]
+        next.samples = samples + [reading]
+        next.lastReadFailed = false
+        return next
+    }
+
+    var isSettled: Bool { CoverFlowGateLogic.isSettled(streak, required: required) }
+
+    var outcome: GateSettleOutcome {
+        isSettled
+            ? .settled
+            : CoverFlowGateLogic.timeoutOutcome(samples: samples, required: required, lastReadFailed: lastReadFailed)
+    }
+}
+
 extension GateReading {
     init(label: String?, cards: [GateCard], stripMidX: CGFloat) {
         let center = CoverFlowGateLogic.geometricCenter(of: cards, stripMidX: stripMidX)
@@ -227,14 +265,20 @@ enum CoverFlowGateLogic {
         return tail.allSatisfy { $0 == first }
     }
 
-    /// 逾時後判「產品不收斂」還是「探針讀不到」：只有 AX 一路可讀（最後一次也成功、樣本夠、
-    /// 尾段讀得到中心卡）才算產品 C6；否則是探針問題，不得掛到產品頭上（§3.6 TV4）
     static func settleOutcome(readings: [GateReading], required: Int, lastReadFailed: Bool) -> GateSettleOutcome {
-        if isSettled(readings, required: required) { return .settled }
-        let tail = readings.suffix(required)
-        guard !lastReadFailed, readings.count >= required, tail.allSatisfy({ $0.centerIndex != nil }) else {
-            return .axUnreadable
-        }
+        isSettled(readings, required: required)
+            ? .settled
+            : timeoutOutcome(samples: readings, required: required, lastReadFailed: lastReadFailed)
+    }
+
+    /// 逾時後判「產品不收斂」還是「探針讀不到」：只有 AX 一路可讀（最後一次也成功、樣本夠、尾段讀得到中心卡）
+    /// **且尾段確實仍在變**才算產品 C6——尾段全同卻從未連續四次成功＝AX 斷續失敗，是探針問題，
+    /// 不得掛到產品頭上（§3.6 TV4）
+    static func timeoutOutcome(samples: [GateReading], required: Int, lastReadFailed: Bool) -> GateSettleOutcome {
+        let tail = samples.suffix(required)
+        guard !lastReadFailed, samples.count >= required, tail.allSatisfy({ $0.centerIndex != nil }),
+              tail.contains(where: { $0 != tail.first })
+        else { return .axUnreadable }
         return .neverSettles
     }
 
@@ -250,9 +294,14 @@ enum CoverFlowGateLogic {
         )
     }
 
-    /// C5：切 tab 往返後 label 不得改變（§3.7）
-    static func driftFindings(before: String, after: String) -> [GateFinding] {
-        before == after ? [] : [GateFinding(code: "C5-DRIFT", detail: "before=\(before)|after=\(after)")]
+    /// C5：切 tab 往返後 label 不得改變（§3.7）。任一側為 nil（AX 讀不到；空字串是產品狀態，交 C1 判）＝量測失敗 → 探針碼，
+    /// 不得把 AX 失敗寫成 `C5-DRIFT`（R5-4 Round 2 P1 ④）
+    static func driftFindings(before: String?, after: String?) -> [GateFinding] {
+        guard let before, let after else {
+            let detail = "label-unreadable|before=\(before ?? "nil")|after=\(after ?? "nil")"
+            return [GateFinding(code: "PROBE-AX", detail: detail)]
+        }
+        return before == after ? [] : [GateFinding(code: "C5-DRIFT", detail: "before=\(before)|after=\(after)")]
     }
 
     private static func frameKey(_ frame: CGRect) -> [Int] {

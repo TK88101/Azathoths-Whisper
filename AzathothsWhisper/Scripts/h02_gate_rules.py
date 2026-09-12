@@ -12,6 +12,8 @@ from __future__ import annotations
 from typing import Dict, FrozenSet, List, Optional, Tuple
 
 from h02_gate_model import (
+    FROZEN_ALLOWED_CODES,
+    FROZEN_REGISTRATION,
     Cell,
     C2_REGISTERED_STEPS,
     DEFECT2_CODE,
@@ -101,6 +103,37 @@ def _defect3(per_step: Dict[Tuple[str, str], dict]) -> dict:
     return {"status": "NOT_CAUGHT"}
 
 
+def evaluate_frozen_conformity(table: GateTable) -> Tuple[bool, List[str], List[str]]:
+    """R4-F（變體 N′；只對 M0 確認性運行，變異運行不適用）：每次迭代每格 FAIL 的產品碼投影必須 ⊆ F(step)，
+    出現 F 外碼（哪怕 1/10）＝與預登記矛盾 → 不可判定（reasons）；仍 ⊆ F 但與登記不同的格（含翻成 PASS）
+    只記偏離（deviations，報告用），結論交既有 V3／V5／缺陷 2 分支。PROBE／MISSING／UNTAGGED 由 table_valid 處理。
+    回傳 (相符, reasons, deviations)。"""
+    reasons: List[str] = []
+    deviations: List[str] = []
+    for label in table.tests:
+        infos = table.iterations[label]
+        for step in STEPS[label]:
+            allowed = FROZEN_ALLOWED_CODES[(label, step)]
+            registered = FROZEN_REGISTRATION[(label, step)]
+            differing: List[str] = []
+            for info in infos:
+                cell = info.cells[step]
+                if cell.kind == "FAIL":
+                    codes = _codes(cell.sig_set)
+                    extra = sorted(codes - allowed)
+                    if extra:
+                        reasons.append(f"R4-F：{label}.{step} iter {info.iteration} 實得 {extra} ∉ F{sorted(allowed)}")
+                    if codes != registered:
+                        differing.append(f"iter {info.iteration} FAIL{sorted(codes)}")
+                elif cell.kind == "PASS" and registered:
+                    differing.append(f"iter {info.iteration} PASS")
+            if differing:
+                frozen_text = "PASS" if not registered else f"FAIL{sorted(registered)}"
+                shown = "; ".join(differing[:3]) + ("…" if len(differing) > 3 else "")
+                deviations.append(f"{label}.{step}: {len(differing)}/{len(infos)} 次與凍結登記 {frozen_text} 不同（{shown}）")
+    return not reasons, reasons, deviations
+
+
 def evaluate_v3(table: GateTable, iterations: int) -> dict:
     """V3（R4）：缺陷 3＝T4.s2 穩定帶缺陷 3 碼；缺陷 2＝非 EXCLUDED 的 C2 步驟穩定帶 C2-STACK；一致性含 ≤1 格例外。"""
     run_valid, invalid_reasons = table_valid(table, iterations)
@@ -120,6 +153,7 @@ def evaluate_v3(table: GateTable, iterations: int) -> dict:
         and v["status"] == "ALL_FAIL_CONSISTENT"
         and DEFECT2_CODE in _codes(v["sig_set"])
     ]
+    frozen_ok, frozen_reasons, frozen_deviations = evaluate_frozen_conformity(table)
     return {
         "run_valid": run_valid,
         "invalid_reasons": invalid_reasons,
@@ -130,6 +164,9 @@ def evaluate_v3(table: GateTable, iterations: int) -> dict:
         "defect3": _defect3(per_step),
         "defect2_steps": defect2,
         "defect2_reproduced": bool(defect2),
+        "frozen_conformity_ok": frozen_ok,
+        "frozen_conformity_reasons": frozen_reasons,
+        "frozen_deviations": frozen_deviations,
         "errors": list(table.errors),
     }
 
@@ -227,9 +264,12 @@ def verdict(
         name: evaluate_v4(m0, table, m0_iterations, mutant_iterations, excluded=v3["excluded"])
         for name, table in (("M2", m2), ("M3", m3))
     }
-    undecidable = [f"V5：{r}" for r in v5["reasons"]] + [
-        f"{name}：{r['verdict']}" for name, r in v4.items() if r["verdict"] != "OK"
-    ]
+    # 不可判定的獨立觸發（R4-C）：table_valid（經 V5 帶入）、V5、變異運行無效、R4-F 凍結表不相符（只對 M0）
+    undecidable = (
+        [f"V5：{r}" for r in v5["reasons"]]
+        + [f"{name}：{r['verdict']}" for name, r in v4.items() if r["verdict"] != "OK"]
+        + list(v3["frozen_conformity_reasons"])
+    )
     partial = (
         ([] if v3["defect2_reproduced"] else ["缺陷 2 在 M0 落定態不可重現"])
         + ([] if v3["consistency_ok"] else [f"V3 一致性不成立：{v3['inconsistent']}"])

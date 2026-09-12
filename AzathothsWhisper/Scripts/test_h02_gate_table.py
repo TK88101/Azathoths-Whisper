@@ -65,6 +65,25 @@ class TableBuildingTests(unittest.TestCase):
         self.assertEqual(len(info.unattributed), 1)
         self.assertEqual(info.unattributed[0].kind, "UNTAGGED")
 
+    def test_unattributed_teardown_probe_trace_invalidates_iteration(self):
+        # R5-4 Round 2 P1 ②：tearDown 全檔 audit 以未歸屬的 [PROBE-TRACE] 上報（不印 GATE 行）；
+        # 實證（2026-09-12，-test-iterations 2）：XCTFail 掛在該次 Repetition 下、該次 result=Failed
+        def fail_only_first(xc_json):
+            for rep in repetitions_of(xc_json, gate.TEST_LABELS["T3"])[:1]:
+                rep["result"] = "Failed"
+                rep.setdefault("children", []).append({
+                    "nodeType": "Failure Message",
+                    "name": "CoverFlowUITests.swift:42: failed - [PROBE-TRACE] T3.audit write-error:errno=28",
+                })
+        table = m0_run(xc_mutator=fail_only_first)
+        first = table.iterations["T3"][0]
+        self.assertTrue(first.invalid)
+        self.assertIn("未歸屬的 [PROBE-TRACE]", first.invalid_reasons)
+        self.assertEqual(first.cells["s1"].kind, "PASS")
+        self.assertFalse(any("GATE 引用未知步驟" in e for e in table.errors), table.errors)
+        self.assertFalse(gate.table_valid(table, 10)[0])
+        self.assertFalse(table.iterations["T3"][1].invalid)
+
     def test_probe_invalidates_iteration_and_tags_step(self):
         log_text, xc_json = load_fixture("probe_fail")
         table = gate.build_table(log_text, xc_json, expected_iterations=1)

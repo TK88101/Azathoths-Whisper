@@ -67,7 +67,11 @@ enum CoverFlowTraceFormat {
         let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: path))
         defer { try? handle.close() }
         try handle.seek(toOffset: offset)
-        let data = try handle.readToEnd() ?? Data()
+        return parse(try handle.readToEnd() ?? Data(), offset: offset)
+    }
+
+    /// 解析一段從 `offset` 起的位元組；尾端半行不計入 `endOffset`
+    static func parse(_ data: Data, offset: UInt64) -> Snapshot {
         guard let lastNewline = data.lastIndex(of: UInt8(ascii: "\n")) else {
             return Snapshot(header: nil, records: [], problems: [], endOffset: offset)
         }
@@ -80,6 +84,26 @@ enum CoverFlowTraceFormat {
             header: parser.header, records: parser.records, problems: parser.problems,
             endOffset: offset + UInt64(complete.count)
         )
+    }
+
+    /// 全檔 audit（R5-4 Round 2 P1 ②）：從 0 重讀整個檔案，回傳所有協議問題——
+    /// `unreadable:`（開不了／讀不了）、`no-header`、`partial-tail`（尾端半行：寫入端是同步整行 write，
+    /// 測試結束時不該留半行）以及 `read` 本身的 problems（gap／time／nul／write-error／malformed）。
+    /// runner 每條測試結束前呼叫一次，任何問題 → `[PROBE-TRACE]`；空陣列＝整份軌跡健康
+    /// **同一份位元組**既產生記錄也決定尾端是否完整：partial-tail 不可另外 stat 檔案大小——先讀後 stat 之間
+    /// 寫入端若追加一行，健康軌跡會被誤報成半行（2026-09-12 對抗核查的 TOCTOU 反例）
+    static func audit(path: String) -> [String] {
+        let data: Data
+        do {
+            data = try Data(contentsOf: URL(fileURLWithPath: path))
+        } catch {
+            return ["unreadable:\(error.localizedDescription)"]
+        }
+        let snapshot = parse(data, offset: 0)
+        var problems = snapshot.problems
+        if snapshot.header == nil { problems.append("no-header") }
+        if UInt64(data.count) != snapshot.endOffset { problems.append("partial-tail") }
+        return problems
     }
 
     private struct Parser {

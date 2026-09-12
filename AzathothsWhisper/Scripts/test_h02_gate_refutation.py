@@ -59,6 +59,31 @@ class R4RefutationTests(unittest.TestCase):
         self.assertFalse(valid)
         self.assertTrue(any("成對" in r or "收尾" in r for r in reasons), reasons)
 
+    def test_lone_orphan_finish_line_is_an_error(self):
+        # R5-4 Round 2 P1 ③：沒有開著迭代的收尾行不得靜默略過——它證明日誌行序或截斷有問題
+        method = gate.TEST_LABELS["T3"]
+        finish = f"Test Case '-[AzathothsWhisperUITests.CoverFlowUITests {method}]' passed (1.0 seconds)."
+        table = m0_run(log_mutator=lambda text: finish + "\n" + text)
+        self.assertTrue(any("孤兒收尾" in e for e in table.errors), table.errors)
+        valid, reasons = gate.table_valid(table, 10)
+        self.assertFalse(valid)
+
+    def test_start_overlapping_an_open_iteration_is_an_error(self):
+        method = gate.TEST_LABELS["T3"]
+        start = f"Test Case '-[AzathothsWhisperUITests.CoverFlowUITests {method}]' started."
+        table = m0_run(log_mutator=lambda text: text.replace(start, start + "\n" + start, 1))
+        self.assertTrue(any("覆蓋已開" in e for e in table.errors), table.errors)
+        self.assertFalse(gate.table_valid(table, 10)[0])
+
+    def test_parse_log_returns_pairing_errors(self):
+        method = gate.TEST_LABELS["T3"]
+        finish = f"Test Case '-[AzathothsWhisperUITests.CoverFlowUITests {method}]' failed (1.0 seconds)."
+        per_test, orphans, closed, pairing = gate.parse_log(finish + "\n")
+        self.assertEqual(per_test["T3"], [])
+        self.assertEqual(closed["T3"], 0)
+        self.assertEqual(len(pairing), 1)
+        self.assertIn("孤兒收尾", pairing[0])
+
     def test_started_without_finish_line_is_invalid(self):
         method = gate.TEST_LABELS["T3"]
 

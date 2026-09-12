@@ -395,6 +395,13 @@ struct CoverFlowGateLogicTests {
         #expect(findings.first?.detail == "before=T19|after=T16")
     }
 
+    /// 量測失敗不得冒充產品 C5（R5-4 Round 2 P1 ④）：任一側 label 讀不到 → 探針碼，絕不是 `C5-DRIFT`
+    @Test func unreadableLabelAroundRebuildIsProbeNotDrift() {
+        #expect(Logic.driftFindings(before: nil, after: "T19").map(\.code) == ["PROBE-AX"])
+        #expect(Logic.driftFindings(before: "T19", after: nil).map(\.code) == ["PROBE-AX"])
+        #expect(Logic.driftFindings(before: nil, after: nil).map(\.code) == ["PROBE-AX"])
+    }
+
     // MARK: 落定逾時分流（§3.6 TV4）與截圖穩定鍵（TV6）
 
     private func reading(_ center: Int?, x: Int) -> GateReading {
@@ -418,6 +425,45 @@ struct CoverFlowGateLogicTests {
         #expect(Logic.settleOutcome(readings: Array(moving.prefix(2)), required: 4, lastReadFailed: false) == .axUnreadable)
         let noCentre = (0..<4).map { reading(nil, x: $0) }
         #expect(Logic.settleOutcome(readings: noCentre, required: 4, lastReadFailed: false) == .axUnreadable)
+    }
+
+    /// 落定樣本必須真正「連續」（R5-4 Round 2 P1 ①）：讀取失敗要清空 streak——
+    /// 「3 成功＋1 失敗＋1 成功」不得算成 4 次連續而提前 settled（那會繞過 settleOutcome 的分流）
+    @Test func readFailureClearsTheSettleStreak() {
+        let steady = reading(7, x: 3)
+        let broken = GateSettleTracker(required: 4)
+            .observing(steady).observing(steady).observing(steady).observing(nil).observing(steady)
+        #expect(!broken.isSettled)
+        #expect(broken.outcome == .axUnreadable, "失敗後樣本不足＝探針問題，不得報成產品 C6")
+        let recovered = broken.observing(steady).observing(steady).observing(steady)
+        #expect(recovered.isSettled)
+        #expect(recovered.outcome == .settled)
+    }
+
+    /// 一次晚期讀取失敗不得把真正在動的產品 C6 降成探針碼：逾時分流看全部成功樣本，尾段仍在變 → C6
+    @Test func lateSingleReadFailureKeepsProductNeverSettles() {
+        var tracker = GateSettleTracker(required: 4)
+        for x in 0..<6 { tracker = tracker.observing(reading(7, x: x)) }
+        tracker = tracker.observing(nil)
+        for x in 6..<9 { tracker = tracker.observing(reading(7, x: x)) }
+        #expect(!tracker.isSettled)
+        #expect(tracker.outcome == .neverSettles)
+    }
+
+    /// 尾段全同卻從未連續四次成功＝AX 斷續失敗 → 探針，不是 C6
+    @Test func intermittentAxWithSteadyFramesIsProbeNotC6() {
+        let steady = reading(7, x: 3)
+        var tracker = GateSettleTracker(required: 4)
+        for _ in 0..<5 { tracker = tracker.observing(steady).observing(steady).observing(nil) }
+        #expect(!tracker.isSettled)
+        #expect(tracker.observing(steady).outcome == .axUnreadable)
+    }
+
+    @Test func trackerReportsNeverSettlesOnlyWhileAxStaysReadable() {
+        let moving = (0..<4).reduce(GateSettleTracker(required: 4)) { $0.observing(reading(7, x: $1)) }
+        #expect(moving.outcome == .neverSettles)
+        #expect(moving.observing(nil).outcome == .axUnreadable)
+        #expect(GateSettleTracker(required: 4).outcome == .axUnreadable)
     }
 
     @Test func stabilityKeyCoversEveryCardNotJustTheCentre() {

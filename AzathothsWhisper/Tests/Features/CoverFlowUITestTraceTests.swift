@@ -105,6 +105,46 @@ struct CoverFlowUITestTraceTests {
         #expect(snapshot.endOffset == UInt64("0\t10\tbind\tT10\n".utf8.count))
     }
 
+    /// 全檔 audit（R5-4 Round 2 P1 ②）：`watermark()` 只留 endOffset，前綴裡的 write-error／malformed
+    /// 若不從 0 重讀就永遠被跳過——每條測試結束前必須做一次全檔 audit
+    @Test func fullFileAuditSeesProblemsBeforeTheWatermark() throws {
+        let path = temporaryPath()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let trace = try #require(CoverFlowUITestTrace(path: path))
+        trace.record(kind: .bind, payload: "T10")
+        let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: path))
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(CoverFlowTraceFormat.errorLine(errno: 28).utf8))
+        try handle.close()
+        let mark = try CoverFlowTraceFormat.read(path: path, fromOffset: 0).endOffset
+        trace.record(kind: .bind, payload: "T11")
+
+        let sinceMark = try CoverFlowTraceFormat.read(path: path, fromOffset: mark)
+        #expect(sinceMark.problems.isEmpty, "水位之後看不見前綴問題——這正是全檔 audit 要補的洞")
+        let audit = CoverFlowTraceFormat.audit(path: path)
+        #expect(audit.contains { $0.hasPrefix("write-error") }, "\(audit)")
+    }
+
+    @Test func auditReportsMissingHeaderPartialTailAndUnreadableFile() throws {
+        let path = temporaryPath()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        try Data("0\t10\tbind\tT10\n1\t20\tbi".utf8).write(to: URL(fileURLWithPath: path))
+        let audit = CoverFlowTraceFormat.audit(path: path)
+        #expect(audit.contains("no-header"), "\(audit)")
+        #expect(audit.contains("partial-tail"), "\(audit)")
+        let missing = CoverFlowTraceFormat.audit(path: "/nonexistent-dir-\(UUID().uuidString)/trace.log")
+        #expect(missing.contains { $0.hasPrefix("unreadable") }, "\(missing)")
+    }
+
+    @Test func cleanTraceAuditsClean() throws {
+        let path = temporaryPath()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let trace = try #require(CoverFlowUITestTrace(path: path))
+        trace.record(kind: .bind, payload: "T10")
+        trace.record(kind: .live, payload: "end")
+        #expect(CoverFlowTraceFormat.audit(path: path).isEmpty)
+    }
+
     @Test func unwritablePathYieldsNoTrace() {
         #expect(CoverFlowUITestTrace(path: "/nonexistent-dir-\(UUID().uuidString)/trace.log") == nil)
     }

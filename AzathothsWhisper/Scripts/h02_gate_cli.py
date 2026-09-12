@@ -35,6 +35,9 @@ def _print_v3(v3: dict) -> None:
         extra = f" sig={v['sig_set']}" if "sig_set" in v else ""
         print(f"  - {t}.{s}: {v['status']}{extra}")
     print(f"inconsistent: {v3['inconsistent']}  excluded: {v3['excluded']}  consistency_ok: {v3['consistency_ok']}")
+    print(f"frozen_conformity_ok: {v3['frozen_conformity_ok']}")
+    _print_lines("R4-F 不相符（→ 不可判定）", v3["frozen_conformity_reasons"])
+    _print_lines("frozen_deviations（只記錄，不改結論）", v3["frozen_deviations"])
     print(f"defect3: {v3['defect3']}")
     print(f"defect2_steps: {[(t, s) for t, s, _ in v3['defect2_steps']]}")
 

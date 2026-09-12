@@ -100,26 +100,20 @@ final class CoverFlowProbe {
         return nil
     }
 
+    /// 落定：連續 `settleReadings` 次相同讀數。streak 與逾時分流都在 `GateSettleTracker`（純邏輯、有單測）；
+    /// 讀取失敗會清空 streak，不會把斷續的成功拼成「連續」
     func waitForStableCenter() -> Settle {
-        var readings: [GateReading] = []
+        var tracker = GateSettleTracker(required: Self.settleReadings)
         var last: State?
-        var lastReadFailed = true
         let deadline = Date().addingTimeInterval(Self.settleTimeout)
         while Date() < deadline {
-            if let state = readState() {
-                last = state
-                lastReadFailed = false
-                readings.append(state.reading)
-                if CoverFlowGateLogic.isSettled(readings, required: Self.settleReadings) { return .settled(state) }
-            } else {
-                lastReadFailed = true
-            }
+            let state = readState()
+            if let state { last = state }
+            tracker = tracker.observing(state?.reading)
+            if tracker.isSettled, let state { return .settled(state) }
             Thread.sleep(forTimeInterval: Self.pollInterval)
         }
-        let outcome = CoverFlowGateLogic.settleOutcome(
-            readings: readings, required: Self.settleReadings, lastReadFailed: lastReadFailed
-        )
-        guard outcome == .neverSettles, let last else { return .axUnreadable }
+        guard tracker.outcome == .neverSettles, let last else { return .axUnreadable }
         return .neverSettles(last)
     }
 
@@ -245,6 +239,11 @@ struct CoverFlowTraceSession {
 
     func header() -> CoverFlowTraceFormat.Header? {
         read(from: 0)?.header
+    }
+
+    /// 全檔 audit（從 0 重讀）：水位讀取會永久跳過前綴裡的問題，每條測試結束前必須補這一次
+    func audit() -> [String] {
+        CoverFlowTraceFormat.audit(path: path)
     }
 
     /// 讀到軌跡靜止（`quiet` 內無新行，最多等 `limit`）為止；回傳水位之後的全部記錄

@@ -142,10 +142,13 @@ def _classify_gate_token(token: str) -> Tuple[str, str]:
 
 def parse_log(
     log_text: str, test_labels: Optional[Dict[str, str]] = None
-) -> Tuple[Dict[str, List[List[GateLine]]], List[str], Dict[str, int]]:
-    """回傳 ({test_label: [[GateLine,...一次迭代內依序], ...]}, 孤兒 GATE 行清單, {test_label: 成對收尾的迭代數})。
+) -> Tuple[Dict[str, List[List[GateLine]]], List[str], Dict[str, int], List[str]]:
+    """回傳 ({test_label: [[GateLine,...一次迭代內依序], ...]}, 孤兒 GATE 行清單,
+    {test_label: 成對收尾的迭代數}, 配對錯誤清單)。
 
-    配對以「目前開著的迭代」為準，不只比總數：沒有開始的收尾、開著又再開始、EOF 仍開著，都不算成對。"""
+    配對以「目前開著的迭代」為準，不只比總數：沒有開始的收尾、開著又再開始、EOF 仍開著，都不算成對。
+    前兩種還各記一條配對錯誤（R5-4 Round 2 P1 ③）：單獨的孤兒收尾行總數仍能對上，靜默略過會讓
+    行序錯亂／截斷再拼接的日誌判成有效。"""
     test_labels = test_labels or TEST_LABELS
     method_to_label = {v: k for k, v in test_labels.items()}
     per_test: Dict[str, List[List[GateLine]]] = {label: [] for label in test_labels}
@@ -153,6 +156,7 @@ def parse_log(
     open_label: Optional[str] = None
     open_lines: Optional[List[GateLine]] = None
     orphan_lines: List[str] = []
+    pairing_errors: List[str] = []
 
     for raw_line in log_text.splitlines():
         m = _TESTCASE_LINE_RE.search(raw_line)
@@ -163,11 +167,20 @@ def parse_log(
             if label is None or m.group("cls") != UI_TEST_CLASS:
                 continue
             if verb == "started":
+                if open_label is not None:
+                    pairing_errors.append(
+                        f"{label}: started 覆蓋已開的 {open_label} 迭代（第 {len(per_test[open_label])} 次未收尾）"
+                    )
                 open_label, open_lines = label, []
                 per_test[label].append(open_lines)
             elif open_label == label:  # 只有關掉自己開著的那次才算成對
                 closed[label] += 1
                 open_label, open_lines = None, None
+            else:
+                pairing_errors.append(
+                    f"{label}: 孤兒收尾行（{verb}）沒有對應的 started"
+                    + (f"（當時開著的是 {open_label}）" if open_label is not None else "")
+                )
             continue
         gate = parse_gate_token(raw_line)
         if gate is not None:
@@ -175,7 +188,7 @@ def parse_log(
                 orphan_lines.append(raw_line.strip())
             else:
                 open_lines.append(gate)
-    return per_test, orphan_lines, closed
+    return per_test, orphan_lines, closed, pairing_errors
 
 
 # xcresult 解析

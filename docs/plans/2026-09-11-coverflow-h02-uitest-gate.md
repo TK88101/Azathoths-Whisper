@@ -265,6 +265,7 @@ project.yml 在 UITests target 追加這兩個檔。**單一來源**：旗標名
   - **V5**、**V3**、**結論**的機械語義見 §6 R4 條文；`verdict` 子命令依 §6 R4-C 的優先序輸出唯一結論，V4 權重留給使用者
   - 失敗文字解析：真實形態是 `<檔>.swift:<行>: failed - <XCTFail 訊息>`；剝前綴後只再剝一次 XCTFail 的 `failed - `，
     其他斷言巨集的包裝不剝（§11「判定腳本缺陷」）
+  - **R4-F（2026-09-12 R5）**：`evaluate_v3` 另回傳 `frozen_conformity_ok`／`frozen_conformity_reasons`／`frozen_deviations`（§6 R4-F），`verdict` 把不相符列入不可判定；`v3`／`verdict` 子命令印出三欄
   - **R4 補正（2026-09-11 三視角對抗核查，§11）**：① GATE 與 SIG 的交叉核對比**碼集合**（產出端 GATE 碼去重、
     每個 finding 一條 SIG，故兩側同碼合法）；② GATE／SIG 的 `<test>.` 前綴必須等於本測試，否則記 error 且不頂替該步驟
     （不得掩蓋 MISSING）；③ 日誌 `started` 必須與 `passed/failed` 成對，數目不符記 error（截斷的運行不得判有效）；
@@ -335,7 +336,7 @@ S 階段結束時凍結全部閾值（§6 護欄）。
 | V2 | xcodegen 重生成後，pbxproj／xcscheme 相對 **T1 前快照**（md5 `a06b0909…`）只多出新檔條目與截圖設定 | diff |
 | V3 | **M0 閘門**（R4 修訂）：`table_valid`（§3.12）；**缺陷 3**＝T4.s2 10/10 FAIL、每次含 {`C1-OFFSET`、`C3-TARGET-MISS`、`C5-DRIFT`} 之一、且十次完整正規化簽名集合相同；**缺陷 2**＝至少一個非 EXCLUDED 的 C2 登記步驟（T1.s2／T1.s3／T2.s2／T2.s3／T4.s1／T4.s2）10/10 FAIL、每次含 `C2-STACK`（同格可兼有其他產品碼）、且十次簽名集合相同；否則依 §3.10「不可重現」分支；**一致性**＝其餘步驟十次結果一致，例外見下 R4-X | §3.12 腳本 |
 | V4 | **歷史變異回歸**：M2、M3 各自是否被步驟級差異殺死（§3.11：M0 該步驟 10/10 PASS、變異 3/3 FAIL 且簽名集合一致、簽名屬全部產品碼）；baseline 與 mutant 各自須 `table_valid`；EXCLUDED 格不可作殺死步驟；結果連同 trace 事件性質上報，權重由使用者決定 | 同上 |
-| V5 | **陽性對照**（R4 修訂）：M0 上 T2.s1 10/10 全契約 PASS；且至少一個非 EXCLUDED 的端點步驟（T2.s2／T2.s3／T4.s1）**十次結果一致**（ALL_PASS 或 ALL_FAIL_CONSISTENT）且**每一次**結果 ∈ {PASS, 碼集恰為 {`C2-STACK`} 的 FAIL}——即端點陽性子契約 C0、C1、C3、C6 十次皆綠，`C2-STACK` 不參與 V5 成敗，任何其他產品碼即 V5 失敗；S2 已知點分類命中。**「十次一致」為 R4 補正**（2026-09-11 對抗核查：否則一個時紅時綠的端點可充當陽性對照，且多一個無關 flake 反而使結論變寬鬆）——只收緊不放寬，待使用者確認是否需再過 Phase 1 | 同上＋§11 |
+| V5 | **陽性對照**（R4 修訂）：M0 上 T2.s1 10/10 全契約 PASS；且至少一個非 EXCLUDED 的端點步驟（T2.s2／T2.s3／T4.s1）**十次結果一致**（ALL_PASS 或 ALL_FAIL_CONSISTENT）且**每一次**結果 ∈ {PASS, 碼集恰為 {`C2-STACK`} 的 FAIL}——即端點陽性子契約 C0、C1、C3、C6 十次皆綠，`C2-STACK` 不參與 V5 成敗，任何其他產品碼即 V5 失敗；S2 已知點分類命中。**「十次一致」為 R4 補正**（2026-09-11 對抗核查：否則一個時紅時綠的端點可充當陽性對照，且多一個無關 flake 反而使結論變寬鬆）——只收緊不放寬；**已於 R5（2026-09-12）Phase 1 快速複審通過並由使用者拍板**，精確解讀：ALL_PASS＝十格皆 PASS；ALL_FAIL_CONSISTENT＝十格皆 FAIL 且十次完整正規化 `sig_set` 相同且產品碼投影恰為 {`C2-STACK`}；INCONSISTENT 與 EXCLUDED 皆不得為 V5 候選 | 同上＋§11 |
 | V6 | **不回歸**：單測紅燈清單與 T0 完全相同（只多出新單測的綠）；既有 UITests 與 **T0 樹**（R4：`git archive aad6a9b`＋§11 R5-3 所列四檔重建）同一命令的結果逐條相同——A-10 為 PASS 或已知失敗（`ShellUITests.swift:174`，state≠notRunning）皆視同基線，BatchLive skip，其餘逐條相同 | 清單 diff |
 | V7 | **Release 排除**：主證據＝源碼結構（app target 內每個新增檔整檔包在 `#if DEBUG … #endif`；`AppModel.live()` 分支、trace 鉤子、label AX value 都在 `#if DEBUG` 內；grep 腳本逐檔驗）＋ Release 構建成功；輔證＝`strings` 不含旗標名與型別名 | grep＋構建＋`strings` |
 | V8 | repo 內無變異碼：`CoverFlowStrip.swift` md5 始終 ＝ `a9ac2902…`（T0 基準） | md5 |
@@ -347,9 +348,20 @@ S 階段結束時凍結全部閾值（§6 護欄）。
 (c) 該步驟不進缺陷 2／3 證據、V5 端點候選、V4 可殺集合。不適用任何變異運行或修復候選（修復候選仍須四測試 ×20 全綠，§3.10）。
 其根因只記為推論（「觀察到渲染次序不確定；推論：產品側 z 序時序，亦可能是截圖相對 compositing 的取樣時機」）
 
+**R4-F 凍結表相符（2026-09-12 R5，變體 N′；使用者拍板）**：只對 `cf-m0-confirm`（變異運行不適用——V4 已是步驟級差異，變異本就該產生 M0 沒有的碼）。
+以 §11 凍結預登記表定義每個登記步驟的允許產品碼集合 F(step)：PASS 步驟（T1.s1／T2.s1／T3.s1）＝∅；T1.s2／T1.s3／T2.s2／T2.s3／T4.s1＝{`C2-STACK`}；
+T4.s2＝{`C1-OFFSET`, `C3-TARGET-MISS`, `C5-DRIFT`, `C2-STACK`}（§6 V3 明文接受以 C1／C3／C5 之一抓缺陷 3，相符檢查不得縮掉它）。
+判定：每次迭代每格若為 FAIL，其產品碼投影必須 ⊆ F(step)；出現 F 外碼（哪怕 1/10）＝與預登記矛盾 → R4-C「不可判定」的獨立觸發（不併入 `table_valid`）。
+**不要求**凍結為 FAIL 的步驟日後仍失敗：翻成 PASS 或碼集合為登記的子集只記 `frozen_deviations`（報告用），結論交既有 V3 一致性／V5 端點 ALL_PASS／§3.10 缺陷 2 不可重現分支。
+PROBE／MISSING／UNTAGGED 格由 `table_valid` 處理，不重複計。實作：`evaluate_frozen_conformity`（`h02_gate_rules.py`）、`FROZEN_REGISTRATION`／`FROZEN_ALLOWED_CODES`（`h02_gate_model.py`）；`v3`／`verdict` 印出三個新欄位。
+（我方原提案「變體 S」——另要求凍結 FAIL 步驟不得十次全 PASS——被 Codex 以三個反例駁回，見 §12 R5）
+
+**D1 預登記（2026-09-12 R5）**：確認性運行若前置 C6 導致任一登記步驟 MISSING、或由 `s0`／`setup` 產生「未知步驟」error，依現行 `table_valid` 判不可判定；保留證據、重跑前回 Phase 1。不新增 blocked-step 規格碼（C6 落在最後登記步驟時表格仍可有效，走既有謂詞）。
+**D2 預登記（2026-09-12 R5）**：C4 維持「nil 原始回寫不算變」；已知盲區＝「11→12→nil→12→13」與 hold「nil→13」的瞬時擺動不可偵測（C1／C2 只量落定終態、C5 只涵蓋切 tab），證據包明列，留待修復計劃結合 nil 持續時間或同步幾何取樣再議。
+
 **閘門結論**（R4-C：機械判定、按下列優先序取第一個成立者；V4 權重由使用者在看到結果後裁決）
 1. **不可建**：S 階段備案用盡 → 上報
-2. **不可判定**：任一確認性運行（`cf-m0-confirm`、`cf-M2-confirm`、`cf-M3-confirm`）`table_valid` 不成立，或 V5 不成立 → 保留該份證據；重跑須先回 Phase 1 明言修訂
+2. **不可判定**：任一確認性運行（`cf-m0-confirm`、`cf-M2-confirm`、`cf-M3-confirm`）`table_valid` 不成立，或 V5 不成立，或 R4-F 凍結表不相符（只對 `cf-m0-confirm`）→ 保留該份證據；重跑須先回 Phase 1 明言修訂
 3. **不通過**：缺陷 3 未抓到或 T4.s2 不穩定 → **禁止第四次修復**
 4. **部分通過**：缺陷 3 穩定，但以下任一——缺陷 2 落「不可重現」分支；V4 有變異未殺；V3 一致性不成立（≥2 格不一致，或不一致格不符 R4-X）→ 帶選項上報，使用者裁決是否開始第四次修復
 5. **通過**：其餘（V3 全部成立＋V5 成立＋V4 兩變異皆殺）
@@ -668,13 +680,107 @@ T1.s2／T1.s3／T2.s2／T2.s3／T4.s1＝FAIL{C2-STACK}；T4.s2＝FAIL{C1-OFFSET,
   - Q3 殘餘風險排序（對確認性結論）：第 8 條（前置 C6 → 後續 MISSING，方向是假紅／假不可判定，不會假綠）＞ 第 10 條（nil 回寫語義，可能假綠也可能假紅，但不影響目前 V4 的殺死點）＞ 第 5 條（跨段序號／時間）
   - 本輪實跑：Python 76/76 OK；探索資料復算仍為「通過」、T2.s2 EXCLUDED、M2／M3 皆殺（與拆檔前一致）
 
-### 暫停狀態（2026-09-11 深夜，使用者收工；已 commit 並 push）
+### 暫停狀態（2026-09-11 深夜，使用者收工；已 commit 並 push）——**已於 2026-09-12 恢復並完成 R5-4 P1／R5-5／R5-6，見下列各節**
 - **完成**：R5-1（計劃修訂）、R5-2（判定器 TDD＋3 視角對抗核查修正）、R5-3（真 T0 基線，V6 逐條相同）、R5-4（simcodex Round 1 全部落地＋Round 2 codex 驗收）
 - **未跑**：R5-5（確認性閘門：`cf-m0-confirm` M0 ×10 ＋ `cf-M2-confirm`／`cf-M3-confirm` ×3，需使用者在場授權 Automation Mode、機器閒置約 25 分鐘）、R5-6（機械結論＋證據包）
 - **恢復前必須先處置**（否則確認性運行的證據會帶著已知量測缺口）：R5-4 Round 2 的 4 條新 P1（落定 streak、trace 全檔 audit、孤兒收尾行、T4 的 `?? "nil"`）
 - **待使用者裁決的三項**（觸及判據語義，不得自行實施）：① 前置 C6 → 後續 MISSING 的 blocked-step 規格碼；② C4 是否把落定後的 `nil` 回寫算作「變」；
   ③ V5 端點「十次一致」這條 R4 補正是否需再過一輪 Phase 1（它只收緊不放寬）
 - 證據目錄 `~/Developer/bjork-h02-gate/`（含 `debate-R4/` 辯論全文、`mutant-runs/` 溯源、各輪 xcresult 與日誌）在 repo 之外，**未進版本庫**
+
+### R5-4 Round 2 的 4 條 P1 修法落地（2026-09-12，恢復後第一步；基建修正、不動判據）
+- TDD：先寫 6 條 Swift＋3 條 Python 測試 → RED（Swift 以 `audit` 未實作的編譯失敗為 RED；Python 2 failures＋1 error）→ 實作 → GREEN
+  - ① 落定 streak：`GateSettleTracker`（不可變、`observing(nil)` 清空 readings 並記 lastReadFailed）進 `CoverFlowGateLogic`；`CoverFlowProbe.waitForStableCenter` 只用 tracker。
+    單測 `readFailureClearsTheSettleStreak`（3 成功＋1 失敗＋1 成功 → 未 settled、outcome＝axUnreadable）、`trackerReportsNeverSettlesOnlyWhileAxStaysReadable`
+  - ② trace 全檔 audit：`CoverFlowTraceFormat.audit(path:)`（從 0 重讀：unreadable／no-header／partial-tail／gap／time／nul／write-error／malformed）；
+    `CoverFlowUITests.tearDown` 先於 `super.tearDown()`（app 未終止）做一次，問題以**未歸屬**的 `XCTFail("[PROBE-TRACE] <T>.audit …")` 上報（不印 GATE 行）→ 該迭代 invalid；
+    `verifyIdentity` 同一 snapshot 有 problems → PROBE-TRACE；`scrollStep` 的 hold 讀不到 → PROBE-TRACE（不再 `?? []`）。
+    單測 `fullFileAuditSeesProblemsBeforeTheWatermark`（水位之後看不見前綴 write-error，audit 看得見）、`auditReportsMissingHeaderPartialTailAndUnreadableFile`、`cleanTraceAuditsClean`
+  - ③ `parse_log` 回傳第 4 元 `pairing_errors`：孤兒收尾行（無對應 started、或開著的是別的測試）與 started 覆蓋已開迭代都進 `table.errors` → `table_valid` False。
+    測試 `test_lone_orphan_finish_line_is_an_error`（總數仍對得上的孤兒收尾行）、`test_start_overlapping_an_open_iteration_is_an_error`、`test_parse_log_returns_pairing_errors`
+  - ④ T4：切 tab 前 label 讀不到 → `reportSingle(step: "T4.s2", code: "PROBE-AX")` 並 return；`driftFindings(before: String?, after: String?)` 任一側 nil → `PROBE-AX`（絕不 `C5-DRIFT`）。
+    單測 `unreadableLabelAroundRebuildIsProbeNotDrift`
+- 驗證（最終代碼）：Python 79/79；Swift 全量 **379 tests／39 suites、6 issues＝EDGE args 1,4,5,6,7,8，紅燈清單與 T0 逐條相同**（`unit-R55.xcresult`）；UITests target 編譯通過。
+  V1：GateLogic 98.1%、TraceFormat 97.8%、`CoverFlowUITestTrace` 89.8%、Fixture／Music／組裝分支 100%。V2：pbxproj 相對 T1 前快照刪 0／增 62（與 T10 同）、xcscheme 只多 `systemAttachmentLifetime`。
+  V7：`rel-R55/` Release 構建成功，`strings -a` 對 8 個測試專用符號＋`GateSettleTracker` 全為 0，陽性對照 `coverflow-center-label` 2／`CoverFlowViewModel` 6；6 個新增 app 檔首尾 `#if DEBUG`／`#endif`，`live()` 分支、binding 鉤子、AX value 皆在 DEBUG 內。V8：Strip md5 `a9ac2902…` 不變
+- 產品碼集合未動（`ProductCodeSingleSourceTests` 綠）；凍結參數、凍結預登記表、§6 判據皆未觸及
+- **對抗核查**（Opus 5，4 條修法 × 3 透鏡＝12 票，唯讀、每票須附可復跑反例）：11 票未駁倒（high）；**1 票駁倒（medium）**＋4 條殘餘疑慮，處置如下（均為量測保真，不動判據）：
+  - 駁倒：`audit` 的 partial-tail 先讀後 stat 是 TOCTOU（假紅方向）→ 改為**同一份位元組**解析＋比對尾端（`CoverFlowTraceFormat.parse(_:offset:)` 抽出，`read` 與 `audit` 共用）
+  - T4 的 `before` 單次無重試、一 nil 即整輪作廢 → 改取 T4.s1 **落定狀態**（連續 4 次相同讀數）的 label；仍 nil → PROBE-AX
+  - streak 清空使逾時分流的 C6 觀測窗縮到「最後一段連續成功」，一次晚期 AX 失敗會把真正在動的產品 C6 降成探針 → tracker 另留全部成功樣本 `samples`；
+    `timeoutOutcome`：AX 一路可讀**且尾段仍在變**才報 C6，尾段全同卻從未連續四次成功＝AX 斷續失敗 → 探針。新增單測 `lateSingleReadFailureKeepsProductNeverSettles`、`intermittentAxWithSteadyFramesIsProbeNotC6`
+  - **實證關閉兩條疑慮**（臨時 XCTest 類 `-test-iterations 2`，用後即刪、檔案已還原）：tearDown 內的 XCTFail 掛在該次 **Repetition** 節點下、該次 `result=Failed`
+    （`_iterations_from_test_case_node` 收得到，不會被丟棄）；日誌每次迭代只印一行 `failed` 收尾（不產生孤兒收尾行）
+  - 記錄不處置：`s0`／`setup` 的 GATE 行引用未知步驟（既有結構；與未歸屬 PROBE 同樣落 invalid → 不可判定，無語義差）；持續性 I/O 失敗會留下內部自洽的截斷檔（需真實磁碟故障）；
+    `""` label 是產品狀態（C1-LABEL-CARD-MISSING），guard 只攔 nil；凍結表產生時的落定實作允許跨失敗拼接，本次修法改變了該量測程序——R5-5 本就是重跑 V5 的確認性運行，差異若出現逐格上報
+- **完整性批評**（Opus 5，對照 Codex ② 四個子句）：12 位核查者一致漏掉一條**假綠**路徑——`scrollStep` 保持期後 `probe.readState()?.labelIndex` 讀取失敗被壓成 nil、
+  在 `writebackFindings` 被 `compactMap` 靜默丟掉（沒有 PROBE、沒有碼、迭代仍有效；它是非 binding 驅動拉回的唯一偵測點）→ 已修：讀不到 → PROBE-AX 並停止本步驟。
+  ② 的 runner 接線（tearDown → 未歸屬 PROBE → invalid）原本零測試 → 新增 Python 回歸 `test_unattributed_teardown_probe_trace_invalidates_iteration`（依上述實證形態）。
+  記錄不處置：判定端無規則要求「audit 曾執行」（缺席只在 launch 前崩潰時發生，該迭代本已 UNTAGGED invalid）；`verifyIdentity` 的 problems 檢查與既有 no-header／PROBE-WINDOW 同樣上報在 `<T>.setup`，
+  落 table 級 errors（同路徑，仍為不可判定）；未登記方法的 started 巢狀在已開迭代內不記 pairing error（目前不可觸發）
+- 加固後：Swift 兩個 suite 57 條綠、UITests target 編譯通過（`build-for-testing`）；Python 80/80
+
+### R4-F 凍結表相符落地（2026-09-12，使用者拍板後；判據修訂已於 §6／§12 R5 記錄）
+- TDD：`test_h02_gate_frozen.py` 12 條先 RED（6 errors＋5 failures）→ 實作 `FROZEN_REGISTRATION`／`FROZEN_ALLOWED_CODES`（model）、`evaluate_frozen_conformity`（rules，
+  併入 `evaluate_v3` 三欄與 `verdict` 不可判定清單）、`_print_v3` 印三欄（cli，第三輪辯論補正）→ GREEN **92/92**。
+  釘住：CE1（T3.s1 10/10 C6）、CE2（T1.s3 穩定多出 C4-SNAPBACK）、1/10 出現 F 外碼 → 不可判定；CE3（T4.s2 C3＋C2）相符；CE4／CE5（T1.s3／T2.s2 翻 10/10 PASS）相符、記偏離、T2.s2 仍為 V5 候選；
+  合法 R4-X 9/1 相符；五個 C2 步驟全 PASS → 部分通過；M2／M3 帶新碼不受限；F 表覆蓋全部登記步驟且 ⊆ PRODUCT_CODES；CLI 輸出含 `frozen_conformity_ok` 與 R4-F 理由
+- 探索資料復算（只作判定器自檢）：仍「通過」、T2.s2 EXCLUDED、`frozen_conformity_ok=True`、偏離只有 `T2.s2: 1/10 次與凍結登記 FAIL['C2-STACK'] 不同（iter 4 PASS）`
+- R5-5 prep：M2／M3 scratch 由最終代碼（HEAD `b74636f`＋`worktree.patch`）rsync 重建，只差 `CoverFlowStrip.swift`（md5 M2 `57da040c…`／M3 `48687466…`；repo `a9ac2902…`），溯源在 `mutant-runs-R55/`
+
+### R5-5 確認性閘門實測（2026-09-12 晚，使用者在場授權 Automation Mode、機器閒置）
+- 兩次中止（不計證據、未進入測試）：`cf-m0-confirm-aborted1/2-automation-timeout.*`——runner 60 秒內未取得 Automation Mode 授權（使用者不在機器前），0 個 Test Case；
+  第三次啟動由使用者放行後正常進入
+- **`cf-m0-confirm`（M0 ×10，閘門配置；CDHash `2343d542…`，IDENTITY 40 次同一 Products、instances=1；started＝finished＝40；PROBE 0；40 次 tearDown 全檔 audit 皆乾淨）**：
+
+| 步驟 | 十次結果 | 對照凍結表 |
+|---|---|---|
+| T1.s1／T2.s1／T3.s1 | 10/10 PASS | ＝ |
+| T1.s2 | 10/10 FAIL{C2-STACK\|G=T13\|over=T12\|side=L} | ＝（簽名與探索輪相同） |
+| **T1.s3** | **4 FAIL{C2-STACK\|G=T11\|over=T12\|side=R}／6 PASS → INCONSISTENT** | 偏離（T8 部分跑曾見 5/4；探索輪 cf-m0 為 10/10） |
+| **T2.s2** | **9 FAIL{C2-STACK\|G=T00\|over=T01\|side=R}／1 PASS（iter 8）→ INCONSISTENT** | 偏離（與探索輪同形態） |
+| T2.s3 | 10/10 FAIL{C2-STACK\|G=T19\|over=T18\|side=L} | ＝ |
+| T4.s1 | 10/10 FAIL{C2-STACK\|G=T19\|over=T18\|side=L} | ＝ |
+| T4.s2 | 10/10 FAIL{C1-OFFSET\|label=T19\|centered=T16\|strides=+3, C2-STACK\|G=T16\|over=T17\|side=R} | ＝ |
+
+  - `v3`：`run_valid=True`；`frozen_conformity_ok=True`（零 F 外碼；偏離只有上列兩格翻 PASS）；缺陷 3 **CAUGHT**（T4.s2 10/10 一致）；缺陷 2 由 T1.s2／T2.s3／T4.s1／T4.s2 承擔；
+    **不一致兩格 → R4-X 只能豁免一格 → `consistency_ok=False`**（`excluded=None`）
+- **`cf-M2-confirm`／`cf-M3-confirm`（×3，閘門配置；scratch 由最終代碼重建、只差 Strip；CDHash M2 `44824442…`／M3 `39b83889…`；IDENTITY 各 12 次指向自己的 Products、instances=1；started＝finished＝12；PROBE 0；audit 全乾淨）**：
+
+| 變異 | 步驟級結果（3/3） | 殺死步驟（M0 10/10 PASS ∧ 變異 3/3 FAIL 簽名一致） |
+|---|---|---|
+| M2 | T1.s1／T2.s1 FAIL{C2-STACK\|G=T11\|over=T10\|side=L}；T3.s1 PASS；T4.s2 **PASS**（`.leading` 使 C1-OFFSET 消失）；其餘 FAIL{C2-STACK}（T1.s2 2/3） | **T1.s1、T2.s1** |
+| M3 | 九格全 FAIL{C2-STACK}（T3.s1＝G=T10\|over=T09\|side=L；T4.s2 只剩 C2、C1-OFFSET 消失） | **T1.s1、T2.s1、T3.s1** |
+
+  與探索輪 T9 的殺死點與簽名逐格相同；殺死全落在鍵盤與首次載入步驟，不依賴合成捲動慣性（S7 不需要）
+- **機械結論（`verdict --s2-verified`，R4-C）：部分通過**——唯一理由「V3 一致性不成立：T1.s3、T2.s2」。V5 成立（T2.s1 10/10；端點 T2.s3／T4.s1 ALL_FAIL_CONSISTENT 且碼恰 {C2}）；缺陷 3 CAUGHT；缺陷 2 重現；
+  R4-F 相符；三份 `table_valid`；M2／M3 皆殺（權重待使用者裁決）。輸出：`cf-*-confirm.table.txt/json`、`cf-m0-confirm.v3.txt`、`cf-M2/M3-confirm.v4.txt`、`R55-verdict.txt`
+- **V9**：三份 xcresult 附件＝視窗截圖 PNG（90／27／27，**全為 2400×1600**）＋ 契約報告 txt（90／27／27）＋ XCUITest 對 `"EDITOR" Button` 的 debug description（範圍限 target app）；spindump 0
+- **V6 既有 UITests（`ui-R55`，§10 不帶閘門參數）**：preflight 第一次撞鑰匙串授權框（74s `does not have a process ID`，重建後 CDHash 變化；memory `rebuild-keychain-prompt-blocks-uitests`），
+  使用者放行後第二次 preflight 15s 通過（兩次皆不計證據）；證據輪 17 條＝**15 綠、1 skip（BatchLive）、1 紅＝A-10（`ShellUITests.swift:174`，同基線）**，
+  與 `ui-T0`（真 T0 樹）正規化後**逐條相同** → V6 ✓
+- 收尾（HF5）：M2／M3 app 與 runner `lsregister -u`，LaunchServices 殘留 0；scratch DerivedData 改名退役（未刪）
+
+### R5-6 證據包（2026-09-12；全部證據在 `~/Developer/bjork-h02-gate/`，repo 內只有代碼與本計劃；未 commit、未 push）
+
+| # | 結果 | 證據 |
+|---|---|---|
+| V1 | ✓ GateLogic 98.1%、TraceFormat 97.8%、Trace 89.8%、Fixture／Music／組裝 100% | `unit-R55.xcresult`（xccov） |
+| V2 | ✓ pbxproj 刪 0／增 62（同 T10）；xcscheme 只多 `systemAttachmentLifetime` | diff vs `pbxproj-preT1`／`xcscheme-preT1` |
+| V3 | **部分成立**：缺陷 3 CAUGHT（T4.s2 10/10 `C1-OFFSET strides=+3`＋`C2-STACK`）；缺陷 2 重現（T1.s2／T2.s3／T4.s1／T4.s2 10/10 C2）；**一致性 ✗（T1.s3 4/6、T2.s2 9/1 兩格）**；R4-F 相符 | `cf-m0-confirm.*`、`cf-m0-confirm.v3.txt` |
+| V4 | M2 殺（T1.s1、T2.s1）；M3 殺（T1.s1、T2.s1、T3.s1）；簽名與探索輪相同；**權重由使用者裁決** | `cf-M2/M3-confirm.*`、`.v4.txt`、`mutant-runs-R55/` |
+| V5 | ✓ T2.s1 10/10；端點 T2.s3／T4.s1 ALL_FAIL_CONSISTENT 且碼恰 {C2}；S2 已知點命中（§11） | `cf-m0-confirm.v3.txt` |
+| V6 | ✓ 單測 379/39 suites 紅燈＝T0；既有 UITests 17 條與 `ui-T0` 逐條相同 | `unit-R55.*`、`ui-R55.*`、`ui-T0.*` |
+| V7 | ✓ Release 構建成功；`strings` 對 9 個測試專用符號全 0；6 個新檔整檔 `#if DEBUG` | `rel-R55/`、`rel-build-R55.log` |
+| V8 | ✓ `CoverFlowStrip.swift` md5 `a9ac2902…` | `mutant-runs-R55/M0-hashlist.txt` |
+| V9 | ✓ PNG 全 2400×1600（90／27／27）；txt 只有契約報告與 XCUITest debug description；spindump 0 | scratchpad `att-*-222809/` |
+| V10 | ✓ H-05 行文與交接檔補註未動（T11 已完成） | `git diff` 不含 ACCEPTANCE／交接檔 |
+
+- **機械結論（R4-C）：部分通過**——缺陷 3 穩定、缺陷 2 重現、V5 成立、M2／M3 皆殺；唯一未成立＝V3 一致性（兩格不一致，R4-X 只能豁免一格）。
+  依 R4-C #4「帶選項上報，使用者裁決是否開始第四次修復」；V4 權重亦由使用者裁決
+- 已知量測盲區（D2）：C4 對「nil→同值瞬時擺動」不可偵測；殘餘清單見 §11「完整性批評」
+- 不一致兩格的觀察（只記事實）：T1.s3＝反向捲回時滯後 zIndex 約半數不留下（T8 部分跑 5/4、探索輪 10/10、本輪 4/6）；T2.s2＝左端點 10 次有 1 次不疊（探索輪 9/1、本輪 9/1）；
+  兩者皆為「時紅時綠」的 C2 步驟，不影響缺陷偵測（其餘 C2 步驟 10/10），但按 §6 護欄不得為使其穩定而放寬判據
 
 ## 12. 附錄：評審辯論記錄
 
@@ -766,3 +872,37 @@ T1.s2／T1.s3／T2.s2／T2.s3／T4.s1＝FAIL{C2-STACK}；T4.s2＝FAIL{C1-OFFSET,
 
 - 我方輸在哪：想用暴露判據缺陷的同一份資料直接宣布通過，而計劃自己的護欄早已要求修訂後重跑；J5 會開出一個常設豁免，正好是前三次「測試看起來可以、真機仍錯」的通道
 - Codex 最擔心的一步（R2／R3）：確認性 M0 可能同時出現兩格不一致 → 依 R4-C 落「部分通過」，交使用者裁決
+
+### R5（2026-09-12）：三項待裁決事項＋判定器凍結表缺口的 Phase 1 快速複審（Codex gpt-5.6-sol，reasoning high，兩輪；thecure）
+全文存 `~/Developer/bjork-h02-gate/debate-R5/`。證據：歷史 222 格 GATE（cf-m0／M1／M2／M3／m0-gate／0ms）C6＝0、C4-*＝0；探索 V4 殺死點與 C4 無關。
+
+| ID | 我方主張 | Codex | 勝方 | 落點（**使用者 2026-09-12 拍板：執行**） |
+|---|---|---|---|---|
+| D1 blocked-step | 不新增、延後；出 C6 一律不可判定 | 方向對；「一律不可判定」錯——只有 C6 造成登記步驟 MISSING 或 `s0`／`setup` 未知步驟 error 才必然 table_valid 失敗（C6 落在最後登記步驟時表格可有效）；若日後加 BLOCKED 只能是診斷型（不算 PASS/FAIL、不進 V3/V4/V5、仍使 table_valid 失敗） | Codex（限縮） | 預登記句採限縮版；不加 BLOCKED |
+| D2 C4 nil | 維持 nil 不算變 | 方向對；我方理由 (b)「歷史零 C4」與 (c)「終態由 C1 守住」不成立——`11→12→nil→12→13` 與 hold `nil→13` 的瞬時擺動會假綠，C1／C2 只量落定終態、C5 只涵蓋切 tab；但把 nil 算變會假紅，故凍結現行語義並明列為量測盲區 | Codex（理由） | R5-5 維持；證據包列「nil→同值瞬時擺動」為 C4 盲區 |
+| D3 V5 十次一致 | 須過 Phase 1；只收緊 | 對；條文不夠精確：須定義 ALL_PASS＝十格皆 PASS、ALL_FAIL_CONSISTENT＝十格皆 FAIL 且十次完整正規化 `sig_set` 相同且產品碼投影恰為 {C2-STACK}；INCONSISTENT 與 EXCLUDED 皆不得為 V5 候選（與 `evaluate_v5` 實作一致） | Codex（措辭） | 以此精確解讀記入 §12，§11 不動 |
+| D4 凍結表缺口（Codex 最擔心） | — | `evaluate_v3`／`verdict` 完全不讀 §11 凍結表：T3.s1 10/10 C6、T1.s3 穩定多出 C4-SNAPBACK 仍「通過」（我方復現，另證 T4.s2 出 C3 替代 C1、T1.s3／T2.s2 翻 10/10 PASS 亦「通過」）；建議 R5-5 前回 Phase 1 | Codex | 見 R4-F |
+| R4-F 變體 S（我方） | 每次產品碼 ⊆ F(step) **且**凍結 FAIL 步驟不得十次全 PASS；違反 → 不可判定 | **錯**：把 T7 單次觀察升格為「必須持續失敗」的契約——(1) V5 明文接受端點 ALL_PASS（`test_registered_c2_step_all_pass_is_consistent_not_excluded` 釘住）；(2) 五個 C2 步驟全 PASS 是 §3.10 預登記的「缺陷 2 不可重現 → 部分通過」分支，S 使其不可達；(3) §6 V3 明文接受 T4.s2 以 C1／C3／C5 之一抓缺陷 3 | Codex | 撤回 S |
+| R4-F 變體 N′（Codex） | — | PASS 步驟 F＝∅；T1.s2／T1.s3／T2.s2／T2.s3／T4.s1 F＝{C2-STACK}；T4.s2 F＝{C1-OFFSET, C3-TARGET-MISS, C5-DRIFT, C2-STACK}；**每次迭代的產品碼投影 ⊆ F(step)**；不要求凍結 FAIL 步驟日後仍失敗；ALL_PASS 偏離只記證據包、由既有 V3／V5／缺陷 2 分支判定；只對 `cf-m0-confirm`（變異運行不適用，V4 已是步驟級差異）；作為 R4-C「不可判定」的獨立觸發（V3 回傳 `frozen_conformity_ok`／`reasons`，不併入 table_valid）；R5-5 前 TDD 實作 | Codex | 採 N′，寫入 §6 R4-F；先 RED 後 GREEN（見 §11） |
+
+- Codex 最擔心（R2）：把探針越穩、症狀越少的運行制度化成「不可判定」——那會把已知假綠修成假不可判定，比漏讀凍結表更糟
+- **R3 整體確認**（thecure 第 7 步；完整方案＋投入順序打包提交）：判定語義無致命欠落・矛盾；兩點補正（採納）：① `_print_v3`／`verdict` 須印出三個新欄位，否則 CE4／CE5 的偏離只存在於記憶體；
+  ② §6 V5 的「待使用者確認」須改為已確定、§12 的「待拍板」同步收斂。投入順序妥當。**最易失敗的一步＝`cf-m0-confirm ×10`**：40 次 GUI 迭代中任何一次 PROBE、未歸屬失敗、前置 C6 造成 MISSING 或 F 外碼即不可判定，且首份運行規則不容輕率重試
+- 使用者 2026-09-12 拍板：「那就繼續執行吧」——D1／D2／D3／D4（N′）全部按上表落點執行
+
+### R6（2026-09-12 深夜）：閘門結論後的兩項裁決（V4 權重、部分通過後是否啟動第四次修復）——thecure 三輪，Codex gpt-5.6-sol high；全文 `debate-R5/cure-*-r6*.{md,txt}`
+
+| ID | 我方主張 | Codex | 勝方 | 落點 |
+|---|---|---|---|---|
+| J1 V4 權重 | 「閘門靈敏度已示範」，足以作第四次修復的仲裁者 | 窄義正確：**必要否決控制**（候選不再殺 M2／M3 即否決），不是充分證明；殺死點只在鍵盤／首載，不得宣稱覆蓋捲動慣性 | Codex（限縮） | A |
+| J2 啟動修復、不先查兩格不一致 | 不一致是產品行為，量測問題已排除 | 行動對、因果斷言錯：`readStable` 不看 z-order、C2 由單張截圖 5×5 一點決定、T2.s2 PASS／FAIL 的 AX 幾何相同——截圖／compositing 取樣時機未排除，成因只能記推論 | Codex（論證） | B |
+| J3 修復計劃預登記 | (a) 候選任一 C2 即不通過 (b) 候選 20/20 PASS 即與 M2/M3 可區分 (c) 只有動 AX／fixture 才回 Phase 1 | (a) 對；(b) 不足：M2／M3 須從候選同一 tree 重建實跑；(c) 過窄：任何凍結輸入改動都回 Phase 1；另缺過渡態手段先證紅、D2 處置、手滑可判定程序 | Codex | C.2／C.4–C.7 |
+| J4 不重跑、不改判據 | — | 對；不通過只限缺陷 3 未抓到或 T4.s2 不穩定，本輪不落入 | 我方 | B |
+| R2 整體確認 | 打包方案 | 三處文本異議：C.1 **R4-F 不得套到候選**（只屬 cf-m0-confirm）→ 候選改單一規則；C.5 D2 二擇一各自要可證偽條件；C.6「任何可見覆疊」錯（Cover Flow 本有正常交疊）→「非應在最上層的鄰張遮住應 frontmost 的卡」＋逐路徑參數；D 順序「M0 證紅」改「M0 或受控壞形態」 | Codex | 全部採納 |
+| R3 修正版整體確認 | — | **「無い」** | — | 定稿 |
+
+- Codex 最擔心：把「受控壞形態能紅」誤當「實體觸控板過渡態已覆蓋」——須同一訊號、同一失敗謂詞、實體手滑證據鏈；最易失敗的一步＝過渡態證偽手段的負對照成立
+- **定稿方案（待使用者確認執行）**：A V4＝必要否決控制；B 啟動第四次修復、不重跑 R5-5、不改 §6；C 第四次修復計劃預登記 C.1–C.7（候選單一規則：有效運行且四測試 ×20 每格全 PASS，任何產品 SIG 即不通過，PROBE＝無效；
+  M2／M3 從候選同一 tree 重建 ×3 且各保留一個歷史殺死點 3/3 簽名一致；診斷儀器只解釋不裁決；過渡態手段先在 M0 或受控壞形態證紅；D2 二擇一各附可證偽條件 `C4-NIL-DWELL`／`C4-NIL-SHIFT`；
+  手滑失敗謂詞與逐路徑參數、每路徑 ≥5 次；任何凍結輸入改動回 Phase 1）；D 順序：確認 → 收官 → 新計劃 Phase 1 → 儀器健康 → 過渡態證紅 → 產品修復 → 候選 ×20 → M2／M3 ×3 → 實體手滑 → 結論
+

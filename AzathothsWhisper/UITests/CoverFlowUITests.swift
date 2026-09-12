@@ -21,6 +21,26 @@ final class CoverFlowUITests: AppUITestCase {
 
     private var probe: CoverFlowProbe!
     private var trace: CoverFlowTraceSession!
+    private var testLabel = ""
+
+    /// 每條測試結束前對整份軌跡做一次全檔 audit（R5-4 Round 2 P1 ②）：水位讀取只看新行，
+    /// 前綴裡的 write-error／malformed／gap 否則永遠不會被檢查。問題以**未歸屬**的 `[PROBE-TRACE]` 上報
+    /// （不印 GATE 行——它不是契約步驟），判定腳本據此把該次迭代記 invalid
+    override func tearDown() {
+        auditTrace()
+        super.tearDown()
+    }
+
+    private func auditTrace() {
+        guard let trace else { return }
+        let problems = trace.audit()
+        print("AUDIT \(testLabel).trace problems=\(problems)")
+        guard !problems.isEmpty else { return }
+        let previous = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = previous }
+        XCTFail("[PROBE-TRACE] \(testLabel).audit \(problems.joined(separator: ","))")
+    }
 
     // MARK: 四條路徑
 
@@ -57,18 +77,22 @@ final class CoverFlowUITests: AppUITestCase {
         guard launchCoverFlow(test: "T4"), settle(step: "T4.s0") != nil,
               focusAndStepRight(step: "T4.s1") != nil,
               press(.rightArrow, times: Self.endpointPresses - 1, step: "T4.s1"),
-              settle(step: "T4.s1") != nil
+              let settledBefore = settle(step: "T4.s1")
         else { return }
         let last = Fixture.trackCount - 1
         probe.assertContract(step: "T4.s1", want: last, in: self)
-        let before = probe.readState()?.label ?? "nil"
+        // 切 tab 前的 label 取自 T4.s1 的落定狀態（連續 4 次相同讀數），不另做單次無重試的讀取；
+        // 落定狀態仍無 label＝量測失敗：報探針並停止本路徑，不得以 "nil" 頂替後被判成 C5-DRIFT
+        guard let before = settledBefore.label else {
+            probe.reportSingle(step: "T4.s2", code: "PROBE-AX", detail: "no-label-before-tab-switch", in: self)
+            return
+        }
 
         app.buttons["EDITOR"].click()
         guard waitForStripToDisappear(step: "T4.s2") else { return }
         app.buttons["COVER FLOW"].click()
         guard waitForLabel(step: "T4.s2"), let rebuilt = settle(step: "T4.s2") else { return }
-        let after = rebuilt.label ?? "nil"
-        let drift = CoverFlowGateLogic.driftFindings(before: before, after: after)
+        let drift = CoverFlowGateLogic.driftFindings(before: before, after: rebuilt.label)
         probe.assertContract(step: "T4.s2", want: last, extra: drift, in: self)
     }
 
@@ -84,6 +108,7 @@ final class CoverFlowUITests: AppUITestCase {
         launch(language: "en", environment: environment)
         probe = CoverFlowProbe(app: app)
         trace = CoverFlowTraceSession(path: tracePath)
+        testLabel = test
         waitForMainUI()
         let step = "\(test).setup"
         guard verifyIdentity(step: step), verifyWindow(step: step) else { return false }
@@ -93,8 +118,14 @@ final class CoverFlowUITests: AppUITestCase {
 
     /// 二進位身分：trace header 由 app 自報 bundle 路徑（主證據），runner 側同 bundle ID 恰好一個實例（輔證）
     @MainActor private func verifyIdentity(step: String) -> Bool {
-        guard let header = trace.header() else {
+        guard let snapshot = trace.read(from: 0), let header = snapshot.header else {
             probe.reportSingle(step: step, code: "PROBE-TRACE", detail: "no-header", in: self)
+            return false
+        }
+        // 同一份 snapshot 的協議問題也要看：header 正確但已有 write-error 的軌跡不是健康的證據
+        guard snapshot.problems.isEmpty else {
+            let detail = "problems=\(snapshot.problems.joined(separator: ","))"
+            probe.reportSingle(step: step, code: "PROBE-TRACE", detail: detail, in: self)
             return false
         }
         let instances = NSRunningApplication.runningApplications(withBundleIdentifier: Self.bundleID).count
@@ -218,14 +249,24 @@ final class CoverFlowUITests: AppUITestCase {
         }
         let holdMark = gesture.endOffset
         Thread.sleep(forTimeInterval: CoverFlowProbe.holdDuration)
-        let hold = trace.read(from: holdMark)
-        let afterHold = probe.readState()?.labelIndex
+        // hold 段讀不到＝探針失敗，不得以空序列冒充「保持期間沒有回寫」
+        guard let hold = trace.read(from: holdMark) else {
+            probe.reportSingle(step: step, code: "PROBE-TRACE", detail: "unreadable-after-hold", in: self)
+            return
+        }
+        // 保持期後的 AX 讀數是 runner 對「中心是否被改掉」的獨立觀測（也是非 binding 驅動的拉回唯一偵測點）：
+        // 讀不到＝探針失敗，不得壓成 nil 後被 compactMap 靜默丟掉（2026-09-12 完整性批評指出的假綠路徑）
+        guard let afterHoldState = probe.readState() else {
+            probe.reportSingle(step: step, code: "PROBE-AX", detail: "unreadable-after-hold", in: self)
+            return
+        }
+        let afterHold = afterHoldState.labelIndex
         var findings = CoverFlowGateLogic.writebackFindings(
             start: start, gesture: CoverFlowTraceSession.bindIndices(gesture),
-            hold: (hold.map(CoverFlowTraceSession.bindIndices) ?? []) + [afterHold],
+            hold: CoverFlowTraceSession.bindIndices(hold) + [afterHold],
             settled: settled.labelIndex
         )
-        let problems = gesture.problems + (hold?.problems ?? [])
+        let problems = gesture.problems + hold.problems
         if !problems.isEmpty {
             findings.append(GateFinding(code: "PROBE-TRACE", detail: problems.joined(separator: ",")))
         }
