@@ -6,7 +6,7 @@ import Foundation
 ///
 /// app（寫入端 `CoverFlowUITestTrace`）與 UITests（讀取端）同編此檔，格式只有一個來源。
 /// 每行以 `\t` 分欄：
-/// - 檔首：`#header  pid=…  bundle=…  exe-size=…  exe-mtime=…`（兼作二進位身分證據，§3.13）
+/// - 檔首：`#header  pid=…  bundle=…  exe-size=…  exe-mtime=…  epoch-us=…`（兼作二進位身分證據，§3.13）
 /// - 記錄：`序號  微秒  kind  payload`
 /// - 寫入失敗：`#error  errno=…`
 enum CoverFlowTraceFormat {
@@ -24,6 +24,10 @@ enum CoverFlowTraceFormat {
         let bundlePath: String
         let executableSize: Int64
         let executableModified: Int64
+        /// wall-clock 錨點（µs，`Date().timeIntervalSince1970`），與記錄的 `ContinuousClock` 起點同一時刻取。
+        /// runner 的 marks 檔記 wall-clock，兩種時間軸靠這個欄位對齊（計劃 §5.4「分段來源」）。
+        /// **舊檔缺欄＝nil**，不得因此判 `no-header`——既有證據包仍要讀得出來
+        let epochMicroseconds: Int64?
     }
 
     struct Record: Equatable, Sendable {
@@ -31,6 +35,52 @@ enum CoverFlowTraceFormat {
         let microseconds: Int64
         let kind: Kind
         let payload: String
+    }
+
+    /// 一次 bind 回寫的三種型別（計劃 §5.5「bind 解析先分型」）。
+    ///
+    /// 舊的 `bindIndices` 把字面 `nil` 與非 fixture ID（真實曲庫的 persistentID、壞值）**都**壓成 nil，
+    /// 於是「SwiftUI 回寫了 nil」與「軌跡記到看不懂的值」在判定上不可區分；後者在 fixture 模式下是探針故障
+    enum BindValue: Equatable, Sendable {
+        /// payload 是 `T00`…`T19`
+        case fixture(Int)
+        /// payload 是寫入端為 `nil` 記下的字面字串
+        case literalNil
+        /// 其他任何 payload（fixture 模式下＝`PROBE-TRACE`）
+        case unknown(String)
+
+        /// 舊判定介面（`writebackFindings` 吃 `[Int?]`）：只有 fixture 有索引
+        var fixtureIndex: Int? {
+            guard case .fixture(let index) = self else { return nil }
+            return index
+        }
+
+        var unknownPayload: String? {
+            guard case .unknown(let payload) = self else { return nil }
+            return payload
+        }
+    }
+
+    /// 帶時間戳的 bind 回寫（時間戳＝記錄的 `ContinuousClock` 相對微秒，與 header 的 `epoch-us` 同錨點）
+    struct BindSample: Equatable, Sendable {
+        let value: BindValue
+        let microseconds: Int64
+    }
+
+    /// 寫入端對 `nil` 記下的字面值（`CoverFlowUITestTrace.recordBinding`）
+    static let literalNilPayload = "nil"
+
+    /// 快照裡的 bind 記錄 → 分型樣本，順序不變
+    static func bindSamples(_ snapshot: Snapshot) -> [BindSample] {
+        snapshot.records.filter { $0.kind == .bind }.map {
+            BindSample(value: bindValue(payload: $0.payload), microseconds: $0.microseconds)
+        }
+    }
+
+    static func bindValue(payload: String) -> BindValue {
+        if payload == literalNilPayload { return .literalNil }
+        if let index = CoverFlowUITestFixture.index(of: payload) { return .fixture(index) }
+        return .unknown(payload)
     }
 
     struct Snapshot: Sendable {
@@ -42,14 +92,38 @@ enum CoverFlowTraceFormat {
         let endOffset: UInt64
     }
 
+    /// wall-clock 錨點（µs）。trace header 的 `epoch-us` 與 runner marks 的每一行都取這個值，
+    /// 兩條時間軸才能對齊（計劃 §5.4「分段來源」）
+    static func nowEpochMicroseconds() -> Int64 {
+        Int64((Date().timeIntervalSince1970 * 1_000_000).rounded())
+    }
+
+    /// 同步追加協議：`write(2)` 允許短寫，也可能被信號打斷；寫不完就是失敗（回 false），不當成已寫入。
+    /// trace 與 marks 兩個寫入端共用同一份實作，避免兩處各自演化出不同的短寫語義
+    static func appendAll(_ bytes: [UInt8], to descriptor: Int32) -> Bool {
+        var offset = 0
+        while offset < bytes.count {
+            let written = bytes.withUnsafeBytes { buffer in
+                Darwin.write(descriptor, buffer.baseAddress! + offset, bytes.count - offset)
+            }
+            if written > 0 {
+                offset += written
+            } else if !(written < 0 && errno == EINTR) {
+                return false
+            }
+        }
+        return true
+    }
+
     /// 欄位內不得出現分欄或換行，否則讀取端會切錯行
     static func sanitise(_ text: String) -> String {
         text.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ")
     }
 
     static func headerLine(_ header: Header) -> String {
-        "#header\tpid=\(header.pid)\tbundle=\(sanitise(header.bundlePath))"
-            + "\texe-size=\(header.executableSize)\texe-mtime=\(header.executableModified)\n"
+        let epoch = header.epochMicroseconds.map { "\tepoch-us=\($0)" } ?? ""
+        return "#header\tpid=\(header.pid)\tbundle=\(sanitise(header.bundlePath))"
+            + "\texe-size=\(header.executableSize)\texe-mtime=\(header.executableModified)\(epoch)\n"
     }
 
     static func recordLine(_ record: Record) -> String {
@@ -151,7 +225,10 @@ enum CoverFlowTraceFormat {
                   let size = values["exe-size"].flatMap(Int64.init),
                   let modified = values["exe-mtime"].flatMap(Int64.init)
             else { return nil }
-            return Header(pid: pid, bundlePath: bundle, executableSize: size, executableModified: modified)
+            return Header(
+                pid: pid, bundlePath: bundle, executableSize: size, executableModified: modified,
+                epochMicroseconds: values["epoch-us"].flatMap(Int64.init)
+            )
         }
     }
 }

@@ -140,6 +140,9 @@ final class AppModel {
         if let uiTestModel = makeCoverFlowUITestModelIfRequested(environment: environment) {
             return uiTestModel
         }
+        // fixture OFF 也要能記軌跡：C.6 實體手滑輪用真實 Music、以 `open --env` 正常啟動（計劃 §5.6／§5.7 (3)）。
+        // 安裝條件由 shouldInstall 一處決定（路徑非空 ∧ 非單元測試 host），fixture ON 的分支已在上面裝過
+        CoverFlowUITestTrace.installIfRequested(environment: environment)
         let isTestHost = environment[unitTestHostFlag] == "1"
         let store = isTestHost
             ? ConfigStore(secrets: EphemeralSecretStore())

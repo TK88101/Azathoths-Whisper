@@ -30,6 +30,29 @@ struct CoverFlowUITestTraceTests {
         #expect(snapshot.problems.isEmpty)
     }
 
+    /// §5.7 (1)：header 帶 wall-clock 錨點，runner marks（wall-clock µs）與 trace 的
+    /// `ContinuousClock` 相對微秒才能對齊（§5.4「分段來源」要求兩種 marks 同錨點）
+    @Test func headerCarriesWallClockEpochAnchor() throws {
+        let path = temporaryPath()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let before = Int64(Date().timeIntervalSince1970 * 1_000_000)
+        _ = try #require(CoverFlowUITestTrace(path: path))
+        let after = Int64(Date().timeIntervalSince1970 * 1_000_000)
+
+        let header = try #require(try CoverFlowTraceFormat.read(path: path, fromOffset: 0).header)
+        let epoch = try #require(header.epochMicroseconds)
+        #expect(epoch >= before && epoch <= after, "epoch-us 必須是開檔當下的 wall-clock：\(epoch)")
+    }
+
+    /// 舊檔（無 `epoch-us` 欄）仍要解析得出 header，否則既有證據包一律變成 `no-header`
+    @Test func headerWithoutEpochFieldStillParses() {
+        let legacy = "#header\tpid=7\tbundle=/tmp/A.app\texe-size=42\texe-mtime=99\n"
+        let snapshot = CoverFlowTraceFormat.parse(Data(legacy.utf8), offset: 0)
+        #expect(snapshot.header?.epochMicroseconds == nil)
+        #expect(snapshot.header?.pid == 7)
+        #expect(snapshot.problems.isEmpty)
+    }
+
     @Test func recordsAreSequencedMonotonicAndSanitised() throws {
         let path = temporaryPath()
         defer { try? FileManager.default.removeItem(atPath: path) }
@@ -48,6 +71,20 @@ struct CoverFlowUITestTraceTests {
         let times = snapshot.records.map(\.microseconds)
         #expect(times == times.sorted())
         #expect(trace.writeErrors == 0)
+    }
+
+    /// §5.7 (2)：bind 回寫分三型。舊的 `bindIndices` 把字面 `nil` 與非 fixture ID 都壓成 nil，
+    /// 於是「SwiftUI 回寫 nil」與「軌跡記到看不懂的值」在判定上無法區分（計劃 §2 D2 盲區）
+    @Test func bindSamplesSeparateFixtureLiteralNilAndUnknown() {
+        let lines = "0\t10\tbind\tT11\n1\t20\tbind\tnil\n2\t30\tbind\t1234567890\n3\t40\tevent\tphase=1\n"
+            + "4\t50\tbind\tT20\n"
+        let snapshot = CoverFlowTraceFormat.parse(Data(lines.utf8), offset: 0)
+
+        let samples = CoverFlowTraceFormat.bindSamples(snapshot)
+        #expect(samples.map(\.value) == [.fixture(11), .literalNil, .unknown("1234567890"), .unknown("T20")])
+        #expect(samples.map(\.microseconds) == [10, 20, 30, 50], "讀取端必須帶時間戳")
+        #expect(samples.map(\.value.fixtureIndex) == [11, nil, nil, nil], "writebackFindings 的輸入仍是 [Int?]")
+        #expect(samples.compactMap(\.value.unknownPayload) == ["1234567890", "T20"])
     }
 
     /// runner 不截斷檔案，只讀水位之後的行（計劃 §3.5）
@@ -155,6 +192,24 @@ struct CoverFlowUITestTraceTests {
         let path = temporaryPath()
         defer { try? FileManager.default.removeItem(atPath: path) }
         #expect(CoverFlowUITestTrace.makeIfRequested(environment: [CoverFlowUITestFixture.tracePathVariable: path]) != nil)
+    }
+
+    /// §5.7 (3)：安裝條件＝`tracePath 非空 && !isUnitTestHost`，與 fixture 旗標無關——
+    /// 實體手滑輪以 `open --env` 正常啟動（fixture OFF）也要記軌跡。
+    /// 這裡只驗**純判定**：真的安裝會污染行程級單例 `shared`，不在單元測試裡執行
+    @Test func installDecisionIgnoresFixtureFlagButHonoursUnitTestHost() {
+        let path = CoverFlowUITestFixture.tracePathVariable
+        let fixture = CoverFlowUITestFixture.launchFlag
+        let host = AppModel.unitTestHostFlag
+
+        #expect(CoverFlowUITestTrace.shouldInstall(environment: [fixture: "1", path: "/tmp/t"], isInstalled: false))
+        #expect(CoverFlowUITestTrace.shouldInstall(environment: [path: "/tmp/t"], isInstalled: false))
+        #expect(CoverFlowUITestTrace.shouldInstall(environment: [path: "/tmp/t", host: "0"], isInstalled: false))
+        #expect(!CoverFlowUITestTrace.shouldInstall(environment: [path: "/tmp/t", host: "1"], isInstalled: false))
+        #expect(!CoverFlowUITestTrace.shouldInstall(environment: [fixture: "1"], isInstalled: false))
+        #expect(!CoverFlowUITestTrace.shouldInstall(environment: [path: ""], isInstalled: false))
+        #expect(!CoverFlowUITestTrace.shouldInstall(environment: [fixture: "1", path: "/tmp/t"], isInstalled: true),
+                "已安裝就不再安裝：切 tab 重建、兩條分支都呼叫時只裝一次")
     }
 
     /// 切 tab 重建 CoverFlowView 不得重複安裝監聽（否則同一事件記兩次，C4 判定被灌水）

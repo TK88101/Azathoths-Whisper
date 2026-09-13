@@ -128,3 +128,35 @@ class GateTable:
     iterations: Dict[str, List[IterationInfo]]
     errors: List[str]
     iteration_count_mismatch: Dict[str, Tuple[int, int]]
+
+
+# F1（計劃 `docs/plans/2026-09-13-coverflow-h02-fix4.md` §5.2）：R5-5 確認性殺死簽名（逐字凍結，不得由結果校準）
+R55_KILL_SIGNATURES: Dict[str, Dict[Tuple[str, str], FrozenSet[str]]] = {
+    "M2": {
+        ("T1", "s1"): frozenset({"C2-STACK|G=T11|over=T10|side=L"}),
+        ("T2", "s1"): frozenset({"C2-STACK|G=T11|over=T10|side=L"}),
+    },
+    "M3": {
+        ("T1", "s1"): frozenset({"C2-STACK|G=T11|over=T10|side=L"}),
+        ("T2", "s1"): frozenset({"C2-STACK|G=T11|over=T10|side=L"}),
+        ("T3", "s1"): frozenset({"C2-STACK|G=T10|over=T09|side=L"}),
+    },
+}
+
+# 通過條件的步驟集合（≥ 1 步殺死即可）
+REQUIRED_KILL_STEPS: Dict[str, Tuple[Tuple[str, str], ...]] = {
+    "M2": (("T1", "s1"), ("T2", "s1")),
+    "M3": (("T1", "s1"), ("T2", "s1"), ("T3", "s1")),
+}
+
+MUTANT_NAMES: Tuple[str, ...] = ("M2", "M3")
+
+# §5.7 (7) 證據包 manifest：`<evidence>/<test>-<n>.manifest.json`
+MANIFEST_SCHEMA = 1
+MANIFEST_SUFFIX = ".manifest.json"
+EVIDENCE_REQUIRED_FILES: Tuple[str, ...] = ("trace", "marks")  # 必須非 null
+EVIDENCE_OPTIONAL_FILES: Tuple[str, ...] = ("sampler",)  # 鍵必須在，值可為 null（儀器 OFF）
+
+# §5.2 殺死點消失分支：候選改動檔的機械判定
+COVERFLOW_DIR = "Features/CoverFlow/"
+COVERFLOW_STRIP_FILE = "CoverFlowStrip.swift"

@@ -23,6 +23,9 @@ docstring 裡，此處只列索引）：
   7. GATE／SIG 交叉核對錯誤與 table_valid 的關係 —— 見 `h02_gate_table.py`／`h02_gate_rules.py`。
   8. 單一 device／test plan configuration、多個相符節點只取第一個 —— 見 `h02_gate_parse.py`。
   9. `C2-NA` 為資訊性代碼，絕不是失敗 —— 見 `h02_gate_model.py`。
+  11. F1（`docs/plans/2026-09-13-coverflow-h02-fix4.md` §5.1／§5.2／§5.7 (7)）：`candidate`／`negative-control`
+      子命令、R5-5 殺死簽名常量與「殺死須含 C2-STACK」條款、證據包 manifest 完整性 —— 見
+      `h02_gate_model.py`／`h02_gate_rules.py`。
   10. R4-F 凍結表相符（只對 M0 確認性運行；F(step) 表與偏離記錄）—— 見 `h02_gate_model.py`／`h02_gate_rules.py`。
 """
 from __future__ import annotations
@@ -31,6 +34,8 @@ import sys
 
 from h02_gate_model import (
     C2_REGISTERED_STEPS,
+    COVERFLOW_DIR,
+    COVERFLOW_STRIP_FILE,
     Cell,
     DEFECT2_CODE,
     DEFECT2_EVIDENCE_STEPS,
@@ -45,8 +50,13 @@ from h02_gate_model import (
     GateTable,
     INFORMATIONAL_CODES,
     IterationInfo,
+    MANIFEST_SCHEMA,
+    MANIFEST_SUFFIX,
+    MUTANT_NAMES,
     POSITIVE_CONTROL_STEP,
     PRODUCT_CODES,
+    R55_KILL_SIGNATURES,
+    REQUIRED_KILL_STEPS,
     STEPS,
     TEST_LABELS,
     UI_TEST_CLASS,
@@ -82,6 +92,7 @@ from h02_gate_table import (
     table_to_json,
 )
 from h02_gate_rules import (
+    _baseline_reasons,
     _cells,
     _codes,
     _defect3,
@@ -91,15 +102,27 @@ from h02_gate_rules import (
     _kill_outcome,
     _passes_endpoint_subcontract,
     _step_status,
+    candidate_failures,
+    evaluate_candidate,
+    evaluate_evidence,
     evaluate_frozen_conformity,
+    evaluate_negative_control,
     evaluate_v3,
     evaluate_v4,
     evaluate_v5,
+    has_non_strip_coverflow_change,
+    kill_outcome_with_defect2,
+    kill_signature_has_defect2,
+    mutant_kill_report,
+    non_strip_coverflow_changes,
     table_valid,
     verdict,
 )
 from h02_gate_cli import (
     _build_argparser,
+    _load_product_files,
+    _print_candidate,
+    _print_negative_control,
     _load_table,
     _load_text,
     _print_lines,
@@ -114,11 +137,16 @@ __all__ = [
     "TEST_LABELS", "STEPS", "UI_TEST_CLASS", "PRODUCT_CODES", "INFORMATIONAL_CODES",
     "DEFECT3_CODES", "DEFECT2_CODE", "C2_REGISTERED_STEPS", "DEFECT2_EVIDENCE_STEPS",
     "DEFECT3_STEP", "POSITIVE_CONTROL_STEP", "ENDPOINT_STEPS", "FROZEN_REGISTRATION", "FROZEN_ALLOWED_CODES",
+    "R55_KILL_SIGNATURES", "REQUIRED_KILL_STEPS", "MUTANT_NAMES", "MANIFEST_SCHEMA", "MANIFEST_SUFFIX",
+    "COVERFLOW_DIR", "COVERFLOW_STRIP_FILE",
     "GateInputError", "GateLine", "FailureEntry", "Cell", "IterationInfo", "GateTable",
     "strip_swift_prefix", "failure_message_body", "parse_gate_token", "parse_failure_message",
     "parse_log", "load_xcresult_json", "parse_xcresult",
     "build_table", "format_table", "table_to_json",
     "table_valid", "evaluate_v3", "evaluate_v5", "evaluate_v4", "evaluate_frozen_conformity", "verdict",
+    "evaluate_candidate", "evaluate_evidence", "evaluate_negative_control", "candidate_failures",
+    "kill_outcome_with_defect2", "kill_signature_has_defect2", "mutant_kill_report",
+    "has_non_strip_coverflow_change", "non_strip_coverflow_changes",
     "main",
 ]
 

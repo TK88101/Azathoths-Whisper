@@ -86,11 +86,16 @@ targets:
     platform: macOS
     sources:
       - path: UITests
-      # H-02 UI 測試閘門：與 app 同編的單一來源（旗標名、色板、判定純邏輯、軌跡格式），
-      # 見 docs/plans/2026-09-11-coverflow-h02-uitest-gate.md §3.3。三檔整檔包在 #if DEBUG 內
+      # H-02 UI 測試閘門：與 app 同編的單一來源（旗標名、色板、判定純邏輯、軌跡格式、
+      # 證據命名與 manifest、marks 行格式、報告遙測行），
+      # 見 docs/plans/2026-09-11-coverflow-h02-uitest-gate.md §3.3
+      # 與 docs/plans/2026-09-13-coverflow-h02-fix4.md §5.7 (7)(9)(10)。各檔整檔包在 #if DEBUG 內
       - path: App/UITestSupport/CoverFlowUITestFixture.swift
       - path: App/UITestSupport/CoverFlowGateLogic.swift
       - path: App/UITestSupport/CoverFlowTraceFormat.swift
+      - path: App/UITestSupport/CoverFlowEvidence.swift
+      - path: App/UITestSupport/CoverFlowMarksFormat.swift
+      - path: App/UITestSupport/CoverFlowReportTelemetry.swift
     dependencies:
       - target: AzathothsWhisper
     settings:

@@ -21,6 +21,9 @@ final class CoverFlowUITests: AppUITestCase {
 
     private var probe: CoverFlowProbe!
     private var trace: CoverFlowTraceSession!
+    /// 步驟邊界（wall-clock µs）；未設 `AZW_EVIDENCE_DIR` 時是 no-op（計劃 §5.7 (10)）
+    private var marks: CoverFlowMarks!
+    private var evidence: CoverFlowEvidence.Destination!
     private var testLabel = ""
 
     /// 每條測試結束前對整份軌跡做一次全檔 audit（R5-4 Round 2 P1 ②）：水位讀取只看新行，
@@ -28,7 +31,28 @@ final class CoverFlowUITests: AppUITestCase {
     /// （不印 GATE 行——它不是契約步驟），判定腳本據此把該次迭代記 invalid
     override func tearDown() {
         auditTrace()
+        marks?.close()
+        // 先讓 super 終止被測 app，trace 檔到那一刻才真正定版；manifest 的 md5 必須是最終內容，
+        // 否則「app 在 audit 之後又追加了一行」會被判定器讀成證據與清單不符
         super.tearDown()
+        writeEvidenceManifest()
+    }
+
+    /// `<dir>/<test>-<n>.manifest.json`（計劃 §5.7 (7)）。沒有證據目錄＝閘門輪，維持 R5-5 的行為不寫。
+    /// 寫失敗不另發 XCTFail：本檔不得新增產品碼，而「manifest 缺檔」本身就是判定器判運行無效的依據
+    private func writeEvidenceManifest() {
+        guard let evidence, let directory = evidence.directory, let ordinal = evidence.ordinal else { return }
+        let environment = ProcessInfo.processInfo.environment
+        do {
+            let path = try CoverFlowEvidence.writeManifest(
+                directory: directory, test: testLabel, ordinal: ordinal,
+                treeHash: environment[CoverFlowEvidence.treeHashVariable] ?? "",
+                cdhash: environment[CoverFlowEvidence.cdhashVariable] ?? ""
+            )
+            print("EVIDENCE \(testLabel)-\(ordinal) manifest=\(path)")
+        } catch {
+            print("EVIDENCE \(testLabel)-\(ordinal) manifest-error=\(error.localizedDescription)")
+        }
     }
 
     private func auditTrace() {
@@ -99,21 +123,39 @@ final class CoverFlowUITests: AppUITestCase {
     // MARK: 共同前置
 
     @MainActor private func launchCoverFlow(test: String) -> Bool {
-        let tracePath = FileManager.default.temporaryDirectory
-            .appendingPathComponent("azw-cf-trace-\(UUID().uuidString).log").path
-        var environment = [Fixture.launchFlag: "1", Fixture.tracePathVariable: tracePath]
+        let destination = Self.evidenceDestination(test: test)
+        var environment = [Fixture.launchFlag: "1", Fixture.tracePathVariable: destination.tracePath]
         if let delay = ProcessInfo.processInfo.environment[Fixture.albumDelayVariable] {
             environment[Fixture.albumDelayVariable] = delay      // 0ms 資訊對照輪（§3.2）
         }
+        evidence = destination
+        marks = CoverFlowMarks(path: destination.marksPath)
         launch(language: "en", environment: environment)
-        probe = CoverFlowProbe(app: app)
-        trace = CoverFlowTraceSession(path: tracePath)
+        probe = CoverFlowProbe(app: app, marks: marks)
+        trace = CoverFlowTraceSession(path: destination.tracePath)
         testLabel = test
         waitForMainUI()
         let step = "\(test).setup"
         guard verifyIdentity(step: step), verifyWindow(step: step) else { return false }
         app.buttons["COVER FLOW"].click()
         return waitForLabel(step: step)
+    }
+
+    /// 證據落點（計劃 §5.7 (7)）：`AZW_EVIDENCE_DIR`（經 `TEST_RUNNER_` 前綴轉發）有值時，
+    /// trace／marks 以 `<test>-<n>.*` 持久化；缺省退回現行的 temporaryDirectory＋UUID，閘門輪行為不變
+    private static func evidenceDestination(test: String) -> CoverFlowEvidence.Destination {
+        let manager = FileManager.default
+        let directory = ProcessInfo.processInfo.environment[CoverFlowEvidence.directoryVariable]
+            .flatMap { $0.isEmpty ? nil : $0 }
+        if let directory {
+            try? manager.createDirectory(atPath: directory, withIntermediateDirectories: true)
+        }
+        let existing = directory.flatMap { try? manager.contentsOfDirectory(atPath: $0) } ?? []
+        let fallback = manager.temporaryDirectory
+            .appendingPathComponent("azw-cf-trace-\(UUID().uuidString).log").path
+        return CoverFlowEvidence.destination(
+            directory: directory, test: test, existingFileNames: existing, fallbackTracePath: fallback
+        )
     }
 
     /// 二進位身分：trace header 由 app 自報 bundle 路徑（主證據），runner 側同 bundle ID 恰好一個實例（輔證）
@@ -185,6 +227,7 @@ final class CoverFlowUITests: AppUITestCase {
     @MainActor private func settle(step: String) -> CoverFlowProbe.State? {
         switch probe.waitForStableCenter() {
         case .settled(let state):
+            marks?.record(.settled, step)
             return state
         case .neverSettles:
             probe.reportSingle(step: step, code: "C6-NEVER-SETTLES", detail: "", in: self)
@@ -205,6 +248,8 @@ final class CoverFlowUITests: AppUITestCase {
     /// 點 label 取焦點（在 ScrollView 之外：點卡片可能把焦點交給 ScrollView，方向鍵就改走原生捲動）後按一次 →。
     /// 回傳按前的 label 索引；label 完全沒變＝`[PROBE-FOCUS]`，變了但不是 ＋1 交給契約的 C3 判
     @MainActor private func focusAndStepRight(step: String) -> Int? {
+        marks?.record(.stepBegin, step)
+        defer { marks?.record(.stepEnd, step) }
         guard let before = probe.readState()?.labelIndex else {
             probe.reportSingle(step: step, code: "PROBE-AX", detail: "no-label-before-focus", in: self)
             return nil
@@ -224,18 +269,35 @@ final class CoverFlowUITests: AppUITestCase {
     }
 
     @MainActor private func press(_ key: XCUIKeyboardKey, times: Int, step: String) -> Bool {
+        let name = Self.name(of: key)
         for _ in 0..<times {
             guard ensureForeground(step: step) else { return false }
+            // 鍵盤事件不進 trace（只有 `.scrollWheel` 局部監聽），marks 是命令路徑唯一的時間錨點
+            marks?.record(.key, name)
             app.typeKey(key, modifierFlags: [])
         }
         return true
     }
 
+    /// `XCUIKeyboardKey` 的 rawValue 是私有區 Unicode，直接寫進 marks 不可讀
+    private static func name(of key: XCUIKeyboardKey) -> String {
+        switch key.rawValue {
+        case XCUIKeyboardKey.leftArrow.rawValue: return "leftArrow"
+        case XCUIKeyboardKey.rightArrow.rawValue: return "rightArrow"
+        default: return "other"
+        }
+    }
+
     /// 捲動段：記水位 → 捲動 → 等軌跡靜止 → 落定 → 保持 1.5s → C4（整段軌跡）＋ 契約
     @MainActor private func scrollStep(_ step: String, deltaX: CGFloat) {
+        marks?.record(.stepBegin, step)
+        defer { marks?.record(.stepEnd, step) }
         guard ensureForeground(step: step), let start = probe.readState()?.labelIndex else { return }
         let mark = trace.watermark()
+        // `XCUIElement.scroll` 是阻塞呼叫：手勢期間 runner 不能取樣，起訖只能靠這兩個 mark 定界
+        marks?.record(.scrollBegin, String(format: "%.1f", deltaX))
         probe.scroll(byDeltaX: deltaX)
+        marks?.record(.scrollEnd, String(format: "%.1f", deltaX))
         guard trace.readUntilQuiet(from: mark, quiet: CoverFlowProbe.traceQuiet) != nil else {
             probe.reportSingle(step: step, code: "PROBE-TRACE", detail: "unreadable", in: self)
             return
@@ -261,12 +323,20 @@ final class CoverFlowUITests: AppUITestCase {
             return
         }
         let afterHold = afterHoldState.labelIndex
+        let gestureBinds = CoverFlowTraceSession.bindRecords(gesture)
+        let holdBinds = CoverFlowTraceSession.bindRecords(hold)
         var findings = CoverFlowGateLogic.writebackFindings(
-            start: start, gesture: CoverFlowTraceSession.bindIndices(gesture),
-            hold: CoverFlowTraceSession.bindIndices(hold) + [afterHold],
+            start: start, gesture: gestureBinds.map(\.value.fixtureIndex),
+            hold: holdBinds.map(\.value.fixtureIndex) + [afterHold],
             settled: settled.labelIndex
         )
-        let problems = gesture.problems + hold.problems
+        var problems = gesture.problems + hold.problems
+        // fixture 模式下 binding 只會回寫 T00…T19 或字面 nil；其他 payload＝量測沒讀懂，
+        // 不得沿用舊行為靜默壓成 nil 後被 compactMap 丟掉（計劃 §5.7 (2)）
+        let unknown = (gestureBinds + holdBinds).compactMap(\.value.unknownPayload)
+        if !unknown.isEmpty {
+            problems.append("unknown-bind=" + unknown.joined(separator: "/"))
+        }
         if !problems.isEmpty {
             findings.append(GateFinding(code: "PROBE-TRACE", detail: problems.joined(separator: ",")))
         }

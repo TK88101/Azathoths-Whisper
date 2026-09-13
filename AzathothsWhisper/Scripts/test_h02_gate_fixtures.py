@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -170,6 +171,14 @@ FROZEN_M0 = {
 MISSING = "MISSING"
 
 
+def _gate_code(sig):
+    """由失敗訊息反推 GATE 行的碼 token：`SIG{T1.s2|C2-STACK|…}` → `C2-STACK`；
+    `[PROBE-AX] …` → `PROBE-AX`（探針 token 與產品碼在 GATE 行同一位置，見 `h02_gate_parse`）。"""
+    if sig.startswith("[PROBE-"):
+        return sig[1 : sig.index("]")]
+    return sig.split("|")[1]
+
+
 def m0_grid(n=10, overrides=None, drop_tests=(), base=None):
     """overrides[(label, step)]＝固定結果或 `f(iteration_1based) -> 結果`；結果為 None（PASS）、SIG 清單（FAIL）或 MISSING（不輸出 GATE）。
     GATE 行的碼清單**去重**，與 Swift 產出端（`CoverFlowGateLogic.gateLine`）一致。"""
@@ -192,7 +201,7 @@ def m0_grid(n=10, overrides=None, drop_tests=(), base=None):
                 if outcome is None:
                     lines.append(f"GATE{{{label}.{s}|PASS}}")
                     continue
-                codes = ",".join(dict.fromkeys(sig.split("|")[1] for sig in outcome))
+                codes = ",".join(dict.fromkeys(_gate_code(sig) for sig in outcome))
                 lines.append(f"GATE{{{label}.{s}|FAIL|{codes}}}")
                 failure_texts[(label, i, s)] = list(outcome)
             iters.append(lines)
@@ -235,3 +244,95 @@ MUTANT_KILLED = {
     ("T1", "s1"): ["SIG{T1.s1|C2-STACK|G=T11|over=T10|side=L}"],
     ("T2", "s1"): ["SIG{T2.s1|C2-STACK|G=T11|over=T10|side=L}"],
 }
+
+
+# ---------------------------------------------------------------------------
+# F1（計劃 `docs/plans/2026-09-13-coverflow-h02-fix4.md` §5.1／§5.2／§5.7 (7)）：
+# 候選閘門／負對照／證據包夾具
+# ---------------------------------------------------------------------------
+
+ALL_PASS_BASE = {(label, s): None for label, steps in gate.STEPS.items() for s in steps}
+
+# R5-5 確認性殺死簽名（計劃 §2 事實基線）：M2 於 T1.s1／T2.s1；M3 另加 T3.s1
+M2_KILL = dict(MUTANT_KILLED)
+M3_KILL = {**MUTANT_KILLED, ("T3", "s1"): ["SIG{T3.s1|C2-STACK|G=T10|over=T09|side=L}"]}
+
+PROBE_T1S1 = "[PROBE-CONTRACT] 契約報告不可讀"
+UNTAGGED_T1S1 = "XCTAssertTrue failed"
+
+EVIDENCE_TESTS = tuple(gate.TEST_LABELS)
+EVIDENCE_TREE_HASH = "9f" * 20
+EVIDENCE_CDHASH = "3c" * 20
+
+
+def run_inputs(n=20, overrides=None, drop_tests=(), base=None):
+    """回傳 (log_text, xcresult_json)——CLI 測試需要的是檔案內容而非已建好的 GateTable。"""
+    grid, failure_texts = m0_grid(n, overrides, drop_tests, base or ALL_PASS_BASE)
+    return make_log(grid), xcresult_for_grid(grid, failure_texts)
+
+
+def candidate_run(n=20, overrides=None, drop_tests=(), xc_mutator=None, log_mutator=None):
+    """候選／變異運行：以「全 PASS」為底（不是 M0 凍結表），overrides 注入個別失敗格。"""
+    return m0_run(
+        n=n,
+        overrides=overrides,
+        drop_tests=drop_tests,
+        xc_mutator=xc_mutator,
+        base=ALL_PASS_BASE,
+        log_mutator=log_mutator,
+    )
+
+
+def write_run(directory, name, n=20, overrides=None, drop_tests=(), base=None):
+    """把一份合成運行寫成 `<name>.log` ＋ `<name>.xcresult.json`，回傳 (log_path, xcresult_path)。"""
+    log_text, xc_json = run_inputs(n, overrides, drop_tests, base)
+    log_path = Path(directory) / f"{name}.log"
+    xc_path = Path(directory) / f"{name}.xcresult.json"
+    log_path.write_text(log_text, encoding="utf-8")
+    xc_path.write_text(json.dumps(xc_json, ensure_ascii=False), encoding="utf-8")
+    return str(log_path), str(xc_path)
+
+
+def _write_evidence_file(root, name, body):
+    (root / name).write_text(body, encoding="utf-8")
+    return {"path": name, "md5": hashlib.md5(body.encode("utf-8")).hexdigest()}
+
+
+def write_evidence(root, iterations, tests=EVIDENCE_TESTS, with_sampler=False, transform=None):
+    """產生 §5.7 (7) 的證據目錄：每個 test／iteration 一份 trace＋marks（可選 sampler）與 manifest。
+
+    `transform(manifest) -> manifest | None`：回傳新 manifest（不就地改）以構造欄位錯誤；
+    回傳 None 則不寫該份 manifest（構造缺份數／不連號）。
+    """
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+    for test in tests:
+        for ordinal in range(1, iterations + 1):
+            stem = f"{test}-{ordinal}"
+            files = {
+                "trace": _write_evidence_file(root, f"{stem}.trace", f"epoch-us=1000\n{stem}\n"),
+                "marks": _write_evidence_file(root, f"{stem}.marks", f"step-begin|{stem}\n"),
+                "sampler": (
+                    _write_evidence_file(root, f"{stem}.sampler", f"frame|{stem}\n") if with_sampler else None
+                ),
+            }
+            manifest = {
+                "schema": 1,
+                "test": test,
+                "ordinal": ordinal,
+                "tree_hash": EVIDENCE_TREE_HASH,
+                "cdhash": EVIDENCE_CDHASH,
+                "files": files,
+            }
+            if transform is not None:
+                manifest = transform(manifest)
+            if manifest is not None:
+                (root / f"{stem}.manifest.json").write_text(
+                    json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+    return Path(root)
+
+
+def at_manifest(test, ordinal, change):
+    """只對指定 (test, ordinal) 的 manifest 套用 `change`（純函數，回傳新 dict 或 None）。"""
+    return lambda m: change(m) if (m["test"] == test and m["ordinal"] == ordinal) else m

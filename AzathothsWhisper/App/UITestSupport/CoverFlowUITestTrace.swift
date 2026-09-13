@@ -18,7 +18,9 @@ final class CoverFlowUITestTrace {
     private(set) static var shared: CoverFlowUITestTrace?
 
     private let descriptor: Int32
-    private let origin = ContinuousClock.now
+    private let origin: ContinuousClock.Instant
+    /// header 寫下的 wall-clock 錨點；與 `origin` 在 init 內連續兩行取得（計劃 §5.7 (1)）
+    let epochMicroseconds: Int64
     private var nextSequence = 0
     private(set) var writeErrors = 0
     private var eventMonitor: Any?
@@ -31,7 +33,10 @@ final class CoverFlowUITestTrace {
         let descriptor = open(path, O_WRONLY | O_CREAT | O_APPEND, 0o644)
         guard descriptor >= 0 else { return nil }
         self.descriptor = descriptor
-        append(CoverFlowTraceFormat.headerLine(Self.currentHeader()))
+        // 兩個時鐘必須錨在同一時刻：記錄用 ContinuousClock 相對微秒，runner 的 marks 用 wall-clock
+        self.origin = ContinuousClock.now
+        self.epochMicroseconds = CoverFlowTraceFormat.nowEpochMicroseconds()
+        append(CoverFlowTraceFormat.headerLine(Self.currentHeader(epochMicroseconds: epochMicroseconds)))
     }
 
     deinit {
@@ -43,15 +48,29 @@ final class CoverFlowUITestTrace {
         return CoverFlowUITestTrace(path: path)
     }
 
+    /// 是否應安裝軌跡旁路（純判定，計劃 §5.7 (3)）。
+    ///
+    /// 條件＝**軌跡路徑非空 ∧ 不是單元測試 host**，與 fixture 旗標無關：
+    /// 實體手滑輪（C.6）以 `open --env` 正常啟動、fixture OFF，同樣要記軌跡；
+    /// 反之單元測試 host 的環境若誤帶路徑（scheme 為單元測試注入 `AZW_UNIT_TEST_HOST=1`），
+    /// 安裝會在整個測試行程裡留下事件監聽與單例。`isInstalled` 讓「只安裝一次」也是純函數性質
+    static func shouldInstall(environment: [String: String], isInstalled: Bool) -> Bool {
+        guard !isInstalled else { return false }
+        guard let path = environment[CoverFlowUITestFixture.tracePathVariable], !path.isEmpty else { return false }
+        return environment[AppModel.unitTestHostFlag] != "1"
+    }
+
     static func installIfRequested(environment: [String: String]) {
-        guard shared == nil, let trace = makeIfRequested(environment: environment) else { return }
+        guard shouldInstall(environment: environment, isInstalled: shared != nil),
+              let trace = makeIfRequested(environment: environment)
+        else { return }
         trace.startMonitoring()
         shared = trace
     }
 
     /// `CoverFlowView` 的 scrollPosition binding setter 呼叫：記 SwiftUI 的原始回寫值（未經 VM 過濾）
     static func recordBinding(_ persistentID: String?) {
-        shared?.record(kind: .bind, payload: persistentID ?? "nil")
+        shared?.record(kind: .bind, payload: persistentID ?? CoverFlowTraceFormat.literalNilPayload)
     }
 
     func record(kind: CoverFlowTraceFormat.Kind, payload: String) {
@@ -107,23 +126,12 @@ final class CoverFlowUITestTrace {
         _ = writeAll(Array(CoverFlowTraceFormat.errorLine(errno: failure).utf8))
     }
 
-    /// `write(2)` 允許短寫，也可能被信號打斷；寫不完就是失敗（回 false），不當成已寫入
+    /// 短寫續寫、`EINTR` 重試的協議與 marks 檔共用一份實作（`CoverFlowTraceFormat.appendAll`）
     private func writeAll(_ bytes: [UInt8]) -> Bool {
-        var offset = 0
-        while offset < bytes.count {
-            let written = bytes.withUnsafeBytes { buffer in
-                Darwin.write(descriptor, buffer.baseAddress! + offset, bytes.count - offset)
-            }
-            if written > 0 {
-                offset += written
-            } else if !(written < 0 && errno == EINTR) {
-                return false
-            }
-        }
-        return true
+        CoverFlowTraceFormat.appendAll(bytes, to: descriptor)
     }
 
-    private static func currentHeader() -> CoverFlowTraceFormat.Header {
+    private static func currentHeader(epochMicroseconds: Int64) -> CoverFlowTraceFormat.Header {
         let attributes = Bundle.main.executableURL.flatMap {
             try? FileManager.default.attributesOfItem(atPath: $0.path)
         }
@@ -131,7 +139,7 @@ final class CoverFlowUITestTrace {
         let modified = (attributes?[.modificationDate] as? Date).map { Int64($0.timeIntervalSince1970) } ?? 0
         return CoverFlowTraceFormat.Header(
             pid: ProcessInfo.processInfo.processIdentifier, bundlePath: Bundle.main.bundleURL.path,
-            executableSize: size, executableModified: modified
+            executableSize: size, executableModified: modified, epochMicroseconds: epochMicroseconds
         )
     }
 }
