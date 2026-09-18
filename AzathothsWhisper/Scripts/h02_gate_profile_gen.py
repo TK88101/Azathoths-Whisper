@@ -67,6 +67,7 @@ from h02_gate_rules import (
 
 STAGING_COMPONENTS: Tuple[str, ...] = _STAGING_COMPONENTS
 _ATTEMPTS_FILENAME = "attempts.jsonl"
+_FROZEN_LEDGER_FILENAME = "frozen.jsonl"
 CHECK_FILENAME = "scene0-check.json"
 
 _MANIFEST_REQUIRED_KEYS: Tuple[str, ...] = (
@@ -131,6 +132,61 @@ def check_file_path(root) -> Path:
 
 def _attempts_path(root) -> Path:
     return _staging_dir(root) / _ATTEMPTS_FILENAME
+
+
+def _frozen_ledger_path(root) -> Path:
+    return _staging_dir(root) / _FROZEN_LEDGER_FILENAME
+
+
+def record_frozen_component(root, component: str) -> None:
+    """凍結帳本（append-only）：staging 成功後記下該元件當下的 sha256。
+
+    用途＝擋住「用文字編輯器改完 staging 再跑一次 `profile check` 重新祝福」這條路徑
+    （§7 場 0 停止分支第 3 條的首份規則、§10 R10「不得跑到綠為止」）。**誠實標明**：帳本本身
+    也可被一併竄改，與 `load_active_profile` 的既有口徑一致——作用是把成本墊高並留下可見絆線，
+    不是密碼學防偽。"""
+    path = _frozen_ledger_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    entry = {"component": component, "sha256": sha256_file(staging_component_path(root, component))}
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(entry, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def read_frozen_ledger(root) -> Dict[str, str]:
+    """回傳 {component: 凍結當下的 sha256}；同一元件重複出現時取第一筆（首份規則）。"""
+    path = _frozen_ledger_path(root)
+    result: Dict[str, str] = {}
+    if not path.is_file():
+        return result
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        component, digest = entry.get("component"), entry.get("sha256")
+        if isinstance(component, str) and isinstance(digest, str) and component not in result:
+            result[component] = digest
+    return result
+
+
+def frozen_ledger_mismatches(root) -> List[str]:
+    """帳本與磁碟現檔逐一比對；不符或檔案消失即回一條理由。"""
+    reasons: List[str] = []
+    for component, digest in sorted(read_frozen_ledger(root).items()):
+        path = staging_component_path(root, component)
+        if not path.is_file():
+            reasons.append(f"staging/{component}.staging.json 已不在磁碟（凍結帳本有記錄）")
+            continue
+        actual = sha256_file(path)
+        if actual != digest:
+            reasons.append(
+                f"staging/{component}.staging.json 自凍結後被改動（違反首份規則；"
+                f"凍結時 {digest}／目前 {actual}）"
+            )
+    return reasons
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +341,8 @@ def build_m0_staging(
         "kind": "m0",
         "tree_hash": manifest["swift_hashlist_sha256"],
         "cdhash": manifest["cdhash"],
+        # §10 R13 跨元件面：四份元件須在同一環境凍結（`_cross_component_env_reasons` 逐一比對）
+        "environment": {k: manifest[k] for k in ("os_build", "xcode_build", "sdk")},
         "steps": steps,
         "log_sha256": log_sha256,
         "checks": {
@@ -346,6 +404,7 @@ def build_mutant_staging(
     data: Dict[str, object] = {
         "schema": R27_PROFILE_SCHEMA,
         "kind": name.lower(),
+        "environment": {k: manifest[k] for k in ("os_build", "xcode_build", "sdk")},
         "kill_signatures": {f"{t}.{s}": list(sig) for t, s, sig in killed},
         "tree_hash": manifest["swift_hashlist_sha256"],
         "cdhash": manifest["cdhash"],
@@ -409,6 +468,7 @@ def build_ui_staging(results: Mapping[str, str], manifest: Mapping, evidence_has
         "schema": R27_PROFILE_SCHEMA,
         "kind": "ui_t0_prime",
         "results": dict(results),
+        "environment": {k: manifest[k] for k in ("os_build", "xcode_build", "sdk")},
         "tree_hash": manifest["swift_hashlist_sha256"],
         "cdhash": manifest["cdhash"],
     }
@@ -422,6 +482,33 @@ def build_ui_staging(results: Mapping[str, str], manifest: Mapping, evidence_has
 # ---------------------------------------------------------------------------
 # profile check（§7 場 0 的停止分支 ＋ §6 場 0 列停止條件）
 # ---------------------------------------------------------------------------
+
+
+def _cross_component_env_reasons(root) -> List[str]:
+    """§10 R13 的跨元件面：四份元件必須在同一環境凍結。各元件 staging 記錄的 `environment`
+    （os_build／xcode_build／sdk，來自各自 tree-manifest）與 m0 的不一致即 STOP——場 0 是同一台
+    機器同一場次，不一致代表其中一份是別的環境或別的時間點跑的。m0 未 staged 時不判（另有條件）。"""
+    m0 = load_staging_component(root, "m0")
+    if m0 is None:
+        return []
+    baseline = m0.get("environment")
+    if not isinstance(baseline, dict) or not baseline:
+        return []
+    reasons: List[str] = []
+    for component in STAGING_COMPONENTS:
+        if component == "m0":
+            continue
+        data = load_staging_component(root, component)
+        if data is None:
+            continue
+        env = data.get("environment")
+        if not isinstance(env, dict) or not env:
+            continue
+        if env != baseline:
+            reasons.append(
+                f"staging/{component} 的環境指紋與 m0 不一致（m0 {baseline}／{component} {env}）"
+            )
+    return reasons
 
 
 def _attempts_stop_reasons(root) -> List[str]:
@@ -485,6 +572,14 @@ def evaluate_scene0_check(root) -> dict:
     if ui is None:
         reasons.append("ui-T0′ 尚未 staged（17 條既有 UITests 未齊全凍結）")
 
+    frozen_reasons = frozen_ledger_mismatches(root)
+    checks["staging_unmodified_since_freeze"] = not frozen_reasons
+    reasons.extend(frozen_reasons)
+
+    env_reasons = _cross_component_env_reasons(root)
+    checks["components_same_environment"] = not env_reasons
+    reasons.extend(env_reasons)
+
     attempts_reasons = _attempts_stop_reasons(root)
     checks["attempts_stop_triggered"] = bool(attempts_reasons)
     reasons.extend(attempts_reasons)
@@ -520,9 +615,19 @@ def write_scene0_check(root) -> dict:
 
 
 def evaluate_activate_gate(root) -> Tuple[bool, List[str]]:
-    """只有 `staging/scene0-check.json` 為 PASS、且其記錄的 staging sha256 與磁碟上目前的 staging
-    檔逐一相符，才允許呼叫 `activate_r27`；否則拒絕並說明——防止「check 過後、activate 前」有人
-    又手動改了 staging 檔卻沒重跑 check。"""
+    """啟用閘門，三道全過才准 `activate_r27`：
+
+    1. **現場重算**場 0 停止條件（`evaluate_scene0_check`）必須 PASS——**不採信**
+       `scene0-check.json` 記載的 result。第 4 輪對抗覆核實測：手寫一份 `result: "PASS"`＋
+       照算的 `staging_sha256` 即可啟用一份真實停止條件為 STOP 的 profile；
+    2. `profile check` 跑過且當時結論為 PASS（保留人工流程的留痕）；
+    3. check 當時記錄的 staging sha256 與磁碟現檔逐一相符（擋「check 過後、activate 前」的手改）。
+    """
+    live = evaluate_scene0_check(root)
+    if live["result"] != "PASS":
+        return False, ["現場重算的場 0 停止條件不是 PASS（不採信 scene0-check.json 的記載）"] + [
+            str(r) for r in live["reasons"]
+        ]
     path = check_file_path(root)
     if not path.is_file():
         return False, ["尚未執行過 `profile check`（缺 staging/scene0-check.json）"]

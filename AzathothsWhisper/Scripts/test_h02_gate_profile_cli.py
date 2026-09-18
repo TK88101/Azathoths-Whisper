@@ -308,6 +308,8 @@ class CheckCliTests(ProfileCliTestCase):
 
 class ActivateCliTests(ProfileCliTestCase):
     def test_activate_without_check_is_refused(self):
+        """四份都 staged、現場重算亦為 PASS，但沒跑過 `profile check` → 仍拒絕（保留人工流程留痕）。"""
+        self.stage_all_four()
         code, out, err = self.run_cli(["profile", "activate", "--profile-dir", self.root, "--version", "v1"])
         self.assertEqual(code, 2)
         self.assertIn("尚未執行過", err)
@@ -331,7 +333,10 @@ class ActivateCliTests(ProfileCliTestCase):
 
         code, out, err = self.run_cli(["profile", "activate", "--profile-dir", self.root, "--version", "v1"])
         self.assertEqual(code, 2)
-        self.assertIn("已變動", err)
+        # 凍結帳本會在現場重算階段先抓到（訊息說「自凍結後被改動」）；即使帳本被一併刪除，
+        # check 記錄的 sha256 比對仍會抓到（訊息說「已變動」）——兩條防線任一即可。
+        self.assertIn("ui_t0_prime", err)
+        self.assertTrue(("改動" in err) or ("變動" in err), err)
         self.assertFalse((Path(self.root) / "active" / "profile.json").is_file())
 
     def test_activate_after_check_pass_and_unchanged_succeeds(self):
@@ -349,6 +354,141 @@ class ShowCliTests(ProfileCliTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("(無)", out)
         self.assertIn("未 staged", out)
+
+
+class ActivateTrustBoundaryTests(ProfileCliTestCase):
+    """第 4 輪對抗覆核（2026-09-19）實測繞過成功的兩條信任邊界。"""
+
+    def _forge_check_pass(self):
+        """手寫一份聲稱 PASS 的 scene0-check.json（staging_sha256 照現檔正確計算）。"""
+        import h02_gate_profile_gen as pgen
+        payload = {
+            "schema": 1,
+            "result": "PASS",
+            "reasons": [],
+            "checks": {},
+            "staging_sha256": {
+                c: pgen.sha256_file(pgen.staging_component_path(self.root, c))
+                for c in pgen.STAGING_COMPONENTS
+                if pgen.staging_component_path(self.root, c).is_file()
+            },
+        }
+        path = Path(self.root) / "staging" / "scene0-check.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+
+    def _stage_four_with_unkilling_m2(self):
+        """四份都 staged，但 M2 的運行與 baseline 無差異＝未殺死 → 真實 check 必為 STOP。"""
+        (code0, _, err0), m0_log, m0_xc = self.stage_m0()
+        self.assertEqual(code0, 0, err0)
+        # M2 只在非 required 的 T3.s1 殺死 → kill_signatures 非空（可 stage），但 kill_ok=False → check STOP
+        weak_m2 = {("T3", "s1"): ["SIG{T3.s1|C2-STACK|G=T10|over=T09|side=L}"]}
+        for name, overrides in (("M2", weak_m2), ("M3", fx.M3_KILL)):
+            log_path, xc_path = fx.write_run(self.tmp, f"cf-{name}-27", n=3, overrides=overrides)
+            manifest = write_manifest(self.tmp, name)
+            code, out, err = self.run_cli(
+                [
+                    "profile", "stage-mutant", "--profile-dir", self.root, "--name", name,
+                    "--log", log_path, "--xcresult", xc_path, "--iterations", "3",
+                    "--baseline-log", m0_log, "--baseline-xcresult", m0_xc, "--baseline-iterations", "10",
+                    "--tree-manifest", manifest, "--run-env-fingerprint", RUN_ENV_TEXT,
+                ]
+            )
+            self.assertEqual(code, 0, err)
+        ui_log = Path(self.tmp) / "ui-T0p.log"
+        ui_log.write_text(ui_log_text(), encoding="utf-8")
+        ui_xc = Path(self.tmp) / "ui-T0p.xcresult"
+        ui_xc.mkdir()
+        ui_manifest = write_manifest(self.tmp, "uiT0p", tree="ui-T0p")
+        code, out, err = self.run_cli(
+            [
+                "profile", "stage-ui", "--profile-dir", self.root,
+                "--log", str(ui_log), "--xcresult", str(ui_xc), "--tree-manifest", ui_manifest,
+            ]
+        )
+        self.assertEqual(code, 0, err)
+
+    def test_forged_check_file_cannot_activate(self):
+        """activate 必須**現場重算**停止條件，不得採信 scene0-check.json 的記載——
+        否則手寫一份 PASS（sha256 照算）就能啟用一份真實 check 為 STOP 的 profile。"""
+        self._stage_four_with_unkilling_m2()
+        code, out, err = self.run_cli(["profile", "check", "--profile-dir", self.root])
+        self.assertEqual(code, 1, out + err)  # 真實 check ＝ STOP（1＝停止條件觸發，2 保留給輸入錯誤）
+        self._forge_check_pass()
+        code, out, err = self.run_cli(["profile", "activate", "--profile-dir", self.root, "--version", "forged"])
+        self.assertEqual(code, 2, out + err)
+        self.assertFalse((Path(self.root) / "active" / "profile.json").is_file())
+
+    def test_edited_staging_cannot_be_re_blessed_by_rerunning_check(self):
+        """手改 staging 後重跑 check 不得「重新祝福」：凍結帳本比對須讓 check 落 STOP
+        （§7 首份規則、§10 R10「不得跑到綠為止」）。"""
+        self.stage_all_four()
+        code, out, err = self.run_cli(["profile", "check", "--profile-dir", self.root])
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("PASS", out)
+
+        m0_path = Path(self.root) / "staging" / "m0.staging.json"
+        data = json.loads(m0_path.read_text(encoding="utf-8"))
+        data["steps"]["T4.s2"]["allowed_codes"] = sorted(set(data["steps"]["T4.s2"]["allowed_codes"]) | {"C6-NEVER-SETTLES"})
+        m0_path.write_text(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+
+        code, out, err = self.run_cli(["profile", "check", "--profile-dir", self.root])
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("凍結", out + err)
+
+        code, out, err = self.run_cli(["profile", "activate", "--profile-dir", self.root, "--version", "edited"])
+        self.assertEqual(code, 2, out + err)
+        self.assertFalse((Path(self.root) / "active" / "profile.json").is_file())
+
+
+class IterationsGuardTests(ProfileCliTestCase):
+    """§6 場 0 列：cf-m0-27 ×10、M2／M3 各 ×3。首份規則沒有覆蓋開關，一次打錯 --iterations
+    就會把欠採樣的基準永久凍結，故在 stage 端就擋。"""
+
+    def test_stage_m0_refuses_non_ten_iterations(self):
+        (code, out, err), _, _ = self.stage_m0(n=3)
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("10", out + err)
+        self.assertFalse((Path(self.root) / "staging" / "m0.staging.json").is_file())
+
+    def test_stage_mutant_refuses_non_three_iterations(self):
+        (code0, _, err0), m0_log, m0_xc = self.stage_m0()
+        self.assertEqual(code0, 0, err0)
+        log_path, xc_path = fx.write_run(self.tmp, "cf-M2-27", n=10, overrides=fx.MUTANT_KILLED)
+        manifest = write_manifest(self.tmp, "M2")
+        code, out, err = self.run_cli(
+            [
+                "profile", "stage-mutant", "--profile-dir", self.root, "--name", "M2",
+                "--log", log_path, "--xcresult", xc_path, "--iterations", "10",
+                "--baseline-log", m0_log, "--baseline-xcresult", m0_xc, "--baseline-iterations", "10",
+                "--tree-manifest", manifest, "--run-env-fingerprint", RUN_ENV_TEXT,
+            ]
+        )
+        self.assertEqual(code, 2, out + err)
+        self.assertFalse((Path(self.root) / "staging" / "m2.staging.json").is_file())
+
+
+class CrossComponentEnvFingerprintTests(ProfileCliTestCase):
+    """四份元件必須在同一環境凍結（§10 R13 的跨元件面）：m2／m3／ui 的 manifest 指紋
+    與 m0 不一致時，check 落 STOP。"""
+
+    def test_mutant_staged_in_other_environment_stops_check(self):
+        (code0, _, err0), m0_log, m0_xc = self.stage_m0()
+        self.assertEqual(code0, 0, err0)
+        other_env = "os_build=99Z999,xcode_build=99A999,sdk=macosx99.0"
+        log_path, xc_path = fx.write_run(self.tmp, "cf-M2-27", n=3, overrides=fx.MUTANT_KILLED)
+        manifest = write_manifest(self.tmp, "M2", os_build="99Z999", xcode_build="99A999", sdk="macosx99.0")
+        code, out, err = self.run_cli(
+            [
+                "profile", "stage-mutant", "--profile-dir", self.root, "--name", "M2",
+                "--log", log_path, "--xcresult", xc_path, "--iterations", "3",
+                "--baseline-log", m0_log, "--baseline-xcresult", m0_xc, "--baseline-iterations", "10",
+                "--tree-manifest", manifest, "--run-env-fingerprint", other_env,
+            ]
+        )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["profile", "check", "--profile-dir", self.root])
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("環境指紋", out + err)
 
 
 if __name__ == "__main__":

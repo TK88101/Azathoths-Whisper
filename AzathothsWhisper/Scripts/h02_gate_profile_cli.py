@@ -96,6 +96,12 @@ def add_profile_subparsers(sub) -> None:
     _add_profile_dir_arg(p_show)
 
 
+# §6 場 0 列的固定採樣次數：cf-m0-27 ×10、M2／M3 各 ×3（baseline 仍是那份 ×10）。
+# 首份規則沒有覆蓋開關，故在 stage 端就擋住打錯的 --iterations。
+_SCENE0_M0_ITERATIONS = 10
+_SCENE0_MUTANT_ITERATIONS = 3
+
+
 def _resolve_profile_dir(args) -> Path:
     return Path(args.profile_dir if args.profile_dir is not None else _DEFAULT_R27_PROFILE_DIR)
 
@@ -140,6 +146,8 @@ def _stage_or_invalid_attempt(root, component: str, tree: str, data: dict) -> No
     except ProfileError as e:
         pgen.record_invalid_attempt(root, tree, component, [str(e)])
         raise pgen.ProfileCliError(f"staging/{component} 驗證失敗（{e}），已記入 attempts.jsonl") from e
+    # 首份規則的絆線：凍結當下的 sha256 進 append-only 帳本，`profile check` 會逐一比對現檔
+    pgen.record_frozen_component(root, component)
 
 
 def _refuse_if_already_staged(root, component: str) -> None:
@@ -157,6 +165,11 @@ def _refuse_if_already_staged(root, component: str) -> None:
 
 def _cmd_stage_m0(args) -> int:
     root = _resolve_profile_dir(args)
+    if args.iterations != _SCENE0_M0_ITERATIONS:
+        raise pgen.ProfileCliError(
+            f"stage-m0 拒絕：§6 場 0 列要求 cf-m0-27 ×{_SCENE0_M0_ITERATIONS}，實得 --iterations "
+            f"{args.iterations}（首份規則無覆蓋開關，欠採樣的基準一旦凍結就改不回來）"
+        )
     _refuse_if_already_staged(root, "m0")
     manifest = pgen.load_tree_manifest(args.tree_manifest)
     tree = manifest["tree"]
@@ -182,6 +195,12 @@ def _cmd_stage_mutant(args) -> int:
     root = _resolve_profile_dir(args)
     name = args.name
     component = name.lower()
+    if args.iterations != _SCENE0_MUTANT_ITERATIONS or args.baseline_iterations != _SCENE0_M0_ITERATIONS:
+        raise pgen.ProfileCliError(
+            f"stage-mutant 拒絕：§6 場 0 列要求變異 ×{_SCENE0_MUTANT_ITERATIONS}、baseline ×"
+            f"{_SCENE0_M0_ITERATIONS}，實得 --iterations {args.iterations}／--baseline-iterations "
+            f"{args.baseline_iterations}"
+        )
     _refuse_if_already_staged(root, component)
 
     m0_staging = load_staging_component(root, "m0")

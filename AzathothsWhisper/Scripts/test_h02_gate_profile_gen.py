@@ -512,9 +512,13 @@ class EvaluateActivateGateTests(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
 
     def test_no_check_yet_is_refused(self):
+        """空 staging 下，第一道（現場重算停止條件）就先攔——不採信 check 檔的那道在其後。
+        「缺 check 檔」本身的拒絕見 CLI 層 `ActivateCliTests.test_activate_without_check_is_refused`
+        （四份都 staged、現場重算 PASS，只差沒跑過 check）。"""
         ok, reasons = pgen.evaluate_activate_gate(self.root)
         self.assertFalse(ok)
-        self.assertTrue(any("尚未執行過" in r for r in reasons))
+        self.assertTrue(any("現場重算" in r for r in reasons), reasons)
+        self.assertTrue(any("m0 尚未 staged" in r for r in reasons), reasons)
 
     def test_check_stop_is_refused(self):
         stage_healthy_ui(self.root)  # 只 staged 一元件 → STOP
