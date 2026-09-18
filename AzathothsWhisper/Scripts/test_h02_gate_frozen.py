@@ -7,11 +7,24 @@ from __future__ import annotations
 
 import contextlib
 import io
+import tempfile
 import unittest
+from pathlib import Path
 
 import h02_gate_eval as gate
 import h02_gate_r27_profile as r27profile
-from test_h02_gate_fixtures import C2, MUTANT_KILLED, T4S2_OFFSET, T4S2_STACK, m0_run, pass_at, r27_profile
+from test_h02_gate_fixtures import (
+    C2,
+    FROZEN_M0,
+    MUTANT_KILLED,
+    T4S2_OFFSET,
+    T4S2_STACK,
+    m0_run,
+    pass_at,
+    r27_profile,
+    write_active_r27_profile,
+    write_run,
+)
 
 C6_T3 = "SIG{T3.s1|C6-NEVER-SETTLES}"
 SNAPBACK_T1S3 = "SIG{T1.s3|C4-SNAPBACK|from=T11|to=T12}"
@@ -170,6 +183,126 @@ class FrozenConformityCLITests(unittest.TestCase):
         self.assertIn("不可判定", out)
         self.assertIn("R4-F", out)
         self.assertIn("frozen_conformity_ok: False", out)
+
+
+class FrozenConformityFullCliTests(unittest.TestCase):
+    """must_fix 1：甲案的攔阻半邊必須經 CLI 可達——`v3`／`verdict` 子命令補上 `--profile-dir`
+    之前，經 CLI 呼叫時 `active_profile` 恆為 `None`，R4-F 的 active-profile 判據永遠碰不到。
+    這裡走真正的 `gate.main([...])`（檔案 I/O），不是函式層直呼 `evaluate_v3`／`verdict`。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = self._tmp.name
+        self.addCleanup(self._tmp.cleanup)
+
+    def run_cli(self, argv):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = gate.main(argv)
+        return code, out.getvalue()
+
+    def test_v3_cli_without_profile_dir_only_shows_deviations(self):
+        """不給 `--profile-dir`（指向空目錄）時 active_profile 為 None，外來碼只計 deviations，
+        不落入 R4-F 不可判定。"""
+        log_path, xc_path = write_run(self.tmp, "m0", n=10, overrides={("T3", "s1"): [C6_T3]}, base=FROZEN_M0)
+        code, out = self.run_cli(
+            [
+                "v3", "--log", log_path, "--xcresult", xc_path, "--iterations", "10",
+                "--profile-dir", str(Path(self.tmp) / "no-such-profile"),
+            ]
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("frozen_conformity_ok: True", out)
+        self.assertNotIn("R4-F：", out)
+        self.assertIn("active_profile: 無", out)
+
+    def test_v3_cli_with_profile_dir_blocks_foreign_code(self):
+        """給 `--profile-dir` 且該步驟登記了收緊的 allowed_codes 時，外來碼經 CLI 仍被攔為
+        R4-F 不可判定（甲案的攔阻半邊必須經 CLI 可達）。"""
+        log_path, xc_path = write_run(self.tmp, "m0", n=10, overrides={("T3", "s1"): [C6_T3]}, base=FROZEN_M0)
+        profile_dir = Path(self.tmp) / "r27-profile"
+        write_active_r27_profile(
+            profile_dir,
+            m0_overrides={"T3.s1": {"sig_set": [], "allowed_codes": [], "stable": True, "observations": []}},
+        )
+        code, out = self.run_cli(
+            [
+                "v3", "--log", log_path, "--xcresult", xc_path, "--iterations", "10",
+                "--profile-dir", str(profile_dir),
+            ]
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("frozen_conformity_ok: False", out)
+        self.assertIn("T3.s1", out)
+        self.assertIn("R4-F", out)
+        self.assertIn("active_profile: version=synthetic-r27", out)
+
+    def test_verdict_cli_without_profile_dir_shows_deviation_not_undecidable(self):
+        m0_log, m0_xc = write_run(self.tmp, "m0", n=10, overrides={("T3", "s1"): [C6_T3]}, base=FROZEN_M0)
+        m2_log, m2_xc = write_run(self.tmp, "m2", n=3, overrides=MUTANT_KILLED)
+        m3_log, m3_xc = write_run(self.tmp, "m3", n=3, overrides=MUTANT_KILLED)
+        code, out = self.run_cli(
+            [
+                "verdict",
+                "--m0-log", m0_log, "--m0-xcresult", m0_xc,
+                "--m2-log", m2_log, "--m2-xcresult", m2_xc,
+                "--m3-log", m3_log, "--m3-xcresult", m3_xc,
+                "--s2-verified",
+                "--profile-dir", str(Path(self.tmp) / "no-such-profile"),
+            ]
+        )
+        self.assertEqual(code, 0)
+        self.assertNotIn("不可判定", out)
+        self.assertIn("frozen_conformity_ok: True", out)
+        self.assertIn("T3.s1", out)
+
+    def test_verdict_cli_with_profile_dir_blocks_foreign_code(self):
+        m0_log, m0_xc = write_run(self.tmp, "m0", n=10, overrides={("T3", "s1"): [C6_T3]}, base=FROZEN_M0)
+        m2_log, m2_xc = write_run(self.tmp, "m2", n=3, overrides=MUTANT_KILLED)
+        m3_log, m3_xc = write_run(self.tmp, "m3", n=3, overrides=MUTANT_KILLED)
+        profile_dir = Path(self.tmp) / "r27-profile"
+        write_active_r27_profile(
+            profile_dir,
+            m0_overrides={"T3.s1": {"sig_set": [], "allowed_codes": [], "stable": True, "observations": []}},
+        )
+        code, out = self.run_cli(
+            [
+                "verdict",
+                "--m0-log", m0_log, "--m0-xcresult", m0_xc,
+                "--m2-log", m2_log, "--m2-xcresult", m2_xc,
+                "--m3-log", m3_log, "--m3-xcresult", m3_xc,
+                "--s2-verified",
+                "--profile-dir", str(profile_dir),
+            ]
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("不可判定", out)
+        self.assertIn("R4-F", out)
+
+    def test_verdict_cli_run_env_fingerprint_mismatch_is_undecidable(self):
+        """must_fix（R13 fail-closed 經 CLI 可達）：M0 本身乾淨（無外來碼），profile 全步驟
+        permissive（不觸發 R4-F），唯獨環境指紋不符——單獨這一項須把結論打成不可判定。"""
+        m0_log, m0_xc = write_run(self.tmp, "m0", n=10, base=FROZEN_M0)
+        m2_log, m2_xc = write_run(self.tmp, "m2", n=3, overrides=MUTANT_KILLED)
+        m3_log, m3_xc = write_run(self.tmp, "m3", n=3, overrides=MUTANT_KILLED)
+        profile_dir = Path(self.tmp) / "r27-profile"
+        fp = {"os_build": "26A428", "xcode_build": "27A266a", "sdk": "macosx27.0"}
+        write_active_r27_profile(profile_dir, env_fingerprint=fp)
+        code, out = self.run_cli(
+            [
+                "verdict",
+                "--m0-log", m0_log, "--m0-xcresult", m0_xc,
+                "--m2-log", m2_log, "--m2-xcresult", m2_xc,
+                "--m3-log", m3_log, "--m3-xcresult", m3_xc,
+                "--s2-verified",
+                "--profile-dir", str(profile_dir),
+                "--run-env-fingerprint", "os_build=WRONG,xcode_build=27A266a,sdk=macosx27.0",
+            ]
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("不可判定", out)
+        self.assertIn("env_fingerprint: mismatch", out)
+        self.assertIn("frozen_conformity_ok: True", out)  # 確認不可判定是指紋造成，不是 R4-F
 
 
 if __name__ == "__main__":

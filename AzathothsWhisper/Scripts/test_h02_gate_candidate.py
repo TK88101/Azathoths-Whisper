@@ -18,7 +18,9 @@ from test_h02_gate_fixtures import (
     M2_KILL,
     M3_KILL,
     PROBE_T1S1,
+    R27_CDHASH,
     R27_PROFILE_MATCHING_R55,
+    R27_TREE_HASH,
     UNTAGGED_T1S1,
     at_manifest,
     candidate_run,
@@ -487,6 +489,34 @@ class NegativeControlTests(unittest.TestCase):
             frozenset({"C2-STACK|G=T10|over=T09|side=L"}),
         )
 
+    def test_active_profile_provenance_is_reported_not_cross_checked(self):
+        """刻意決定（主線程 2026-09-18 拍板，見 `docs/plans/2026-09-13-coverflow-h02-fix4.md`）：
+        profile 的 tree_hash／cdhash 是場 0 **基準樹**（M0 運行時那棵樹）的溯源記錄，不得拿來
+        跟受評運行的 tree hash 做相等比對後判「無效」——M2_K／M3_K 依設計是從**候選 tree**
+        （不是 profile 的 M0 基準樹）重建的，樹 hash 本來就會不同；若交叉核對，C.2 對任何
+        候選改動都會恆為無效。正確做法：只把 `active_profile_provenance` 印進報告輸出。
+
+        本測試釘住這個決定：`evaluate_negative_control` 完全不接受、也不使用任何「受評運行
+        的 tree hash」參數（函式簽名裡沒有），profile 的 tree_hash／cdhash 因此不可能被拿去
+        跟什麼比較——`active_profile_provenance` 只是把 profile 自己的溯源欄位原樣列出，
+        結論不受影響（見 `R27Profile.provenance` docstring）。下一輪覆核者若又提議加交叉
+        核對，先讀這裡。"""
+        result = self.evaluate(active_profile=R27_PROFILE_MATCHING_R55)
+        self.assertEqual(result["conclusion"], "通過")
+        self.assertEqual(
+            result["active_profile_provenance"],
+            {
+                "version": "synthetic-r27",
+                "tree_hash": R27_TREE_HASH,
+                "cdhash": R27_CDHASH,
+                "env_fingerprint": {},
+            },
+        )
+
+    def test_active_profile_provenance_is_none_without_active_profile(self):
+        result = self.evaluate()  # active_profile 預設 None
+        self.assertIsNone(result["active_profile_provenance"])
+
 
 class CandidateCliTests(unittest.TestCase):
     """§5.7 (5)：CLI 兩個子命令與 facade 匯出。"""
@@ -569,6 +599,76 @@ class CandidateCliTests(unittest.TestCase):
         )
         self.assertEqual(code, 0)
         self.assertIn("結論=通過", text)
+        # 第 5 項：profile 溯源（version／tree_hash／cdhash）須印進報告輸出。
+        self.assertIn("active_profile: version=synthetic-r27", text)
+        self.assertIn(f"tree_hash={R27_TREE_HASH}", text)
+
+    # -- must_fix：§10 R13 環境指紋 --run-env-fingerprint（CLI 解析＋fail-closed）-----------
+
+    def _negative_control_argv(self, profile_dir, extra=()):
+        base_log, base_xc = write_run(self.tmp, "base", n=20)
+        m2_log, m2_xc = write_run(self.tmp, "m2", n=3, overrides=M2_KILL)
+        m3_log, m3_xc = write_run(self.tmp, "m3", n=3, overrides=M3_KILL)
+        return [
+            "negative-control",
+            "--baseline-log", base_log, "--baseline-xcresult", base_xc, "--baseline-iterations", "20",
+            "--m2-log", m2_log, "--m2-xcresult", m2_xc,
+            "--m3-log", m3_log, "--m3-xcresult", m3_xc,
+            "--mutant-iterations", "3",
+            "--profile-dir", str(profile_dir),
+            *extra,
+        ]
+
+    def test_negative_control_cli_run_env_fingerprint_bad_format_is_error(self):
+        """`--run-env-fingerprint` 格式錯誤（缺 `=`）須是 CLI 錯誤（exit 2），不得靜默生出一份
+        看似合法但缺鍵少值的指紋。"""
+        profile_dir = Path(self.tmp) / "r27-profile"
+        write_active_r27_profile(profile_dir)
+        code, _ = self.run_cli(
+            self._negative_control_argv(profile_dir, extra=["--run-env-fingerprint", "os_build"])
+        )
+        self.assertEqual(code, 2)
+
+    def test_negative_control_cli_run_env_fingerprint_matching_passes(self):
+        fp = {"os_build": "26A428", "xcode_build": "27A266a", "sdk": "macosx27.0"}
+        profile_dir = Path(self.tmp) / "r27-profile"
+        write_active_r27_profile(profile_dir, env_fingerprint=fp)
+        code, text = self.run_cli(
+            self._negative_control_argv(
+                profile_dir,
+                extra=["--run-env-fingerprint", "os_build=26A428,xcode_build=27A266a,sdk=macosx27.0"],
+            )
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("結論=通過", text)
+        self.assertIn("env_fingerprint: match", text)
+
+    def test_negative_control_cli_run_env_fingerprint_mismatch_is_invalid(self):
+        fp = {"os_build": "26A428", "xcode_build": "27A266a", "sdk": "macosx27.0"}
+        profile_dir = Path(self.tmp) / "r27-profile"
+        write_active_r27_profile(profile_dir, env_fingerprint=fp)
+        code, text = self.run_cli(
+            self._negative_control_argv(
+                profile_dir,
+                extra=["--run-env-fingerprint", "os_build=99Z999,xcode_build=27A266a,sdk=macosx27.0"],
+            )
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("結論=無效", text)
+        self.assertIn("env_fingerprint: mismatch", text)
+        self.assertIn("os_build", text)
+
+    def test_negative_control_cli_without_run_env_fingerprint_but_profile_has_one_is_invalid(self):
+        """must_fix（fail-closed）：profile 已記錄環境指紋，CLI 完全不給 `--run-env-fingerprint`
+        （場 0 前 CLI 呼叫的現況）——不得再悄悄通過，須判「無效」。這正是修前的漏洞：R13
+        對任何 CLI 呼叫恆為 unknown、零效果。"""
+        fp = {"os_build": "26A428", "xcode_build": "27A266a", "sdk": "macosx27.0"}
+        profile_dir = Path(self.tmp) / "r27-profile"
+        write_active_r27_profile(profile_dir, env_fingerprint=fp)
+        code, text = self.run_cli(self._negative_control_argv(profile_dir))
+        self.assertEqual(code, 0)
+        self.assertIn("結論=無效", text)
+        self.assertIn("env_fingerprint: unmeasured", text)
 
     def test_negative_control_cli_product_files_without_profile_is_invalid(self):
         """must_fix 1 配套：§7「2 無效」優先於「3 不可判定」——即使殺死點消失且候選改了非 Strip

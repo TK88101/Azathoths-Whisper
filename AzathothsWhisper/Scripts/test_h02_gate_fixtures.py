@@ -368,23 +368,40 @@ R27_PROFILE_MATCHING_R55 = r27_profile(
 )
 
 
-def write_active_r27_profile(root, m2_kill=None, m3_kill=None, version="synthetic-r27"):
+def _permissive_m0_steps():
+    """§13 第 5 項「M0 每步登記」：`activate_r27` 要求 staging/m0 的 `steps` 鍵集合恰為全部
+    9 個 `(test, step)`（由 `gate.STEPS` 導出）。這裡預設每步 `allowed_codes` 放行全部
+    `PRODUCT_CODES`（permissive）——`write_active_r27_profile` 主要供 C.2 負對照 CLI 測試用，
+    R4-F（M0 允許碼）不是那些測試的重點，permissive 預設可避免無關的 R4-F 誤觸；要測
+    R4-F 攔阻時用 `m0_overrides` 覆寫特定步驟。"""
+    return {
+        f"{label}.{step}": {"sig_set": [], "allowed_codes": sorted(gate.PRODUCT_CODES), "stable": True, "observations": []}
+        for label, steps in gate.STEPS.items()
+        for step in steps
+    }
+
+
+def write_active_r27_profile(
+    root, m2_kill=None, m3_kill=None, version="synthetic-r27", m0_overrides=None, env_fingerprint=None
+):
     """走完整 staging → activate 流程，把一份 active R27 profile 寫進 `root`（CLI 測試用；
-    `--profile-dir root` 讀得到）。M0／ui-T0′ 用最小合成值填滿（activate 要求四者皆有效）。"""
+    `--profile-dir root` 讀得到）。M0 預設鋪滿全部 9 步（permissive allowed_codes；見
+    `_permissive_m0_steps`），`m0_overrides` 可覆寫個別步驟（如收緊 allowed_codes 測 R4-F
+    攔阻）；`env_fingerprint` 可選（§10 R13 CLI 測試用）。ui-T0′ 用最小合成值填滿
+    （activate 要求四者皆有效）。"""
     root = Path(root)
-    r27profile.stage_component(
-        root,
-        "m0",
-        {
-            "schema": gate.R27_PROFILE_SCHEMA,
-            "kind": "m0",
-            "tree_hash": R27_TREE_HASH,
-            "cdhash": R27_CDHASH,
-            "steps": {
-                "T1.s1": {"sig_set": [], "allowed_codes": [], "stable": True, "observations": []},
-            },
-        },
-    )
+    m0_steps = _permissive_m0_steps()
+    m0_steps.update(m0_overrides or {})
+    m0_data = {
+        "schema": gate.R27_PROFILE_SCHEMA,
+        "kind": "m0",
+        "tree_hash": R27_TREE_HASH,
+        "cdhash": R27_CDHASH,
+        "steps": m0_steps,
+    }
+    if env_fingerprint is not None:
+        m0_data["env_fingerprint"] = env_fingerprint
+    r27profile.stage_component(root, "m0", m0_data)
     r27profile.stage_component(
         root,
         "m2",

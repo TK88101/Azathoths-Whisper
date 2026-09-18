@@ -8,11 +8,11 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from h02_gate_model import GateInputError, GateTable
 from h02_gate_parse import load_xcresult_json
-from h02_gate_r27_profile import ProfileError, load_active_profile
+from h02_gate_r27_profile import ProfileError, R27Profile, load_active_profile
 from h02_gate_rules import (
     evaluate_candidate,
     evaluate_negative_control,
@@ -35,6 +35,19 @@ def _print_lines(title: str, lines: List[str], limit: int = 20) -> None:
         print(f"  … 另 {len(lines) - limit} 條")
 
 
+def _print_profile_provenance(provenance: Optional[dict]) -> None:
+    """把 active R27 profile 的溯源欄位印進報告輸出（v5 §13／§10 R13 配套）。刻意決定：
+    只印出，不拿 tree_hash／cdhash 跟受評運行的 tree hash 做相等比對後判無效——見
+    `R27Profile.provenance` docstring。"""
+    if provenance is None:
+        print("active_profile: 無")
+        return
+    print(
+        f"active_profile: version={provenance['version']} tree_hash={provenance['tree_hash']} "
+        f"cdhash={provenance['cdhash']} env_fingerprint={provenance['env_fingerprint'] or '未記錄'}"
+    )
+
+
 def _print_v3(v3: dict) -> None:
     print("== V3 判定（R4）==")
     print(f"run_valid: {v3['run_valid']}")
@@ -49,6 +62,9 @@ def _print_v3(v3: dict) -> None:
     _print_lines("frozen_deviations（只記錄，不改結論）", v3["frozen_deviations"])
     print(f"defect3: {v3['defect3']}")
     print(f"defect2_steps: {[(t, s) for t, s, _ in v3['defect2_steps']]}")
+    print(f"env_fingerprint: {v3['env_fingerprint']}")
+    _print_lines("env_fingerprint 不符／未量測（§10 R13 → 不可判定）", v3["env_fingerprint_reasons"])
+    _print_profile_provenance(v3["active_profile_provenance"])
 
 
 def _print_v5(v5: dict) -> None:
@@ -125,6 +141,7 @@ def _print_negative_control(result: dict) -> None:
         "historical_R55_deviation（僅報告；R55 唯讀歷史，不參與結論）", result["historical_R55_deviation"]
     )
     print(f"env_fingerprint: {result['env_fingerprint']}")
+    _print_profile_provenance(result["active_profile_provenance"])
     _print_lines("候選改動的 CoverFlow 非 Strip 檔", result["product_files"])
     for report in result["mutants"].values():
         _print_mutant_report(report)
@@ -145,6 +162,29 @@ def _load_product_files(path: Optional[str]) -> Optional[List[str]]:
     return None if path is None else _load_text(path).splitlines()
 
 
+def _add_profile_args(parser: argparse.ArgumentParser) -> None:
+    """R27 profile 讀取與 §10 R13 環境指紋——`v3`／`verdict`／`negative-control` 三個子命令共用
+    （must_fix：原本只有 `negative-control` 有，`v3`／`verdict` 經 CLI 呼叫時 `active_profile`
+    恆為 `None`，甲案的攔阻半邊在 CLI 不可達）。"""
+    parser.add_argument(
+        "--profile-dir",
+        default=_DEFAULT_R27_PROFILE_DIR,
+        help=(
+            "R27 profile 根目錄（讀 <dir>/active/profile.json；預設倉庫外 "
+            f"{_DEFAULT_R27_PROFILE_DIR}，v5 §13 第 2 項）；尚未 activate 過則視為無 active profile"
+        ),
+    )
+    parser.add_argument(
+        "--run-env-fingerprint",
+        default=None,
+        help=(
+            "本次運行的環境指紋，逗號分隔 key=value（例：os_build=26A428,xcode_build=27A266a,"
+            "sdk=macosx27.0）；§10 R13 fail-closed：active profile 已記錄指紋但本參數未給 → "
+            "env_fingerprint=unmeasured → 判定無效／不可判定"
+        ),
+    )
+
+
 def _build_argparser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="h02_gate_eval.py",
@@ -162,6 +202,7 @@ def _build_argparser() -> argparse.ArgumentParser:
     p_v3.add_argument("--log", required=True)
     p_v3.add_argument("--xcresult", required=True)
     p_v3.add_argument("--iterations", type=int, required=True)
+    _add_profile_args(p_v3)
 
     p_v4 = sub.add_parser("v4", help="歷史變異回歸：步驟級差異殺死判定")
     p_v4.add_argument("--baseline-log", required=True)
@@ -180,6 +221,7 @@ def _build_argparser() -> argparse.ArgumentParser:
     p_verdict.add_argument(
         "--s2-verified", action="store_true", help="斷言 S2 已知點分類命中（計劃 §11 S2 實測）；不給則 V5 不成立"
     )
+    _add_profile_args(p_verdict)
 
     _add_f1_parsers(sub)
     return parser
@@ -202,18 +244,44 @@ def _add_f1_parsers(sub) -> None:
         p_neg.add_argument(f"--{run}-xcresult", required=True)
     p_neg.add_argument("--mutant-iterations", type=int, default=3)
     p_neg.add_argument("--product-files", default=None, help="候選改動的產品源檔清單（殺死點消失分支判定）")
-    p_neg.add_argument(
-        "--profile-dir",
-        default=_DEFAULT_R27_PROFILE_DIR,
-        help=(
-            "R27 profile 根目錄（讀 <dir>/active/profile.json；預設倉庫外 "
-            f"{_DEFAULT_R27_PROFILE_DIR}，v5 §13 第 2 項）；尚未 activate 過則視為無 active profile"
-        ),
-    )
+    _add_profile_args(p_neg)
 
 
 def _load_table(log_path: str, xcresult_path: str, iterations: Optional[int]) -> GateTable:
     return build_table(_load_text(log_path), load_xcresult_json(xcresult_path), expected_iterations=iterations)
+
+
+def _load_active_profile_arg(profile_dir: str) -> Optional[R27Profile]:
+    """`--profile-dir` 共用載入邏輯（`v3`／`verdict`／`negative-control` 三個子命令共用）；
+    `ProfileError` 轉譯成 `GateInputError`，由 `main()` 的統一錯誤處理印出、回傳 exit code 2。"""
+    try:
+        return load_active_profile(Path(profile_dir))
+    except ProfileError as e:
+        raise GateInputError(f"R27 profile 讀取失敗（{profile_dir}）：{e}") from e
+
+
+def _parse_run_env_fingerprint(text: Optional[str]) -> Optional[Dict[str, str]]:
+    """`--run-env-fingerprint` 的 `os_build=...,xcode_build=...,sdk=...` 語法解析（§10 R13）。
+    未給 → `None`（呼叫端沒量測，交由 `env_fingerprint_check` 依 profile 是否已記錄指紋判斷
+    `unknown`／`unmeasured`）。格式錯誤（缺 `=`、鍵或值為空、整串解不出任何鍵值）一律
+    `GateInputError`，不得靜默吞掉、生出一份看似合法但是空的指紋。"""
+    if text is None:
+        return None
+    result: Dict[str, str] = {}
+    for pair in text.split(","):
+        pair = pair.strip()
+        if not pair:
+            continue
+        if "=" not in pair:
+            raise GateInputError(f"--run-env-fingerprint 格式錯誤（缺 '='）：{pair!r}")
+        key, _, value = pair.partition("=")
+        key, value = key.strip(), value.strip()
+        if not key or not value:
+            raise GateInputError(f"--run-env-fingerprint 格式錯誤（鍵或值為空）：{pair!r}")
+        result[key] = value
+    if not result:
+        raise GateInputError(f"--run-env-fingerprint 未解析出任何鍵值：{text!r}")
+    return result
 
 
 def _run_candidate(args) -> int:
@@ -222,14 +290,41 @@ def _run_candidate(args) -> int:
     return 0
 
 
+def _run_v3(args) -> int:
+    table = _load_table(args.log, args.xcresult, args.iterations)
+    active_profile = _load_active_profile_arg(args.profile_dir)
+    run_env_fingerprint = _parse_run_env_fingerprint(args.run_env_fingerprint)
+    _print_v3(evaluate_v3(table, args.iterations, active_profile, run_env_fingerprint))
+    return 0
+
+
+def _run_verdict(args) -> int:
+    m0 = _load_table(args.m0_log, args.m0_xcresult, args.m0_iterations)
+    m2 = _load_table(args.m2_log, args.m2_xcresult, args.mutant_iterations)
+    m3 = _load_table(args.m3_log, args.m3_xcresult, args.mutant_iterations)
+    active_profile = _load_active_profile_arg(args.profile_dir)
+    run_env_fingerprint = _parse_run_env_fingerprint(args.run_env_fingerprint)
+    _print_verdict(
+        verdict(
+            m0,
+            m2,
+            m3,
+            args.s2_verified,
+            args.m0_iterations,
+            args.mutant_iterations,
+            active_profile=active_profile,
+            run_env_fingerprint=run_env_fingerprint,
+        )
+    )
+    return 0
+
+
 def _run_negative_control(args) -> int:
     baseline = _load_table(args.baseline_log, args.baseline_xcresult, args.baseline_iterations)
     m2 = _load_table(args.m2_log, args.m2_xcresult, args.mutant_iterations)
     m3 = _load_table(args.m3_log, args.m3_xcresult, args.mutant_iterations)
-    try:
-        active_profile = load_active_profile(Path(args.profile_dir))
-    except ProfileError as e:
-        raise GateInputError(f"R27 profile 讀取失敗（{args.profile_dir}）：{e}") from e
+    active_profile = _load_active_profile_arg(args.profile_dir)
+    run_env_fingerprint = _parse_run_env_fingerprint(args.run_env_fingerprint)
     _print_negative_control(
         evaluate_negative_control(
             baseline,
@@ -239,6 +334,7 @@ def _run_negative_control(args) -> int:
             args.mutant_iterations,
             product_files=_load_product_files(args.product_files),
             active_profile=active_profile,
+            run_env_fingerprint=run_env_fingerprint,
         )
     )
     return 0
@@ -260,9 +356,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 0
 
         if args.command == "v3":
-            table = _load_table(args.log, args.xcresult, args.iterations)
-            _print_v3(evaluate_v3(table, args.iterations))
-            return 0
+            return _run_v3(args)
 
         if args.command == "v4":
             base_table = _load_table(args.baseline_log, args.baseline_xcresult, args.baseline_iterations)
@@ -277,11 +371,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             return _run_negative_control(args)
 
         if args.command == "verdict":
-            m0 = _load_table(args.m0_log, args.m0_xcresult, args.m0_iterations)
-            m2 = _load_table(args.m2_log, args.m2_xcresult, args.mutant_iterations)
-            m3 = _load_table(args.m3_log, args.m3_xcresult, args.mutant_iterations)
-            _print_verdict(verdict(m0, m2, m3, args.s2_verified, args.m0_iterations, args.mutant_iterations))
-            return 0
+            return _run_verdict(args)
     except GateInputError as e:
         print(f"錯誤：{e}", file=sys.stderr)
         return 2

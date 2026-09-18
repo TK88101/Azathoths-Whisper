@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, FrozenSet, List, Mapping, Optional, Tuple
 
+from h02_gate_model import STEPS
+
 R27_PROFILE_SCHEMA = 1
 
 _STAGING_COMPONENTS: Tuple[str, ...] = ("m0", "m2", "m3", "ui_t0_prime")
@@ -37,6 +39,14 @@ _UI_T0_PRIME_OUTCOMES: FrozenSet[str] = frozenset({"PASS", "FAIL", "SKIP"})
 # v5 §10 R13：環境指紋（環境再度漂移時，判定器須能拒絕誤用「別的 OS 凍結的 profile」）。
 # 可選——附了就必須三鍵齊全；缺席＝該 profile 未記錄，比對時報 "unknown"（見 `env_fingerprint_check`）。
 _ENV_FINGERPRINT_KEYS: Tuple[str, ...] = ("os_build", "xcode_build", "sdk")
+
+# §13 第 5 項「M0 每步登記」：activate_r27 要求 staging/m0 的 steps 鍵集合恰為這 9 個
+# （由 STEPS 導出，不寫死），缺一即拒絕啟用——防止一份只登記 1 步的殘缺 profile 讓其餘
+# 8 步永遠不被 R4-F 檢查（見 `activate_r27` 與 `test_h02_gate_r27_profile.py` 的
+# `test_m0_missing_steps_refuses_activation`）。
+_ALL_M0_STEP_KEYS: FrozenSet[Tuple[str, str]] = frozenset(
+    (label, step) for label, steps in STEPS.items() for step in steps
+)
 
 
 class ProfileError(Exception):
@@ -74,6 +84,22 @@ class R27Profile:
         if name == "M3":
             return self.m3_kill
         raise ProfileError(f"未知的變異名稱：{name!r}")
+
+    def provenance(self) -> Dict[str, object]:
+        """溯源資訊（version／tree_hash／cdhash／env_fingerprint），供報告輸出用。
+
+        刻意決定（主線程 2026-09-18 拍板，見 `docs/plans/2026-09-13-coverflow-h02-fix4.md`）：
+        這些欄位記的是場 0 **基準樹**（M0 運行時的那棵樹）的身分，不是「本次受評運行的 tree
+        必須與之相等」的斷言。M2_K／M3_K 依設計是從**候選 tree**（而非這份 profile 的 M0
+        基準樹）重建的，樹 hash 本來就會不同——把它們拿來相等比對後判「無效」，會讓 C.2
+        對任何候選改動恆為無效。呼叫端只應把這份 dict 印進報告，不得據此比較／判定結論
+        （測試見 `test_active_profile_provenance_is_reported_not_cross_checked`）。"""
+        return {
+            "version": self.version,
+            "tree_hash": self.tree_hash,
+            "cdhash": self.cdhash,
+            "env_fingerprint": dict(self.env_fingerprint),
+        }
 
 
 def _split_step_key(key: str, where: str) -> Tuple[str, str]:
@@ -241,9 +267,18 @@ def activate_r27(root: Path, version: str, *, allow_replace: bool = False) -> R2
     `load_active_profile` 永遠讀不回，形成啟用了卻不可讀的殭屍狀態）。已有 active profile 時
     預設拒絕（首份規則，§7 場 0 停止分支 3）；確需替換須顯式 `allow_replace=True`。
 
+    §13 第 5 項「M0 每步登記」：staging/m0 的 `steps` 鍵集合須恰為 `STEPS` 導出的全部 9 個
+    `(test, step)`，缺一即拒絕啟用並列出缺哪些——只登記 1 步就能啟用的話，其餘 8 步永遠
+    不會被 R4-F 檢查到（一份殘缺 profile 卻被當成「已覆蓋」）。
+
     成功時把四份 staging **原文**（不只是抽出來的欄位）連同各自的 sha256 一併存進
-    `active/profile.json`，以 write-temp + `os.replace` 單次原子寫入；`load_active_profile`
-    藉此能對每份原文重算 hash 逐一核對，防止手寫檔繞過 staging 直接偽造 active profile。"""
+    `active/profile.json`，以 write-temp + `os.replace` 單次原子寫入。`component_hashes`
+    只是**自洽性**檢查（防半成品寫入、事後竄改內容卻忘了同步改 hash）——不是真實性檢查：
+    hash 本身是用內容重算出來的，純手寫的偽造檔只要自己按同演算法算好 hash 照樣會通過。
+    因此另外把四份 staging **檔案本身**（`staging/<c>.staging.json`，而非重新序列化的內容）
+    的 sha256 也存進 `staging_file_hashes`；`load_active_profile` 要求這四份 staging 檔仍在
+    磁碟且與紀錄相符，手寫偽造者除了 active 檔本身還得同時偽造四份 staging 檔才能過關，
+    抬高了偽造門檻（仍非密碼學意義上的防偽——見 `load_active_profile` docstring）。"""
     if not isinstance(version, str) or not version:
         raise ProfileError("啟用拒絕：version 不得為空")
     root = Path(root)
@@ -261,6 +296,7 @@ def activate_r27(root: Path, version: str, *, allow_replace: bool = False) -> R2
     raw: Dict[str, dict] = {}
     parsed: Dict[str, object] = {}
     hashes: Dict[str, str] = {}
+    staging_hashes: Dict[str, str] = {}
     for component in _STAGING_COMPONENTS:
         data = load_staging_component(root, component)
         raw[component] = data
@@ -269,6 +305,18 @@ def activate_r27(root: Path, version: str, *, allow_replace: bool = False) -> R2
         except ProfileError as e:
             raise ProfileError(f"啟用拒絕：staging/{component} 無效（{e}）") from e
         hashes[component] = _hash_bytes(_canonical_bytes(data))
+        staging_hashes[component] = _hash_bytes(_staging_path(root, component).read_bytes())
+
+    m0_keys = set(parsed["m0"])
+    if m0_keys != _ALL_M0_STEP_KEYS:
+        missing_steps = sorted(f"{l}.{s}" for l, s in _ALL_M0_STEP_KEYS - m0_keys)
+        extra_steps = sorted(f"{l}.{s}" for l, s in m0_keys - _ALL_M0_STEP_KEYS)
+        detail = "；".join(
+            part
+            for part in (f"缺 {missing_steps}" if missing_steps else "", f"多餘 {extra_steps}" if extra_steps else "")
+            if part
+        )
+        raise ProfileError(f"啟用拒絕：staging/m0 須登記全部 9 個步驟（{detail}）")
 
     tree_hash = raw["m0"].get("tree_hash", "")
     cdhash = raw["m0"].get("cdhash", "")
@@ -281,6 +329,7 @@ def activate_r27(root: Path, version: str, *, allow_replace: bool = False) -> R2
         "active_profile": "R27",
         "version": version,
         "component_hashes": hashes,
+        "staging_file_hashes": staging_hashes,
         "components": raw,
     }
 
@@ -306,9 +355,19 @@ def load_active_profile(root: Path) -> Optional[R27Profile]:
     """只讀 `active/profile.json`；不存在＝尚無 active profile（回 None，不是錯誤）。staging
     中的元件無論多完整都不會被這個函式看見——建立中的 R27 永遠不會被誤當成 active（第 13 項）。
 
-    載入時重新驗證：`component_hashes` 須四元件齊全、皆為 64 字元小寫 hex；對 `components` 下
-    每份原文重算 sha256，須與宣稱的 hash 逐一相符，不符（或整份是手寫、繞過 `activate_r27` 的
-    偽造檔）即 `ProfileError`——不得讓一份沒驗證過的表被靜默當成 active。"""
+    載入時重新驗證 `component_hashes`：須四元件齊全、皆為 64 字元小寫 hex；對 `components` 下
+    每份原文重算 sha256，須與宣稱的 hash 逐一相符。**據實澄清**（原 docstring 曾寫「防止手寫
+    檔繞過 staging 直接偽造 active profile」，與實測不符，已於覆核中訂正）：這只是**自洽性**
+    檢查——防半成品寫入、防事後竄改內容卻忘了同步改 hash——不是**真實性**檢查。hash 本身是
+    用內容重算出來的，攻擊者只要用同一演算法（`json.dumps(..., indent=2, sort_keys=True)` →
+    sha256）自己算好 hash，一份純手寫、從未經過 `activate_r27`／`stage_component` 的偽造檔照樣
+    會通過這一關。
+
+    真正提高偽造門檻的是下一步：另外要求 `staging_file_hashes` 四元件齊全，且對應的
+    `staging/<c>.staging.json` 仍在磁碟、其目前位元組內容的 sha256 與記錄相符——偽造者除了
+    偽造 active 檔本身，還得同時偽造四份格式相符的 staging 檔並放在正確路徑，才能通過全部
+    檢查。這仍不是密碼學意義上的防偽（沒有簽章／不可否認性），只是把「隨手竄改一個欄位」
+    的攻擊成本墊高到「同時維護五份互相一致的檔案」。"""
     target = Path(root) / _ACTIVE_DIRNAME / _ACTIVE_FILENAME
     if not target.is_file():
         return None
@@ -332,6 +391,26 @@ def load_active_profile(root: Path) -> Optional[R27Profile]:
     for name, digest in hashes.items():
         if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
             raise ProfileError(f"active/{_ACTIVE_FILENAME}: component_hashes.{name} 不是合法的 64 字元 sha256 hex")
+
+    staging_hashes = payload.get("staging_file_hashes")
+    if not isinstance(staging_hashes, dict) or set(staging_hashes) != set(_STAGING_COMPONENTS):
+        raise ProfileError(f"active/{_ACTIVE_FILENAME}: 缺 staging_file_hashes 或元件不齊")
+    for name, digest in staging_hashes.items():
+        if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+            raise ProfileError(
+                f"active/{_ACTIVE_FILENAME}: staging_file_hashes.{name} 不是合法的 64 字元 sha256 hex"
+            )
+        staging_file = _staging_path(Path(root), name)
+        if not staging_file.is_file():
+            raise ProfileError(
+                f"active/{_ACTIVE_FILENAME}: staging/{name}.staging.json 已不在磁碟（無法驗證溯源）"
+            )
+        actual_staging_hash = _hash_bytes(staging_file.read_bytes())
+        if actual_staging_hash != digest:
+            raise ProfileError(
+                f"active/{_ACTIVE_FILENAME}: staging/{name}.staging.json 內容與 staging_file_hashes 不符"
+                f"（manifest {digest}／實得 {actual_staging_hash}）"
+            )
 
     parsed: Dict[str, object] = {}
     for name in _STAGING_COMPONENTS:
@@ -366,16 +445,27 @@ def env_fingerprint_check(
     profile: R27Profile, run_env_fingerprint: Optional[Mapping[str, str]]
 ) -> Tuple[str, List[str]]:
     """v5 §10 R13：profile 記錄的環境指紋與受評運行的環境指紋比對，下結論前必做。回傳
-    `(status, reasons)`：
+    `(status, reasons)`。**must_fix（原 fail-open 已訂正）**：舊版把「profile 有指紋但運行端
+    沒給」也歸為 `unknown`、不影響結論——CLI 端又從不供應運行端指紋，等於 R13 恆為零效果。
+    現行四態：
 
-      - `"unknown"`：profile 或運行任一沒有指紋（現行運行端多半拿不到，§10 R13 的落地備註），
-        無法比對，只在報告中明列，不影響結論；
+      - `"unknown"`：profile 本身沒記錄指紋（比 `run_env_fingerprint` 是否給了更優先判斷）——
+        沒有基準可比對，不是「沒量測」而是「這份 profile 沒承諾過」，不影響結論；
+      - `"unmeasured"`：profile 有指紋，但 `run_env_fingerprint` 未提供（`None` 或 `{}`）——
+        **fail-closed**：呼叫端須判「無效」，不得把「沒測」靜默當成「沒事」（§10 R13
+        「不靜默比對」）；
       - `"match"`：兩者都有且逐鍵相符；
       - `"mismatch"`：兩者都有但至少一鍵不符（`reasons` 逐條列出）——呼叫端須判「無效」，
         不得靜默採用為別的 OS 凍結的 profile。
     """
-    if not profile.env_fingerprint or not run_env_fingerprint:
+    if not profile.env_fingerprint:
         return "unknown", []
+    if not run_env_fingerprint:
+        return "unmeasured", [
+            "env_fingerprint：profile 已記錄環境指紋（"
+            f"{sorted(profile.env_fingerprint)}），但本次運行未提供 --run-env-fingerprint"
+            "（§10 R13 fail-closed：未量測不得靜默視為相符）"
+        ]
     reasons = [
         f"env_fingerprint.{key}：profile={profile.env_fingerprint.get(key)!r} "
         f"≠ 運行={run_env_fingerprint.get(key)!r}"

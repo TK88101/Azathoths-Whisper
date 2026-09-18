@@ -165,9 +165,18 @@ def evaluate_frozen_conformity(
     return not reasons, reasons, deviations
 
 
-def evaluate_v3(table: GateTable, iterations: int, active_profile: Optional[R27Profile] = None) -> dict:
+def evaluate_v3(
+    table: GateTable,
+    iterations: int,
+    active_profile: Optional[R27Profile] = None,
+    run_env_fingerprint: Optional[Mapping[str, str]] = None,
+) -> dict:
     """V3（R4）：缺陷 3＝T4.s2 穩定帶缺陷 3 碼；缺陷 2＝非 EXCLUDED 的 C2 步驟穩定帶 C2-STACK；一致性含 ≤1 格例外。
-    `active_profile`：R4-F 的判據來源（見 `evaluate_frozen_conformity`），預設 `None`。"""
+    `active_profile`：R4-F 的判據來源（見 `evaluate_frozen_conformity`），預設 `None`。
+    `run_env_fingerprint`：§10 R13 環境指紋 fail-closed 檢查（見 `env_fingerprint_check`）——
+    只在有 `active_profile` 時才有意義；`mismatch`／`unmeasured` 的 reasons 併入
+    `verdict()` 的不可判定清單（本函式本身不下結論，只回報 `env_fingerprint`／
+    `env_fingerprint_reasons`）。"""
     run_valid, invalid_reasons = table_valid(table, iterations)
     per_step = {
         (label, step): _step_status(_cells(table, (label, step)))
@@ -186,6 +195,9 @@ def evaluate_v3(table: GateTable, iterations: int, active_profile: Optional[R27P
         and DEFECT2_CODE in _codes(v["sig_set"])
     ]
     frozen_ok, frozen_reasons, frozen_deviations = evaluate_frozen_conformity(table, active_profile)
+    env_status, env_reasons = (
+        env_fingerprint_check(active_profile, run_env_fingerprint) if active_profile is not None else ("unknown", [])
+    )
     return {
         "run_valid": run_valid,
         "invalid_reasons": invalid_reasons,
@@ -199,6 +211,9 @@ def evaluate_v3(table: GateTable, iterations: int, active_profile: Optional[R27P
         "frozen_conformity_ok": frozen_ok,
         "frozen_conformity_reasons": frozen_reasons,
         "frozen_deviations": frozen_deviations,
+        "env_fingerprint": env_status,
+        "env_fingerprint_reasons": env_reasons,
+        "active_profile_provenance": active_profile.provenance() if active_profile is not None else None,
         "errors": list(table.errors),
     }
 
@@ -288,21 +303,26 @@ def verdict(
     m0_iterations: int = 10,
     mutant_iterations: int = 3,
     active_profile: Optional[R27Profile] = None,
+    run_env_fingerprint: Optional[Mapping[str, str]] = None,
 ) -> dict:
     """R4-C：按優先序取第一個成立的結論（不可判定 → 不通過 → 部分通過 → 通過）。
     「不可建」屬 S 階段、不由本函數輸出；V4 權重由使用者在看到結果後裁決。
-    `active_profile`：轉交 `evaluate_v3`（R4-F 判據），預設 `None`。"""
-    v3 = evaluate_v3(m0, m0_iterations, active_profile)
+    `active_profile`：轉交 `evaluate_v3`（R4-F 判據），預設 `None`。`run_env_fingerprint`：
+    §10 R13 環境指紋 fail-closed 檢查——有 active profile 時，`mismatch`／`unmeasured`
+    與 R4-F 不相符同一優先序，併入不可判定（見 `evaluate_v3`）。"""
+    v3 = evaluate_v3(m0, m0_iterations, active_profile, run_env_fingerprint)
     v5 = evaluate_v5(m0, v3, s2_verified)
     v4 = {
         name: evaluate_v4(m0, table, m0_iterations, mutant_iterations, excluded=v3["excluded"])
         for name, table in (("M2", m2), ("M3", m3))
     }
-    # 不可判定的獨立觸發（R4-C）：table_valid（經 V5 帶入）、V5、變異運行無效、R4-F 凍結表不相符（只對 M0）
+    # 不可判定的獨立觸發（R4-C）：table_valid（經 V5 帶入）、V5、變異運行無效、
+    # R4-F 凍結表不相符（只對 M0）、§10 R13 環境指紋 mismatch／unmeasured（只對 M0）
     undecidable = (
         [f"V5：{r}" for r in v5["reasons"]]
         + [f"{name}：{r['verdict']}" for name, r in v4.items() if r["verdict"] != "OK"]
         + list(v3["frozen_conformity_reasons"])
+        + list(v3["env_fingerprint_reasons"])
     )
     partial = (
         ([] if v3["defect2_reproduced"] else ["缺陷 2 在 M0 落定態不可重現"])
@@ -317,7 +337,14 @@ def verdict(
         conclusion, reasons = "部分通過", partial
     else:
         conclusion, reasons = "通過", []
-    return {"conclusion": conclusion, "reasons": reasons, "v3": v3, "v5": v5, "v4": v4}
+    return {
+        "conclusion": conclusion,
+        "reasons": reasons,
+        "v3": v3,
+        "v5": v5,
+        "v4": v4,
+        "active_profile_provenance": v3["active_profile_provenance"],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -603,15 +630,21 @@ def evaluate_negative_control(
 ) -> dict:
     """C.2（§5.2；profile 改造見 v5 §13 第 4、5、13 項；環境指紋見 §10 R13）結論按序取第一個成立者：
     無效（變異運行無效）→ baseline不合格 → **無效（缺 active profile）** →
-    **無效（環境指紋不符）** → 回Phase1-變異移植／不通過 → 不可判定-待解釋 → 通過。
+    **無效（環境指紋不符／未量測）** → 回Phase1-變異移植／不通過 → 不可判定-待解釋 → 通過。
 
     §7 結論程序「互斥、按序取第一個成立者」中「2 無效」優先於「3 不可判定」「4 不通過」：
-    `active_profile=None`（尚未啟用 R27，場 0 前或場 0 中途停止時的常態）與「環境指紋不符」
-    都必須在 migration／unkilled 判定**之前**攔下，不得先落到「回Phase1-變異移植」或「不通過」
-    才被發現其實整個判定基準都不成立。`historical_R55_deviation` 無論是否有 active profile
-    都計算並回報，但只供參考，不影響 conclusion。`mutants`／`active_profile_deviation` 兩欄
-    在任一「無效（缺 active profile）」短路前一律算好，供人工核對「殺死點其實成立」
-    （見 `test_no_active_profile_is_invalid_even_when_kills_would_match_r55`）。"""
+    `active_profile=None`（尚未啟用 R27，場 0 前或場 0 中途停止時的常態）與「環境指紋不符／
+    未量測」都必須在 migration／unkilled 判定**之前**攔下，不得先落到「回Phase1-變異移植」
+    或「不通過」才被發現其實整個判定基準都不成立。`historical_R55_deviation` 無論是否有
+    active profile 都計算並回報，但只供參考，不影響 conclusion。`mutants`／
+    `active_profile_deviation` 兩欄在任一「無效（缺 active profile）」短路前一律算好，
+    供人工核對「殺死點其實成立」（見 `test_no_active_profile_is_invalid_even_when_kills_would_match_r55`）。
+    **must_fix（fail-closed）**：舊版 `env_fingerprint_check` 對「profile 有指紋但運行端沒給」
+    回 `unknown`、不影響結論，而 CLI 從不供應運行端指紋，等於 R13 恆為零效果；現在該情形回
+    `unmeasured`，與 `mismatch` 同樣判「無效」（見 `env_fingerprint_check`）。
+    `active_profile_provenance`：profile 的溯源欄位（version／tree_hash／cdhash／
+    env_fingerprint），只供報告輸出，刻意不與受評運行的 tree hash 交叉核對（見
+    `R27Profile.provenance` docstring 與 `test_active_profile_provenance_is_reported_not_cross_checked`）。"""
     tables = {"M2": m2_table, "M3": m3_table}
     mutant_reasons = [
         f"{name}: {reason}"
@@ -627,6 +660,7 @@ def evaluate_negative_control(
         "mutants": {},
         "active_profile_present": active_profile is not None,
         "active_profile_deviation": None,
+        "active_profile_provenance": active_profile.provenance() if active_profile is not None else None,
         "historical_R55_deviation": [],
         "env_fingerprint": "unknown",
         "product_files": changed,
@@ -660,7 +694,7 @@ def evaluate_negative_control(
         return dict(result, conclusion="無效", reasons=[_NO_ACTIVE_PROFILE_REASON])
     env_status, env_reasons = env_fingerprint_check(active_profile, run_env_fingerprint)
     result = dict(result, env_fingerprint=env_status)
-    if env_status == "mismatch":
+    if env_status in ("mismatch", "unmeasured"):
         return dict(result, conclusion="無效", reasons=env_reasons)
     if migration:
         return dict(

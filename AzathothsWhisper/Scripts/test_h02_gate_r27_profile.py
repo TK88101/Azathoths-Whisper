@@ -19,21 +19,32 @@ def valid_env_fingerprint():
     return {"os_build": "26A428", "xcode_build": "27A266a", "sdk": "MacOSX26.5.sdk"}
 
 
+def _boilerplate_m0_steps():
+    """§13 第 5 項「M0 每步登記」：`activate_r27` 要求 staging/m0 的 steps 鍵集合恰為全部
+    9 個 `(test, step)`（由 STEPS 導出）。這裡先鋪滿 9 步的最小合法值，呼叫端再覆寫想細測的
+    那幾步（如 T1.s1／T4.s2），不必每次自己重寫全部 9 步。"""
+    return {
+        f"{label}.{step}": {"sig_set": [], "allowed_codes": [], "stable": True, "observations": []}
+        for label, steps in r27.STEPS.items()
+        for step in steps
+    }
+
+
 def valid_m0(env_fingerprint=None):
+    steps = _boilerplate_m0_steps()
+    steps["T1.s1"] = {"sig_set": [], "allowed_codes": [], "stable": True, "observations": []}
+    steps["T4.s2"] = {
+        "sig_set": ["C1-OFFSET|label=T19|centered=T16|strides=+3"],
+        "allowed_codes": ["C1-OFFSET", "C2-STACK", "C3-TARGET-MISS", "C5-DRIFT"],
+        "stable": False,
+        "observations": ["10 次中 6 次 C1-OFFSET、4 次 C2-STACK"],
+    }
     data = {
         "schema": r27.R27_PROFILE_SCHEMA,
         "kind": "m0",
         "tree_hash": "aa" * 20,
         "cdhash": "bb" * 20,
-        "steps": {
-            "T1.s1": {"sig_set": [], "allowed_codes": [], "stable": True, "observations": []},
-            "T4.s2": {
-                "sig_set": ["C1-OFFSET|label=T19|centered=T16|strides=+3"],
-                "allowed_codes": ["C1-OFFSET", "C2-STACK", "C3-TARGET-MISS", "C5-DRIFT"],
-                "stable": False,
-                "observations": ["10 次中 6 次 C1-OFFSET、4 次 C2-STACK"],
-            },
-        },
+        "steps": steps,
     }
     if env_fingerprint is not None:
         data["env_fingerprint"] = env_fingerprint
@@ -239,6 +250,41 @@ class ActivateR27Tests(unittest.TestCase):
         with self.assertRaises(r27.ProfileError):
             r27.activate_r27(self.root, version="v1")
 
+    # -- §13 第 5 項：M0 須每步登記，不得只登記 1 步就啟用 -----------------------------
+
+    def test_m0_partial_steps_refuses_activation(self):
+        """一份只登記 1 步（T1.s1）的殘缺 M0 不得啟用——否則其餘 8 步永遠不會被 R4-F
+        檢查，等同一份殘缺 profile 被當成「已覆蓋」。"""
+        m0 = valid_m0()
+        m0["steps"] = {"T1.s1": m0["steps"]["T1.s1"]}
+        self.stage_all(m0=m0)
+        with self.assertRaises(r27.ProfileError) as ctx:
+            r27.activate_r27(self.root, version="v1")
+        message = str(ctx.exception)
+        self.assertIn("T1.s2", message)
+        self.assertIn("T4.s2", message)
+        self.assertIsNone(r27.load_active_profile(self.root))
+
+    def test_m0_extra_unknown_step_refuses_activation(self):
+        """反向情形：登記了全部 9 步之外還多一個不存在的步驟鍵，同樣拒絕（鍵集合須「恰為」
+        STEPS 導出的 9 個，不是「至少含有」）。"""
+        m0 = valid_m0()
+        m0["steps"]["T9.s1"] = {"sig_set": [], "allowed_codes": [], "stable": True, "observations": []}
+        self.stage_all(m0=m0)
+        with self.assertRaises(r27.ProfileError) as ctx:
+            r27.activate_r27(self.root, version="v1")
+        self.assertIn("T9.s1", str(ctx.exception))
+
+    def test_m0_all_nine_steps_registered_activates(self):
+        """對照組：`valid_m0()` 本身已鋪滿全部 9 步，應正常啟用（確認 fixture 本身合法，
+        不是靠巧合繞過新加的檢查）。"""
+        self.stage_all()
+        activated = r27.activate_r27(self.root, version="v1")
+        self.assertEqual(
+            set(activated.m0),
+            {(label, step) for label, steps in r27.STEPS.items() for step in steps},
+        )
+
     def test_successful_activation_round_trips_via_load_active_profile(self):
         self.stage_all()
         activated = r27.activate_r27(self.root, version="scene0-run-1")
@@ -337,6 +383,41 @@ class ActivateR27Tests(unittest.TestCase):
         with self.assertRaises(r27.ProfileError):
             r27.load_active_profile(self.root)
 
+    # -- must_fix：hash 是自洽性而非真實性，加驗 staging 檔本身仍在磁碟且相符 --------------
+    # （`component_hashes` 只防「內容與宣稱的 hash 對不上」；純手寫＋自算 hash 的偽造檔可以
+    # 繞過它。下列兩測釘住新加的第二道檢查：staging 檔案本身必須還在，且位元組內容不變。）
+
+    def test_load_active_profile_rejects_when_staging_file_deleted(self):
+        """啟用後把 staging/m0.staging.json 刪掉——`load_active_profile` 須拒絕，不得因為
+        `active/profile.json` 本身完好就放行（那份完好的 active 檔也可能是純手寫偽造的）。"""
+        self.stage_all()
+        r27.activate_r27(self.root, version="v1")
+        (self.root / "staging" / "m0.staging.json").unlink()
+        with self.assertRaises(r27.ProfileError) as ctx:
+            r27.load_active_profile(self.root)
+        self.assertIn("m0", str(ctx.exception))
+
+    def test_load_active_profile_rejects_when_staging_file_modified(self):
+        """啟用後竄改 staging/m3.staging.json 的位元組內容（即使改完仍是合法 JSON）——
+        與啟用當下記錄的 `staging_file_hashes` 不符，須拒絕。"""
+        self.stage_all()
+        r27.activate_r27(self.root, version="v1")
+        path = self.root / "staging" / "m3.staging.json"
+        tampered = json.loads(path.read_text(encoding="utf-8"))
+        tampered["kill_signatures"]["T1.s1"] = ["C2-STACK|G=TAMPERED"]
+        path.write_text(json.dumps(tampered, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        with self.assertRaises(r27.ProfileError) as ctx:
+            r27.load_active_profile(self.root)
+        self.assertIn("m3", str(ctx.exception))
+
+    def test_activation_records_staging_file_hashes_for_all_four_components(self):
+        self.stage_all()
+        r27.activate_r27(self.root, version="v1")
+        payload = json.loads((self.root / "active" / "profile.json").read_text(encoding="utf-8"))
+        self.assertEqual(set(payload["staging_file_hashes"]), {"m0", "m2", "m3", "ui_t0_prime"})
+        for digest in payload["staging_file_hashes"].values():
+            self.assertEqual(len(digest), 64)
+
     # -- 追加項（§10 R13）：M0 的環境指紋 -----------------------------------------------
 
     def test_m0_without_env_fingerprint_defaults_to_empty_dict(self):
@@ -405,6 +486,50 @@ class ActiveProfileDeviationsTests(unittest.TestCase):
             r27.active_profile_deviations("M9", [], self.profile)
 
 
+class ProfileProvenanceTests(unittest.TestCase):
+    """`R27Profile.provenance()`：只回傳溯源欄位供報告輸出，見裁定 docstring
+    （不得拿 tree_hash／cdhash 跟受評運行做相等比對後判無效，另見
+    `test_h02_gate_candidate.NegativeControlTests.test_active_profile_provenance_is_reported_not_cross_checked`）。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+        for name, data in (
+            ("m0", valid_m0(env_fingerprint=valid_env_fingerprint())),
+            ("m2", valid_m2()),
+            ("m3", valid_m3()),
+            ("ui_t0_prime", valid_ui_t0_prime()),
+        ):
+            r27.stage_component(self.root, name, data)
+        self.profile = r27.activate_r27(self.root, version="scene0-run-9")
+
+    def test_provenance_returns_version_tree_hash_cdhash_env_fingerprint(self):
+        self.assertEqual(
+            self.profile.provenance(),
+            {
+                "version": "scene0-run-9",
+                "tree_hash": "aa" * 20,
+                "cdhash": "bb" * 20,
+                "env_fingerprint": valid_env_fingerprint(),
+            },
+        )
+
+    def test_provenance_env_fingerprint_defaults_to_empty_dict_when_unrecorded(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        no_fp_root = Path(tmp.name)
+        for name, data in (
+            ("m0", valid_m0()),
+            ("m2", valid_m2()),
+            ("m3", valid_m3()),
+            ("ui_t0_prime", valid_ui_t0_prime()),
+        ):
+            r27.stage_component(no_fp_root, name, data)
+        profile = r27.activate_r27(no_fp_root, version="v-no-fp")
+        self.assertEqual(profile.provenance()["env_fingerprint"], {})
+
+
 class EnvFingerprintCheckTests(unittest.TestCase):
     """§10 R13：profile 與受評運行的環境指紋比對——防止靜默採用為別的 OS 凍結的 profile。"""
 
@@ -429,18 +554,25 @@ class EnvFingerprintCheckTests(unittest.TestCase):
         self.assertEqual(status, "unknown")
         self.assertEqual(reasons, [])
 
-    def test_profile_only_is_unknown(self):
-        """§10 R13 落地備註：運行端指紋現行拿不到——只有 profile 有指紋時仍只能報 unknown，
-        不得因此判定符合或不符合。"""
+    def test_profile_only_is_unmeasured(self):
+        """must_fix（R13 fail-closed）：profile 已記錄環境指紋，但運行端未提供——不得再回
+        `unknown`（那等於零效果：任何 CLI 呼叫只要不傳指紋就永遠通過比對）。須回 `unmeasured`，
+        呼叫端據此判「無效」（§10 R13「不靜默比對」；`{}` 與 `None` 視為同一種「未提供」）。"""
         profile = self._activate_with_fingerprint(valid_env_fingerprint())
         status, reasons = r27.env_fingerprint_check(profile, None)
-        self.assertEqual(status, "unknown")
-        self.assertEqual(reasons, [])
+        self.assertEqual(status, "unmeasured")
+        self.assertTrue(reasons, reasons)
+        status_empty, reasons_empty = r27.env_fingerprint_check(profile, {})
+        self.assertEqual(status_empty, "unmeasured")
+        self.assertTrue(reasons_empty, reasons_empty)
 
     def test_run_only_is_unknown(self):
+        """profile 本身沒記錄環境指紋時，不論運行端有沒有提供都是 `unknown`——沒有基準可比，
+        不是「運行端沒測」的 fail-closed 情境（那個情境要求 profile 先有記錄）。"""
         profile = self._activate_with_fingerprint(None)
         status, reasons = r27.env_fingerprint_check(profile, valid_env_fingerprint())
         self.assertEqual(status, "unknown")
+        self.assertEqual(reasons, [])
 
     def test_matching_fingerprints_is_match(self):
         fp = valid_env_fingerprint()
