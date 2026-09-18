@@ -11,9 +11,11 @@ import io
 import json
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import h02_gate_eval as gate
+import h02_gate_cli as gate_cli
 from test_h02_gate_fixtures import (
     M2_KILL,
     M3_KILL,
@@ -510,6 +512,7 @@ class NegativeControlTests(unittest.TestCase):
                 "tree_hash": R27_TREE_HASH,
                 "cdhash": R27_CDHASH,
                 "env_fingerprint": {},
+                "display": "",
             },
         )
 
@@ -525,6 +528,10 @@ class CandidateCliTests(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.tmp = self._tmp.name
         self.addCleanup(self._tmp.cleanup)
+        # 預設 profile 路徑指向空的臨時目錄：測試不得依賴本機 ~/Developer 下是否已有 active profile
+        patcher = mock.patch.object(gate_cli, "_DEFAULT_R27_PROFILE_DIR", str(Path(self.tmp) / "default-r27-profile"))
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def run_cli(self, argv):
         out = io.StringIO()
@@ -574,7 +581,6 @@ class CandidateCliTests(unittest.TestCase):
                 "--m2-log", m2_log, "--m2-xcresult", m2_xc,
                 "--m3-log", m3_log, "--m3-xcresult", m3_xc,
                 "--mutant-iterations", "3",
-                "--profile-dir", str(Path(self.tmp) / "no-such-r27-profile"),
             ]
         )
         self.assertEqual(code, 0)
@@ -687,7 +693,6 @@ class CandidateCliTests(unittest.TestCase):
                 "--m2-log", m2_log, "--m2-xcresult", m2_xc,
                 "--m3-log", m3_log, "--m3-xcresult", m3_xc,
                 "--product-files", str(files),
-                "--profile-dir", str(Path(self.tmp) / "no-such-r27-profile"),
             ]
         )
         self.assertEqual(code, 0)

@@ -512,6 +512,7 @@ class ProfileProvenanceTests(unittest.TestCase):
                 "tree_hash": "aa" * 20,
                 "cdhash": "bb" * 20,
                 "env_fingerprint": valid_env_fingerprint(),
+                "display": "",
             },
         )
 
@@ -588,6 +589,63 @@ class EnvFingerprintCheckTests(unittest.TestCase):
         status, reasons = r27.env_fingerprint_check(profile, run_fp)
         self.assertEqual(status, "mismatch")
         self.assertTrue(any("os_build" in r for r in reasons), reasons)
+
+
+
+class DisplayProvenanceTests(unittest.TestCase):
+    """v5 §10 R13 的「顯示設定」：記進 profile 作溯源、**不**進環境指紋的相等比對。
+
+    刻意決定（主線程 2026-09-18）：指紋只收 os_build／xcode_build／sdk 三個可由命令列取得
+    且格式固定的鍵；顯示設定（解析度／縮放／刷新率）沒有兩端都能取得的標準字串格式，放進
+    相等比對只會製造假的 mismatch，所以只記錄、印進報告，不參與結論。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def stage_all(self, m0):
+        components = {"m0": m0, "m2": valid_m2(), "m3": valid_m3(), "ui_t0_prime": valid_ui_t0_prime()}
+        for name, data in components.items():
+            r27.stage_component(self.root, name, data)
+
+    def test_display_is_recorded_as_provenance(self):
+        m0 = valid_m0()
+        m0["display"] = "Built-in Retina 3456x2234 @2x 120Hz"
+        self.stage_all(m0)
+        activated = r27.activate_r27(self.root, version="v1")
+        self.assertEqual(activated.display, m0["display"])
+        self.assertEqual(activated.provenance()["display"], m0["display"])
+        loaded = r27.load_active_profile(self.root)
+        self.assertEqual(loaded.display, m0["display"])
+
+    def test_display_does_not_enter_env_fingerprint(self):
+        m0 = valid_m0(env_fingerprint=valid_env_fingerprint())
+        m0["display"] = "Built-in Retina 3456x2234 @2x 120Hz"
+        self.stage_all(m0)
+        activated = r27.activate_r27(self.root, version="v1")
+        self.assertNotIn("display", activated.env_fingerprint)
+        self.assertEqual(set(activated.env_fingerprint), {"os_build", "xcode_build", "sdk"})
+
+    def test_display_inside_env_fingerprint_is_rejected(self):
+        """顯示設定放錯位置（塞進 env_fingerprint）要明確拒絕，不得默默變成第四個比對鍵。"""
+        fp = dict(valid_env_fingerprint(), display="3456x2234")
+        self.stage_all(valid_m0(env_fingerprint=fp))
+        with self.assertRaises(r27.ProfileError):
+            r27.activate_r27(self.root, version="v1")
+
+    def test_empty_display_is_rejected(self):
+        m0 = valid_m0()
+        m0["display"] = ""
+        self.stage_all(m0)
+        with self.assertRaises(r27.ProfileError):
+            r27.activate_r27(self.root, version="v1")
+
+    def test_missing_display_defaults_to_empty(self):
+        self.stage_all(valid_m0())
+        activated = r27.activate_r27(self.root, version="v1")
+        self.assertEqual(activated.display, "")
+        self.assertEqual(activated.provenance()["display"], "")
 
 
 if __name__ == "__main__":

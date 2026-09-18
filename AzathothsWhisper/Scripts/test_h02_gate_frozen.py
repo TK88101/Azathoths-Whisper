@@ -9,9 +9,11 @@ import contextlib
 import io
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import h02_gate_eval as gate
+import h02_gate_cli as gate_cli
 import h02_gate_r27_profile as r27profile
 from test_h02_gate_fixtures import (
     C2,
@@ -194,6 +196,10 @@ class FrozenConformityFullCliTests(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.tmp = self._tmp.name
         self.addCleanup(self._tmp.cleanup)
+        # 預設 profile 路徑指向空的臨時目錄：測試不得依賴本機 ~/Developer 下是否已有 active profile
+        patcher = mock.patch.object(gate_cli, "_DEFAULT_R27_PROFILE_DIR", str(Path(self.tmp) / "default-r27-profile"))
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def run_cli(self, argv):
         out = io.StringIO()
@@ -208,7 +214,6 @@ class FrozenConformityFullCliTests(unittest.TestCase):
         code, out = self.run_cli(
             [
                 "v3", "--log", log_path, "--xcresult", xc_path, "--iterations", "10",
-                "--profile-dir", str(Path(self.tmp) / "no-such-profile"),
             ]
         )
         self.assertEqual(code, 0)
@@ -248,7 +253,6 @@ class FrozenConformityFullCliTests(unittest.TestCase):
                 "--m2-log", m2_log, "--m2-xcresult", m2_xc,
                 "--m3-log", m3_log, "--m3-xcresult", m3_xc,
                 "--s2-verified",
-                "--profile-dir", str(Path(self.tmp) / "no-such-profile"),
             ]
         )
         self.assertEqual(code, 0)

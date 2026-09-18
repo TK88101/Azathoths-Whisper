@@ -44,7 +44,8 @@ def _print_profile_provenance(provenance: Optional[dict]) -> None:
         return
     print(
         f"active_profile: version={provenance['version']} tree_hash={provenance['tree_hash']} "
-        f"cdhash={provenance['cdhash']} env_fingerprint={provenance['env_fingerprint'] or '未記錄'}"
+        f"cdhash={provenance['cdhash']} env_fingerprint={provenance['env_fingerprint'] or '未記錄'} "
+        f"display={provenance.get('display') or '未記錄'}"
     )
 
 
@@ -168,10 +169,11 @@ def _add_profile_args(parser: argparse.ArgumentParser) -> None:
     恆為 `None`，甲案的攔阻半邊在 CLI 不可達）。"""
     parser.add_argument(
         "--profile-dir",
-        default=_DEFAULT_R27_PROFILE_DIR,
+        default=None,
         help=(
-            "R27 profile 根目錄（讀 <dir>/active/profile.json；預設倉庫外 "
-            f"{_DEFAULT_R27_PROFILE_DIR}，v5 §13 第 2 項）；尚未 activate 過則視為無 active profile"
+            "R27 profile 根目錄（讀 <dir>/active/profile.json）。不給＝讀預設路徑 "
+            f"{_DEFAULT_R27_PROFILE_DIR}，該處尚未 activate 過則視為無 active profile；"
+            "**顯式給了**卻找不到 active/profile.json ＝ 輸入錯誤（exit 2），防打錯路徑靜默降級"
         ),
     )
     parser.add_argument(
@@ -251,13 +253,26 @@ def _load_table(log_path: str, xcresult_path: str, iterations: Optional[int]) ->
     return build_table(_load_text(log_path), load_xcresult_json(xcresult_path), expected_iterations=iterations)
 
 
-def _load_active_profile_arg(profile_dir: str) -> Optional[R27Profile]:
-    """`--profile-dir` 共用載入邏輯（`v3`／`verdict`／`negative-control` 三個子命令共用）；
-    `ProfileError` 轉譯成 `GateInputError`，由 `main()` 的統一錯誤處理印出、回傳 exit code 2。"""
+def _load_active_profile_arg(profile_dir: Optional[str]) -> Optional[R27Profile]:
+    """`--profile-dir` 共用載入邏輯（`v3`／`verdict`／`negative-control` 三個子命令共用）。
+
+    - 未給（`None`）→ 讀 `_DEFAULT_R27_PROFILE_DIR`；尚未 activate ＝ 無 active profile（場 0 的
+      cf-m0-27 首跑仰賴此語義：甲案只出 deviations）。
+    - **顯式給了**卻沒有 active/profile.json → `GateInputError`（exit 2）。打錯路徑若靜默降級成
+      「無 profile」，v3／verdict 的結論會從不可判定翻成通過（第 3 輪覆核實測）。
+    `ProfileError` 一律轉譯成 `GateInputError`，由 `main()` 的統一錯誤處理印出、回傳 exit code 2。"""
+    explicit = profile_dir is not None
+    root = profile_dir if explicit else _DEFAULT_R27_PROFILE_DIR
     try:
-        return load_active_profile(Path(profile_dir))
+        profile = load_active_profile(Path(root))
     except ProfileError as e:
-        raise GateInputError(f"R27 profile 讀取失敗（{profile_dir}）：{e}") from e
+        raise GateInputError(f"R27 profile 讀取失敗（{root}）：{e}") from e
+    if profile is None and explicit:
+        raise GateInputError(
+            f"R27 profile 不存在：顯式指定的 --profile-dir {root} 下沒有 active/profile.json"
+            "（不給 --profile-dir 才會以預設路徑缺檔視為「尚無 active profile」）"
+        )
+    return profile
 
 
 def _parse_run_env_fingerprint(text: Optional[str]) -> Optional[Dict[str, str]]:

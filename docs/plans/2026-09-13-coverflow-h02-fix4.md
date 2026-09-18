@@ -312,7 +312,7 @@
 | F1 | 判定器 TDD（Python）：`candidate`（通過／不通過／無效；夾具：180 全 PASS、1/180 C2、1 PROBE、19 次、UNTAGGED、manifest 缺檔）；`negative-control`（殺死含 C2、偏離列示、未解釋→不可判定、殺死點消失＋非 Strip diff 分支、無效、不可建）；`PRODUCT_CODES` 佔位；facade 與掃描清單同步 | RED→GREEN；既有 92 條仍綠 |
 | F2 | 基建：§5.7 (1)(2)(3)(7)(9)(10)＋儀器 (8)＋Z1 spike（U1a／U1b／U1c，各出結論）＋K3 spike（M2／M3 檔在含 H3-a(a) 參數草案的 tree 是否編譯）＋H3 觸發 spike（nil 起始是否回寫 items[0]） | Swift 單測 RED→GREEN；儀器 OFF 預設；`strings` 0；Z1 三項結論寫 §13 並**立即上報**使用者（成立／備案／不可建），再開場 1 |
 | | **v5 結算（2026-09-18）**：(1)(2)(3)(7)(9)(10) 已完成並驗收（`strings` 全 0、`ProductCodeSingleSourceTests` 綠）；**Z1 已結案**（U1a／U1c／U-DL 成立、U5 已答、U1b 改無 AX 方案）；**儀器 (8) 與報告腳本 (6) 移到場 0 之後**（場 0 是存亡門，先做可能白做）；**K3 spike 只在 b′ 被否決後才需要**（b′ 不動 Strip 介面）；單測基準改 T0′ | — |
-| **F2b**（v5 新增） | 判定器 R27 profile（staging→原子啟用、雙列偏離、缺 active 即無效）TDD ＋ 場 0 四棵樹預構建與身分記錄 | Python 測試 RED→GREEN 且既有全綠；`PREBUILD.md` 四棵樹表齊全（tree hash／Strip md5／CDHash／Products／log）；M2·M3 與 M0 只差 Strip；未跑任何測試 |
+| **F2b**（v5 新增） | 判定器 R27 profile（staging→原子啟用、雙列偏離、缺 active 即無效）TDD ＋ 場 0 四棵樹預構建與身分記錄 ＋ **R27 staging 產生器與 `profile stage`／`profile activate` CLI**（從 `cf-m0-27`／M2／M3／ui-T0′ 的運行產物產出 staging JSON；場 0 當天不得手寫 JSON） | Python 測試 RED→GREEN 且既有全綠；`PREBUILD.md` 四棵樹表齊全（tree hash／Strip md5／CDHash／Products／log）；M2·M3 與 M0 只差 Strip；未跑任何測試 |
 | **F2c**（v5 新增，場 0 之後） | spike 3（不需使用者在場）：§5.3 的無 AX 卡片語義身分三案；b′ 在真實組裝的六項（20 曲非同步填入、切 tab 重建只灌一次、佔位圖→`.task` 不再觸發命令、generation 取代與遲到回呼、已佈局後的 `trackChanged` 邊界、單參數 `onGeometryChange` 編譯路徑）；動畫四分法 | 各項有數字結論；身分方案定案或明記缺口；b′ 兩接縫有結論 |
 | **F2d**（v5 新增，F2c 之後） | G6 的無 AX 正式 RED 凍結（測試名、失敗輸出、基線 hash） | RED 在未改 H3 的基線上重現；覆蓋遠距、兩方向、末端 |
 | F3 | 場 1 前半：F3a 等價對照（**v5：基建 tree OFF ×3 對已啟用的 R27**）；F3b 健康 (a)–(e) | 全成立；否則 §10 R2 階梯上報 |
@@ -405,7 +405,7 @@
 | R10 | 為求綠改測試／跑到綠為止 | §5.7 觸發清單；首份規則；無效上限；候選上限；多維熔斷 |
 | R11 | 部署目標被順手改動 | §5.7 觸發清單含 `deploymentTarget` |
 | R12 | 使用者在場成本（**v5：四場 ≈ 4–5 小時**） | 場次表合併運行；Z1 spike 先報結論再開場；場 0 的構建全部在到場前完成 |
-| **R13**（v5） | 環境再度漂移（macOS／Xcode 又升級）使 R27 基準再失效 | R27 profile 記 OS build／Xcode／SDK／顯示設定；判定器在 OS 指紋不符時拒絕以該 profile 下結論（回無效），不靜默比對 |
+| **R13**（v5） | 環境再度漂移（macOS／Xcode 又升級）使 R27 基準再失效 | R27 profile 的 m0 段記**環境指紋三鍵** `os_build`／`xcode_build`／`sdk`（逐字相等比對，**fail-closed**：不符 → 無效；profile 有指紋而運行端未以 `--run-env-fingerprint` 提供 → `unmeasured` → 無效；profile 無指紋 → `unknown` 不影響結論）。**顯示設定**另記在 m0 頂層 `display`，只作溯源、印進報告、**不參與比對**（沒有兩端通用的標準字串，放進相等比對只會製造假 mismatch；2026-09-18 主線程裁定） |
 | **R14**（v5） | F-AX：閘門（XCUITest 讀 AX）與無 AX 真實使用走不同路徑，使候選「全綠但真實失敗」 | G6／W15 的無 AX RED→GREEN；C.6 實體輪明定無 AX 客戶端；sampler 不讀 AX；身分方案須 ON／OFF 驗證 |
 | **R15**（v5） | b′ 的成功窗口極窄（首次佈局回呼內同步才 21/21，落到下一週期即 0/48）；真實組裝多了非同步載入、tab epoch、圖片 task | F2c spike 3 六項先驗；失敗則回 Phase 1（H3-a(a)＋K3，或 H3-b／升目標） |
 
@@ -638,3 +638,10 @@ Codex 結論：不核准 v1（2 P0）。逐條處置（採納＝依建議改；�
 
 - 定稿說明：R4 唯一殘餘為措辭矛盾，修法即 Codex 給出的定義，未再開第五輪確認；辯論全文存 `~/Developer/bjork-h02-gate/debate-R7-fix4/`。
 - 歷輪勝負：R1 我方駁回 1 條（Opus TV F-01 後半，理由＝使用者既裁定 C.1 原文）、修改 4 條，其餘採納；R2／R3／R4 Codex 全勝（全部採納）。我方在本輪辯論中沒有一條純靠論證勝出——所有駁回都是引用使用者既裁定。
+
+### 2026-09-18 Phase 2 第三段（v5 前置：判定器 R27 profile、四棵樹預構建；三輪 Opus 5 對抗覆核）
+
+- **形狀**：兩條獨立鏈（判定器 Python／四棵樹預構建）並行，各由 Sonnet 5 實作、Opus 5 對抗覆核；三輪後改由主線程收尾（熔斷紀律：「記載與事實不符」連續三輪出現）。覆核判決全文 `tool-results/b6gd836ti.txt`（第 1 輪）、`b8fghp99u.txt`（第 2 輪）、workflow `wf_7bea0175-556` journal（第 3 輪）。
+- **判定器（commit 9056b8c → 17611aa → 0460cfb → 本段收尾）**：R27 profile 模組 `h02_gate_r27_profile.py`；staging→原子啟用（含四份原文、`component_hashes`、`staging_file_hashes`，m0 須登記全部 9 步，重複啟用預設拒絕，空 version 拒絕）；C.2 無 active profile 一律「無效」且優先於 3／4 類；雙列 active／historical R55 偏離；R4-F 甲案；`--profile-dir`＋`--run-env-fingerprint` 接到 v3／verdict／negative-control；環境指紋 fail-closed；溯源只印不比。**主線程收尾兩條**：(a) 顯式給了卻找不到 active/profile.json 的 `--profile-dir` → exit 2（第 3 輪發現 v3／verdict 靜默降級使結論由不可判定翻成通過；只有「不給」才讀預設路徑、缺檔＝無 profile）；(b) `display` 欄（只溯源不比對，見 §10 R13）。測試 144 → 181 → 204 → 223 → **234**，全綠。更正：commit `0460cfb` 訊息寫的「204→223 only 增不減」不確——測試 id 實為 **+20／−1**（`test_profile_only_is_unknown` 依 must_fix 改名為 `_is_unmeasured` 並反轉斷言，合法語義改名）。新測試檔 `test_h02_gate_profile_dir.py`（`test_h02_gate_candidate.py` 超 800 行而拆出）。
+- **四棵樹（`~/Developer/bjork-h02-gate/fix4/trees/PREBUILD.md`）**：M0＝`a1d3407`、M2／M3＝只換 Strip（md5 `57da040c…`／`48687466…` 先驗後用，`diff -rq` 證明只差 Strip）、ui-T0′＝`aad6a9b`＋R5-3 四檔（**以歷史 ui-T0 同配置重建：不帶閘門參數，預設 Debug**——第 1 輪誤用 `-O`，被覆核比對歷史 log 第 2 行的真實 invocation 抓到）。四棵樹 app／runner 共 8 個 CDHash 互異並已入 manifest。LaunchServices：`lsregister -dump | grep -c bjork-h02-gate`＝0（主線程實測，含清掉 3 條 Release 版殘留）。場 0 命令草稿已修：(i) preflight 補 `TEST_RUNNER_AZW_EXPECTED_APP_DIR`（M0 樹 `CoverFlowUITests.swift:136` 的 `!expected.isEmpty` 守衛，缺它必撞 `PROBE-WRONG-BINARY`）、既有 UITests 選擇器 17 條含 `BatchLiveUITests`、判定器一律以絕對路徑呼叫 repo 現行版、`RUN_ENV` 環境指紋、`evidence_hash()` 路徑無關且缺檔即失敗。
+- **場 0 前仍缺**：R27 staging 產生器與 `profile stage／activate` CLI（F2b 已追加）；`evidence_hash` 的定位（判定器補欄位，或只入 manifest）待定。

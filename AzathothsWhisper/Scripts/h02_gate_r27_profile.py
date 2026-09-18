@@ -38,6 +38,10 @@ _UI_T0_PRIME_OUTCOMES: FrozenSet[str] = frozenset({"PASS", "FAIL", "SKIP"})
 
 # v5 §10 R13：環境指紋（環境再度漂移時，判定器須能拒絕誤用「別的 OS 凍結的 profile」）。
 # 可選——附了就必須三鍵齊全；缺席＝該 profile 未記錄，比對時報 "unknown"（見 `env_fingerprint_check`）。
+# 刻意只收三鍵（主線程 2026-09-18）：三者都可由命令列取得且格式固定（sw_vers -buildVersion、
+# xcodebuild -version 的 Build version、SDK 裸值如 macosx27.0），兩端能逐字相等比對。
+# §10 R13 的「顯示設定」沒有兩端通用的標準字串，放進相等比對只會製造假 mismatch →
+# 改記在 m0 頂層的 `display` 欄，只作溯源、印進報告，不參與結論（見 `R27Profile.display`）。
 _ENV_FINGERPRINT_KEYS: Tuple[str, ...] = ("os_build", "xcode_build", "sdk")
 
 # §13 第 5 項「M0 每步登記」：activate_r27 要求 staging/m0 的 steps 鍵集合恰為這 9 個
@@ -77,6 +81,8 @@ class R27Profile:
     ui_t0_prime: Dict[str, str]
     # v5 §10 R13：{} ＝本份 profile 未記錄環境指紋（見 `env_fingerprint_check`）
     env_fingerprint: Dict[str, str] = field(default_factory=dict)
+    # v5 §10 R13 的顯示設定：只作溯源（"" ＝未記錄），不參與任何比對或結論
+    display: str = ""
 
     def kill_signatures(self, name: str) -> Dict[Tuple[str, str], FrozenSet[str]]:
         if name == "M2":
@@ -99,6 +105,7 @@ class R27Profile:
             "tree_hash": self.tree_hash,
             "cdhash": self.cdhash,
             "env_fingerprint": dict(self.env_fingerprint),
+            "display": self.display,
         }
 
 
@@ -123,6 +130,15 @@ def _require_schema(data: Mapping, where: str) -> None:
         raise ProfileError(f"{where}: 不是物件")
     if data.get("schema") != R27_PROFILE_SCHEMA:
         raise ProfileError(f"{where}: schema 應為 {R27_PROFILE_SCHEMA}，實得 {data.get('schema')!r}")
+
+
+def _parse_display(data: object, where: str) -> str:
+    """m0 頂層的顯示設定（§10 R13）：可選；缺席 → ""；附了就須為非空字串。只作溯源。"""
+    if data is None:
+        return ""
+    if not isinstance(data, str) or not data.strip():
+        raise ProfileError(f"{where}: display 須為非空字串（不記錄就整個省略）")
+    return data
 
 
 def _parse_env_fingerprint(data: object, where: str) -> Dict[str, str]:
@@ -323,6 +339,7 @@ def activate_r27(root: Path, version: str, *, allow_replace: bool = False) -> R2
     if not tree_hash or not cdhash:
         raise ProfileError("啟用拒絕：staging/m0 缺 tree_hash／cdhash")
     env_fingerprint = _parse_env_fingerprint(raw["m0"].get("env_fingerprint"), "staging/m0")
+    display = _parse_display(raw["m0"].get("display"), "staging/m0")
 
     active_payload = {
         "schema": R27_PROFILE_SCHEMA,
@@ -344,6 +361,7 @@ def activate_r27(root: Path, version: str, *, allow_replace: bool = False) -> R2
         tree_hash=tree_hash,
         cdhash=cdhash,
         env_fingerprint=env_fingerprint,
+        display=display,
         m0=parsed["m0"],
         m2_kill=parsed["m2"],
         m3_kill=parsed["m3"],
@@ -427,6 +445,7 @@ def load_active_profile(root: Path) -> Optional[R27Profile]:
     tree_hash = _require_str(m0_raw, "tree_hash", "active.components.m0")
     cdhash = _require_str(m0_raw, "cdhash", "active.components.m0")
     env_fingerprint = _parse_env_fingerprint(m0_raw.get("env_fingerprint"), "active.components.m0")
+    display = _parse_display(m0_raw.get("display"), "active.components.m0")
 
     return R27Profile(
         schema=R27_PROFILE_SCHEMA,
@@ -434,6 +453,7 @@ def load_active_profile(root: Path) -> Optional[R27Profile]:
         tree_hash=tree_hash,
         cdhash=cdhash,
         env_fingerprint=env_fingerprint,
+        display=display,
         m0=parsed["m0"],
         m2_kill=parsed["m2"],
         m3_kill=parsed["m3"],
