@@ -71,6 +71,7 @@ from h02_gate_r27_profile import (
     R27Profile,
     active_profile_deviations,
     activate_r27,
+    env_fingerprint_check,
     load_active_profile,
 )
 from h02_gate_parse import (
@@ -160,7 +161,7 @@ __all__ = [
     "kill_outcome_with_defect2", "kill_signature_has_defect2", "mutant_kill_report",
     "has_non_strip_coverflow_change", "non_strip_coverflow_changes",
     "R27Profile", "ProfileError", "R27_PROFILE_SCHEMA",
-    "activate_r27", "load_active_profile", "active_profile_deviations",
+    "activate_r27", "load_active_profile", "active_profile_deviations", "env_fingerprint_check",
     "main",
 ]
 

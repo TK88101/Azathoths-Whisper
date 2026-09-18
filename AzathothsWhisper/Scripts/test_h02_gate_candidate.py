@@ -330,6 +330,54 @@ class NegativeControlTests(unittest.TestCase):
         self.assertEqual(result["historical_R55_deviation"], [])
         self.assertTrue(result["mutants"]["M2"]["kill_ok"])
 
+    def test_no_active_profile_with_unkilled_mutant_is_invalid_not_fail(self):
+        """must_fix 1：§7 結論程序「2 無效」優先於「4 不通過」——沒有 active profile 時，
+        即使某個變異確實沒被殺死，也不得判「不通過」，必須先判「無效：缺 active profile」。"""
+        m2 = candidate_run(
+            n=3,
+            overrides={("T1", "s1"): ["SIG{T1.s1|C4-NO-WRITEBACK}"], ("T2", "s1"): ["SIG{T2.s1|C4-NO-WRITEBACK}"]},
+        )
+        result = self.evaluate(m2=m2)  # active_profile 預設 None
+        self.assertEqual(result["conclusion"], "無效")
+        self.assertTrue(any("active profile" in r for r in result["reasons"]), result["reasons"])
+
+    def test_no_active_profile_with_migration_trigger_is_invalid_not_migration(self):
+        """must_fix 1：§7 結論程序「2 無效」優先於「3 不可判定」——沒有 active profile 時，
+        即使殺死點消失且候選改了非 Strip 檔（原本會觸發「回Phase1-變異移植」），也必須先判
+        「無效：缺 active profile」，不得跳過 profile 檢查直接進移植分支。"""
+        clean = candidate_run(n=3)
+        result = self.evaluate(
+            m2=clean,
+            m3=clean,
+            product_files=["Features/CoverFlow/CoverFlowStrip.swift", "Features/CoverFlow/CoverFlowViewModel.swift"],
+        )  # active_profile 預設 None
+        self.assertEqual(result["conclusion"], "無效")
+        self.assertTrue(any("active profile" in r for r in result["reasons"]), result["reasons"])
+        self.assertFalse(result["migration_trigger"] and result["conclusion"] == "回Phase1-變異移植")
+
+    def test_active_profile_deviation_is_populated_when_unkilled_short_circuits(self):
+        """must_fix 2：有 active profile 時，即使結論短路成「不通過」，`active_profile_deviation`
+        欄仍須是空陣列而非 `None`——CLI 才不會誤印「尚無 active profile」。"""
+        m2 = candidate_run(
+            n=3,
+            overrides={("T1", "s1"): ["SIG{T1.s1|C4-NO-WRITEBACK}"], ("T2", "s1"): ["SIG{T2.s1|C4-NO-WRITEBACK}"]},
+        )
+        result = self.evaluate(m2=m2, active_profile=R27_PROFILE_MATCHING_R55)
+        self.assertEqual(result["conclusion"], "不通過")
+        self.assertEqual(result["active_profile_deviation"], [])
+
+    def test_active_profile_deviation_is_populated_when_migration_short_circuits(self):
+        """must_fix 2：migration 短路分支同樣不得漏帶 active_profile_deviation。"""
+        clean = candidate_run(n=3)
+        result = self.evaluate(
+            m2=clean,
+            m3=clean,
+            product_files=["Features/CoverFlow/CoverFlowStrip.swift", "Features/CoverFlow/CoverFlowViewModel.swift"],
+            active_profile=R27_PROFILE_MATCHING_R55,
+        )
+        self.assertEqual(result["conclusion"], "回Phase1-變異移植")
+        self.assertEqual(result["active_profile_deviation"], [])
+
     def test_no_active_profile_per_mutant_deviation_is_none_not_empty_list(self):
         """`active_profile_deviation` 用 `None` 區分「尚無 active profile」與「有 profile 但零偏離」，
         不得用空陣列混淆兩者（呼叫端才能分辨要不要顯示「尚無 active profile」）。"""
@@ -355,11 +403,12 @@ class NegativeControlTests(unittest.TestCase):
         )
 
     def test_mutant_with_non_c2_code_only_is_not_killed(self):
+        # must_fix 1：「2 無效」優先於「4 不通過」，須給有效 active profile 才能評到殺死判定本身。
         m2 = candidate_run(
             n=3,
             overrides={("T1", "s1"): ["SIG{T1.s1|C4-NO-WRITEBACK}"], ("T2", "s1"): ["SIG{T2.s1|C4-NO-WRITEBACK}"]},
         )
-        result = self.evaluate(m2=m2)
+        result = self.evaluate(m2=m2, active_profile=R27_PROFILE_MATCHING_R55)
         self.assertEqual(result["conclusion"], "不通過")
         self.assertFalse(result["mutants"]["M2"]["kill_ok"])
 
@@ -400,24 +449,29 @@ class NegativeControlTests(unittest.TestCase):
         self.assertEqual(result["conclusion"], "無效")
 
     def test_kill_point_gone_with_vm_change_returns_to_phase1(self):
+        # must_fix 1：同上，須給有效 active profile 才能評到 migration 分支本身。
         clean = candidate_run(n=3)
         result = self.evaluate(
             m2=clean,
             m3=clean,
             product_files=["Features/CoverFlow/CoverFlowStrip.swift", "Features/CoverFlow/CoverFlowViewModel.swift"],
+            active_profile=R27_PROFILE_MATCHING_R55,
         )
         self.assertEqual(result["conclusion"], "回Phase1-變異移植")
         self.assertTrue(result["migration_trigger"])
 
     def test_kill_point_gone_with_strip_only_change_is_fail(self):
         clean = candidate_run(n=3)
-        result = self.evaluate(m2=clean, m3=clean, product_files=["Features/CoverFlow/CoverFlowStrip.swift"])
+        result = self.evaluate(
+            m2=clean, m3=clean, product_files=["Features/CoverFlow/CoverFlowStrip.swift"],
+            active_profile=R27_PROFILE_MATCHING_R55,
+        )
         self.assertEqual(result["conclusion"], "不通過")
         self.assertFalse(result["migration_trigger"])
 
     def test_kill_point_gone_without_product_files_is_fail(self):
         clean = candidate_run(n=3)
-        result = self.evaluate(m2=clean, m3=clean)
+        result = self.evaluate(m2=clean, m3=clean, active_profile=R27_PROFILE_MATCHING_R55)
         self.assertEqual(result["conclusion"], "不通過")
 
     def test_r55_signature_constant_matches_plan(self):
@@ -516,9 +570,11 @@ class CandidateCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("結論=通過", text)
 
-    def test_negative_control_cli_product_files(self):
-        """回Phase1-變異移植分支在 kill_ok 判定就觸發，不會走到簽名比對——不需要 active profile
-        也應成立（指向空目錄，證明這條路徑確實不依賴 profile）。"""
+    def test_negative_control_cli_product_files_without_profile_is_invalid(self):
+        """must_fix 1 配套：§7「2 無效」優先於「3 不可判定」——即使殺死點消失且候選改了非 Strip
+        檔（單獨看會觸發「回Phase1-變異移植」），沒有 active profile 時仍須先判「無效」，不得
+        繞過 profile 檢查直接進移植分支（舊版本測試在此指向空目錄卻斷言「回Phase1-變異移植」，
+        鎖死了與 §7 結論程序矛盾的行為，已改正）。"""
         base_log, base_xc = write_run(self.tmp, "base", n=20)
         m2_log, m2_xc = write_run(self.tmp, "m2", n=3)
         m3_log, m3_xc = write_run(self.tmp, "m3", n=3)
@@ -535,7 +591,57 @@ class CandidateCliTests(unittest.TestCase):
             ]
         )
         self.assertEqual(code, 0)
+        self.assertIn("結論=無效", text)
+        self.assertIn("active profile", text)
+
+    def test_negative_control_cli_product_files_with_profile_still_migrates(self):
+        """回Phase1-變異移植分支在有 active profile 時仍可正常觸發（確認 must_fix 1 沒有
+        意外關掉這條分支，只是把「無 profile」的優先序糾正過來）。"""
+        base_log, base_xc = write_run(self.tmp, "base", n=20)
+        m2_log, m2_xc = write_run(self.tmp, "m2", n=3)
+        m3_log, m3_xc = write_run(self.tmp, "m3", n=3)
+        files = Path(self.tmp) / "product-files.txt"
+        files.write_text("Features/CoverFlow/CoverFlowViewModel.swift\n", encoding="utf-8")
+        profile_dir = Path(self.tmp) / "r27-profile"
+        write_active_r27_profile(profile_dir)
+        code, text = self.run_cli(
+            [
+                "negative-control",
+                "--baseline-log", base_log, "--baseline-xcresult", base_xc, "--baseline-iterations", "20",
+                "--m2-log", m2_log, "--m2-xcresult", m2_xc,
+                "--m3-log", m3_log, "--m3-xcresult", m3_xc,
+                "--product-files", str(files),
+                "--profile-dir", str(profile_dir),
+            ]
+        )
+        self.assertEqual(code, 0)
         self.assertIn("結論=回Phase1-變異移植", text)
+
+    def test_negative_control_cli_does_not_falsely_claim_no_profile_when_unkilled(self):
+        """must_fix 2：有 active profile 但結論短路成「不通過」時，CLI 不得誤印
+        「尚無 active profile」（舊版只憑 `active_profile_deviation is None` 判斷，短路分支
+        沒補這欄，會印出與事實不符的文案）。"""
+        base_log, base_xc = write_run(self.tmp, "base", n=20)
+        m2_log, m2_xc = write_run(
+            self.tmp, "m2", n=3,
+            overrides={("T1", "s1"): ["SIG{T1.s1|C4-NO-WRITEBACK}"], ("T2", "s1"): ["SIG{T2.s1|C4-NO-WRITEBACK}"]},
+        )
+        m3_log, m3_xc = write_run(self.tmp, "m3", n=3, overrides=M3_KILL)
+        profile_dir = Path(self.tmp) / "r27-profile"
+        write_active_r27_profile(profile_dir)
+        code, text = self.run_cli(
+            [
+                "negative-control",
+                "--baseline-log", base_log, "--baseline-xcresult", base_xc, "--baseline-iterations", "20",
+                "--m2-log", m2_log, "--m2-xcresult", m2_xc,
+                "--m3-log", m3_log, "--m3-xcresult", m3_xc,
+                "--mutant-iterations", "3",
+                "--profile-dir", str(profile_dir),
+            ]
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("結論=不通過", text)
+        self.assertNotIn("尚無 active profile", text)
 
     def test_facade_exports_new_symbols(self):
         for name in (

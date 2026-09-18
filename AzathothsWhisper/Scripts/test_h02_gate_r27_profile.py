@@ -14,8 +14,13 @@ from pathlib import Path
 import h02_gate_r27_profile as r27
 
 
-def valid_m0():
-    return {
+def valid_env_fingerprint():
+    """v5 §10 R13：合成的環境指紋範例（非真實場 0 證據）。"""
+    return {"os_build": "26A428", "xcode_build": "27A266a", "sdk": "MacOSX26.5.sdk"}
+
+
+def valid_m0(env_fingerprint=None):
+    data = {
         "schema": r27.R27_PROFILE_SCHEMA,
         "kind": "m0",
         "tree_hash": "aa" * 20,
@@ -30,6 +35,9 @@ def valid_m0():
             },
         },
     }
+    if env_fingerprint is not None:
+        data["env_fingerprint"] = env_fingerprint
+    return data
 
 
 def valid_m2():
@@ -264,6 +272,101 @@ class ActivateR27Tests(unittest.TestCase):
         with self.assertRaises(r27.ProfileError):
             r27.load_active_profile(self.root)
 
+    # -- must_fix 4：version 不得為空（§13 第 13 項配套修正） -----------------------------
+
+    def test_empty_version_refuses_activation(self):
+        """啟用前必須驗 version 為非空字串，否則會寫出一份之後 `load_active_profile` 永遠
+        拋 ProfileError（缺 version）的殭屍 active 檔——與「尚未啟用」無法區分。"""
+        self.stage_all()
+        with self.assertRaises(r27.ProfileError):
+            r27.activate_r27(self.root, version="")
+        self.assertFalse((self.root / "active" / "profile.json").exists())
+        self.assertIsNone(r27.load_active_profile(self.root))
+
+    # -- must_fix 5：首份凍結，重複啟用預設拒絕 ----------------------------------------
+
+    def test_second_activation_is_refused_by_default(self):
+        """§7 場 0 停止分支 3「首份規則」：已有 active profile 時，第二次啟用預設拒絕，
+        不得悄悄覆蓋第一份凍結。"""
+        self.stage_all()
+        r27.activate_r27(self.root, version="run-1")
+        self.stage_all()  # 模擬又跑了一輪，重新 staging
+        with self.assertRaises(r27.ProfileError):
+            r27.activate_r27(self.root, version="run-2")
+        loaded = r27.load_active_profile(self.root)
+        self.assertEqual(loaded.version, "run-1")
+
+    def test_allow_replace_overwrites(self):
+        """顯式 `allow_replace=True` 才允許替換既有 active profile。"""
+        self.stage_all()
+        r27.activate_r27(self.root, version="run-1")
+        self.stage_all()
+        r27.activate_r27(self.root, version="run-2", allow_replace=True)
+        loaded = r27.load_active_profile(self.root)
+        self.assertEqual(loaded.version, "run-2")
+
+    # -- must_fix 3：載入時重驗 manifest（缺／錯 component_hashes 必須被拒） -----------
+
+    def test_active_file_missing_component_hashes_is_rejected(self):
+        """手寫（未經 staging／activate）一份缺 `component_hashes` 的 active 檔必須被拒，
+        不得照單全收（原始漏洞的重現）。"""
+        active_dir = self.root / "active"
+        active_dir.mkdir(parents=True)
+        forged = {
+            "schema": r27.R27_PROFILE_SCHEMA,
+            "active_profile": "R27",
+            "version": "forged",
+            "components": {
+                "m0": valid_m0(), "m2": valid_m2(), "m3": valid_m3(), "ui_t0_prime": valid_ui_t0_prime(),
+            },
+            # component_hashes 故意缺席
+        }
+        (active_dir / "profile.json").write_text(json.dumps(forged, ensure_ascii=False), encoding="utf-8")
+        with self.assertRaises(r27.ProfileError):
+            r27.load_active_profile(self.root)
+
+    def test_active_file_wrong_component_hash_value_is_rejected(self):
+        """`component_hashes` 語法合法（64 字元 hex）但與 `components` 原文重算的 sha256 不符
+        時必須被拒——防止事後竄改內容卻保留一個看似合法的舊 hash。"""
+        self.stage_all()
+        r27.activate_r27(self.root, version="v1")
+        target = self.root / "active" / "profile.json"
+        payload = json.loads(target.read_text(encoding="utf-8"))
+        payload["component_hashes"]["m0"] = "0" * 64
+        target.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        with self.assertRaises(r27.ProfileError):
+            r27.load_active_profile(self.root)
+
+    # -- 追加項（§10 R13）：M0 的環境指紋 -----------------------------------------------
+
+    def test_m0_without_env_fingerprint_defaults_to_empty_dict(self):
+        """未附環境指紋＝該份 profile 未記錄，回空 dict（不是錯誤；比對時報 unknown）。"""
+        self.stage_all()
+        activated = r27.activate_r27(self.root, version="v1")
+        self.assertEqual(activated.env_fingerprint, {})
+        loaded = r27.load_active_profile(self.root)
+        self.assertEqual(loaded.env_fingerprint, {})
+
+    def test_m0_env_fingerprint_round_trips_through_activation(self):
+        fp = valid_env_fingerprint()
+        self.stage_all(m0=valid_m0(env_fingerprint=fp))
+        activated = r27.activate_r27(self.root, version="v1")
+        self.assertEqual(activated.env_fingerprint, fp)
+        loaded = r27.load_active_profile(self.root)
+        self.assertEqual(loaded.env_fingerprint, fp)
+
+    def test_m0_env_fingerprint_missing_key_is_rejected(self):
+        bad_fp = {"os_build": "26A428", "xcode_build": "27A266a"}  # 缺 sdk
+        self.stage_all(m0=valid_m0(env_fingerprint=bad_fp))
+        with self.assertRaises(r27.ProfileError):
+            r27.activate_r27(self.root, version="v1")
+
+    def test_m0_env_fingerprint_empty_value_is_rejected(self):
+        bad_fp = {**valid_env_fingerprint(), "os_build": ""}
+        self.stage_all(m0=valid_m0(env_fingerprint=bad_fp))
+        with self.assertRaises(r27.ProfileError):
+            r27.activate_r27(self.root, version="v1")
+
 
 class ActiveProfileDeviationsTests(unittest.TestCase):
     def setUp(self):
@@ -300,6 +403,59 @@ class ActiveProfileDeviationsTests(unittest.TestCase):
     def test_unknown_mutant_name_raises(self):
         with self.assertRaises(r27.ProfileError):
             r27.active_profile_deviations("M9", [], self.profile)
+
+
+class EnvFingerprintCheckTests(unittest.TestCase):
+    """§10 R13：profile 與受評運行的環境指紋比對——防止靜默採用為別的 OS 凍結的 profile。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def _activate_with_fingerprint(self, fingerprint):
+        for name, data in (
+            ("m0", valid_m0(env_fingerprint=fingerprint)),
+            ("m2", valid_m2()),
+            ("m3", valid_m3()),
+            ("ui_t0_prime", valid_ui_t0_prime()),
+        ):
+            r27.stage_component(self.root, name, data)
+        return r27.activate_r27(self.root, version="v1")
+
+    def test_both_missing_is_unknown(self):
+        profile = self._activate_with_fingerprint(None)
+        status, reasons = r27.env_fingerprint_check(profile, None)
+        self.assertEqual(status, "unknown")
+        self.assertEqual(reasons, [])
+
+    def test_profile_only_is_unknown(self):
+        """§10 R13 落地備註：運行端指紋現行拿不到——只有 profile 有指紋時仍只能報 unknown，
+        不得因此判定符合或不符合。"""
+        profile = self._activate_with_fingerprint(valid_env_fingerprint())
+        status, reasons = r27.env_fingerprint_check(profile, None)
+        self.assertEqual(status, "unknown")
+        self.assertEqual(reasons, [])
+
+    def test_run_only_is_unknown(self):
+        profile = self._activate_with_fingerprint(None)
+        status, reasons = r27.env_fingerprint_check(profile, valid_env_fingerprint())
+        self.assertEqual(status, "unknown")
+
+    def test_matching_fingerprints_is_match(self):
+        fp = valid_env_fingerprint()
+        profile = self._activate_with_fingerprint(fp)
+        status, reasons = r27.env_fingerprint_check(profile, dict(fp))
+        self.assertEqual(status, "match")
+        self.assertEqual(reasons, [])
+
+    def test_mismatching_fingerprint_is_mismatch(self):
+        fp = valid_env_fingerprint()
+        profile = self._activate_with_fingerprint(fp)
+        run_fp = dict(fp, os_build="99Z999")
+        status, reasons = r27.env_fingerprint_check(profile, run_fp)
+        self.assertEqual(status, "mismatch")
+        self.assertTrue(any("os_build" in r for r in reasons), reasons)
 
 
 if __name__ == "__main__":

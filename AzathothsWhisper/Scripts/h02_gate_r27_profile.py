@@ -22,7 +22,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, FrozenSet, List, Mapping, Optional, Tuple
 
@@ -33,6 +33,10 @@ _ACTIVE_DIRNAME = "active"
 _STAGING_DIRNAME = "staging"
 _ACTIVE_FILENAME = "profile.json"
 _UI_T0_PRIME_OUTCOMES: FrozenSet[str] = frozenset({"PASS", "FAIL", "SKIP"})
+
+# v5 §10 R13：環境指紋（環境再度漂移時，判定器須能拒絕誤用「別的 OS 凍結的 profile」）。
+# 可選——附了就必須三鍵齊全；缺席＝該 profile 未記錄，比對時報 "unknown"（見 `env_fingerprint_check`）。
+_ENV_FINGERPRINT_KEYS: Tuple[str, ...] = ("os_build", "xcode_build", "sdk")
 
 
 class ProfileError(Exception):
@@ -61,6 +65,8 @@ class R27Profile:
     m2_kill: Dict[Tuple[str, str], FrozenSet[str]]
     m3_kill: Dict[Tuple[str, str], FrozenSet[str]]
     ui_t0_prime: Dict[str, str]
+    # v5 §10 R13：{} ＝本份 profile 未記錄環境指紋（見 `env_fingerprint_check`）
+    env_fingerprint: Dict[str, str] = field(default_factory=dict)
 
     def kill_signatures(self, name: str) -> Dict[Tuple[str, str], FrozenSet[str]]:
         if name == "M2":
@@ -91,6 +97,19 @@ def _require_schema(data: Mapping, where: str) -> None:
         raise ProfileError(f"{where}: 不是物件")
     if data.get("schema") != R27_PROFILE_SCHEMA:
         raise ProfileError(f"{where}: schema 應為 {R27_PROFILE_SCHEMA}，實得 {data.get('schema')!r}")
+
+
+def _parse_env_fingerprint(data: object, where: str) -> Dict[str, str]:
+    """v5 §10 R13：環境指紋可選——`None`（欄位缺席）＝本份 profile 未記錄，回空 dict；附了就必須
+    恰好含 `os_build`／`xcode_build`／`sdk` 三鍵，值皆非空字串，否則拒絕（不得半殘留）。"""
+    if data is None:
+        return {}
+    if not isinstance(data, dict) or set(data) != set(_ENV_FINGERPRINT_KEYS):
+        raise ProfileError(f"{where}: env_fingerprint 須為恰含 {_ENV_FINGERPRINT_KEYS} 三鍵的物件")
+    for key in _ENV_FINGERPRINT_KEYS:
+        if not isinstance(data[key], str) or not data[key]:
+            raise ProfileError(f"{where}: env_fingerprint.{key} 須為非空字串")
+    return dict(data)
 
 
 # ---------------------------------------------------------------------------
@@ -216,52 +235,56 @@ def _canonical_bytes(data: Mapping) -> bytes:
 # ---------------------------------------------------------------------------
 
 
-def activate_r27(root: Path, version: str) -> R27Profile:
+def activate_r27(root: Path, version: str, *, allow_replace: bool = False) -> R27Profile:
     """M0／M2／M3／ui-T0′ 四者皆有效且格式相符才允許啟用；任一缺失或格式不對 → 整體拒絕，
-    不寫任何 active 檔（保留既有 staging 證據）。成功時把四者 hash 與合併後的 profile 併進
-    「一份 manifest」，以 write-temp + `os.replace` 單次原子寫入 `active/profile.json`。"""
+    不寫任何 active 檔（保留既有 staging 證據）。`version` 不得為空字串（否則寫出後
+    `load_active_profile` 永遠讀不回，形成啟用了卻不可讀的殭屍狀態）。已有 active profile 時
+    預設拒絕（首份規則，§7 場 0 停止分支 3）；確需替換須顯式 `allow_replace=True`。
+
+    成功時把四份 staging **原文**（不只是抽出來的欄位）連同各自的 sha256 一併存進
+    `active/profile.json`，以 write-temp + `os.replace` 單次原子寫入；`load_active_profile`
+    藉此能對每份原文重算 hash 逐一核對，防止手寫檔繞過 staging 直接偽造 active profile。"""
+    if not isinstance(version, str) or not version:
+        raise ProfileError("啟用拒絕：version 不得為空")
     root = Path(root)
-    staged: Dict[str, dict] = {}
+    active_dir = root / _ACTIVE_DIRNAME
+    target = active_dir / _ACTIVE_FILENAME
+    if target.is_file() and not allow_replace:
+        raise ProfileError(
+            "啟用拒絕：active profile 已存在（首份規則），如確需替換請顯式 allow_replace=True"
+        )
+
     missing = [c for c in _STAGING_COMPONENTS if load_staging_component(root, c) is None]
     if missing:
         raise ProfileError(f"啟用拒絕：staging 缺元件 {missing}（M0／M2／M3／ui-T0′ 四者皆須有效）")
 
+    raw: Dict[str, dict] = {}
     parsed: Dict[str, object] = {}
     hashes: Dict[str, str] = {}
     for component in _STAGING_COMPONENTS:
-        raw = load_staging_component(root, component)
-        staged[component] = raw
+        data = load_staging_component(root, component)
+        raw[component] = data
         try:
-            parsed[component] = _COMPONENT_PARSERS[component](raw)
+            parsed[component] = _COMPONENT_PARSERS[component](data)
         except ProfileError as e:
             raise ProfileError(f"啟用拒絕：staging/{component} 無效（{e}）") from e
-        hashes[component] = _hash_bytes(_canonical_bytes(raw))
+        hashes[component] = _hash_bytes(_canonical_bytes(data))
 
-    tree_hash = staged["m0"].get("tree_hash", "")
-    cdhash = staged["m0"].get("cdhash", "")
+    tree_hash = raw["m0"].get("tree_hash", "")
+    cdhash = raw["m0"].get("cdhash", "")
     if not tree_hash or not cdhash:
         raise ProfileError("啟用拒絕：staging/m0 缺 tree_hash／cdhash")
+    env_fingerprint = _parse_env_fingerprint(raw["m0"].get("env_fingerprint"), "staging/m0")
 
-    profile_payload = {
-        "schema": R27_PROFILE_SCHEMA,
-        "version": version,
-        "tree_hash": tree_hash,
-        "cdhash": cdhash,
-        "m0": staged["m0"]["steps"],
-        "m2": staged["m2"]["kill_signatures"],
-        "m3": staged["m3"]["kill_signatures"],
-        "ui_t0_prime": staged["ui_t0_prime"]["results"],
-    }
     active_payload = {
         "schema": R27_PROFILE_SCHEMA,
         "active_profile": "R27",
+        "version": version,
         "component_hashes": hashes,
-        "profile": profile_payload,
+        "components": raw,
     }
 
-    active_dir = root / _ACTIVE_DIRNAME
     active_dir.mkdir(parents=True, exist_ok=True)
-    target = active_dir / _ACTIVE_FILENAME
     tmp = active_dir / f".{_ACTIVE_FILENAME}.tmp-{os.getpid()}"
     tmp.write_text(json.dumps(active_payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
     os.replace(tmp, target)  # 同檔系統內原子換檔：中途中斷不會留下半成品 active 檔
@@ -271,6 +294,7 @@ def activate_r27(root: Path, version: str) -> R27Profile:
         version=version,
         tree_hash=tree_hash,
         cdhash=cdhash,
+        env_fingerprint=env_fingerprint,
         m0=parsed["m0"],
         m2_kill=parsed["m2"],
         m3_kill=parsed["m3"],
@@ -280,7 +304,11 @@ def activate_r27(root: Path, version: str) -> R27Profile:
 
 def load_active_profile(root: Path) -> Optional[R27Profile]:
     """只讀 `active/profile.json`；不存在＝尚無 active profile（回 None，不是錯誤）。staging
-    中的元件無論多完整都不會被這個函式看見——建立中的 R27 永遠不會被誤當成 active（第 13 項）。"""
+    中的元件無論多完整都不會被這個函式看見——建立中的 R27 永遠不會被誤當成 active（第 13 項）。
+
+    載入時重新驗證：`component_hashes` 須四元件齊全、皆為 64 字元小寫 hex；對 `components` 下
+    每份原文重算 sha256，須與宣稱的 hash 逐一相符，不符（或整份是手寫、繞過 `activate_r27` 的
+    偽造檔）即 `ProfileError`——不得讓一份沒驗證過的表被靜默當成 active。"""
     target = Path(root) / _ACTIVE_DIRNAME / _ACTIVE_FILENAME
     if not target.is_file():
         return None
@@ -290,30 +318,73 @@ def load_active_profile(root: Path) -> Optional[R27Profile]:
         raise ProfileError(f"active/{_ACTIVE_FILENAME}: 無法解析（{e}）") from e
     if not isinstance(payload, dict) or payload.get("active_profile") != "R27":
         raise ProfileError(f"active/{_ACTIVE_FILENAME}: active_profile 應為 'R27'")
-    profile = payload.get("profile")
-    if not isinstance(profile, dict):
-        raise ProfileError(f"active/{_ACTIVE_FILENAME}: 缺 profile")
-    _require_schema(profile, "active.profile")
-    m0 = parse_m0_component({"schema": R27_PROFILE_SCHEMA, "kind": "m0", "steps": profile.get("m0")})
-    m2 = parse_kill_component(
-        {"schema": R27_PROFILE_SCHEMA, "kind": "m2", "kill_signatures": profile.get("m2")}, "M2"
-    )
-    m3 = parse_kill_component(
-        {"schema": R27_PROFILE_SCHEMA, "kind": "m3", "kill_signatures": profile.get("m3")}, "M3"
-    )
-    ui_t0_prime = parse_ui_t0_prime_component(
-        {"schema": R27_PROFILE_SCHEMA, "kind": "ui_t0_prime", "results": profile.get("ui_t0_prime")}
-    )
+    version = payload.get("version")
+    if not isinstance(version, str) or not version:
+        raise ProfileError(f"active/{_ACTIVE_FILENAME}: 缺必要欄位 version")
+
+    components = payload.get("components")
+    if not isinstance(components, dict) or set(components) != set(_STAGING_COMPONENTS):
+        raise ProfileError(f"active/{_ACTIVE_FILENAME}: components 缺元件或含未知元件")
+
+    hashes = payload.get("component_hashes")
+    if not isinstance(hashes, dict) or set(hashes) != set(_STAGING_COMPONENTS):
+        raise ProfileError(f"active/{_ACTIVE_FILENAME}: 缺 component_hashes 或元件不齊")
+    for name, digest in hashes.items():
+        if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+            raise ProfileError(f"active/{_ACTIVE_FILENAME}: component_hashes.{name} 不是合法的 64 字元 sha256 hex")
+
+    parsed: Dict[str, object] = {}
+    for name in _STAGING_COMPONENTS:
+        raw = components[name]
+        actual = _hash_bytes(_canonical_bytes(raw)) if isinstance(raw, dict) else None
+        if actual != hashes[name]:
+            raise ProfileError(
+                f"active/{_ACTIVE_FILENAME}: components.{name} 與 component_hashes 不符"
+                f"（manifest {hashes[name]}／實得 {actual}）"
+            )
+        parsed[name] = _COMPONENT_PARSERS[name](raw)
+
+    m0_raw = components["m0"]
+    tree_hash = _require_str(m0_raw, "tree_hash", "active.components.m0")
+    cdhash = _require_str(m0_raw, "cdhash", "active.components.m0")
+    env_fingerprint = _parse_env_fingerprint(m0_raw.get("env_fingerprint"), "active.components.m0")
+
     return R27Profile(
-        schema=profile["schema"],
-        version=_require_str(profile, "version", "active.profile"),
-        tree_hash=_require_str(profile, "tree_hash", "active.profile"),
-        cdhash=_require_str(profile, "cdhash", "active.profile"),
-        m0=m0,
-        m2_kill=m2,
-        m3_kill=m3,
-        ui_t0_prime=ui_t0_prime,
+        schema=R27_PROFILE_SCHEMA,
+        version=version,
+        tree_hash=tree_hash,
+        cdhash=cdhash,
+        env_fingerprint=env_fingerprint,
+        m0=parsed["m0"],
+        m2_kill=parsed["m2"],
+        m3_kill=parsed["m3"],
+        ui_t0_prime=parsed["ui_t0_prime"],
     )
+
+
+def env_fingerprint_check(
+    profile: R27Profile, run_env_fingerprint: Optional[Mapping[str, str]]
+) -> Tuple[str, List[str]]:
+    """v5 §10 R13：profile 記錄的環境指紋與受評運行的環境指紋比對，下結論前必做。回傳
+    `(status, reasons)`：
+
+      - `"unknown"`：profile 或運行任一沒有指紋（現行運行端多半拿不到，§10 R13 的落地備註），
+        無法比對，只在報告中明列，不影響結論；
+      - `"match"`：兩者都有且逐鍵相符；
+      - `"mismatch"`：兩者都有但至少一鍵不符（`reasons` 逐條列出）——呼叫端須判「無效」，
+        不得靜默採用為別的 OS 凍結的 profile。
+    """
+    if not profile.env_fingerprint or not run_env_fingerprint:
+        return "unknown", []
+    reasons = [
+        f"env_fingerprint.{key}：profile={profile.env_fingerprint.get(key)!r} "
+        f"≠ 運行={run_env_fingerprint.get(key)!r}"
+        for key in sorted(set(profile.env_fingerprint) | set(run_env_fingerprint))
+        if profile.env_fingerprint.get(key) != run_env_fingerprint.get(key)
+    ]
+    if reasons:
+        return "mismatch", reasons
+    return "match", []
 
 
 # ---------------------------------------------------------------------------

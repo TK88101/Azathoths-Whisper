@@ -106,19 +106,25 @@ def _print_mutant_report(report: dict) -> None:
 
 
 def _print_negative_control(result: dict) -> None:
-    """C.2（§5.2；雙欄偏離見 v5 §13 第 4、5 項）負對照輸出。"""
+    """C.2（§5.2；雙欄偏離見 v5 §13 第 4、5 項；env_fingerprint 見 §10 R13）負對照輸出。
+    是否顯示「尚無 active profile」由明確的 `active_profile_present` 布林決定，不再從
+    `active_profile_deviation is None` 反推（那欄在 profile 存在但 migration／unkilled 短路時
+    仍可能是空陣列，用 `is None` 判斷會印出與事實不符的文案）。"""
     print("== C.2 負對照（M2／M3）==")
     print(f"結論={result['conclusion']}")
     _print_lines("理由", result["reasons"])
     _print_lines("變異運行無效", result["mutant_invalid_reasons"])
     _print_lines("baseline 不合格", result["baseline_reasons"])
-    if result["active_profile_deviation"] is None:
+    if not result["active_profile_present"]:
         print("active_profile_deviation: 尚無 active profile")
-    else:
+    elif result["active_profile_deviation"]:
         _print_lines("active_profile_deviation（需解釋；參與結論）", result["active_profile_deviation"])
+    else:
+        print("active_profile_deviation: []（有 active profile，零偏離）")
     _print_lines(
         "historical_R55_deviation（僅報告；R55 唯讀歷史，不參與結論）", result["historical_R55_deviation"]
     )
+    print(f"env_fingerprint: {result['env_fingerprint']}")
     _print_lines("候選改動的 CoverFlow 非 Strip 檔", result["product_files"])
     for report in result["mutants"].values():
         _print_mutant_report(report)

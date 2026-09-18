@@ -12,14 +12,13 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
-from typing import Dict, FrozenSet, List, Optional, Tuple
+from typing import Dict, FrozenSet, List, Mapping, Optional, Tuple
 
 from h02_gate_model import (
     COVERFLOW_DIR,
     COVERFLOW_STRIP_FILE,
     EVIDENCE_OPTIONAL_FILES,
     EVIDENCE_REQUIRED_FILES,
-    FROZEN_ALLOWED_CODES,
     FROZEN_REGISTRATION,
     MANIFEST_SCHEMA,
     MANIFEST_SUFFIX,
@@ -40,7 +39,7 @@ from h02_gate_model import (
     STEPS,
     TEST_LABELS,
 )
-from h02_gate_r27_profile import R27Profile, active_profile_deviations
+from h02_gate_r27_profile import R27Profile, active_profile_deviations, env_fingerprint_check
 
 # V3／V4／V5 判定與結論（R4 修訂：計劃 §3.12 table_valid、§6 V3／V5／R4-X／R4-C）
 
@@ -116,26 +115,42 @@ def _defect3(per_step: Dict[Tuple[str, str], dict]) -> dict:
     return {"status": "NOT_CAUGHT"}
 
 
-def evaluate_frozen_conformity(table: GateTable) -> Tuple[bool, List[str], List[str]]:
-    """R4-F（變體 N′；只對 M0 確認性運行，變異運行不適用）：每次迭代每格 FAIL 的產品碼投影必須 ⊆ F(step)，
-    出現 F 外碼（哪怕 1/10）＝與預登記矛盾 → 不可判定（reasons）；仍 ⊆ F 但與登記不同的格（含翻成 PASS）
-    只記偏離（deviations，報告用），結論交既有 V3／V5／缺陷 2 分支。PROBE／MISSING／UNTAGGED 由 table_valid 處理。
-    回傳 (相符, reasons, deviations)。"""
+def evaluate_frozen_conformity(
+    table: GateTable, active_profile: Optional[R27Profile] = None
+) -> Tuple[bool, List[str], List[str]]:
+    """R4-F（變體 N′；只對 M0 確認性運行，變異運行不適用）。
+
+    v5 §13 第 2、4、6 項起：`FROZEN_ALLOWED_CODES`／`FROZEN_REGISTRATION`（26.6.2 導出）降為
+    historical，**不得再作 27（或任何無 active profile 的運行）的判定基準**——沒有 active
+    profile 時，任何步驟與舊表的差異一律只計 `deviations`（報告用，標「歷史 26.6.2」），
+    **不產生 `reasons`**（不使結論落入「不可判定」；場 0 `cf-m0-27` 就是典型的「尚無 active
+    profile」運行，不得被舊表擋下）。
+
+    有 `active_profile` 且該步驟已在 `active_profile.m0` 登記時（甲案），改以
+    `active_profile.m0[(label, step)].allowed_codes` 作判據：超出 → `reasons`（不可判定）。
+    未在 active profile 登記的步驟（含 active_profile 整個是 `None`）一律只計 deviations。
+    `FROZEN_ALLOWED_CODES`／`FROZEN_REGISTRATION` 的值本身不變，只降級為 deviations 的
+    historical 比較對象。回傳 (相符, reasons, deviations)。"""
     reasons: List[str] = []
     deviations: List[str] = []
     for label in table.tests:
         infos = table.iterations[label]
         for step in STEPS[label]:
-            allowed = FROZEN_ALLOWED_CODES[(label, step)]
-            registered = FROZEN_REGISTRATION[(label, step)]
+            key = (label, step)
+            registered = FROZEN_REGISTRATION[key]
+            active_step = active_profile.m0.get(key) if active_profile is not None else None
             differing: List[str] = []
             for info in infos:
                 cell = info.cells[step]
                 if cell.kind == "FAIL":
                     codes = _codes(cell.sig_set)
-                    extra = sorted(codes - allowed)
-                    if extra:
-                        reasons.append(f"R4-F：{label}.{step} iter {info.iteration} 實得 {extra} ∉ F{sorted(allowed)}")
+                    if active_step is not None:
+                        extra = sorted(codes - active_step.allowed_codes)
+                        if extra:
+                            reasons.append(
+                                f"R4-F：{label}.{step} iter {info.iteration} 實得 {extra} ∉ "
+                                f"active R27 M0 允許碼 {sorted(active_step.allowed_codes)}"
+                            )
                     if codes != registered:
                         differing.append(f"iter {info.iteration} FAIL{sorted(codes)}")
                 elif cell.kind == "PASS" and registered:
@@ -143,12 +158,16 @@ def evaluate_frozen_conformity(table: GateTable) -> Tuple[bool, List[str], List[
             if differing:
                 frozen_text = "PASS" if not registered else f"FAIL{sorted(registered)}"
                 shown = "; ".join(differing[:3]) + ("…" if len(differing) > 3 else "")
-                deviations.append(f"{label}.{step}: {len(differing)}/{len(infos)} 次與凍結登記 {frozen_text} 不同（{shown}）")
+                deviations.append(
+                    f"{label}.{step}: {len(differing)}/{len(infos)} 次與凍結登記（歷史 26.6.2）"
+                    f"{frozen_text} 不同（{shown}）"
+                )
     return not reasons, reasons, deviations
 
 
-def evaluate_v3(table: GateTable, iterations: int) -> dict:
-    """V3（R4）：缺陷 3＝T4.s2 穩定帶缺陷 3 碼；缺陷 2＝非 EXCLUDED 的 C2 步驟穩定帶 C2-STACK；一致性含 ≤1 格例外。"""
+def evaluate_v3(table: GateTable, iterations: int, active_profile: Optional[R27Profile] = None) -> dict:
+    """V3（R4）：缺陷 3＝T4.s2 穩定帶缺陷 3 碼；缺陷 2＝非 EXCLUDED 的 C2 步驟穩定帶 C2-STACK；一致性含 ≤1 格例外。
+    `active_profile`：R4-F 的判據來源（見 `evaluate_frozen_conformity`），預設 `None`。"""
     run_valid, invalid_reasons = table_valid(table, iterations)
     per_step = {
         (label, step): _step_status(_cells(table, (label, step)))
@@ -166,7 +185,7 @@ def evaluate_v3(table: GateTable, iterations: int) -> dict:
         and v["status"] == "ALL_FAIL_CONSISTENT"
         and DEFECT2_CODE in _codes(v["sig_set"])
     ]
-    frozen_ok, frozen_reasons, frozen_deviations = evaluate_frozen_conformity(table)
+    frozen_ok, frozen_reasons, frozen_deviations = evaluate_frozen_conformity(table, active_profile)
     return {
         "run_valid": run_valid,
         "invalid_reasons": invalid_reasons,
@@ -268,10 +287,12 @@ def verdict(
     s2_verified: bool,
     m0_iterations: int = 10,
     mutant_iterations: int = 3,
+    active_profile: Optional[R27Profile] = None,
 ) -> dict:
     """R4-C：按優先序取第一個成立的結論（不可判定 → 不通過 → 部分通過 → 通過）。
-    「不可建」屬 S 階段、不由本函數輸出；V4 權重由使用者在看到結果後裁決。"""
-    v3 = evaluate_v3(m0, m0_iterations)
+    「不可建」屬 S 階段、不由本函數輸出；V4 權重由使用者在看到結果後裁決。
+    `active_profile`：轉交 `evaluate_v3`（R4-F 判據），預設 `None`。"""
+    v3 = evaluate_v3(m0, m0_iterations, active_profile)
     v5 = evaluate_v5(m0, v3, s2_verified)
     v4 = {
         name: evaluate_v4(m0, table, m0_iterations, mutant_iterations, excluded=v3["excluded"])
@@ -578,13 +599,19 @@ def evaluate_negative_control(
     mutant_iterations: int = 3,
     product_files=None,
     active_profile: Optional[R27Profile] = None,
+    run_env_fingerprint: Optional[Mapping[str, str]] = None,
 ) -> dict:
-    """C.2（§5.2；profile 改造見 v5 §13 第 4、5、13 項）結論按序取第一個成立者：
-    無效（變異運行無效）→ baseline不合格 → 回Phase1-變異移植／不通過 →
-    無效（缺 active profile）→ 不可判定-待解釋 → 通過。
-    `active_profile=None`（尚未啟用 R27，場 0 前或場 0 中途停止時的常態）在到達簽名比對這一步
-    時判「無效：缺 active profile」，不得默默落回 R55 下結論；`historical_R55_deviation` 無論
-    是否有 active profile 都計算並回報，但只供參考，不影響 conclusion。"""
+    """C.2（§5.2；profile 改造見 v5 §13 第 4、5、13 項；環境指紋見 §10 R13）結論按序取第一個成立者：
+    無效（變異運行無效）→ baseline不合格 → **無效（缺 active profile）** →
+    **無效（環境指紋不符）** → 回Phase1-變異移植／不通過 → 不可判定-待解釋 → 通過。
+
+    §7 結論程序「互斥、按序取第一個成立者」中「2 無效」優先於「3 不可判定」「4 不通過」：
+    `active_profile=None`（尚未啟用 R27，場 0 前或場 0 中途停止時的常態）與「環境指紋不符」
+    都必須在 migration／unkilled 判定**之前**攔下，不得先落到「回Phase1-變異移植」或「不通過」
+    才被發現其實整個判定基準都不成立。`historical_R55_deviation` 無論是否有 active profile
+    都計算並回報，但只供參考，不影響 conclusion。`mutants`／`active_profile_deviation` 兩欄
+    在任一「無效（缺 active profile）」短路前一律算好，供人工核對「殺死點其實成立」
+    （見 `test_no_active_profile_is_invalid_even_when_kills_would_match_r55`）。"""
     tables = {"M2": m2_table, "M3": m3_table}
     mutant_reasons = [
         f"{name}: {reason}"
@@ -598,8 +625,10 @@ def evaluate_negative_control(
         "baseline_reasons": baseline_reasons,
         "mutant_invalid_reasons": mutant_reasons,
         "mutants": {},
+        "active_profile_present": active_profile is not None,
         "active_profile_deviation": None,
         "historical_R55_deviation": [],
+        "env_fingerprint": "unknown",
         "product_files": changed,
         "migration_trigger": False,
     }
@@ -607,13 +636,32 @@ def evaluate_negative_control(
         return dict(base, conclusion="無效", reasons=mutant_reasons)
     if not baseline_ok:
         return dict(base, conclusion="baseline不合格", reasons=baseline_reasons)
+
     reports = {
         name: mutant_kill_report(name, baseline_table, tables[name], active_profile) for name in MUTANT_NAMES
     }
     historical_deviation = [d for name in MUTANT_NAMES for d in reports[name]["historical_R55_deviation"]]
+    active_deviation = (
+        None
+        if active_profile is None
+        else [d for name in MUTANT_NAMES for d in (reports[name]["active_profile_deviation"] or ())]
+    )
     unkilled = [name for name in MUTANT_NAMES if not reports[name]["kill_ok"]]
     migration = bool(unkilled) and bool(changed)
-    result = dict(base, mutants=reports, historical_R55_deviation=historical_deviation, migration_trigger=migration)
+    result = dict(
+        base,
+        mutants=reports,
+        active_profile_deviation=active_deviation,
+        historical_R55_deviation=historical_deviation,
+        migration_trigger=migration,
+    )
+    # §7 W7「無效（含缺 active profile）→ 2」優先於 3、4：在 migration／unkilled 之前攔下。
+    if active_profile is None:
+        return dict(result, conclusion="無效", reasons=[_NO_ACTIVE_PROFILE_REASON])
+    env_status, env_reasons = env_fingerprint_check(active_profile, run_env_fingerprint)
+    result = dict(result, env_fingerprint=env_status)
+    if env_status == "mismatch":
+        return dict(result, conclusion="無效", reasons=env_reasons)
     if migration:
         return dict(
             result,
@@ -623,10 +671,6 @@ def evaluate_negative_control(
         )
     if unkilled:
         return dict(result, conclusion="不通過", reasons=[_unkilled_reason(reports[name]) for name in unkilled])
-    if active_profile is None:
-        return dict(result, conclusion="無效", reasons=[_NO_ACTIVE_PROFILE_REASON])
-    active_deviation = [d for name in MUTANT_NAMES for d in (reports[name]["active_profile_deviation"] or ())]
-    result = dict(result, active_profile_deviation=active_deviation)
     if active_deviation:
         return dict(result, conclusion="不可判定-待解釋", reasons=active_deviation)
     return dict(result, conclusion="通過", reasons=[])

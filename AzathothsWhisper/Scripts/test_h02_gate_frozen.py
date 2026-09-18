@@ -10,15 +10,16 @@ import io
 import unittest
 
 import h02_gate_eval as gate
-from test_h02_gate_fixtures import C2, MUTANT_KILLED, T4S2_OFFSET, T4S2_STACK, m0_run, pass_at
+import h02_gate_r27_profile as r27profile
+from test_h02_gate_fixtures import C2, MUTANT_KILLED, T4S2_OFFSET, T4S2_STACK, m0_run, pass_at, r27_profile
 
 C6_T3 = "SIG{T3.s1|C6-NEVER-SETTLES}"
 SNAPBACK_T1S3 = "SIG{T1.s3|C4-SNAPBACK|from=T11|to=T12}"
 
 
-def verdict(m0, mutant=None):
+def verdict(m0, mutant=None, active_profile=None):
     mutant = mutant or m0_run(n=3, overrides=MUTANT_KILLED)
-    return gate.verdict(m0, mutant, mutant, s2_verified=True)
+    return gate.verdict(m0, mutant, mutant, s2_verified=True, active_profile=active_profile)
 
 
 class FrozenConformityTests(unittest.TestCase):
@@ -28,22 +29,56 @@ class FrozenConformityTests(unittest.TestCase):
         self.assertEqual(v3["frozen_conformity_reasons"], [])
         self.assertEqual(v3["frozen_deviations"], [])
 
-    def test_ce1_stable_c6_on_frozen_pass_step_is_undecidable(self):
+    def test_ce1_stable_c6_on_frozen_pass_step_only_deviates_without_active_profile(self):
+        """v5 §13 第 2、4、6 項改寫：`FROZEN_ALLOWED_CODES`／`FROZEN_REGISTRATION`（26.6.2 導出）
+        降為 historical，不得再作沒有 active profile 時的判定基準——CE1（穩定新碼出現在凍結
+        PASS 步驟）不再讓結論落入「不可判定」，只記 deviations（場 0 `cf-m0-27` 首跑時尚無
+        active profile，不得被舊表擋下）。若要恢復「新碼即擋」，見
+        `test_active_profile_m0_allowed_codes_blocks_foreign_code`（改用 active profile 的
+        M0 允許碼登記）。"""
         v = verdict(m0_run(overrides={("T3", "s1"): [C6_T3]}))
-        self.assertEqual(v["conclusion"], "不可判定")
-        self.assertTrue(any("R4-F" in r and "T3.s1" in r and "C6-NEVER-SETTLES" in r for r in v["reasons"]), v["reasons"])
+        self.assertNotEqual(v["conclusion"], "不可判定")
+        self.assertEqual(v["v3"]["frozen_conformity_reasons"], [])
+        self.assertTrue(v["v3"]["frozen_conformity_ok"])
+        self.assertTrue(any("T3.s1" in d for d in v["v3"]["frozen_deviations"]), v["v3"]["frozen_deviations"])
 
-    def test_ce2_stable_extra_code_on_frozen_c2_step_is_undecidable(self):
+    def test_ce2_stable_extra_code_on_frozen_c2_step_only_deviates_without_active_profile(self):
         v = verdict(m0_run(overrides={("T1", "s3"): [C2[("T1", "s3")], SNAPBACK_T1S3]}))
-        self.assertEqual(v["conclusion"], "不可判定")
-        self.assertTrue(any("C4-SNAPBACK" in r for r in v["reasons"]), v["reasons"])
+        self.assertNotEqual(v["conclusion"], "不可判定")
+        self.assertEqual(v["v3"]["frozen_conformity_reasons"], [])
+        self.assertTrue(any("C4-SNAPBACK" in d for d in v["v3"]["frozen_deviations"]), v["v3"]["frozen_deviations"])
 
-    def test_single_iteration_with_foreign_code_is_also_undecidable(self):
-        # 不是只擋「穩定」的新碼：1/10 出現 F 外碼同樣與預登記矛盾
+    def test_single_iteration_with_foreign_code_only_deviates_without_active_profile(self):
+        # 不再是「1/10 出現 F 外碼即擋」：無 active profile 時只記偏離。
         once = lambda i: [C2[("T1", "s2")], "SIG{T1.s2|C4-REVERSAL|seq=T11>T12>T11}"] if i == 7 else [C2[("T1", "s2")]]  # noqa: E731
         v = verdict(m0_run(overrides={("T1", "s2"): once}))
-        self.assertEqual(v["conclusion"], "不可判定")
-        self.assertTrue(any("iter 7" in r for r in v["reasons"]), v["reasons"])
+        self.assertNotEqual(v["conclusion"], "不可判定")
+        self.assertEqual(v["v3"]["frozen_conformity_reasons"], [])
+        self.assertTrue(any("iter 7" in d for d in v["v3"]["frozen_deviations"]), v["v3"]["frozen_deviations"])
+
+    def test_active_profile_m0_allowed_codes_blocks_foreign_code(self):
+        """甲案：有 active profile 且該步驟已登記 `allowed_codes` 時，超出的碼仍判「不可判定」
+        （R4-F 的判據從舊表換成 active profile 的 M0 半，攔阻能力保留，只是判定來源換了）。"""
+        profile = r27_profile(
+            m0={("T3", "s1"): r27profile.M0StepProfile(sig_set=frozenset(), allowed_codes=frozenset(), stable=True)}
+        )
+        v3 = gate.evaluate_v3(m0_run(overrides={("T3", "s1"): [C6_T3]}), 10, active_profile=profile)
+        self.assertFalse(v3["frozen_conformity_ok"])
+        self.assertTrue(
+            any("R4-F" in r and "T3.s1" in r and "C6-NEVER-SETTLES" in r for r in v3["frozen_conformity_reasons"]),
+            v3["frozen_conformity_reasons"],
+        )
+
+    def test_active_profile_present_but_step_unregistered_only_deviates(self):
+        """有 active profile，但違規步驟本身不在 `active_profile.m0` 登記中——一樣只記偏離，
+        不得誤用舊表把它擋下（登記範圍外的步驟等同沒有 active 依據）。"""
+        profile = r27_profile(
+            m0={("T1", "s1"): r27profile.M0StepProfile(sig_set=frozenset(), allowed_codes=frozenset(), stable=True)}
+        )
+        v3 = gate.evaluate_v3(m0_run(overrides={("T3", "s1"): [C6_T3]}), 10, active_profile=profile)
+        self.assertTrue(v3["frozen_conformity_ok"])
+        self.assertEqual(v3["frozen_conformity_reasons"], [])
+        self.assertTrue(any("T3.s1" in d for d in v3["frozen_deviations"]), v3["frozen_deviations"])
 
     def test_ce3_c3_instead_of_c1_at_t4s2_conforms(self):
         # §6 V3 明文接受 T4.s2 以 C1／C3／C5 之一抓缺陷 3 → F(T4.s2) 含 DEFECT3_CODES；與登記 {C1,C2} 不同只記偏離
@@ -111,10 +146,26 @@ class FrozenConformityCLITests(unittest.TestCase):
         self.assertIn("frozen_conformity_ok: True", out)
         self.assertIn("T2.s2", out)
 
-    def test_print_verdict_shows_r4f_reason(self):
+    def test_print_verdict_without_active_profile_shows_deviation_not_undecidable(self):
+        """v5 §13 第 2、4、6 項改寫：無 active profile 時 CLI 不得印「不可判定」／「R4-F」——
+        只印 deviations，`frozen_conformity_ok` 維持 True。"""
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             gate._print_verdict(verdict(m0_run(overrides={("T3", "s1"): [C6_T3]})))
+        out = buf.getvalue()
+        self.assertNotIn("不可判定", out)
+        self.assertIn("frozen_conformity_ok: True", out)
+        self.assertIn("T3.s1", out)
+
+    def test_print_verdict_with_active_profile_still_shows_r4f_reason(self):
+        """甲案：有 active profile 且該步驟已登記 allowed_codes 時，CLI 仍印「不可判定」／
+        「R4-F」（判定來源換成 active profile，攔阻能力不變）。"""
+        profile = r27_profile(
+            m0={("T3", "s1"): r27profile.M0StepProfile(sig_set=frozenset(), allowed_codes=frozenset(), stable=True)}
+        )
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            gate._print_verdict(verdict(m0_run(overrides={("T3", "s1"): [C6_T3]}), active_profile=profile))
         out = buf.getvalue()
         self.assertIn("不可判定", out)
         self.assertIn("R4-F", out)
