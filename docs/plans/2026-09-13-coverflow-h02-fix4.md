@@ -7,7 +7,8 @@
 - 模式（fatboyslim Phase 0）：本 session＝**normal**（只做 Phase 1：寫 Plan → Codex 評審辯論 → 定稿；不動產品源碼、不跑 UITest、不 commit）。
   實施 session 開工時重判；本計劃預登記推薦 **normal**——每場 UITest 需使用者在場授權 Automation Mode（memory
   `automation-mode-timeout-needs-user-present`），無人值守段不存在；候選迭代受 §5.1 絕對上限與熔斷約束（操作護欄，需使用者批准）
-- 狀態：**定稿（2026-09-13）**。v1 經 Codex R1（12 條）＋ Opus 四視角（53 條）改為 v2；v2 經 Codex R2（10 條，全部採納）改為 v3；v3 經 Codex R3 整體確認（4 條殘餘，全部採納）改為 v4；Codex R4 窄範圍確認：三處與 §14 R3 表「無異議」，僅 R3-1 措辭殘餘一處，已按其建議改為 `physical_valid_base／_off／_on`（§14 R4）。**使用者 2026-09-13 確認執行並批准 §5 操作護欄**；ACCEPTANCE H-02 狀態變更未另行明示 → 依 N3 留待使用者拍板，本計劃不動 ACCEPTANCE
+- 狀態：**v5 定稿（2026-09-18，使用者批准執行）**——macOS 27／Xcode 27 升級使 26.6.2 的全部 UI 基準失效，經 thecure 四輪辯論收斂：新增**場 0 基準重建**（§6；§3 B／N2 的有限例外）、**G6 無 AX 遠跳條款**（範圍擴大，使用者批准）、**H3 改走 b′**（Strip 介面不動）、Z1 五項結案、判定器改 **R27 active profile**（staging→原子啟用）。變更逐條見 §13「v5 提案」，辯論全文 `~/Developer/bjork-h02-gate/fix4/debate-R8/`。以下 v4 沿革保留：
+- v4 沿革：**定稿（2026-09-13）**。v1 經 Codex R1（12 條）＋ Opus 四視角（53 條）改為 v2；v2 經 Codex R2（10 條，全部採納）改為 v3；v3 經 Codex R3 整體確認（4 條殘餘，全部採納）改為 v4；Codex R4 窄範圍確認：三處與 §14 R3 表「無異議」，僅 R3-1 措辭殘餘一處，已按其建議改為 `physical_valid_base／_off／_on`（§14 R4）。**使用者 2026-09-13 確認執行並批准 §5 操作護欄**；ACCEPTANCE H-02 狀態變更未另行明示 → 依 N3 留待使用者拍板，本計劃不動 ACCEPTANCE
 
 **用語**：「產品源碼」＝`Features/CoverFlow/*.swift` 等產品側檔案；「產品碼」只指 C0–C7 失敗碼（判定器 `PRODUCT_CODES`）。
 
@@ -28,12 +29,15 @@
 - G3　C.1–C.7 全部落成可由腳本／程序判定的條款（§5），判定器先 TDD 再用。
 - G4　證據包逐條回扣 §7；閘門計劃 §11 記錄的兩格不一致（T1.s3、T2.s2）以 C.3 儀器**解釋**（不裁決）。
 - G5　不惡化 H-05：程式化居中（含初始值路徑的補居中與其跨幀回寫）不得被誤判為使用者接管（K5，F7 先紅後綠）。
+- G6　**（v5 新增，2026-09-18 使用者批准範圍擴大）** 無 AX 客戶端時，H3 產生的程式化居中（含 `trackChanged`／載入完成／重建的**遠距、尚未具現**目標）必須把 requested 卡置於視口中心，**|Δ| ≤ 3pt**；Δ 定義＝U1c 還原的**變換前 layout midX** − viewport midX（只沿用 C1 的數值閾值，訊號與現行 C1 的 AX 變換後外框不同）。條款只規結果、不規修法。依據：F-JUMP 證偽了「運行時路徑正確」這個 G1 的參照前提（§13）。
 
 **非目標**
 - N1　重議使用者既裁定（§3）。
 - N2　改閘門計劃 §6 判據、R4-C／R4-F／R4-X；重跑 R5-5。
+  **v5 例外（2026-09-18 使用者批准）**：macOS 27／Xcode 27 升級使 26.6.2 上的全部 UI 基準失效（§13 實證），新增**場 0 基準重建**（§6）——在 27 上重跑 M0／M2／M3／既有 UITests 以建立 R27 基準。這是**基準重建，不是重判**：R5-5 的「部分通過」結論與 §3 B 的既裁定不變，舊資料降為 26.6.2 歷史事實。
 - N3　ACCEPTANCE H-02 狀態改寫／拆條、❌ 圖例、M8 收口條件、DMG 重建、README——屬交接檔 §5.3 收尾與閘門計劃 N5／N6 的驗收基線變更；R6 的 D 序列「收官」＝閘門計劃 R5-6 證據包＋commit `a1d3407`（已於 2026-09-12 完成）。ACCEPTANCE 是否現在就把 H-02 標為「已驗失敗」由使用者另行拍板（見 §3 D 註），不在本計劃內默認推遲或默認執行。
 - N4　H-04 自動平滑居中動畫；H-05 的完整交互整合驗證（本計劃只守 G5／K5 不惡化）。
+  **v5 註**：G6 只規結果。若 F7 的**動畫四分法**（裸賦值／`Transaction.disablesAnimations=true`／零時長 animation／可見 animation，同一無 AX 條件、同一目標集合、以 presentation layer 時序判「有無中間位置幀」）證明**唯有可見動畫**能滿足 G6，則停在 F7 前帶數據問使用者是否擴大 H-04，不得先行實作。API 名稱不作「非可見」的證據。
 - N5　提高 macOS 部署目標。本計劃**預設維持 14.0**（§4.4 D-A）；若實測證明 macOS 14 API 路線不可行，升目標是使用者決定，另問。
 - N6　S7 事件注入（`CGEventCreateScrollWheelEvent` 帶 phase／momentum）作為閘門判據——只保留為 §5.4 的備案手段，須先向使用者報告並取得同意。
 - N7　H2-e（顯式 ZStack 自行排序繪製）：v1 曾列為預設候選，R1 裁決刪除——它與 M1 同屬回呼→狀態通道、又拆掉 LazyHStack 惰性（真實專輯無 20 曲上限），改動面最大而無獨立證偽條件。
@@ -61,9 +65,13 @@
 | 運行成本：M0 ×10（40 case）測試時間合計 490 s；M2／M3 ×3 各約 147 s；含構建三份約 25 分鐘 → 候選 ×20 估 20–25 分鐘、×3 變異各約 5 分鐘、四測試 ×3 約 5 分鐘 | `cf-*-confirm.log` 逐 case 加總 |
 | SDK（Xcode 26.6，MacOSX26.5.sdk；本機 macOS 26.6.2；部署目標 **14.0**）：`scrollPosition(id:anchor:)`／`contentMargins`／單參數 `onGeometryChange(for:of:action:)` **macOS 14**（帶 (old,new) 重載 15+）；`ScrollPosition`（`scrollTo(id:anchor:)`、`isPositionedByUser`、`viewID`）、`onScrollPhaseChange`、`onScrollGeometryChange`、`onScrollTargetVisibilityChange` **macOS 15+**；`NSView.displayLink(target:selector:)` **`API_AVAILABLE(macos(14.0))`**，標頭註明 view hidden／不在顯示器上時不回呼；`open --env NAME=VALUE` 可為正常 LaunchServices 啟動注入環境變數；`screencapture -v`／`-V <seconds>` 可錄影 | swiftinterface `@available` 行；`NSView.h:609-616`；`man open`；`man screencapture` |
 | 交接檔記錄的死路：`contentMargins(for:.scrollContent)` 取代 safeAreaPadding → EDGE 失敗表與基線逐字節相同；`.padding` 取代 → 更糟（請求 0→實際 3）；M2 `.leading` 修 command 破 observed；M3 `scrollTo` 與手滑打架；閘門計劃 §2：**首次載入屬哪條路徑未知** | 交接檔 §2；閘門計劃 §2 |
-| T0 單測基線：EDGE `edgeItemsAlsoReachCenter` 6/7 紅（args 1,4,5,6,7,8；落點 max(0, 請求−3)）、RUNTIME 3/3 綠、RENDERED 綠——EDGE 是缺陷 3 的單元級訊號；RENDERED 是缺陷 1 修法（兩端同座標空間）的守門 | 閘門計劃 §11 T0；`CoverFlowStripRenderGeometryTests.swift` |
+| ~~T0 單測基線：EDGE 6/7 紅（args 1,4,5,6,7,8）、RUNTIME 3/3 綠、RENDERED 綠~~ → **v5：降為 26.6.2 歷史事實**。**T0′（macOS 27，2026-09-18 實跑 `a1d3407`）＝381 tests／8 issues**：EDGE 6 紅（同一參數集合，但 4–7 落點由 d≈0.1 貼齊變為偏 ~17pt）＋**RENDERED 2 條紅**（走同一初始值路徑）；RUNTIME 3/3 仍綠 | `fix4/unit-a1d3407-m27.log`；§13 |
 | M2／M3 重建程序（R5-5 已跑通）：rsync 最終 tree → 只換 `CoverFlowStrip.swift` → 獨立 `-derivedDataPath` → 串行 `test` → 溯源（hashlist 只差 Strip、CDHash、products dir、IDENTITY）→ `lsregister -u` | 閘門計劃 §11 T9／R5-5；`mutant-runs-R55/` |
 | codex CLI 0.153.2；Automation Mode 需使用者在場（60 s 逾時）；重建後既有 UITests 與非 fixture 啟動會撞鑰匙串授權框（閘門 fixture 模式走 `EphemeralSecretStore` 不受影響） | `which codex`；memory 兩條 |
+| **v5 環境基線（2026-09-18 實查）**：本機 **macOS 27（26A428）＋Xcode 27.0（27A266a）＋SDK 27.0**（2026-09-16 升級）；部署目標仍 14.0。上表 SDK 行的可用性結論仍成立，但**單參數 `onGeometryChange(for:of:action:)` 實為 macOS 13+**（15+ 才是 (old,new) 雙參數版）；macOS 14 的**運行時**語義本機無法實證（無 14 機器），凡涉 14 的結論一律標「未證」 | `sw_vers`／`xcodebuild -version`／`softwareupdate --history`；SDK swiftinterface |
+| **v5 失效清單**（降為 26.6.2 歷史事實，**不得**作 macOS 27 上的比較基準）：`cf-m0-confirm` 每格結果／七個穩定步驟／兩格不一致；`FROZEN_REGISTRATION`（R4-F）；`R55_KILL_SIGNATURES` 作為當前偏離基準；T0；`ui-T0`；M2／M3 的舊殺死形態；下方 §4.2「運行時路徑正確」敘述；舊運行時間估計。**不失效**：C.1 180/180、C.2 殺死須含 `C2-STACK`、C0–C6 語義、凍結輸入參數、M2／M3 源檔與 hash | §13；thecure R8 辯論 |
+| **F-AX（v5）**：一次 in-process AX 讀取會使 LazyHStack 多具現一張卡，並把之後的程式化跳轉落點由 0/48 變 15/15；讀 CALayer 屬性無此效應 → 閘門（XCUITest 讀 AX）對**無 AX 真實使用**的外推力受限 | Z1 第 2 輪 §5.1 |
+| **F-JUMP（v5）**：無 AX 時產品同款裸賦值跳到未具現目標落鄰卡（nil→6 +41.5pt、nil→7 −41.0pt，各 3/3）；`withAnimation` 貼齊；RUNTIME 單測在 drive 前已輪詢 AX 且目標 1/4/8 撞不到此形態 | Z1 第 2 輪 §5.2；`CoverFlowStripRenderGeometryTests.swift:308` |
 
 ## 3. 使用者既裁定（2026-09-12 拍板，閘門計劃 §12 R6 定稿方案；不重議）
 
@@ -88,7 +96,8 @@
 
 ### 4.2 缺陷 3（初始值路徑少滾 3 stride）：事實與推論鏈
 
-事實：只出在「視圖帶著非 nil `centerID` 被建立」的路徑（EDGE 6/7 紅、T4.s2 10/10 `strides=+3`）；運行時路徑（`onChange` 驅動）正確（RUNTIME 3/3、T2 端點 T00／T19 皆到達）。偏移 ≈ `edgePadding / stride`；`.leading` 可歸零但破壞 observed（M2 真機）。偏移形態下 SwiftUI **沒有**回寫 T16（label 仍 T19）。
+事實：只出在「視圖帶著非 nil `centerID` 被建立」的路徑（EDGE 6/7 紅、T4.s2 10/10 `strides=+3`）；運行時路徑（`onChange` 驅動）正確（RUNTIME 3/3、T2 端點 T00／T19 皆到達）。
+> **v5 修正（2026-09-18）**：「運行時路徑正確」**已被 F-JUMP 證偽**——無 AX 客戶端時，裸賦值跳到**未具現**目標會確定性落鄰卡（±41pt）。舊敘述成立的範圍僅限「有 AX 觀察下、目標已具現」。缺陷 3 的機制在 macOS 27 上另有新事實：clip `bounds.origin.x`＝正確位移 − leading `contentInsets` 466（466/150.8＝3.09 stride），殘差 13.6pt 在 27 上不再被 viewAligned 吸附吃掉（§13 U5）。偏移 ≈ `edgePadding / stride`；`.leading` 可歸零但破壞 observed（M2 真機）。偏移形態下 SwiftUI **沒有**回寫 T16（label 仍 T19）。
 
 推論（推測）：初始值路徑與運行時路徑在 SwiftUI 內是兩套定位計算，只有後者對 safeAreaPadding 正確。修法方向＝**讓初始值路徑不存在**：視圖永遠以 nil 建立，佈局就緒後經運行時路徑居中；不再給定位公式打補償。
 
@@ -99,7 +108,7 @@
 | K1 | 疊放次序不得依賴會**停在舊值**的狀態：任何 `onGeometryChange`→`@State` 通道須先由 F4 spike 實測「滯後 ≤ 1 幀且落定後不停在舊值」，否則否決該路線（適用所有 H2 分枝，無例外） | F4 spike＋C.1 |
 | K2 | 不改 `anchor`（維持 `.center`）；不用 `ScrollViewReader.scrollTo` 與使用者捲動競爭；不改 `safeAreaPadding` 為 `.padding`／`contentMargins` | simcodex 審查＋M2／M3 負對照 |
 | K3 | `CoverFlowStrip` 泛型介面與 `CoverFlowGeometry` API 源碼相容，歷史變異 Strip 檔可直接替換編譯；**以 F2 spike 實際編譯 M2／M3 檔為準**。修法若需 Strip 新參數 → 先回 Phase 1 辯論變異移植程序 | F2／F9 構建 |
-| K4 | EDGE 7/7、RUNTIME 3/3、**RENDERED（缺陷 1 不回歸）**全綠；其餘單測紅燈清單＝T0 | F7 TDD |
+| K4 | **（v5 改寫）候選全量單測零 issue**：EDGE 7/7、RUNTIME 3/3、**RENDERED（缺陷 1 不回歸）**、K5 新測試、G6 的無 AX RED 與全部新增測試皆綠。T0′ 的 8 issues（EDGE 6＋RENDERED 2）只作**修復前 RED**，**不是候選容許的紅燈** | F7 TDD |
 | K5 | 程式化居中（含初始值路徑的補居中及其**跨幀**回寫）不得把 `userHasOverriddenAutoCenter` 設為 true；保護窗口必須覆蓋實際持續期。**先紅後綠**：F7 新增 VM 測試「程式化居中期間連送多個途經 id 的 `scrollPositionDidChange`，落定後 override 仍為 false」，並把 `differentIDCallbackIsTreatedAsUserTakeoverEvenIfProgrammatic` 由釘現況改為新契約 | F7 TDD（VM 必改） |
 | K6 | Release 不含任何測試／儀器符號；儀器預設關閉、閘門運行永不開啟 | `strings`＋grep（W11） |
 | K7 | 候選一律先過單測與 Python 判定器測試，再花 UI 運行 | §6 F9 前置 |
@@ -114,11 +123,17 @@
   - 回寫處理：`armed`／`applying` 期間回寫 ≠ requested → 視為途經、丟棄、不設 override；回寫 ＝ requested → `idle`（settled）。之後的**延遲途經**（`途經 → requested → 延遲途經`）以 generation 比對：只接受 generation ≥ 當前者，settled 後 T_late（預登記 250 ms）內與 requested 不同的回寫仍視為該 generation 的殘餘途經而丟棄。
   - 出口：(a) settled；(b) 被新命令取代（generation+1）；(c) **失敗出口**：進入 applying 後 T_apply（預登記 2 s）內無回寫 ＝ requested → 回 idle、記 log、`centerID` 保持 requested、不設 override（不得永久吞掉之後的使用者捲動）；(d) **取消**：真實使用者輸入——`NSScrollView.willStartLiveScrollNotification`（AppKit，主執行緒觀察；交接檔 §5.2 已建議的 bridge）或鍵盤步進——到達即退出 armed／applying，之後回寫按現行語義視為使用者接管。
   - K5 測試（先紅）至少四組序列：① nil 起始首次回寫 items[0] 不接管；② `途經 → requested → 延遲途經` 不接管；③ requested 永不回寫 → T_apply 後 idle 且後續使用者回寫正常接管；④ applying 期間 live scroll 開始 → 取消並接管。另：⑤ `user` 命令期間途經回寫不重複設 override（冪等）。
-- 落點三選一（F2 spike 決定；優先順序如列）：
-  - H3-a(b)：程式化窗口上移到 VM（`beginProgrammaticCentering(generation)`／回寫比對），`CoverFlowView` binding setter 配合；**Strip 介面完全不動**（K3 最安全）。
-  - H3-a(a)：Strip 加帶預設值的新參數（例如 `onLayoutReady`）；須先以 M2／M3 檔實際編譯證明 K3 仍成立，否則不選。
+- 落點（**v5 改寫，2026-09-18；依 Z1 第 2 輪 U5 實證＋thecure R8**）：
+  - **H3-a(b′)＝第一順位**：程式化窗口在 VM（`beginProgrammaticCentering(generation)`），觸發訊號由**呼叫方**取得——`CoverFlowView` 傳給 Strip 的**內容閉包**（或對 Strip 外掛的 modifier）在**首次 `onGeometryChange` 回呼內同步**呼叫 VM 灌入 requested。**Strip 泛型介面與 `CoverFlowGeometry` 完全不動 → K3 天然成立、不觸發 §5.7**。證據：U5 的 B 情境 21/21 貼齊（目標 3／6／7／8）、只一次同值 echo、0 途經，其探針正是掛在內容閉包內。
+    - 守衛：**MainActor 上原子消耗的 `(viewEpoch, generation, requested)`**——先消耗再寫 binding；不匹配或已消耗的回呼 no-op。**禁用**每卡 `@State Bool` 與 VM 永久 Bool。
+    - **接縫 1（spike 3 必驗）**：現行 binding setter 只交付 `id`、無 generation provenance（`CoverFlowView.swift:35`）→ 要麼證明 setter 閉包能捕獲建立時的 `(viewEpoch, generation)` 且延遲回呼確實回到原閉包，要麼把契約改成「active-generation 時間窗＋live-scroll 取消」，**不得**聲稱能比對回呼自身的 generation。
+    - **接縫 2（必做）**：分離 `commandedID` 與傳給 Strip 的 `scrollID`——切 tab 重建時 VM 仍持有 `centerID`，Strip 初次 getter 讀到非 nil，b′ 就沒有消除初始值路徑；b′ 回呼須先原子 `armed → applying` 再寫 `scrollID=requested`。
+    - 以**單參數** `onGeometryChange`（deployment target 14）實作，不用 15+ 雙參數版；macOS 14 運行時語義**未證**。
+  - ~~H3-a(b)（VM 側非同步觸發族）~~：**實證否決**——`RunLoop.main.perform`（佈局前）24/24 落「請求−3」、`Task.yield` 5/24、固定延遲 50–1500ms 0/48（§13 U5）。否決範圍僅限**已測的 VM 非同步觸發族**。
+  - H3-a(a)：Strip 加帶預設值的新參數（例如 `onLayoutReady`）——**第二順位**；K3 明文「修法若需 Strip 新參數 → 先回 Phase 1」，故須先做 K3 spike（M2／M3 檔在含新參數的 tree 直接編譯）**再回 Phase 1 由使用者批准變異移植程序**，才可進 F7。K3 失敗的出口依序：改用可保持舊呼叫相容的 API 形態 → 回 Phase 1 批准新的變異移植程序 → 承認兩條 macOS 14 路線皆失敗、討論 H3-b／升部署目標。
   - H3-b：macOS 15 `ScrollPosition`（`scrollTo`／`isPositionedByUser`）——僅在 (a)(b) 皆被實證否決時，帶證據回 Phase 1 問使用者是否升部署目標（N5、D-A）。
-- 已知風險：以 nil 起始時 SwiftUI 是否在首次佈局回寫 items[0]（U5）；若回寫，`applying` 狀態機必須吞掉它（否則 T4.s2 `C3-TARGET-MISS`／T00 錯位）；EDGE 單測是最便宜的 RED→GREEN 迭代面。
+- ~~已知風險：以 nil 起始時 SwiftUI 是否在首次佈局回寫 items[0]（U5）~~ → **v5：U5 已答（2026-09-18）**——nil 起始 21/21 **不回寫 items[0]**、全情境 0 次途經回寫；`applying` 不必為此設計吞噬邏輯（仍須處理同值 echo）。EDGE 單測仍是最便宜的 RED→GREEN 迭代面。
+- **v5 新增（G6）**：b′ 實作後，H3 的 auto 命令（`trackChanged`／載入完成／重建）在**無 AX、目標未具現**時也必須把 requested 卡置中（G6）。正式 RED 的位置＝場 0 全過 → spike 3 建立並驗證無 AX 身分與 Δ 量測 → 在未改 H3 產品行為的基線上凍結 RED → 動畫四分法 → 必要時問 H-04 → F7 轉綠。RED 要求：全程到 verdict 不讀 AX；20 張或等價大專輯；覆蓋未具現遠距目標、兩個方向與末端；斷言 requested 身分且 |Δlayout| ≤ 3pt；以 VM 測試證明 `trackChanged`（`CoverFlowViewModel.swift:140`）／載入完成（同檔 `:215`）／重建都匯入同一受驗 command pipeline；凍結測試名、失敗輸出與基線 hash。Z1 第 2 輪的 U5x 只作**發現證據**，不得充當正式 RED（9 張簡化 harness、最後仍讀 AX）。
 
 **H2（缺陷 2）——「z 序不停在舊值」**（F4 以兩個 scratch 變異實測選枝，皆 macOS 14 API）
 - S-b（逐項連續 zIndex）：每張卡自己的單參數 `onGeometryChange(for: CGFloat.self)` 寫 |d| 進逐項 `@State`，`zIndex(−|d|)`；旋轉／縮放**維持** `.visualEffect`（缺陷 1 修法不動）。代價：z 序輸入與旋轉輸入仍是兩個通道，但兩者都源於同一幀的佈局幾何；一幀滯後可接受，**停在舊值不可接受**（K1）。
@@ -161,7 +176,7 @@
   - 每份變異運行須**有效**；無效 → 修基建後重跑（受無效上限）。
   - 殺死(step) ⇔ K<n> 該步 20/20 PASS ∧ 變異該步 3/3 FAIL ∧ 三次完整正規化簽名集合相同 ∧ 碼 ⊆ `PRODUCT_CODES` ∧ **產品碼投影含 `C2-STACK`**（其他碼可併存但不得單獨構成殺死——防止 §5.5 新碼把與疊放無關的差異算成殺死）。
   - **通過** ⇔ M2_K 在 {T1.s1, T2.s1} ≥ 1 步殺死 ∧ M3_K 在 {T1.s1, T2.s1, T3.s1} ≥ 1 步殺死。
-  - **簽名偏離**：殺死步驟簽名集合與 R5-5 確認簽名（M2：`C2-STACK|G=T11|over=T10|side=L`；M3：同＋T3.s1 `C2-STACK|G=T10|over=T09|side=L`）逐字比對；不同 → 列示＋解釋；**解釋不出 → 不可判定，上報**（不得自動通過）。
+  - **簽名偏離（v5 改寫）**：比對對象＝**場 0 凍結並已原子啟用的 R27 active profile**（M2／M3 各自的殺死簽名）。判定器同時輸出兩欄：`active_profile_deviation`（參與結論）與 `historical_R55_deviation`（26.6.2 舊值 M2：`C2-STACK|G=T11|over=T10|side=L`；M3：同＋T3.s1 `C2-STACK|G=T10|over=T09|side=L`，**只作跨版本資料、不參與結論**）。active 偏離 → 列示＋解釋；**解釋不出 → 不可判定，上報**。**無 active profile（仍在 staging 或場 0 未全過）→ 運行無效**，不得以 R55 下結論。`REQUIRED_KILL_STEPS` 與「殺死須含 `C2-STACK`」不因換 profile 而改，且**不得依場 0 結果改寫**；若 R27 上 required 集合已無 baseline PASS，跑變異前就停（§7 場 0 停止分支）。
   - **殺死點消失且候選改了 Strip 以外的產品源檔**（VM／Geometry；由 K7 前置的 `git diff --name-only` 機械判定）→ 不判 C.2 不通過、不計熔斷，回 Phase 1 辯論變異移植程序（例如同時回退 VM 改動的第二份變異）。K5 已使 VM 成為必改檔，此分支預期會被觸發，屆時的移植程序須先辯論。
   - **編譯不相容** → 該變異「不可建」→ 上報（不算殺死、不算不通過）。
 
@@ -169,7 +184,13 @@
 
 - 形態：DEBUG-only 取樣器 `CoverFlowUITestSampler`，環境變數 `AZW_COVERFLOW_SAMPLER_PATH=<檔>` 存在且 trace 已安裝時啟動；`NSView.displayLink(target:selector:)` 驅動，**以 `.common` 模式加入 run loop**（live scroll tracking 期間主 run loop 在 event-tracking 模式，`.default` 會靜音）；宿主 view＝主視窗 `contentView`，視窗未就緒時重試安裝。**寫入獨立檔**（不進 trace，`readUntilQuiet` 與契約報告 notes 完全不受影響）；檔首 header 含 `pid`／`epoch-us`（wall-clock 錨點）／bundle。
 - 每幀記錄（`frame`）：`t_us`（與 trace 同一 `ContinuousClock` 起點）、VM `centerID` 在 `items` 中的序位（由組裝時注入的 provider 讀取，DEBUG）、每張可見卡：`items` 序位、**變換前**佈局 midX、變換後外框、z 序訊號；以及在幾何中心卡 G 與兩鄰張的交疊點上「最上層卡序位」。
-- **Z1 spike（F2，動工前必須解決，拆三項）**：U1a z 序訊號來源（CALayer 子層次序或 `layer.hitTest`；備案 AX hit-test）；U1b 層→卡片序位對應（`.drawingGroup()` 後每張卡是否各有可辨識的層；備案：以層的變換後外框與同幀 in-process AX 元素外框配對）；U1c 變換前 midX 是否可由 `layer.position`／`bounds`／`anchorPoint` 還原（備案：用 AX 變換後外框 midX 並預登記 |d| ≤ δ 下的偏差上界）。幾何與 z 序皆取 **presentation layer**（或證明該路徑無隱式動畫）。三項任一不成立 → §10 R2 備案階梯 → 終點「不可建」上報。
+- ~~**Z1 spike（F2，動工前必須解決，拆三項）**~~ → **v5 結案（2026-09-18，Z1 第 2 輪；詳見 §13）**：
+  - **U1a 成立**：z 序訊號＝卡層父層的 `sublayers` 次序（單調反映 zIndex，`zPosition` 全 0），`layer.hitTest`（model 與 presentation 皆可）作交叉核對，50/50＋50/50 命中 zIndex 最大者。**AX hit-test 已證無效**（回樹序），階梯跳過該級。
+  - **U1b 主方法不成立**（卡層無身分載體、同一卡跨位置換 CALayer 物件）。**計劃備案（同幀 AX 外框配對）雖可行（9/9、殘差 0.000pt）但不採用**——F-AX 證明 AX 讀取會改變 LazyHStack 行為，逐幀讀 AX 的 sampler 會自己製造觀察者效應。**改為無 AX 方案**：P_trans 只用**同幀層身分**（G＝分解後佈局 midX 最近視口中心者的層；top＝`sublayers` 次序／`hitTest`；判 `top === G`），**不需卡片語義身分**；絕對 `Txx` 序位只作**非裁決診斷**，**不得由 z 頂層推導**（會循環論證），跨幀追蹤若證不出唯一就刪除絕對序位輸出。卡片語義身分（G6 與 C.3 解釋需要）依序試：① `CoverFlowView` 內容閉包內 DEBUG-only 被動 `NSViewRepresentable` marker（Coordinator 以 `persistentID` 註冊弱引用、逐幀讀 window frame 與層配對，須做 ON／OFF 觀察者效應驗證）；② 純色 contents 指紋；③ 事後 AX 單幀標記（**只限落定快照**，且 AX 前後完整層投影——`ObjectIdentifier`／ancestry／class／bounds／position／anchorPoint／transform／zPosition——逐值不變才可追溯貼標；**不得宣稱排除觀察者效應**、不得用於跨幀或後續行為證據）。
+  - **U1c 成立**：transform 分解（軸邊以齊次 `w≈1` 判別、以軸邊長還原 scale、再回推佈局 midX），落定 max|Δ理論| 1.0pt（除 p=8 的共同 −1pt 落定偏移外 ≤0.4pt），運動中與解析法差 ≤0.2pt，|d|→0 不退化。**NSScrollView 解析法不可獨立使用**（LazyHStack 估計尺寸使 DocumentView 1467→1358、整體偏 108.4pt）。AX 外框備案的偏差上界：|d|<0.05 ≤2.07pt、[0.05,0.20) ≤7.28pt、[0.20,0.29] ≤9.16pt、>1 ≤18.29pt。
+  - **取樣層**：幾何與 z 序**預設讀 presentation layer**；本輪程式化捲動下 model 與 presentation transform 272 樣 0 差異，但真實 live scroll 未驗 → 要降為 model layer 須先由 F3b 實證。
+  - **U-DL 成立（代理）**：sampler 必須以 `.common` 加入 run loop——`.default` 在 event-tracking 泵下 3/3 完全靜音；`.common` 四種泵 ×3 全過（中位 8.33ms@120Hz、最大 ≤20.03ms）。真實觸控板 live scroll 由 F3b (e) 實證。
+  - **sampler 一律不讀 AX**（manifest 記 `identity_source`）；F3b (c) 的觀察者效應量測須涵蓋身分方案本身。
 - 角色分離：儀器＝訊號源。C.3 用途＝解釋兩格不一致與 K1 的滯後量測，結論只寫「觀察／推論／未排除」；不改 C.1／C.2 判據；候選 ×20 與變異 ×3 一律儀器 OFF。§5.4 對同一訊號套預登記謂詞，且先經負對照驗證才可裁決過渡態。
 - **F3a 基建等價對照（儀器 OFF）**：基建改動後的 M0 tree，四測試 ×3 儀器 OFF：運行有效；每格產品碼投影 ⊆ 閘門計劃 R4-F 的 F(step)；R5-5 七個 10/10 穩定步驟（T1.s1／T1.s2／T2.s1／T2.s3／T3.s1／T4.s1／T4.s2）結果與凍結表相同。這是 §5.7「行為差異」的實證，不是 ON 輪。
 - **F3b 儀器健康（儀器 ON，四測試 ×3）**：
@@ -244,7 +265,8 @@
 | P8 | 冷啟動 | Cmd-Q 結束 app → `open --env` 重啟 → 切入 Cover Flow（自動居中） | 首載 | 首載落定 |
 | P9 | 任意 | 在 Music 切到同專輯另一曲（自動居中，H-04／H-05 路徑） | 切歌 | 落定＋2 s |
 
-- 證據：`screencapture -v`（或 QuickTime）全程錄影＋逐次結果表（路徑／次序／有效手勢／F1–F4／P_trans／備註）＋ trace／sampler 檔；離線 P_trans（R-neg／R-on）與「落定時幾何中心序位 vs VM centerID 序位」核對。
+- 證據：`screencapture -v`（或 QuickTime）全程錄影＋逐次結果表（路徑／次序／有效手勢／F1–F4／P_trans／備註）＋ trace／sampler 檔；離線 P_trans（R-neg／R-on）＝**同幀層判定 `top === G`**（不需卡片語義身分）。
+  **v5 改寫**：原「落定時幾何中心序位 vs VM centerID 序位」的核對，**只在 §5.3 的卡片語義身分方案（marker／contents 指紋／事後 AX 單幀標記）之一成立時才做**，且屬非裁決診斷；三案皆不成立 → 刪除該核對，缺口明記（W15 註）。**實體輪一律無 AX 客戶端**：無 XCTest runner、不開 Accessibility Inspector／VoiceOver，sampler 絕不讀 AX；manifest 記 `identity_source`。
 - 判定：R-neg 依 §5.4；候選＝R-off 全部零失敗 ∧ R-on 零失敗且 P_trans 零觸發（段皆有效）；人工與 P_trans 不一致的那一次 → 記錄並查明，不得單方覆蓋。
 
 ### 5.7 C.7 回 Phase 1 觸發 ＋ 本計劃核准的基建改動
@@ -256,9 +278,12 @@
   3. `AppModel.live()` DEBUG 分支：安裝條件＝`tracePath 非空 && !isUnitTestHost`，fixture ON 時行為不變、fixture OFF 也安裝（單測：fixture ON→安裝一次；fixture OFF＋path＋unitTestHost=1→不安裝）；
   4. 新碼 `C4-NIL-DWELL`（進 `PRODUCT_CODES`）與／或 `C4-NIL-SHIFT`（僅 Python 離線，trans 輪）——依 §5.5 選擇程序，可並存；F6 checkpoint 後生效；`C7-TRANSIENT-STACK` 僅 Python 離線；
   5. 判定器 `candidate`／`negative-control` 子命令、`PRODUCT_CODES` 擴充、R5-5 殺死簽名常量、殺死含 C2 條款；facade `h02_gate_eval.py` `__all__` 與 `test_h02_gate_parsing.py` 掃描清單同步；
+     **（v5 追加）profile 機制**：新模組承載 R27 profile（外部 JSON，倉庫外；含 M0 每步登記與允許碼／M2·M3 殺死簽名／ui-T0′ 三份基準），`staging → 原子啟用`（四份齊全且各自有效才以含四者 hash 的 manifest 一次寫入啟用），`_signature_deviations` 改讀 active profile 並雙列 historical R55，缺 active → 無效；`R55_KILL_SIGNATURES` 與 `REQUIRED_KILL_STEPS` 逐字不動；
+  11. **（v5）G6 的無 AX host 測試基建**：layer-only 幾何讀取與 U1c 分解的測試側工具、卡片語義身分方案（§5.3 三案）之實作與其 ON／OFF 觀察者效應驗證；
+  12. **（v5）場 0 四棵樹的預構建與身分記錄**（`fix4/trees/`、`fix4/dd/`，倉庫與 iCloud 樹之外；`build-for-testing` 後全程 `test-without-building`）；
   6. `Scripts/h02_sampler_report.py`（`timeline`／`trans`／`nil`）；
   7. **證據持久化**：runner 讀 `TEST_RUNNER_AZW_EVIDENCE_DIR`，trace／sampler／marks 以 `<test>-<iteration>.*` 命名寫入；缺省退回現行 temporaryDirectory（閘門輪行為不變，單測釘住）；tearDown 寫 manifest（tree hash、CDHash、test、iteration、各檔 md5）；判定器把 manifest 缺檔判無效；
-  8. 儀器 `CoverFlowUITestSampler`（獨立檔、`.common` run loop、presentation layer、provider 注入 centerID／items 序位）；非 fixture 模式的序位映射；
+  8. 儀器 `CoverFlowUITestSampler`（獨立檔、`.common` run loop、presentation layer、provider 注入 centerID／items 序位）；非 fixture 模式的序位映射；**（v5）一律不讀 AX**；卡片語義身分依 §5.3 的三案排序，其中 ① 需在 `CoverFlowView` 內容閉包加 DEBUG-only 被動 `NSViewRepresentable` marker（產品檔 DEBUG 區塊，屬本項儀器範圍，不另觸發 §5.7；須做 ON／OFF 觀察者效應驗證）；
   9. 契約報告新增：截圖起訖 wall-clock、C2 取樣點座標與候選卡、落定耗時與輪詢次數（只增輸出，不改判定）；
   10. runner marks 檔（步驗邊界、按鍵、捲動、截圖、落定）。
   每項先 TDD；(1)(2)(3)(7)(9)(10) 對儀器 OFF 閘門的等價由 F3a 驗證；(4) 依 §5.5 checkpoint；(5) 須與修正後 C.1／C.2 完全一致；(6)(8) 只作用於 ON 輪。
@@ -269,7 +294,8 @@
 
 | 場 | 內容 | 估時 |
 |---|---|---|
-| 場 1 | F3a：M0 OFF 四測試 ×3；F6 校準：M0 OFF T1 ×10；F3b／F4／F5：M0 ON 四測試 ×10（＝`cf-m0-trans`）；F4 spike：S-b ON ×3、S-off ON ×3；F5 備案：M1diag ON ×10（僅 M0 不紅時） | 55–70 分 |
+| **場 0（v5 新增，先於場 1）** | 基準重建（四棵樹已預構建；全程 `test-without-building`、串行、每次驗 Products 身分）：(i) OS 27 的 S2／V5 最小健康 preflight（不計證據輪）→ (ii) `cf-m0-27` ×10（a1d3407），首份有效即凍結 R27 staging → (iii) M2 ×3、M3 ×3 → (iv) `ui-T0′`（鑰匙串 preflight 不計證據）。四份皆有效且未觸發停止 → 原子啟用 `active_profile=R27`。任一停止條件觸發即當場停、不續跑 | 60–75 分 |
+| 場 1 | F3a：M0（＝基建 tree `1055ff0`＋sampler）OFF 四測試 ×3，**對照已啟用的 R27**；F6 校準：M0 OFF T1 ×10；F3b／F4／F5：M0 ON 四測試 ×10（＝`cf-m0-trans`）；F4 spike：S-b ON ×3、S-off ON ×3；F5 備案：M1diag ON ×10（僅 M0 不紅時） | 55–70 分 |
 | 場 2 | F9：`cf-cand-K<n>` ×20 → M2_K／M3_K ×3 → `cf-cand-K<n>-trans` ON ×10；F9b：既有 UITests 17 條（preflight＋證據輪） | 60–75 分 |
 | 場 3 | F10：R-neg（15 手勢）→ R-off（50）→ R-on（45）；錄影 | 60–90 分 |
 
@@ -278,11 +304,15 @@
 | F0 | **本 session**：Plan 定稿（Codex R1／Opus 四視角 → v2 → Codex R2 → R3 整體確認） | §14 逐條處置；使用者確認執行＋批准操作護欄 |
 | F1 | 判定器 TDD（Python）：`candidate`（通過／不通過／無效；夾具：180 全 PASS、1/180 C2、1 PROBE、19 次、UNTAGGED、manifest 缺檔）；`negative-control`（殺死含 C2、偏離列示、未解釋→不可判定、殺死點消失＋非 Strip diff 分支、無效、不可建）；`PRODUCT_CODES` 佔位；facade 與掃描清單同步 | RED→GREEN；既有 92 條仍綠 |
 | F2 | 基建：§5.7 (1)(2)(3)(7)(9)(10)＋儀器 (8)＋Z1 spike（U1a／U1b／U1c，各出結論）＋K3 spike（M2／M3 檔在含 H3-a(a) 參數草案的 tree 是否編譯）＋H3 觸發 spike（nil 起始是否回寫 items[0]） | Swift 單測 RED→GREEN；儀器 OFF 預設；`strings` 0；Z1 三項結論寫 §13 並**立即上報**使用者（成立／備案／不可建），再開場 1 |
-| F3 | 場 1 前半：F3a 等價對照；F3b 健康 (a)–(e) | 全成立；否則 §10 R2 階梯上報 |
+| | **v5 結算（2026-09-18）**：(1)(2)(3)(7)(9)(10) 已完成並驗收（`strings` 全 0、`ProductCodeSingleSourceTests` 綠）；**Z1 已結案**（U1a／U1c／U-DL 成立、U5 已答、U1b 改無 AX 方案）；**儀器 (8) 與報告腳本 (6) 移到場 0 之後**（場 0 是存亡門，先做可能白做）；**K3 spike 只在 b′ 被否決後才需要**（b′ 不動 Strip 介面）；單測基準改 T0′ | — |
+| **F2b**（v5 新增） | 判定器 R27 profile（staging→原子啟用、雙列偏離、缺 active 即無效）TDD ＋ 場 0 四棵樹預構建與身分記錄 | Python 測試 RED→GREEN 且既有全綠；`PREBUILD.md` 四棵樹表齊全（tree hash／Strip md5／CDHash／Products／log）；M2·M3 與 M0 只差 Strip；未跑任何測試 |
+| **F2c**（v5 新增，場 0 之後） | spike 3（不需使用者在場）：§5.3 的無 AX 卡片語義身分三案；b′ 在真實組裝的六項（20 曲非同步填入、切 tab 重建只灌一次、佔位圖→`.task` 不再觸發命令、generation 取代與遲到回呼、已佈局後的 `trackChanged` 邊界、單參數 `onGeometryChange` 編譯路徑）；動畫四分法 | 各項有數字結論；身分方案定案或明記缺口；b′ 兩接縫有結論 |
+| **F2d**（v5 新增，F2c 之後） | G6 的無 AX 正式 RED 凍結（測試名、失敗輸出、基線 hash） | RED 在未改 H3 的基線上重現；覆蓋遠距、兩方向、末端 |
+| F3 | 場 1 前半：F3a 等價對照（**v5：基建 tree OFF ×3 對已啟用的 R27**）；F3b 健康 (a)–(e) | 全成立；否則 §10 R2 階梯上報 |
 | F4 | 場 1 後半：M0 ON ×10 時間序列（兩格不一致的觀察／推論／未排除）；S-b／S-off ON ×3 → K1 選枝 ADR | `timeline` 報告；ADR 入 §13 |
 | F5 | 同場：`trans` 離線判定 M0 ON ×10；不紅則 M1diag ON ×10；凍結門檻 | §5.4 步驟 1–3 之一成立；不可建則上報 |
 | F6 | 離線：以 M0 OFF T1 ×10 trace 做 (i) 標定；(ii) 以 ON 輪 hold 段；選定＋實作＋單測 → **Phase 1 checkpoint 報告使用者** | §5.5 程序有數據；N_nil 唯一 |
-| F7 | 產品修復（TDD）：K5 VM 測試先紅；EDGE 7/7 作 RED；H3 狀態機；H2 依 ADR；同源／不停舊值單測；RENDERED 不回歸；K8 大專輯測試（visible items／artwork task 數有界） | K1–K8 逐項有測試；`git diff --stat` 相稱 |
+| F7 | 產品修復（TDD）：K5 VM 測試先紅；EDGE 7/7 作 RED；H3 狀態機（**v5：走 b′，含 `commandedID`／`scrollID` 分離與原子守衛**）；H2 依 ADR；同源／不停舊值單測；**RENDERED 轉綠**（v5：T0′ 上它是紅，屬修復前 RED）；**G6 的無 AX 遠跳 RED→GREEN（W15）**；K8 大專輯測試（visible items／artwork task 數有界） | K1–K8 逐項有測試；全量單測零 issue；`git diff --stat` 相稱 |
 | F8 | Phase 3 `/simcodex`（最終 tree）；觸及 §5.7 觸發清單 → 回 Phase 1；任何產品源碼改動 → 重走 F7→F8 | 全綠或殘留逐條裁決 |
 | F9 | 場 2：K7 前置 → `cf-cand-K<n>` ×20 → C.1 → M2_K／M3_K ×3 → C.2 → `-trans` ×10 → P_trans。分支：無效→修基建重跑同 K（受上限）；不可建→上報；不通過→F7 | 三者通過 |
 | F9b | 同場：既有 UITests 17 條（preflight＋證據輪）＝W10；xccov＝W1；pbxproj／xcscheme diff＝W14；Release `strings`＝W11 | 各項成立 |
@@ -296,17 +326,18 @@
 | # | 標準 | 判定 | 不成立時歸類 |
 |---|---|---|---|
 | W1 | 新單測全綠；新增純邏輯行覆蓋 ≥ 80%；Python 判定器測試全綠 | xcresult＋`xccov`；unittest | 4 不通過（回 F7／F8 補測） |
-| W2 | EDGE 7/7、RUNTIME 3/3、RENDERED 綠；K5 新 VM 測試綠；其餘紅燈清單＝T0 − EDGE | 清單 diff | 4 不通過 |
+| W2 | **（v5 改寫）候選全量單測零 issue**：EDGE 7/7、RUNTIME 3/3、RENDERED、K5 新 VM 測試、**G6 的無 AX 遠跳測試**與全部新增測試皆綠。T0′ 的 8 issues 只作修復前 RED，不是容許紅燈 | 全量單測輸出 | 4 不通過 |
 | W3a | F3a 等價對照成立 | F3a | 3 不可判定（基建改動非等價 → 回 Phase 1） |
 | W3b | F3b 健康 (a)–(e) 成立 | F3b | 1 不可建（經 §10 R2 階梯；(c) 超標例外 → 3） |
 | W4 | C.4 負對照成立（合成）且門檻凍結 | F5 | 1 不可建（§5.4 步驟 3） |
 | W5 | D2 選定有數據、N_nil 唯一並經 checkpoint；或明列閉合範圍 | F6 | 3 不可判定（僅影響閉合宣稱） |
 | W6 | **C.1**：`cf-cand-K<n>` ×20 有效且 180/180 PASS | `candidate` | 4 不通過（無效 → 2） |
-| W7 | **C.2**：M2_K／M3_K ×3 有效；殺死（含 C2）達標；偏離已列示並解釋 | `negative-control` | 殺死不足 → 4；未解釋／殺死點消失＋非 Strip diff → 3；編譯不相容 → 1；無效 → 2 |
+| W7 | **C.2**：M2_K／M3_K ×3 有效；殺死（含 C2）達標；偏離已列示並解釋。**（v5）偏離比對對象＝已啟用的 R27 active profile**；`R55_KILL_SIGNATURES` 只出現在 historical 欄、不參與結論；無 active profile → 無效 | `negative-control` | 殺死不足 → 4；未解釋／殺死點消失＋非 Strip diff → 3；編譯不相容 → 1；無效（含缺 active profile）→ 2 |
 | W8 | **C.4**：`cf-cand-K<n>-trans` ×10 全部段有效且 P_trans 零觸發 | `trans` | 觸發 → 4；任一段不可判定 → 3；運行無效 → 2 |
 | W9a | **C.6 負對照**：R-neg 每路徑 ≥ 3/5 且與人工對齊 | 結果表＋trace | 3 不可判定 |
 | W9b | **C.6 候選**：R-off 零失敗；R-on 零失敗且零觸發（段皆有效） | 結果表＋trace | 失敗／觸發 → 4；段不可判定或重做額度耗盡 → 3；`physical_valid_off／on` 缺且仍有額度 → 2 |
-| W10 | 既有 UITests 17 條與 `ui-T0` 逐條相同 | 清單 diff | 4 不通過 |
+| W10 | 既有 UITests 17 條與 **`ui-T0′`（v5：場 0 在 macOS 27 上於 `aad6a9b`＋R5-3 四檔重建的 T0 樹跑出的首份有效運行）** 逐條相同；舊 `ui-T0`（26.6.2）只作歷史 | 清單 diff | 4 不通過 |
+| W15 | **（v5 新增，G6）** 無 AX 遠跳 RED→GREEN：修復前 RED 已凍結（測試名、失敗輸出、基線 hash），候選上轉綠；覆蓋未具現遠距目標、兩方向與末端；斷言 requested 身分且 \|Δlayout\| ≤ 3pt；VM 測試證明 `trackChanged`／載入完成／重建匯入同一 command pipeline | 全量單測＋凍結的 RED 紀錄 | 4 不通過；身分來源三案皆不成立 → 3（缺口明記，舉證推到 C.6＋C.1） |
 | W11 | Release `strings` 對測試／儀器符號全 0；新增 DEBUG 檔整檔 `#if DEBUG` | grep＋`strings` | 4 不通過 |
 | W12 | 附件只含裁切到視窗的圖；實體輪 trace 去識別化摘要 | 腳本＋人工核 | 2 無效（證據包退回重出，不重跑） |
 | W13 | K3：M2／M3 變異檔在 K<n> tree 直接編譯 | F9 構建日誌 | 1 不可建 |
@@ -316,7 +347,15 @@
 1. **不可建**：W3b 健康經 §10 R2 階梯用盡仍不成立；W4 依 §5.4 步驟 3 不可建；W13 編譯不相容 → 上報（帶選項）。
 2. **無效**：任一終點運行（`cf-cand`／`M2_K`／`M3_K`／`-trans`／F9b）運行無效或證據不完整；實體重複 `physical_valid_off／on` 缺**且該路徑仍有重做額度**；W12 證據包不合格 → 修基建／補證據、重跑同 K 或重做／重出（受無效上限）。額度耗盡不落此類。
 3. **不可判定／待使用者裁決**：W3a 不成立（基建非等價 → 回 Phase 1）；W3b (c) 觀察者效應超標；W5 閉合範圍受限；W7 偏離未解釋或殺死點消失＋候選改了 Strip 以外檔（回 Phase 1 辯論移植）；W8／W9b 任一段不可判定；W9a 不成立（含 Z1 退到 runner 截圖備案使實體 P_trans 不可評）；實體重做額度耗盡；§5.1 量測成因預登記觸發 → 帶證據上報，使用者裁決。
-4. **不通過**：W1／W2／W6／W7（殺死不足）／W8（觸發）／W9b（失敗或觸發）／W10／W11／W14 任一不成立 → 回 F7／F8（受護欄約束；產品源碼改動則重走 F7→F8→F9）。
+4. **不通過**：W1／W2／W6／W7（殺死不足）／W8（觸發）／W9b（失敗或觸發）／W10／W11／W14／**W15** 任一不成立 → 回 F7／F8（受護欄約束；產品源碼改動則重走 F7→F8→F9）。
+
+**（v5 新增）場 0 的停止分支**（在 W1–W15 之前適用；場 0 未全過則不進場 1，後續 W 一律不評）：
+1. preflight（Automation Mode／鑰匙串／S2 身分健康）**不計證據輪、不計無效**；
+2. 對固定 `(tree, run-kind)`，**第一份有效批次先落盤、hash、凍結**，之後才評 V5 陽性對照／缺陷 2／缺陷 3；
+3. 第一份有效**未抓到缺陷即停止**，禁止以第二份有效重抽（首份規則）；
+4. 尚無有效批次時，同一 `(tree, run-kind)` 累積**兩份無效即停**；其他 run-kind 插入不重置計數；
+5. 場 0 停止一律歸類「**環境前置未成立／待使用者裁決**」（不屬 1–4 類，也不重判 R5-5）；
+6. R27 全程只寫 `staging`，**四份（M0／M2／M3／ui-T0′）皆有效且未觸發停止**才以含四者 hash 的 manifest **原子切換** `active_profile=R27`；中途停止保留 staging 但不啟用、候選禁止開始。
 5. **通過** ⇔ W1–W14 全部成立且第 3 條無任何觸發。
 
 ## 8. 測試策略與流程偏離聲明
@@ -325,7 +364,7 @@
 - 集成：F3a／F3b＝真實組裝上的基建與儀器接線；M2／M3 構建＝介面相容。
 - E2E：四條 XCUITest ×20、變異 ×3、trans ×10、既有 UITests、實體三輪。
 - 覆蓋率：`coverage_gate.sh` 只量 Services＋Infra（不動）；新純邏輯以 W1 逐檔量。
-- **流程偏離**：fatboyslim Phase 3「代碼測試全綠」＝W2；Phase 4「全量測試通過」由 §7 結論程序取代；F9／F9b／F10 一律在 simcodex 之後、最終 tree 上執行。
+- **流程偏離**：fatboyslim Phase 3「代碼測試全綠」＝W2（**v5：＝候選全量單測零 issue**）；Phase 4「全量測試通過」由 §7 結論程序取代；F9／F9b／F10 一律在 simcodex 之後、最終 tree 上執行。
 - 跑任何 UITest 前確認使用者在場；非 fixture 啟動先 preflight 鑰匙串授權框。
 
 ## 9. 影響面
@@ -358,7 +397,10 @@
 | R9 | 授權框／Automation Mode 逾時 | 場次表、preflight、使用者在場 |
 | R10 | 為求綠改測試／跑到綠為止 | §5.7 觸發清單；首份規則；無效上限；候選上限；多維熔斷 |
 | R11 | 部署目標被順手改動 | §5.7 觸發清單含 `deploymentTarget` |
-| R12 | 使用者在場成本（三場 ≈ 3–4 小時） | 場次表合併運行；Z1 spike 先報結論再開場 |
+| R12 | 使用者在場成本（**v5：四場 ≈ 4–5 小時**） | 場次表合併運行；Z1 spike 先報結論再開場；場 0 的構建全部在到場前完成 |
+| **R13**（v5） | 環境再度漂移（macOS／Xcode 又升級）使 R27 基準再失效 | R27 profile 記 OS build／Xcode／SDK／顯示設定；判定器在 OS 指紋不符時拒絕以該 profile 下結論（回無效），不靜默比對 |
+| **R14**（v5） | F-AX：閘門（XCUITest 讀 AX）與無 AX 真實使用走不同路徑，使候選「全綠但真實失敗」 | G6／W15 的無 AX RED→GREEN；C.6 實體輪明定無 AX 客戶端；sampler 不讀 AX；身分方案須 ON／OFF 驗證 |
+| **R15**（v5） | b′ 的成功窗口極窄（首次佈局回呼內同步才 21/21，落到下一週期即 0/48）；真實組裝多了非同步載入、tab epoch、圖片 task | F2c spike 3 六項先驗；失敗則回 Phase 1（H3-a(a)＋K3，或 H3-b／升目標） |
 
 **回退**：產品源碼改動限 `CoverFlowStrip.swift`／`CoverFlowViewModel.swift`／`CoverFlowView.swift`；`git checkout` 即回 M0；測試基建新增檔可整檔刪除、修改檔還原、xcodegen 重生成。
 
@@ -422,7 +464,12 @@ screencapture -v "$G/ev/physical-K<n>/P3-1.mov"
 | U8 | `screencapture -v` 錄影 fps 是否 ≥ 刷新率 | 已知未知 | F2 核；不足則人工判讀只證實不否證 |
 | U9 | Premortem：(a) 合成全綠、實體慣性仍疊——對策 §5.4 實體負對照 3/5；(b) 儀器改時序讓病灶消失——獨立檔＋F3b (c)＋候選 OFF；(c) 為求綠改判據——§5.7＋護欄；(d) 儀器在實體 live scroll 靜音致假綠——`.common`＋(e) 自證 | 未知未知逼出 | 已登記 |
 | U10 | 首載走初始值路徑還是運行時路徑；H3 是否改變 T3.s1 行為與 M3 在該步的殺死 | 已知未知 | F2 spike 讀首載 bind 序列；F7 以 T3 驗 |
-| U11 | `centerID` 六重角色是否需拆分（架構天花板）；H3-b 即拆法 | 已知未知 | F4 ADR 一併裁決；需拆則屬 K3／§5.7 觸發回 Phase 1 |
+| U11 | `centerID` 六重角色是否需拆分（架構天花板）；H3-b 即拆法 | 已知未知 | F4 ADR 一併裁決；需拆則屬 K3／§5.7 觸發回 Phase 1。**v5**：b′ 已要求分離 `commandedID`／`scrollID`，等於先拆出兩個角色 |
+| **U1a／U1b／U1c／U5／U-DL** | Z1 五項 | **已結案（2026-09-18）** | §5.3、§13；U1b 轉為「無 AX 身分三案」待 F2c |
+| **U12**（v5） | F-AX：XCUITest 的 out-of-process AX 是否也改變 LazyHStack 具現與落點 | 已知未知 | F2c spike 3；影響 C.1 對無 AX 真實行為的外推力（R14） |
+| **U13**（v5） | F-JUMP 的完整邊界：哪些 origin／距離／方向會落鄰卡；`withAnimation` 為何貼齊 | 已知未知 | F2c 動畫四分法＋F2d 的 RED |
+| **U14**（v5） | macOS 14／26 運行時語義（本機只有 27，無法實證） | 已知未知 | 結論範圍明定「27 上驗證、26 僅有修復前歷史證據」；需舊 OS runner 才能補 |
+| **U15**（v5） | macOS 27 上 M0 的缺陷 2／缺陷 3 是否仍以足以支撐判據的形態穩定存在 | 已知未知 | **場 0**（存亡門）；不成立則場 0 後停止上報 |
 
 ## 13. 實測記錄（實施中回填）
 
@@ -474,7 +521,7 @@ screencapture -v "$G/ev/physical-K<n>/P3-1.mov"
 - 與第 1 輪不同：具現數＝AX 數（第 1 輪層 6／AX 9）；初始值路徑 centerID=4 停 #1、AX +16.4pt（第 1 輪停 #0）；「畫面停在別張、hitTest 跟 centerID 走」仍在。
 - **範圍外新發現**：**F-AX** 一次 in-process AX 讀取使 LazyHStack 多具現一張卡並改變之後程式化跳轉落點（0/48 → 15/15）；讀 CALayer 屬性無此效應。**F-JUMP** 無 AX 客戶端時，產品同款裸賦值跳到未具現目標落鄰卡（nil→6 +41.5pt、nil→7 −41.0pt，各 3/3），`withAnimation` 跳轉貼齊；RUNTIME 單測在 drive 前已讀 AX（推測因此看不到）。另：末卡 #8 運行時落定恆 −1pt；`withAnimation(duration: 0.8)` 1→7 約 330ms 完成（原因未查）。
 - 仍 TBD：真實 app 組裝上 B 的表現；真實 live scroll 期間回呼率／model≡presentation／途經形態；XCUITest（out-of-process AX）是否觸發 F-AX；非 AX 的層身分方案。
-### v5 提案（thecure 三輪辯論收斂；**待使用者批准，未實施**；辯論全文 `fix4/debate-R8/ask{1,2,3}.md`＋`out{1,2,3}.txt`）
+### v5（thecure 四輪辯論收斂；**2026-09-18 使用者批准執行**，已改寫進 §1／§2／§4／§5／§6／§7／§8／§10／§12 規範章節；辯論全文 `fix4/debate-R8/ask{1..4}.md`＋`out{1..4}.txt`）
 
 勝負：我勝——b′ 不觸發 §5.7（Codex 確認）、N4 邊界只規結果、F-JUMP 納入屬範圍擴大須使用者批准、場 0 三段順序。Codex 勝——H3-a(a)（Strip 新參數）確屬 K3／§5.7 觸發（我原判錯）、J2 失效清單漏項、U1b 口徑、R27 需拆三份基準、事後 AX 標記不足以排除觀察者效應、場 0 應排在 spike 3 之前。
 
