@@ -27,6 +27,10 @@ docstring 裡，此處只列索引）：
       子命令、R5-5 殺死簽名常量與「殺死須含 C2-STACK」條款、證據包 manifest 完整性 —— 見
       `h02_gate_model.py`／`h02_gate_rules.py`。
   10. R4-F 凍結表相符（只對 M0 確認性運行；F(step) 表與偏離記錄）—— 見 `h02_gate_model.py`／`h02_gate_rules.py`。
+  12. R27 profile（`docs/plans/2026-09-13-coverflow-h02-fix4.md` §13 v5 提案第 5、13 項）：
+      `R55_KILL_SIGNATURES` 降為唯讀歷史；場 0 實測基準以外部 JSON 檔 staging → 原子啟用為
+      active profile；C.2 雙欄偏離報告（`active_profile_deviation` 參與結論、`historical_R55_deviation`
+      僅報告）；無 active profile → C.2「無效」 —— 見 `h02_gate_r27_profile.py`／`h02_gate_rules.py`。
 """
 from __future__ import annotations
 
@@ -60,6 +64,14 @@ from h02_gate_model import (
     STEPS,
     TEST_LABELS,
     UI_TEST_CLASS,
+)
+from h02_gate_r27_profile import (
+    ProfileError,
+    R27_PROFILE_SCHEMA,
+    R27Profile,
+    active_profile_deviations,
+    activate_r27,
+    load_active_profile,
 )
 from h02_gate_parse import (
     _classify_gate_token,
@@ -147,6 +159,8 @@ __all__ = [
     "evaluate_candidate", "evaluate_evidence", "evaluate_negative_control", "candidate_failures",
     "kill_outcome_with_defect2", "kill_signature_has_defect2", "mutant_kill_report",
     "has_non_strip_coverflow_change", "non_strip_coverflow_changes",
+    "R27Profile", "ProfileError", "R27_PROFILE_SCHEMA",
+    "activate_r27", "load_active_profile", "active_profile_deviations",
     "main",
 ]
 

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 import h02_gate_eval as gate
+import h02_gate_r27_profile as r27profile
 
 TESTDATA = Path(__file__).resolve().parent / "testdata" / "h02"
 
@@ -336,3 +337,79 @@ def write_evidence(root, iterations, tests=EVIDENCE_TESTS, with_sampler=False, t
 def at_manifest(test, ordinal, change):
     """只對指定 (test, ordinal) 的 manifest 套用 `change`（純函數，回傳新 dict 或 None）。"""
     return lambda m: change(m) if (m["test"] == test and m["ordinal"] == ordinal) else m
+
+
+# ---------------------------------------------------------------------------
+# v5 §13 第 5、13 項：R27 profile 夾具（合成值，非真實場 0 證據）
+# ---------------------------------------------------------------------------
+
+R27_TREE_HASH = "ab" * 20
+R27_CDHASH = "cd" * 20
+
+
+def r27_profile(m2_kill=None, m3_kill=None, version="synthetic-r27", m0=None, ui_t0_prime=None):
+    """直接建構一份 `R27Profile`（測試用，繞過 staging／activate 的檔案 I/O）。
+    `m2_kill`／`m3_kill`：`{(test, step): [簽名字串, ...]}`（與 `R55_KILL_SIGNATURES` 同形狀）。"""
+    return gate.R27Profile(
+        schema=gate.R27_PROFILE_SCHEMA,
+        version=version,
+        tree_hash=R27_TREE_HASH,
+        cdhash=R27_CDHASH,
+        m0=dict(m0 or {}),
+        m2_kill={key: frozenset(v) for key, v in (m2_kill or {}).items()},
+        m3_kill={key: frozenset(v) for key, v in (m3_kill or {}).items()},
+        ui_t0_prime=dict(ui_t0_prime or {}),
+    )
+
+
+# 與 R5-5／M2_KILL／M3_KILL 完全相符的 active profile（用於保留既有「通過」測試意圖）
+R27_PROFILE_MATCHING_R55 = r27_profile(
+    m2_kill=gate.R55_KILL_SIGNATURES["M2"], m3_kill=gate.R55_KILL_SIGNATURES["M3"]
+)
+
+
+def write_active_r27_profile(root, m2_kill=None, m3_kill=None, version="synthetic-r27"):
+    """走完整 staging → activate 流程，把一份 active R27 profile 寫進 `root`（CLI 測試用；
+    `--profile-dir root` 讀得到）。M0／ui-T0′ 用最小合成值填滿（activate 要求四者皆有效）。"""
+    root = Path(root)
+    r27profile.stage_component(
+        root,
+        "m0",
+        {
+            "schema": gate.R27_PROFILE_SCHEMA,
+            "kind": "m0",
+            "tree_hash": R27_TREE_HASH,
+            "cdhash": R27_CDHASH,
+            "steps": {
+                "T1.s1": {"sig_set": [], "allowed_codes": [], "stable": True, "observations": []},
+            },
+        },
+    )
+    r27profile.stage_component(
+        root,
+        "m2",
+        {
+            "schema": gate.R27_PROFILE_SCHEMA,
+            "kind": "m2",
+            "kill_signatures": {
+                f"{t}.{s}": sorted(sig) for (t, s), sig in (m2_kill or gate.R55_KILL_SIGNATURES["M2"]).items()
+            },
+        },
+    )
+    r27profile.stage_component(
+        root,
+        "m3",
+        {
+            "schema": gate.R27_PROFILE_SCHEMA,
+            "kind": "m3",
+            "kill_signatures": {
+                f"{t}.{s}": sorted(sig) for (t, s), sig in (m3_kill or gate.R55_KILL_SIGNATURES["M3"]).items()
+            },
+        },
+    )
+    r27profile.stage_component(
+        root,
+        "ui_t0_prime",
+        {"schema": gate.R27_PROFILE_SCHEMA, "kind": "ui_t0_prime", "results": {"ShellUITests.testFoo": "PASS"}},
+    )
+    return gate.activate_r27(root, version=version)

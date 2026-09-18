@@ -18,9 +18,12 @@ from test_h02_gate_fixtures import (
     M2_KILL,
     M3_KILL,
     PROBE_T1S1,
+    R27_PROFILE_MATCHING_R55,
     UNTAGGED_T1S1,
     at_manifest,
     candidate_run,
+    r27_profile,
+    write_active_r27_profile,
     write_evidence,
     write_run,
 )
@@ -288,9 +291,11 @@ class ProductFilesTests(unittest.TestCase):
 
 
 class NegativeControlTests(unittest.TestCase):
-    """§5.2 C.2：通過／不通過／無效／不可判定-待解釋／回Phase1-變異移植。"""
+    """§5.2 C.2：通過／不通過／無效／不可判定-待解釋／回Phase1-變異移植。
+    v5 §13 第 4、5、13 項起：R55 降為唯讀歷史，C.2 結論改讀 active R27 profile；沒有 active
+    profile 時到達簽名比對這一步就是「無效」，不得默默落回 R55（見 `test_no_active_profile_*`）。"""
 
-    def evaluate(self, baseline=None, m2=None, m3=None, product_files=None):
+    def evaluate(self, baseline=None, m2=None, m3=None, product_files=None, active_profile=None):
         return gate.evaluate_negative_control(
             baseline if baseline is not None else candidate_run(n=20),
             m2 if m2 is not None else candidate_run(n=3, overrides=M2_KILL),
@@ -298,19 +303,56 @@ class NegativeControlTests(unittest.TestCase):
             baseline_iterations=20,
             mutant_iterations=3,
             product_files=product_files,
+            active_profile=active_profile,
         )
 
     def test_consistent_kills_pass(self):
-        result = self.evaluate()
+        result = self.evaluate(active_profile=R27_PROFILE_MATCHING_R55)
         self.assertEqual(result["conclusion"], "通過")
-        self.assertEqual(result["deviations"], [])
+        self.assertEqual(result["active_profile_deviation"], [])
+        self.assertEqual(result["historical_R55_deviation"], [])
         self.assertTrue(result["mutants"]["M2"]["kill_ok"])
         self.assertTrue(result["mutants"]["M3"]["kill_ok"])
 
     def test_m3_killed_only_at_t3s1_passes(self):
         m3 = candidate_run(n=3, overrides={("T3", "s1"): M3_KILL[("T3", "s1")]})
-        result = self.evaluate(m3=m3)
+        result = self.evaluate(m3=m3, active_profile=R27_PROFILE_MATCHING_R55)
         self.assertEqual(result["conclusion"], "通過")
+
+    def test_no_active_profile_is_invalid_even_when_kills_would_match_r55(self):
+        """§13 第 5 項：沒有 active profile 時不得用 R55 下結論——即使殺死簽名與 R55 完全相符，
+        到達簽名比對這一步仍須判「無效」，而不是悄悄借用歷史 R55 判「通過」。"""
+        result = self.evaluate()  # active_profile 預設 None
+        self.assertEqual(result["conclusion"], "無效")
+        self.assertTrue(any("active profile" in r for r in result["reasons"]), result["reasons"])
+        self.assertIsNone(result["active_profile_deviation"])
+        # historical 欄位仍照算，供人工參考；只是不參與結論
+        self.assertEqual(result["historical_R55_deviation"], [])
+        self.assertTrue(result["mutants"]["M2"]["kill_ok"])
+
+    def test_no_active_profile_per_mutant_deviation_is_none_not_empty_list(self):
+        """`active_profile_deviation` 用 `None` 區分「尚無 active profile」與「有 profile 但零偏離」，
+        不得用空陣列混淆兩者（呼叫端才能分辨要不要顯示「尚無 active profile」）。"""
+        result = self.evaluate()
+        self.assertIsNone(result["mutants"]["M2"]["active_profile_deviation"])
+        self.assertIsNone(result["mutants"]["M3"]["active_profile_deviation"])
+
+    def test_active_profile_deviation_alone_decides_conclusion_not_historical(self):
+        """§13 第 4 項：雙欄報告只有 active 參與結論——即使 historical_R55_deviation 非空，
+        只要 active_profile_deviation 為空仍判「通過」。"""
+        # M2 的 T1.s1 用一個與 R55 不同、但與本測試建構的 active profile相符的簽名。
+        custom_sig = "C2-STACK|G=T99|over=T98|side=R"
+        m2 = candidate_run(n=3, overrides={**M2_KILL, ("T1", "s1"): [f"SIG{{T1.s1|{custom_sig}}}"]})
+        profile = r27_profile(
+            m2_kill={("T1", "s1"): [custom_sig], ("T2", "s1"): sorted(gate.R55_KILL_SIGNATURES["M2"][("T2", "s1")])},
+            m3_kill=gate.R55_KILL_SIGNATURES["M3"],
+        )
+        result = self.evaluate(m2=m2, active_profile=profile)
+        self.assertEqual(result["conclusion"], "通過", result["reasons"])
+        self.assertEqual(result["active_profile_deviation"], [])
+        self.assertTrue(
+            any("T1.s1" in d for d in result["historical_R55_deviation"]), result["historical_R55_deviation"]
+        )
 
     def test_mutant_with_non_c2_code_only_is_not_killed(self):
         m2 = candidate_run(
@@ -323,18 +365,18 @@ class NegativeControlTests(unittest.TestCase):
 
     def test_signature_deviation_is_undecidable(self):
         m2 = candidate_run(n=3, overrides={("T1", "s1"): ["SIG{T1.s1|C2-STACK|G=T12|over=T11|side=R}"]})
-        result = self.evaluate(m2=m2)
+        result = self.evaluate(m2=m2, active_profile=R27_PROFILE_MATCHING_R55)
         self.assertEqual(result["conclusion"], "不可判定-待解釋")
-        self.assertTrue(any("T1.s1" in d for d in result["deviations"]), result["deviations"])
+        self.assertTrue(any("T1.s1" in d for d in result["active_profile_deviation"]), result["active_profile_deviation"])
 
     def test_kill_at_unregistered_step_is_deviation(self):
         m2 = candidate_run(
             n=3,
             overrides={**M2_KILL, ("T4", "s1"): ["SIG{T4.s1|C2-STACK|G=T19|over=T18|side=L}"]},
         )
-        result = self.evaluate(m2=m2)
+        result = self.evaluate(m2=m2, active_profile=R27_PROFILE_MATCHING_R55)
         self.assertEqual(result["conclusion"], "不可判定-待解釋")
-        self.assertTrue(any("T4.s1" in d for d in result["deviations"]), result["deviations"])
+        self.assertTrue(any("T4.s1" in d for d in result["active_profile_deviation"]), result["active_profile_deviation"])
 
     def test_baseline_not_all_pass_is_rejected(self):
         baseline = candidate_run(n=20, overrides={("T1", "s2"): only_at(3, [C2_T1S2])})
@@ -435,7 +477,9 @@ class CandidateCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("結論=無效", text)
 
-    def test_negative_control_cli(self):
+    def test_negative_control_cli_without_profile_dir_is_invalid(self):
+        """v5 §13 第 5 項：CLI 不給 `--profile-dir`（或指向空目錄）時無 active profile，
+        即使殺死簽名齊全，也不得悄悄借用 R55 判「通過」——須是「無效：缺 active profile」。"""
         base_log, base_xc = write_run(self.tmp, "base", n=20)
         m2_log, m2_xc = write_run(self.tmp, "m2", n=3, overrides=M2_KILL)
         m3_log, m3_xc = write_run(self.tmp, "m3", n=3, overrides=M3_KILL)
@@ -446,12 +490,35 @@ class CandidateCliTests(unittest.TestCase):
                 "--m2-log", m2_log, "--m2-xcresult", m2_xc,
                 "--m3-log", m3_log, "--m3-xcresult", m3_xc,
                 "--mutant-iterations", "3",
+                "--profile-dir", str(Path(self.tmp) / "no-such-r27-profile"),
+            ]
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("結論=無效", text)
+        self.assertIn("active profile", text)
+
+    def test_negative_control_cli(self):
+        base_log, base_xc = write_run(self.tmp, "base", n=20)
+        m2_log, m2_xc = write_run(self.tmp, "m2", n=3, overrides=M2_KILL)
+        m3_log, m3_xc = write_run(self.tmp, "m3", n=3, overrides=M3_KILL)
+        profile_dir = Path(self.tmp) / "r27-profile"
+        write_active_r27_profile(profile_dir)
+        code, text = self.run_cli(
+            [
+                "negative-control",
+                "--baseline-log", base_log, "--baseline-xcresult", base_xc, "--baseline-iterations", "20",
+                "--m2-log", m2_log, "--m2-xcresult", m2_xc,
+                "--m3-log", m3_log, "--m3-xcresult", m3_xc,
+                "--mutant-iterations", "3",
+                "--profile-dir", str(profile_dir),
             ]
         )
         self.assertEqual(code, 0)
         self.assertIn("結論=通過", text)
 
     def test_negative_control_cli_product_files(self):
+        """回Phase1-變異移植分支在 kill_ok 判定就觸發，不會走到簽名比對——不需要 active profile
+        也應成立（指向空目錄，證明這條路徑確實不依賴 profile）。"""
         base_log, base_xc = write_run(self.tmp, "base", n=20)
         m2_log, m2_xc = write_run(self.tmp, "m2", n=3)
         m3_log, m3_xc = write_run(self.tmp, "m3", n=3)
@@ -464,6 +531,7 @@ class CandidateCliTests(unittest.TestCase):
                 "--m2-log", m2_log, "--m2-xcresult", m2_xc,
                 "--m3-log", m3_log, "--m3-xcresult", m3_xc,
                 "--product-files", str(files),
+                "--profile-dir", str(Path(self.tmp) / "no-such-r27-profile"),
             ]
         )
         self.assertEqual(code, 0)
@@ -478,6 +546,13 @@ class CandidateCliTests(unittest.TestCase):
             "kill_signature_has_defect2",
             "has_non_strip_coverflow_change",
             "R55_KILL_SIGNATURES",
+            # v5 §13 第 5、13 項：R27 profile（見 h02_gate_r27_profile.py）
+            "R27Profile",
+            "ProfileError",
+            "R27_PROFILE_SCHEMA",
+            "activate_r27",
+            "load_active_profile",
+            "active_profile_deviations",
         ):
             self.assertIn(name, gate.__all__, name)
             self.assertTrue(hasattr(gate, name), name)

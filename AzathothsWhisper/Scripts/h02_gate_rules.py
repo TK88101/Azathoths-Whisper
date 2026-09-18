@@ -40,6 +40,7 @@ from h02_gate_model import (
     STEPS,
     TEST_LABELS,
 )
+from h02_gate_r27_profile import R27Profile, active_profile_deviations
 
 # V3／V4／V5 判定與結論（R4 修訂：計劃 §3.12 table_valid、§6 V3／V5／R4-X／R4-C）
 
@@ -487,8 +488,10 @@ def kill_outcome_with_defect2(
     return True, detail
 
 
-def _signature_deviations(name: str, killed: List[Tuple[str, str, object]]) -> List[str]:
-    """殺死步驟的完整簽名集合與 R5-5 凍結簽名逐字比對；不同或未登記 → 偏離。"""
+def _historical_r55_deviations(name: str, killed: List[Tuple[str, str, object]]) -> List[str]:
+    """殺死步驟的完整簽名集合與 R5-5 凍結簽名（`R55_KILL_SIGNATURES`，唯讀歷史）逐字比對；
+    不同或未登記 → 偏離。v5 §13 第 2、5 項起：R55 只作歷史列，本函式的輸出**不參與** C.2 結論，
+    只供報告（`historical_R55_deviation`）；前身即舊名 `_signature_deviations`（h02_gate_rules.py:490）。"""
     expected = R55_KILL_SIGNATURES[name]
     deviations = []
     for label, step, signature in killed:
@@ -501,8 +504,18 @@ def _signature_deviations(name: str, killed: List[Tuple[str, str, object]]) -> L
     return deviations
 
 
-def mutant_kill_report(name: str, baseline_table: GateTable, mutant_table: GateTable) -> dict:
-    """單份變異運行的殺死報告（含 C2 條款）與簽名偏離。"""
+def mutant_kill_report(
+    name: str,
+    baseline_table: GateTable,
+    mutant_table: GateTable,
+    active_profile: Optional[R27Profile] = None,
+) -> dict:
+    """單份變異運行的殺死報告（含 C2 條款）與雙欄簽名偏離（v5 §13 第 4、5 項）：
+    `active_profile_deviation` 只在給了 active R27 profile 時計算（`None`＝尚無 active profile，
+    交由 `evaluate_negative_control` 判「無效：缺 active profile」，不得默默落回 R55）；
+    `historical_R55_deviation` 永遠對 R55（唯讀歷史）計算，只供報告，不參與結論。
+    `REQUIRED_KILL_STEPS`／`kill_outcome_with_defect2`（含 C2-STACK 條款）語義不變，
+    不受 active_profile 是否存在影響（第 6 項）。"""
     killed: List[Tuple[str, str, object]] = []
     survived: List[Tuple[str, str, object]] = []
     for label in TEST_LABELS:
@@ -517,7 +530,10 @@ def mutant_kill_report(name: str, baseline_table: GateTable, mutant_table: GateT
         "survived": survived,
         "required_steps": list(required),
         "kill_ok": any(key in killed_keys for key in required),
-        "deviations": _signature_deviations(name, killed),
+        "active_profile_deviation": (
+            active_profile_deviations(name, killed, active_profile) if active_profile is not None else None
+        ),
+        "historical_R55_deviation": _historical_r55_deviations(name, killed),
     }
 
 
@@ -549,6 +565,11 @@ def _baseline_reasons(table: GateTable, iterations: int) -> Tuple[bool, List[str
     return not reasons, reasons
 
 
+_NO_ACTIVE_PROFILE_REASON = (
+    "缺 active profile：R27 尚未啟用（v5 §13 第 5、13 項），R55 僅作歷史列，不得用於 C.2 結論"
+)
+
+
 def evaluate_negative_control(
     baseline_table: GateTable,
     m2_table: GateTable,
@@ -556,9 +577,14 @@ def evaluate_negative_control(
     baseline_iterations: int = 20,
     mutant_iterations: int = 3,
     product_files=None,
+    active_profile: Optional[R27Profile] = None,
 ) -> dict:
-    """C.2（§5.2）結論按序取第一個成立者：
-    無效（變異運行無效）→ baseline不合格 → 回Phase1-變異移植／不通過 → 不可判定-待解釋 → 通過。"""
+    """C.2（§5.2；profile 改造見 v5 §13 第 4、5、13 項）結論按序取第一個成立者：
+    無效（變異運行無效）→ baseline不合格 → 回Phase1-變異移植／不通過 →
+    無效（缺 active profile）→ 不可判定-待解釋 → 通過。
+    `active_profile=None`（尚未啟用 R27，場 0 前或場 0 中途停止時的常態）在到達簽名比對這一步
+    時判「無效：缺 active profile」，不得默默落回 R55 下結論；`historical_R55_deviation` 無論
+    是否有 active profile 都計算並回報，但只供參考，不影響 conclusion。"""
     tables = {"M2": m2_table, "M3": m3_table}
     mutant_reasons = [
         f"{name}: {reason}"
@@ -572,7 +598,8 @@ def evaluate_negative_control(
         "baseline_reasons": baseline_reasons,
         "mutant_invalid_reasons": mutant_reasons,
         "mutants": {},
-        "deviations": [],
+        "active_profile_deviation": None,
+        "historical_R55_deviation": [],
         "product_files": changed,
         "migration_trigger": False,
     }
@@ -580,11 +607,13 @@ def evaluate_negative_control(
         return dict(base, conclusion="無效", reasons=mutant_reasons)
     if not baseline_ok:
         return dict(base, conclusion="baseline不合格", reasons=baseline_reasons)
-    reports = {name: mutant_kill_report(name, baseline_table, tables[name]) for name in MUTANT_NAMES}
-    deviations = [d for name in MUTANT_NAMES for d in reports[name]["deviations"]]
+    reports = {
+        name: mutant_kill_report(name, baseline_table, tables[name], active_profile) for name in MUTANT_NAMES
+    }
+    historical_deviation = [d for name in MUTANT_NAMES for d in reports[name]["historical_R55_deviation"]]
     unkilled = [name for name in MUTANT_NAMES if not reports[name]["kill_ok"]]
     migration = bool(unkilled) and bool(changed)
-    result = dict(base, mutants=reports, deviations=deviations, migration_trigger=migration)
+    result = dict(base, mutants=reports, historical_R55_deviation=historical_deviation, migration_trigger=migration)
     if migration:
         return dict(
             result,
@@ -594,8 +623,12 @@ def evaluate_negative_control(
         )
     if unkilled:
         return dict(result, conclusion="不通過", reasons=[_unkilled_reason(reports[name]) for name in unkilled])
-    if deviations:
-        return dict(result, conclusion="不可判定-待解釋", reasons=deviations)
+    if active_profile is None:
+        return dict(result, conclusion="無效", reasons=[_NO_ACTIVE_PROFILE_REASON])
+    active_deviation = [d for name in MUTANT_NAMES for d in (reports[name]["active_profile_deviation"] or ())]
+    result = dict(result, active_profile_deviation=active_deviation)
+    if active_deviation:
+        return dict(result, conclusion="不可判定-待解釋", reasons=active_deviation)
     return dict(result, conclusion="通過", reasons=[])
 
 

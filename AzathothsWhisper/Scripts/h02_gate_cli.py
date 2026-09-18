@@ -12,6 +12,7 @@ from typing import List, Optional
 
 from h02_gate_model import GateInputError, GateTable
 from h02_gate_parse import load_xcresult_json
+from h02_gate_r27_profile import ProfileError, load_active_profile
 from h02_gate_rules import (
     evaluate_candidate,
     evaluate_negative_control,
@@ -20,6 +21,8 @@ from h02_gate_rules import (
     verdict,
 )
 from h02_gate_table import build_table, format_table, table_to_json
+
+_DEFAULT_R27_PROFILE_DIR = str(Path.home() / "Developer" / "bjork-h02-gate" / "fix4" / "r27-profile")
 
 
 def _print_lines(title: str, lines: List[str], limit: int = 20) -> None:
@@ -103,13 +106,19 @@ def _print_mutant_report(report: dict) -> None:
 
 
 def _print_negative_control(result: dict) -> None:
-    """C.2（§5.2）負對照輸出。"""
+    """C.2（§5.2；雙欄偏離見 v5 §13 第 4、5 項）負對照輸出。"""
     print("== C.2 負對照（M2／M3）==")
     print(f"結論={result['conclusion']}")
     _print_lines("理由", result["reasons"])
     _print_lines("變異運行無效", result["mutant_invalid_reasons"])
     _print_lines("baseline 不合格", result["baseline_reasons"])
-    _print_lines("簽名偏離（需解釋）", result["deviations"])
+    if result["active_profile_deviation"] is None:
+        print("active_profile_deviation: 尚無 active profile")
+    else:
+        _print_lines("active_profile_deviation（需解釋；參與結論）", result["active_profile_deviation"])
+    _print_lines(
+        "historical_R55_deviation（僅報告；R55 唯讀歷史，不參與結論）", result["historical_R55_deviation"]
+    )
     _print_lines("候選改動的 CoverFlow 非 Strip 檔", result["product_files"])
     for report in result["mutants"].values():
         _print_mutant_report(report)
@@ -187,6 +196,14 @@ def _add_f1_parsers(sub) -> None:
         p_neg.add_argument(f"--{run}-xcresult", required=True)
     p_neg.add_argument("--mutant-iterations", type=int, default=3)
     p_neg.add_argument("--product-files", default=None, help="候選改動的產品源檔清單（殺死點消失分支判定）")
+    p_neg.add_argument(
+        "--profile-dir",
+        default=_DEFAULT_R27_PROFILE_DIR,
+        help=(
+            "R27 profile 根目錄（讀 <dir>/active/profile.json；預設倉庫外 "
+            f"{_DEFAULT_R27_PROFILE_DIR}，v5 §13 第 2 項）；尚未 activate 過則視為無 active profile"
+        ),
+    )
 
 
 def _load_table(log_path: str, xcresult_path: str, iterations: Optional[int]) -> GateTable:
@@ -203,6 +220,10 @@ def _run_negative_control(args) -> int:
     baseline = _load_table(args.baseline_log, args.baseline_xcresult, args.baseline_iterations)
     m2 = _load_table(args.m2_log, args.m2_xcresult, args.mutant_iterations)
     m3 = _load_table(args.m3_log, args.m3_xcresult, args.mutant_iterations)
+    try:
+        active_profile = load_active_profile(Path(args.profile_dir))
+    except ProfileError as e:
+        raise GateInputError(f"R27 profile 讀取失敗（{args.profile_dir}）：{e}") from e
     _print_negative_control(
         evaluate_negative_control(
             baseline,
@@ -211,6 +232,7 @@ def _run_negative_control(args) -> int:
             args.baseline_iterations,
             args.mutant_iterations,
             product_files=_load_product_files(args.product_files),
+            active_profile=active_profile,
         )
     )
     return 0
