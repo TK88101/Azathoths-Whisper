@@ -279,6 +279,8 @@
   4. 新碼 `C4-NIL-DWELL`（進 `PRODUCT_CODES`）與／或 `C4-NIL-SHIFT`（僅 Python 離線，trans 輪）——依 §5.5 選擇程序，可並存；F6 checkpoint 後生效；`C7-TRANSIENT-STACK` 僅 Python 離線；
   5. 判定器 `candidate`／`negative-control` 子命令、`PRODUCT_CODES` 擴充、R5-5 殺死簽名常量、殺死含 C2 條款；facade `h02_gate_eval.py` `__all__` 與 `test_h02_gate_parsing.py` 掃描清單同步；
      **（v5 追加）profile 機制**：新模組承載 R27 profile（外部 JSON，倉庫外；含 M0 每步登記與允許碼／M2·M3 殺死簽名／ui-T0′ 三份基準），`staging → 原子啟用`（四份齊全且各自有效才以含四者 hash 的 manifest 一次寫入啟用），`_signature_deviations` 改讀 active profile 並雙列 historical R55，缺 active → 無效；`R55_KILL_SIGNATURES` 與 `REQUIRED_KILL_STEPS` 逐字不動；
+     **R4-F 的甲案裁定（2026-09-18，實施中補記）**：`evaluate_frozen_conformity` 的判據改讀 `active_profile.m0[(label, step)].allowed_codes`／`.sig_set`；**無 active profile、或該步未登記於 `profile.m0` 時，與 `FROZEN_REGISTRATION`／`FROZEN_ALLOWED_CODES` 的差異一律只入 `frozen_deviations`（26.6.2 historical 欄），不產生 `reasons`、不使結論落入「不可判定」**——場 0 的 `cf-m0-27` 首跑正是此情形（呼應第 4 項「只列雙欄偏離、不停」）。舊表的**值**逐字不動，只改消費方式。`activate_r27` 要求 `m0` **登記全部 9 個步驟**，缺一拒絕啟用（殘缺 profile 會讓未登記步驟永遠不被檢查）。
+     **溯源欄位的裁定（2026-09-18，主線程裁決，覆核意見未採納）**：profile 的 `tree_hash`／`cdhash` 是**場 0 基準樹的溯源資訊**，**不得**與受評運行的 tree hash 作相等比對後判無效——`M2_K`／`M3_K` 依設計就是從候選 tree 重建（§5.2），樹 hash 本來就不同，那樣做會讓 C.2 恆為無效。溯源只印進報告；**該比的是環境指紋**（§10 R13）：profile 有指紋而運行端未提供 → `unmeasured` → **無效（fail-closed）**，有值不符 → 無效，profile 無指紋 → `unknown` 不影響結論。此決定須有測試釘住。
   11. **（v5）G6 的無 AX host 測試基建**：layer-only 幾何讀取與 U1c 分解的測試側工具、卡片語義身分方案（§5.3 三案）之實作與其 ON／OFF 觀察者效應驗證；
   12. **（v5）場 0 四棵樹的預構建與身分記錄**（`fix4/trees/`、`fix4/dd/`，倉庫與 iCloud 樹之外；`build-for-testing` 後全程 `test-without-building`）；
   6. `Scripts/h02_sampler_report.py`（`timeline`／`trans`／`nil`）；
