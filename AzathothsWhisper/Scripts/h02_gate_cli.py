@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 
 from h02_gate_model import GateInputError, GateTable
 from h02_gate_parse import load_xcresult_json
-from h02_gate_r27_profile import ProfileError, R27Profile, load_active_profile
+from h02_gate_r27_profile import _DEFAULT_R27_PROFILE_DIR, ProfileError, R27Profile, load_active_profile
 from h02_gate_rules import (
     evaluate_candidate,
     evaluate_negative_control,
@@ -21,8 +21,7 @@ from h02_gate_rules import (
     verdict,
 )
 from h02_gate_table import build_table, format_table, table_to_json
-
-_DEFAULT_R27_PROFILE_DIR = str(Path.home() / "Developer" / "bjork-h02-gate" / "fix4" / "r27-profile")
+import h02_gate_profile_cli
 
 
 def _print_lines(title: str, lines: List[str], limit: int = 20) -> None:
@@ -226,6 +225,7 @@ def _build_argparser() -> argparse.ArgumentParser:
     _add_profile_args(p_verdict)
 
     _add_f1_parsers(sub)
+    h02_gate_profile_cli.add_profile_subparsers(sub)
     return parser
 
 
@@ -387,6 +387,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         if args.command == "verdict":
             return _run_verdict(args)
+
+        if args.command == "profile":
+            return h02_gate_profile_cli.run_profile(args)
     except GateInputError as e:
         print(f"錯誤：{e}", file=sys.stderr)
         return 2

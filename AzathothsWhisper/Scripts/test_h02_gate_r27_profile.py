@@ -513,6 +513,7 @@ class ProfileProvenanceTests(unittest.TestCase):
                 "cdhash": "bb" * 20,
                 "env_fingerprint": valid_env_fingerprint(),
                 "display": "",
+                "evidence_hashes": {"m0": "", "m2": "", "m3": "", "ui_t0_prime": ""},
             },
         )
 
@@ -646,6 +647,54 @@ class DisplayProvenanceTests(unittest.TestCase):
         activated = r27.activate_r27(self.root, version="v1")
         self.assertEqual(activated.display, "")
         self.assertEqual(activated.provenance()["display"], "")
+
+
+class EvidenceHashProvenanceTests(unittest.TestCase):
+    """F2b／主線程 2026-09-18 裁定：各元件（m0/m2/m3/ui_t0_prime）的 `evidence_hash`——溯源欄位，
+    與 `display` 同一處理原則（只印進報告，從不參與任何比對或結論）。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def stage_all(self, **overrides):
+        components = {"m0": valid_m0(), "m2": valid_m2(), "m3": valid_m3(), "ui_t0_prime": valid_ui_t0_prime()}
+        components.update(overrides)
+        for name, data in components.items():
+            r27.stage_component(self.root, name, data)
+
+    def test_evidence_hash_per_component_round_trips_through_activation(self):
+        m0 = valid_m0()
+        m0["evidence_hash"] = "e0" * 32
+        m2 = valid_m2()
+        m2["evidence_hash"] = "e2" * 32
+        self.stage_all(m0=m0, m2=m2)
+        activated = r27.activate_r27(self.root, version="v1")
+        self.assertEqual(activated.evidence_hashes, {"m0": "e0" * 32, "m2": "e2" * 32, "m3": "", "ui_t0_prime": ""})
+        self.assertEqual(activated.provenance()["evidence_hashes"], activated.evidence_hashes)
+        loaded = r27.load_active_profile(self.root)
+        self.assertEqual(loaded.evidence_hashes, activated.evidence_hashes)
+
+    def test_missing_evidence_hash_defaults_to_empty_string_per_component(self):
+        self.stage_all()
+        activated = r27.activate_r27(self.root, version="v1")
+        self.assertEqual(activated.evidence_hashes, {"m0": "", "m2": "", "m3": "", "ui_t0_prime": ""})
+
+    def test_empty_evidence_hash_is_rejected(self):
+        m0 = valid_m0()
+        m0["evidence_hash"] = ""
+        self.stage_all(m0=m0)
+        with self.assertRaises(r27.ProfileError):
+            r27.activate_r27(self.root, version="v1")
+
+    def test_evidence_hash_never_affects_activation_or_deviation_logic(self):
+        """只印不比：兩份 evidence_hash 完全不同的 profile 仍可正常啟用（不做交叉核對）。"""
+        m0 = valid_m0()
+        m0["evidence_hash"] = "aa" * 32
+        self.stage_all(m0=m0)
+        activated = r27.activate_r27(self.root, version="v1")
+        self.assertTrue(activated.evidence_hashes["m0"])
 
 
 if __name__ == "__main__":

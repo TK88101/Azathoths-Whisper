@@ -30,6 +30,13 @@ from h02_gate_model import STEPS
 
 R27_PROFILE_SCHEMA = 1
 
+# 場 0 F2b：R27 profile 根目錄的預設路徑——原本定義在 `h02_gate_cli.py`，移到本檔（profile 概念
+# 的自然歸屬）以便 `h02_gate_profile_cli.py`／`h02_gate_profile_gen.py` 與 `h02_gate_cli.py` 都能匯入，
+# 不必互相匯入造成循環依賴。`h02_gate_cli.py` 改為 `from h02_gate_r27_profile import _DEFAULT_R27_PROFILE_DIR`；
+# 既有測試 `mock.patch.object(gate_cli, "_DEFAULT_R27_PROFILE_DIR", ...)` patch 的是 `h02_gate_cli`
+# 模組命名空間裡的那個名字，與其原始定義處無關，行為不變。
+_DEFAULT_R27_PROFILE_DIR = str(Path.home() / "Developer" / "bjork-h02-gate" / "fix4" / "r27-profile")
+
 _STAGING_COMPONENTS: Tuple[str, ...] = ("m0", "m2", "m3", "ui_t0_prime")
 _ACTIVE_DIRNAME = "active"
 _STAGING_DIRNAME = "staging"
@@ -83,6 +90,10 @@ class R27Profile:
     env_fingerprint: Dict[str, str] = field(default_factory=dict)
     # v5 §10 R13 的顯示設定：只作溯源（"" ＝未記錄），不參與任何比對或結論
     display: str = ""
+    # 各元件（m0/m2/m3/ui_t0_prime）的 evidence_hash（主線程 2026-09-18 裁定：溯源欄位，
+    # 與 display 同一處理原則——只印進報告，從不參與任何比對或結論）。鍵恆為
+    # `_STAGING_COMPONENTS` 四者；未記錄該元件的 evidence_hash 時值為 ""。
+    evidence_hashes: Dict[str, str] = field(default_factory=dict)
 
     def kill_signatures(self, name: str) -> Dict[Tuple[str, str], FrozenSet[str]]:
         if name == "M2":
@@ -106,6 +117,7 @@ class R27Profile:
             "cdhash": self.cdhash,
             "env_fingerprint": dict(self.env_fingerprint),
             "display": self.display,
+            "evidence_hashes": dict(self.evidence_hashes),
         }
 
 
@@ -138,6 +150,16 @@ def _parse_display(data: object, where: str) -> str:
         return ""
     if not isinstance(data, str) or not data.strip():
         raise ProfileError(f"{where}: display 須為非空字串（不記錄就整個省略）")
+    return data
+
+
+def _parse_evidence_hash(data: object, where: str) -> str:
+    """單一元件的 evidence_hash（主線程 2026-09-18 裁定；與 `_parse_display` 同一原則）：
+    可選——缺席 → ""；附了就須為非空字串。只印進報告，從不參與任何比對或結論。"""
+    if data is None:
+        return ""
+    if not isinstance(data, str) or not data.strip():
+        raise ProfileError(f"{where}: evidence_hash 須為非空字串（不記錄就整個省略）")
     return data
 
 
@@ -340,6 +362,10 @@ def activate_r27(root: Path, version: str, *, allow_replace: bool = False) -> R2
         raise ProfileError("啟用拒絕：staging/m0 缺 tree_hash／cdhash")
     env_fingerprint = _parse_env_fingerprint(raw["m0"].get("env_fingerprint"), "staging/m0")
     display = _parse_display(raw["m0"].get("display"), "staging/m0")
+    evidence_hashes = {
+        component: _parse_evidence_hash(raw[component].get("evidence_hash"), f"staging/{component}")
+        for component in _STAGING_COMPONENTS
+    }
 
     active_payload = {
         "schema": R27_PROFILE_SCHEMA,
@@ -362,6 +388,7 @@ def activate_r27(root: Path, version: str, *, allow_replace: bool = False) -> R2
         cdhash=cdhash,
         env_fingerprint=env_fingerprint,
         display=display,
+        evidence_hashes=evidence_hashes,
         m0=parsed["m0"],
         m2_kill=parsed["m2"],
         m3_kill=parsed["m3"],
@@ -446,6 +473,10 @@ def load_active_profile(root: Path) -> Optional[R27Profile]:
     cdhash = _require_str(m0_raw, "cdhash", "active.components.m0")
     env_fingerprint = _parse_env_fingerprint(m0_raw.get("env_fingerprint"), "active.components.m0")
     display = _parse_display(m0_raw.get("display"), "active.components.m0")
+    evidence_hashes = {
+        name: _parse_evidence_hash(components[name].get("evidence_hash"), f"active.components.{name}")
+        for name in _STAGING_COMPONENTS
+    }
 
     return R27Profile(
         schema=R27_PROFILE_SCHEMA,
@@ -454,6 +485,7 @@ def load_active_profile(root: Path) -> Optional[R27Profile]:
         cdhash=cdhash,
         env_fingerprint=env_fingerprint,
         display=display,
+        evidence_hashes=evidence_hashes,
         m0=parsed["m0"],
         m2_kill=parsed["m2"],
         m3_kill=parsed["m3"],

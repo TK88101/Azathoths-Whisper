@@ -513,6 +513,7 @@ class NegativeControlTests(unittest.TestCase):
                 "cdhash": R27_CDHASH,
                 "env_fingerprint": {},
                 "display": "",
+                "evidence_hashes": {},
             },
         )
 

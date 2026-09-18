@@ -31,6 +31,11 @@ docstring 裡，此處只列索引）：
       `R55_KILL_SIGNATURES` 降為唯讀歷史；場 0 實測基準以外部 JSON 檔 staging → 原子啟用為
       active profile；C.2 雙欄偏離報告（`active_profile_deviation` 參與結論、`historical_R55_deviation`
       僅報告）；無 active profile → C.2「無效」 —— 見 `h02_gate_r27_profile.py`／`h02_gate_rules.py`。
+  13. F2b：R27 staging 產生器與 `profile` 子命令群（`docs/plans/2026-09-13-coverflow-h02-fix4.md`
+      §13 v5 提案第 5 項；場 0 前必做）：由 `cf-m0-27`／M2／M3／`ui-T0′` 的 xcodebuild log＋xcresult
+      產出 staging JSON（不必手寫）；`profile check` 機械化 §7 場 0 的停止分支＋§6 場 0 列停止條件；
+      `profile activate` 只在 `check` 為 PASS 且 staging 未變動時才啟用 —— 見
+      `h02_gate_profile_gen.py`（純函數）／`h02_gate_profile_cli.py`（argparse＋列印）。
 """
 from __future__ import annotations
 
@@ -74,6 +79,8 @@ from h02_gate_r27_profile import (
     env_fingerprint_check,
     load_active_profile,
 )
+import h02_gate_profile_gen as profile_gen
+import h02_gate_profile_cli as profile_cli
 from h02_gate_parse import (
     _classify_gate_token,
     _collect_failure_texts,
@@ -162,6 +169,7 @@ __all__ = [
     "has_non_strip_coverflow_change", "non_strip_coverflow_changes",
     "R27Profile", "ProfileError", "R27_PROFILE_SCHEMA",
     "activate_r27", "load_active_profile", "active_profile_deviations", "env_fingerprint_check",
+    "profile_gen", "profile_cli",
     "main",
 ]
 
