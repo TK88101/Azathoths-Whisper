@@ -299,6 +299,11 @@
 | 場 2 | F9：`cf-cand-K<n>` ×20 → M2_K／M3_K ×3 → `cf-cand-K<n>-trans` ON ×10；F9b：既有 UITests 17 條（preflight＋證據輪） | 60–75 分 |
 | 場 3 | F10：R-neg（15 手勢）→ R-off（50）→ R-on（45）；錄影 | 60–90 分 |
 
+**場次的人工守則（v5；判定器不強制，靠人守，違反即證據包作廢）**
+- **候選禁止提前開始**：`active_profile=R27` 原子啟用之前，不得跑任何 `cf-cand-K<n>` 運行。判定器只擋「無 active profile 時 C.2 下結論」（回無效），**不擋 C.1 開跑**——C.1 的語義本就與 profile 無關（§5.1）。
+- **場 0 (i) preflight 的方法（待使用者於場 0 當天確認）**：跑一輪 `-only-testing:AzathothsWhisperUITests/CoverFlowUITests`**不計證據輪**，只驗 Automation Mode／鑰匙串／Products 身分健康與 S2 已知點分類命中；V5 的「十次一致」留給 (ii) 的 ×10 判（§7 preflight 定義不含 V5）。**這是推論**（§7 第 3 條 preflight 的字面讀法），非原文明寫。
+- **既有 UITests（場 0 (iv)、場 2 F9b）不帶閘門參數**：歷史 `ui-T0` 的真實 invocation 無任何 build settings 覆寫（預設 Debug ＝ `-Onone`），選擇器須覆蓋 **17 條／三個 suite**（Shell 11＋Batch 5＋BatchLive 1 skip，`BatchLiveUITests` 是獨立 class）；ui-T0′ 的樹也必須以同配置構建，否則與 ui-T0 不是同一比較條件（W10）。
+
 | # | 任務 | DoD |
 |---|---|---|
 | F0 | **本 session**：Plan 定稿（Codex R1／Opus 四視角 → v2 → Codex R2 → R3 整體確認） | §14 逐條處置；使用者確認執行＋批准操作護欄 |
