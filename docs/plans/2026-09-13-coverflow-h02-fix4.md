@@ -455,6 +455,18 @@ screencapture -v "$G/ev/physical-K<n>/P3-1.mov"
 
 （runner 端環境變數以 `TEST_RUNNER_` 前綴轉發；儀器旗標由 `launchCoverFlow` 轉入 app 的 launchEnvironment——F2 實作、單測釘住單一來源。既有 UITests 命令沿用閘門計劃 §10。）
 
+### 11.1 場 0（v5 新增；逐字命令的權威來源＝`~/Developer/bjork-h02-gate/fix4/trees/PREBUILD.md`）
+
+命令**不在本計劃重複**，避免兩處漂移：四棵樹的路徑／CDHash／`RUN_ENV`／`evidence_hash()`／每段 `test-without-building` 與 `profile` 呼叫，一律以 `PREBUILD.md` 的「場 0 當天要跑的命令」段為準（該檔與四棵樹一起凍結，並記有各棵樹的 build invocation 原文）。本節只定不變式：
+
+1. **全部 `test-without-building`**：四棵樹已預構建（`fix4/dd/<tree>`），當天不得再構建（重建會改 CDHash，且 `build-for-testing` 每次都重新註冊 LaunchServices）。開跑前復驗 `lsregister -dump | grep -c bjork-h02-gate/fix4/dd` ＝ 0，並逐一比對 8 個 bundle（app＋runner）的 CDHash。
+2. **每段都要帶 `TEST_RUNNER_AZW_EXPECTED_APP_DIR`**（指向該樹的 `Build/Products/Debug`）：空值會被 `CoverFlowUITests.swift`（M0／M2／M3 樹第 136 行）的 `!expected.isEmpty` 守衛直接判 `PROBE-WRONG-BINARY`，**不是**「跳過身分檢查」。
+3. **CoverFlow 四測試用閘門配置**（`-enableCodeCoverage NO SWIFT_OPTIMIZATION_LEVEL=-O`）；**既有 UITests（(iv) ui-T0′）不帶任何 build settings 覆寫**（歷史 `ui-T0` 的真實 invocation 即如此），選擇器覆蓋 17 條／三個 suite（`-only-testing:AzathothsWhisperUITests -skip-testing:AzathothsWhisperUITests/CoverFlowUITests`），allowance 明示對齊哪一份歷史基線。
+4. **判定一律呼叫 repo 現行判定器的絕對路徑**（樹內 `Scripts/` 是 2026-09-12 舊版，無 `candidate`／`profile` 子命令）。場 0 期間**不給** `--profile-dir`（尚無 active profile；顯式給不存在的路徑＝輸入錯誤 exit 2），**要給** `--run-env-fingerprint "$RUN_ENV"`。
+5. **staging 一律走 CLI**：`profile stage-m0`（強制 ×10）→ `profile stage-mutant --name M2|M3`（強制 ×3、baseline ×10）→ `profile stage-ui`（強制 17 條）→ `profile check` → `profile activate --version scene0-run-1`。首份有效即凍結、**無覆蓋開關**；手改 staging 後重跑 check 會被凍結帳本判 STOP；`activate` **現場重算**停止條件，不採信 `scene0-check.json`。
+6. **停止即停**：`profile check` 回 STOP（exit 1）當場結束場 0，不得續跑場 1；歸類「環境前置未成立／待使用者裁決」（§7）。
+7. **證據**：每段算 `evidence_hash`（log＋xcresult，**排除 `database.sqlite3*`**——首次 `xcresulttool` 讀取會改寫它，含它則事後重算不出來），hash 隨 staging 一起凍結。
+
 ## 12. Unknowns 賬本（slipknot 29）
 
 | # | 未知 | 象限 | 處置 |
