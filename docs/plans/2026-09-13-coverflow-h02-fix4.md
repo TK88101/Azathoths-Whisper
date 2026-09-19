@@ -657,3 +657,22 @@ Codex 結論：不核准 v1（2 P0）。逐條處置（採納＝依建議改；�
 - **判定器（commit 9056b8c → 17611aa → 0460cfb → 本段收尾）**：R27 profile 模組 `h02_gate_r27_profile.py`；staging→原子啟用（含四份原文、`component_hashes`、`staging_file_hashes`，m0 須登記全部 9 步，重複啟用預設拒絕，空 version 拒絕）；C.2 無 active profile 一律「無效」且優先於 3／4 類；雙列 active／historical R55 偏離；R4-F 甲案；`--profile-dir`＋`--run-env-fingerprint` 接到 v3／verdict／negative-control；環境指紋 fail-closed；溯源只印不比。**主線程收尾兩條**：(a) 顯式給了卻找不到 active/profile.json 的 `--profile-dir` → exit 2（第 3 輪發現 v3／verdict 靜默降級使結論由不可判定翻成通過；只有「不給」才讀預設路徑、缺檔＝無 profile）；(b) `display` 欄（只溯源不比對，見 §10 R13）。測試 144 → 181 → 204 → 223 → **234**，全綠。更正：commit `0460cfb` 訊息寫的「204→223 only 增不減」不確——測試 id 實為 **+20／−1**（`test_profile_only_is_unknown` 依 must_fix 改名為 `_is_unmeasured` 並反轉斷言，合法語義改名）。新測試檔 `test_h02_gate_profile_dir.py`（`test_h02_gate_candidate.py` 超 800 行而拆出）。
 - **四棵樹（`~/Developer/bjork-h02-gate/fix4/trees/PREBUILD.md`）**：M0＝`a1d3407`、M2／M3＝只換 Strip（md5 `57da040c…`／`48687466…` 先驗後用，`diff -rq` 證明只差 Strip）、ui-T0′＝`aad6a9b`＋R5-3 四檔（**以歷史 ui-T0 同配置重建：不帶閘門參數，預設 Debug**——第 1 輪誤用 `-O`，被覆核比對歷史 log 第 2 行的真實 invocation 抓到）。四棵樹 app／runner 共 8 個 CDHash 互異並已入 manifest。LaunchServices：`lsregister -dump | grep -c bjork-h02-gate`＝0（主線程實測，含清掉 3 條 Release 版殘留）。場 0 命令草稿已修：(i) preflight 補 `TEST_RUNNER_AZW_EXPECTED_APP_DIR`（M0 樹 `CoverFlowUITests.swift:136` 的 `!expected.isEmpty` 守衛，缺它必撞 `PROBE-WRONG-BINARY`）、既有 UITests 選擇器 17 條含 `BatchLiveUITests`、判定器一律以絕對路徑呼叫 repo 現行版、`RUN_ENV` 環境指紋、`evidence_hash()` 路徑無關且缺檔即失敗。
 - **場 0 前仍缺**：R27 staging 產生器與 `profile stage／activate` CLI（F2b 已追加）；`evidence_hash` 的定位（判定器補欄位，或只入 manifest）待定。
+
+### 2026-09-19 profile CLI 與「26.6.2 真實證據彩排」（場 0 前置完成）
+
+**F2b 的 profile CLI（commit `6dd4df2` → `0d00fde`）**：`profile stage-m0`／`stage-mutant`／`stage-ui`／`check`／`activate`／`show`（新模組 `h02_gate_profile_gen.py`＋`h02_gate_profile_cli.py`）。第 4 輪 Opus 5 對抗覆核抓到四條並已收：
+1. **偽造 check 檔可啟用**（實測：手寫 `result: "PASS"`＋照算的 `staging_sha256`，就能啟用一份真實停止條件為 STOP 的 profile）→ `activate` 改為**現場重算**停止條件，不採信 `scene0-check.json`；
+2. **手改 staging 後重跑 check 會被重新祝福**（繞過首份規則與 §10 R10）→ 新增 append-only 凍結帳本 `staging/frozen.jsonl`，`check` 逐一比對現檔；帳本本身仍可被一併竄改（口徑同 `load_active_profile`：墊高成本、留下絆線，非密碼學防偽）；
+3. **`--iterations` 打錯即永久凍結欠採樣基準** → `stage-m0` 強制 ×10、`stage-mutant` 強制 ×3／baseline ×10（§6 場 0 列）；
+4. **`evidence_hash` 不可重算**（首次 `xcrun xcresulttool get` 會改寫 `database.sqlite3`）→ 排除 `database.sqlite3*`；主線程以 `cf-M2-confirm.xcresult` 副本實測：含 sqlite 時 `1d63e359…`→`7272367d…`，排除後讀取前／讀取後／另一副本皆 `d5685a67…`。
+另補：四份元件各記 `environment`（取自各自 tree-manifest），不一致即 STOP（§10 R13 跨元件面）。Python 測試 234 → 309 → **314**，全綠。
+
+**彩排（2026-09-19，scratchpad 獨立 profile 目錄，未碰預設路徑；四份輸入全是 26.6.2 的真實運行證據）**：`cf-m0-confirm`（×10）→ `cf-M2-confirm`／`cf-M3-confirm`（各 ×3）→ `ui-T0.log` → `check` → `activate`，全程 exit 0。程式化交叉核對結果：
+- M2／M3 推出的殺死簽名 **== `R55_KILL_SIGNATURES`**（逐字）；
+- m0 九步的 `allowed_codes` **== `FROZEN_ALLOWED_CODES`**；`sig_set` 的碼投影 **== `FROZEN_REGISTRATION`**；
+- T1.s3／T2.s2 `stable=False`（重現已知的兩格不一致）；T4.s2 簽名 `C1-OFFSET|label=T19|centered=T16|strides=+3`；
+- `defect2_reproduced=True`（T1.s2／T2.s3／T4.s1／T4.s2）、`defect3.status=CAUGHT`、`positive_control_ok=True`；
+- ui 17 條＝15 PASS／1 FAIL（A-10）／1 SKIP（BatchLive），與歷史 `ui-T0` 相同。
+即：**這條管線若在 2026-09-12 存在，會從原始證據一字不差地重建出 R5-5 的全部凍結常量**。這是場 0 前能做到的最強驗證（合成夾具測不到真實 log／xcresult 的解析路徑）。彩排產物在 scratchpad，不入證據包。
+
+**場 0 前置至此齊備**：四棵樹（含以歷史配置重建的 ui-T0′）＋身分記錄、判定器 R27 profile 全鏈、profile CLI、§11.1 的運行不變式。**剩下**：`/simcodex`（Phase 3 實施後評審，待 Codex 額度恢復）→ 使用者排場 0。
