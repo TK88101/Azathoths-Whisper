@@ -101,7 +101,19 @@ class AttemptsTests(unittest.TestCase):
         pgen.record_invalid_attempt(self.tmp, "M0", "m0", ["r"])
         pgen.record_invalid_attempt(self.tmp, "M0", "m0", ["r"])
         summary = pgen.attempts_summary(self.tmp)
-        self.assertEqual(summary[("M0", "m0")], 2)
+        self.assertEqual(summary[("M0", "", "m0")], 2)
+
+    def test_distinct_hashes_sharing_a_prefix_are_not_merged(self):
+        """桶以**完整 hash** 聚合：前 8 碼相同的兩棵樹各 1 份無效，不得被併成 2 而觸發上限
+        （Codex review Round 4）。`@abcd1234` 只是報告文字。"""
+        a, b = "aaaaaaaa" + "1" * 24, "aaaaaaaa" + "2" * 24
+        pgen.record_invalid_attempt(self.tmp, "M0", "m0", ["r"], tree_hash=a)
+        pgen.record_invalid_attempt(self.tmp, "M0", "m0", ["r"], tree_hash=b)
+        summary = pgen.attempts_summary(self.tmp)
+        self.assertEqual(summary[("M0", a, "m0")], 1)
+        self.assertEqual(summary[("M0", b, "m0")], 1)
+        self.assertEqual(pgen.count_invalid_attempts(self.tmp, "M0", "m0", tree_hash=a), 1)
+        self.assertFalse(pgen.evaluate_scene0_check(self.tmp)["checks"]["attempts_stop_triggered"])
 
     def test_no_file_yet_counts_zero(self):
         self.assertEqual(pgen.count_invalid_attempts(self.tmp, "M0", "m0"), 0)
@@ -177,14 +189,14 @@ class BaselineMatchesStagedM0Tests(unittest.TestCase):
 
     def test_matching_sha256_accepted(self):
         m0_staging = {"log_sha256": pgen.sha256_file(self.log_path)}
-        self.assertTrue(pgen.baseline_matches_staged_m0(m0_staging, self.log_path))
+        self.assertTrue(pgen.baseline_sha256_matches_staged_m0(m0_staging, pgen.sha256_file(self.log_path)))
 
     def test_mismatched_sha256_rejected(self):
         m0_staging = {"log_sha256": "0" * 64}
-        self.assertFalse(pgen.baseline_matches_staged_m0(m0_staging, self.log_path))
+        self.assertFalse(pgen.baseline_sha256_matches_staged_m0(m0_staging, pgen.sha256_file(self.log_path)))
 
     def test_missing_log_sha256_field_rejected(self):
-        self.assertFalse(pgen.baseline_matches_staged_m0({}, self.log_path))
+        self.assertFalse(pgen.baseline_sha256_matches_staged_m0({}, pgen.sha256_file(self.log_path)))
 
 
 class BuildMutantStagingTests(unittest.TestCase):

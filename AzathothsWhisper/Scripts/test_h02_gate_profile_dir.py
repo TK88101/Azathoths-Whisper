@@ -6,7 +6,6 @@ v3／verdict／negative-control 三個子命令共用 `h02_gate_cli._load_active
 
 from __future__ import annotations
 
-import io
 import tempfile
 import unittest
 from pathlib import Path

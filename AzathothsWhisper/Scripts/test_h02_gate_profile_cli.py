@@ -6,7 +6,6 @@
 """
 from __future__ import annotations
 
-import io
 import json
 import tempfile
 import unittest
@@ -167,6 +166,22 @@ class StageMutantTests(ProfileCliTestCase):
         code, out, err = self._stage_m2(log_path, xc_path)
         self.assertEqual(code, 2)
         self.assertIn("必須先 stage-m0", err)
+
+    def test_baseline_mismatch_is_reported_before_parsing_the_xcresult(self):
+        """便宜的檢查要排在貴的前面：baseline 身分不符時，應直接報 sha256 不符，
+        而不是先去解析 --baseline-xcresult（那份可能根本壞掉，錯誤訊息會指錯方向）。
+        （Round 2 回歸檢查：log 改讀一次時曾把這個短路順序拆掉。）"""
+        (code0, _, _), _, _ = self.stage_m0()
+        self.assertEqual(code0, 0)
+        different_log, _ = fx.write_run(
+            self.tmp, "not-the-same-m0", n=10, base=fx.FROZEN_M0,
+            overrides={("T3", "s1"): ["SIG{T3.s1|C6-NEVER-SETTLES}"]},
+        )
+        broken_xc = Path(self.tmp) / "broken.xcresult"
+        broken_xc.mkdir()
+        code, out, err = self._stage_m2(different_log, str(broken_xc))
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("sha256 不符", err)
 
     def test_baseline_not_the_staged_m0_is_rejected(self):
         (code0, _, _), m0_log, m0_xc = self.stage_m0()
@@ -491,6 +506,44 @@ class AttemptCapTests(ProfileCliTestCase):
         self.assertEqual(code, 2, out + err)
         self.assertIn("終局", out + err)
         self.assertFalse((Path(self.root) / "staging" / "m0.staging.json").is_file())
+
+
+class AttemptCapIsPerTreeHashTests(ProfileCliTestCase):
+    """終局的無效上限必須按**樹的 hash** 分桶，不能只按 `tree` 標籤字串。
+
+    Round 2 回歸檢查指出：標籤（"M0"）是人給的約定，重建一棵樹後標籤照舊但 hash 已變；
+    若計數只看標籤，舊樹殘留的兩份無效會把新樹永久鎖死，而場 0 的首份規則又沒有覆蓋開關——
+    操作者只能換 `--profile-dir`，且現場沒有任何訊息會提示他。"""
+
+    def _stage_m0_with_manifest(self, manifest_path):
+        log_path, xc_path = fx.write_run(self.tmp, "cf-m0-27", n=10, base=fx.FROZEN_M0)
+        return self.run_cli([
+            "profile", "stage-m0", "--profile-dir", self.root,
+            "--log", log_path, "--xcresult", xc_path, "--iterations", "10",
+            "--tree-manifest", manifest_path, "--run-env-fingerprint", RUN_ENV_TEXT,
+        ])
+
+    def test_cap_from_an_older_tree_does_not_lock_out_a_rebuilt_tree(self):
+        old_manifest = write_manifest(self.tmp, "M0", swift_hashlist_sha256="old" * 16)
+        for i in range(pgen.ATTEMPT_CAP):
+            pgen.record_invalid_attempt(Path(self.root), "M0", "m0", [f"invalid {i}"], tree_hash="old" * 16)
+        # 同一標籤、不同 hash 的重建樹：不得被舊樹的計數鎖死
+        new_manifest = write_manifest(self.tmp, "M0", swift_hashlist_sha256="new" * 16)
+        code, out, err = self._stage_m0_with_manifest(new_manifest)
+        self.assertEqual(code, 0, out + err)
+        # 同一棵舊樹則照樣被擋
+        self.assertEqual(pgen.count_invalid_attempts(Path(self.root), "M0", "m0", tree_hash="old" * 16), pgen.ATTEMPT_CAP)
+        self.assertEqual(pgen.count_invalid_attempts(Path(self.root), "M0", "m0", tree_hash="new" * 16), 0)
+        self.assertTrue(Path(old_manifest).is_file())
+
+    def test_check_does_not_stop_on_an_older_trees_attempt_bucket(self):
+        """stage 端按 hash 放行了重建的樹，`profile check` 就不能再因舊 hash 的桶而 STOP——
+        否則等於沒修（Codex review Round 3）。已 staged 的元件只看它自己那棵樹的計數。"""
+        for i in range(pgen.ATTEMPT_CAP):
+            pgen.record_invalid_attempt(Path(self.root), "M0", "m0", [f"old tree invalid {i}"], tree_hash="old" * 16)
+        self._stage_m0_with_manifest(write_manifest(self.tmp, "M0", swift_hashlist_sha256="new" * 16))
+        reasons = pgen.evaluate_scene0_check(Path(self.root))["reasons"]
+        self.assertFalse([r for r in reasons if "無效嘗試" in r], reasons)
 
 
 if __name__ == "__main__":

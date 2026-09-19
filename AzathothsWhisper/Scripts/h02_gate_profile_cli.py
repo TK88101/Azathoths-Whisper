@@ -137,33 +137,40 @@ def _read_log_once(log_path: str):
     return data.decode("utf-8", errors="replace"), pgen.sha256_bytes(data)
 
 
-def _build_and_validate_table(log_path: str, xcresult_path: str, iterations: int):
-    """回傳 `(table, valid, reasons, log_sha256)`；`table` 一律回傳（呼叫端仍可能需要它做進一步
-    計算，例如 stage-mutant 的殺死判定即使某側無效也可能想看訊息），`valid`／`reasons` 對應
-    `table_valid`，`log_sha256` 來自同一次讀取（見 `_read_log_once`）。"""
-    log_text, log_sha256 = _read_log_once(log_path)
+def _build_and_validate_table_from_text(log_text: str, xcresult_path: str, iterations: int):
+    """回傳 `(table, valid, reasons)`；log 文字由呼叫端提供（已讀過一次，見 `_read_log_once`），
+    解析 xcresult 是這裡最貴的一步，所以呼叫端可以先做便宜的檢查（例如 baseline 的 sha256
+    比對）再進來。"""
     table = build_table(log_text, _load_xcresult(xcresult_path), expected_iterations=iterations)
     valid, reasons = table_valid(table, iterations)
+    return table, valid, reasons
+
+
+def _build_and_validate_table(log_path: str, xcresult_path: str, iterations: int):
+    """`_build_and_validate_table_from_text` 的便利包裝：自己讀 log，另回傳該次讀取算出的
+    `log_sha256`（回 4 元組）。"""
+    log_text, log_sha256 = _read_log_once(log_path)
+    table, valid, reasons = _build_and_validate_table_from_text(log_text, xcresult_path, iterations)
     return table, valid, reasons, log_sha256
 
 
-def _stage_or_invalid_attempt(root, component: str, tree: str, data: dict) -> None:
+def _stage_or_invalid_attempt(root, component: str, tree: str, data: dict, tree_hash: str = "") -> None:
     """呼叫既有 `stage_component`（含它自身的 schema 驗證）；驗證失敗一併算作「無效嘗試」
     （例如變異運行技術上有效但整份 kill_signatures 為空，被 `parse_kill_component` 拒絕）——見
     `h02_gate_profile_gen` 模組 docstring 對「無效」判準的說明。"""
     try:
         stage_component(root, component, data)
     except ProfileError as e:
-        pgen.record_invalid_attempt(root, tree, component, [str(e)])
+        pgen.record_invalid_attempt(root, tree, component, [str(e)], tree_hash=tree_hash)
         raise pgen.ProfileCliError(f"staging/{component} 驗證失敗（{e}），已記入 attempts.jsonl") from e
     # 首份規則的絆線：凍結當下的 sha256 進 append-only 帳本，`profile check` 會逐一比對現檔
     pgen.record_frozen_component(root, component)
 
 
-def _refuse_if_attempt_cap_reached(root, tree: str, component: str) -> None:
+def _refuse_if_attempt_cap_reached(root, tree: str, component: str, tree_hash: str = "") -> None:
     """§7 場 0 停止分支第 4 條是**終局**的：同一 (tree, run-kind) 累積到上限後不得再 stage
     （否則「跑到有效為止」就能把停止條件抹掉，§10 R10）。場 0 當下該做的是停下上報，不是重跑。"""
-    count = pgen.count_invalid_attempts(root, tree, component)
+    count = pgen.count_invalid_attempts(root, tree, component, tree_hash=tree_hash)
     if count >= pgen.ATTEMPT_CAP:
         raise pgen.ProfileCliError(
             f"stage 拒絕：{tree}／{component} 已累積 {count} 份無效嘗試（≥{pgen.ATTEMPT_CAP} 即停，終局）；"
@@ -194,20 +201,20 @@ def _cmd_stage_m0(args) -> int:
     _refuse_if_already_staged(root, "m0")
     manifest = pgen.load_tree_manifest(args.tree_manifest)
     tree = manifest["tree"]
-    _refuse_if_attempt_cap_reached(root, tree, "m0")
+    _refuse_if_attempt_cap_reached(root, tree, "m0", manifest["swift_hashlist_sha256"])
     run_env = pgen.parse_run_env_fingerprint(args.run_env_fingerprint)
     pgen.check_manifest_env_fingerprint(manifest, run_env, "stage-m0")
 
     table, valid, reasons, log_sha256 = _build_and_validate_table(args.log, args.xcresult, args.iterations)
     if not valid:
-        pgen.record_invalid_attempt(root, tree, "m0", reasons)
+        pgen.record_invalid_attempt(root, tree, "m0", reasons, tree_hash=manifest["swift_hashlist_sha256"])
         print("stage-m0：運行無效，已記入 attempts.jsonl：", file=sys.stderr)
         for r in reasons:
             print(f"  - {r}", file=sys.stderr)
         return 2
 
     data = pgen.build_m0_staging(table, args.iterations, manifest, run_env, args.evidence_hash, log_sha256)
-    _stage_or_invalid_attempt(root, "m0", tree, data)
+    _stage_or_invalid_attempt(root, "m0", tree, data, manifest["swift_hashlist_sha256"])
     print(f"已凍結 staging/m0（tree={tree} tree_hash={data['tree_hash']} cdhash={data['cdhash']}）")
     return 0
 
@@ -230,19 +237,22 @@ def _cmd_stage_mutant(args) -> int:
 
     manifest = pgen.load_tree_manifest(args.tree_manifest)
     tree = manifest["tree"]
-    _refuse_if_attempt_cap_reached(root, tree, component)
+    _refuse_if_attempt_cap_reached(root, tree, component, manifest["swift_hashlist_sha256"])
     run_env = pgen.parse_run_env_fingerprint(args.run_env_fingerprint)
     pgen.check_manifest_env_fingerprint(manifest, run_env, f"stage-mutant --name {name}")
 
-    # baseline log 只讀一次：同一次讀取既建表也算 sha256，再用該 sha256 比對 staging/m0 的記錄
-    baseline_table, baseline_valid, baseline_reasons, baseline_log_sha256 = _build_and_validate_table(
-        args.baseline_log, args.baseline_xcresult, args.baseline_iterations
-    )
+    # baseline log 只讀一次；**先**用該次讀取算出的 sha256 做便宜的身分比對，不符就直接拒絕，
+    # 不必先付出解析 xcresult／建表的成本（Round 2 回歸檢查指出的順序問題）
+    baseline_text, baseline_log_sha256 = _read_log_once(args.baseline_log)
     if not pgen.baseline_sha256_matches_staged_m0(m0_staging, baseline_log_sha256):
         raise pgen.ProfileCliError(
             "stage-mutant 拒絕：--baseline-log 與 staging/m0 記錄的來源 log sha256 不符"
             "（baseline 必須就是被 staged 的那份 M0）"
         )
+
+    baseline_table, baseline_valid, baseline_reasons = _build_and_validate_table_from_text(
+        baseline_text, args.baseline_xcresult, args.baseline_iterations
+    )
     if not baseline_valid:
         raise pgen.ProfileCliError(
             "stage-mutant 拒絕：--baseline-log／--baseline-xcresult 本身不是有效運行：" + "；".join(baseline_reasons)
@@ -250,14 +260,14 @@ def _cmd_stage_mutant(args) -> int:
 
     mutant_table, mutant_valid, mutant_reasons, _ = _build_and_validate_table(args.log, args.xcresult, args.iterations)
     if not mutant_valid:
-        pgen.record_invalid_attempt(root, tree, component, mutant_reasons)
+        pgen.record_invalid_attempt(root, tree, component, mutant_reasons, tree_hash=manifest["swift_hashlist_sha256"])
         print(f"stage-mutant {name}：運行無效，已記入 attempts.jsonl：", file=sys.stderr)
         for r in mutant_reasons:
             print(f"  - {r}", file=sys.stderr)
         return 2
 
     data = pgen.build_mutant_staging(name, baseline_table, mutant_table, manifest, args.evidence_hash)
-    _stage_or_invalid_attempt(root, component, tree, data)
+    _stage_or_invalid_attempt(root, component, tree, data, manifest["swift_hashlist_sha256"])
     print(f"已凍結 staging/{component}（kill_ok={data['checks']['kill_ok']}）")
     return 0
 
@@ -267,7 +277,7 @@ def _cmd_stage_ui(args) -> int:
     _refuse_if_already_staged(root, "ui_t0_prime")
     manifest = pgen.load_tree_manifest(args.tree_manifest)
     tree = manifest["tree"]
-    _refuse_if_attempt_cap_reached(root, tree, "ui_t0_prime")
+    _refuse_if_attempt_cap_reached(root, tree, "ui_t0_prime", manifest["swift_hashlist_sha256"])
 
     if not (Path(args.xcresult).is_file() or Path(args.xcresult).is_dir()):
         raise pgen.ProfileCliError(f"stage-ui 拒絕：--xcresult 不存在（{args.xcresult}）")
@@ -276,14 +286,14 @@ def _cmd_stage_ui(args) -> int:
     results = pgen.parse_ui_test_log(log_text)
     reasons = pgen.check_ui_test_coverage(results)
     if reasons:
-        pgen.record_invalid_attempt(root, tree, "ui_t0_prime", reasons)
+        pgen.record_invalid_attempt(root, tree, "ui_t0_prime", reasons, tree_hash=manifest["swift_hashlist_sha256"])
         print("stage-ui：條數不是 17，已記入 attempts.jsonl：", file=sys.stderr)
         for r in reasons:
             print(f"  - {r}", file=sys.stderr)
         return 2
 
     data = pgen.build_ui_staging(results, manifest, args.evidence_hash)
-    _stage_or_invalid_attempt(root, "ui_t0_prime", tree, data)
+    _stage_or_invalid_attempt(root, "ui_t0_prime", tree, data, manifest["swift_hashlist_sha256"])
     print(f"已凍結 staging/ui_t0_prime（17 條：{sum(1 for v in results.values() if v == 'PASS')} PASS）")
     return 0
 
@@ -323,10 +333,7 @@ def _cmd_show(args) -> int:
     if active is None:
         print("  (無)")
     else:
-        prov = active.provenance()
-        print(f"  version={prov['version']} tree_hash={prov['tree_hash']} cdhash={prov['cdhash']}")
-        print(f"  env_fingerprint={prov['env_fingerprint'] or '未記錄'}  display={prov['display'] or '未記錄'}")
-        print(f"  evidence_hashes={prov['evidence_hashes'] or '未記錄'}")
+        print("  " + format_provenance(active.provenance(), include_evidence=True))
 
     print("== staging ==")
     for component in pgen.STAGING_COMPONENTS:
@@ -343,9 +350,9 @@ def _cmd_show(args) -> int:
     else:
         print("== 尚未執行過 profile check ==")
 
-    print("== attempts 計數（(tree, run_kind): 次數）==")
-    for (tree, run_kind), count in sorted(pgen.attempts_summary(root).items(), key=lambda kv: (kv[0][0] or "", kv[0][1] or "")):
-        print(f"  ({tree}, {run_kind}): {count}")
+    print("== attempts 計數（(tree@hash, run_kind): 次數）==")
+    for (label, tree_hash, run_kind), count in sorted(pgen.attempts_summary(root).items()):
+        print(f"  ({pgen.format_attempt_bucket(label, tree_hash)}, {run_kind}): {count}")
     return 0
 
 

@@ -247,10 +247,13 @@ def check_manifest_env_fingerprint(manifest: Mapping, run_env_fingerprint: Mappi
 # ---------------------------------------------------------------------------
 
 
-def record_invalid_attempt(root, tree: str, run_kind: str, reasons: List[str]) -> None:
+def record_invalid_attempt(root, tree: str, run_kind: str, reasons: List[str], tree_hash: str = "") -> None:
+    """記一筆無效嘗試。`tree` 是人給的標籤（"M0"），`tree_hash` 才是該次建置的唯一身分——
+    §7 第 4 條的上限是**終局**的，若只按標籤分桶，重建同名樹後舊樹的殘留計數會把新樹永久鎖死
+    （場 0 沒有覆蓋開關）。舊格式（無 `tree_hash`）的紀錄一律歸到標籤桶，保守計入。"""
     path = _attempts_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    entry = {"tree": tree, "run_kind": run_kind, "reasons": list(reasons)}
+    entry = {"tree": tree, "tree_hash": tree_hash, "run_kind": run_kind, "reasons": list(reasons)}
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, ensure_ascii=False, sort_keys=True) + "\n")
 
@@ -267,16 +270,35 @@ def _read_attempts(root) -> List[dict]:
     return entries
 
 
-def count_invalid_attempts(root, tree: str, run_kind: str) -> int:
-    return sum(1 for e in _read_attempts(root) if e.get("tree") == tree and e.get("run_kind") == run_kind)
-
-
-def attempts_summary(root) -> Dict[Tuple[str, str], int]:
-    counts: Dict[Tuple[str, str], int] = {}
+def count_invalid_attempts(root, tree: str, run_kind: str, tree_hash: str = "") -> int:
+    """同一 `(tree_hash, run_kind)` 的無效次數。`tree_hash` 為空（舊格式紀錄或呼叫端沒給）時
+    退回標籤比對，保守計入——寧可多擋，不可少擋。"""
+    total = 0
     for entry in _read_attempts(root):
-        key = (entry.get("tree"), entry.get("run_kind"))
+        if entry.get("run_kind") != run_kind:
+            continue
+        entry_hash = entry.get("tree_hash") or ""
+        if entry_hash and tree_hash:
+            if entry_hash == tree_hash:
+                total += 1
+        elif entry.get("tree") == tree:
+            total += 1
+    return total
+
+
+def attempts_summary(root) -> Dict[Tuple[str, str, str], int]:
+    """`{(tree 標籤, tree_hash, run_kind): 次數}`——**以完整 hash 聚合**（前綴相同的兩棵樹不得
+    併桶；顯示時才縮寫）。舊格式紀錄無 hash，其 `tree_hash` 為空字串，自成一桶。"""
+    counts: Dict[Tuple[str, str, str], int] = {}
+    for entry in _read_attempts(root):
+        key = (entry.get("tree") or "", entry.get("tree_hash") or "", entry.get("run_kind") or "")
         counts[key] = counts.get(key, 0) + 1
     return counts
+
+
+def format_attempt_bucket(label: str, tree_hash: str) -> str:
+    """報告用的桶名：`M0@abcd1234`（僅顯示用，比對一律用完整 hash）。"""
+    return f"{label}@{tree_hash[:8]}" if tree_hash else label
 
 
 # ---------------------------------------------------------------------------
@@ -364,21 +386,14 @@ def build_m0_staging(
 
 
 def baseline_sha256_matches_staged_m0(m0_staging: Mapping, baseline_log_sha256: str) -> bool:
-    """同 `baseline_matches_staged_m0`，但由呼叫端提供已算好的 sha256（log 只讀一次即可同時
-    建表與比對，見 `h02_gate_profile_cli._read_log_once`）。"""
+    """§F2b：`--baseline-log` 必須就是被 staged 的那份 M0——以 m0 staging 記錄的 `log_sha256`
+    比對呼叫端算好的 sha256（log 只讀一次即可同時比對與建表，見
+    `h02_gate_profile_cli._read_log_once`）；不符即拒絕。
+
+    （`evidence_hash` 是選用溯源欄位、不是每次都有，log 的 sha256 恆可算，故取它為唯一自動化
+    比對依據；`evidence_hash` 只作人工旁證。）"""
     want = m0_staging.get("log_sha256")
     return bool(want) and baseline_log_sha256 == want
-
-
-def baseline_matches_staged_m0(m0_staging: Mapping, baseline_log_path) -> bool:
-    """§F2b：`--baseline-log` 必須就是被 staged 的那份 M0——以 m0 staging 記錄的 `log_sha256`
-    （來源 log 的 sha256）比對；不符即拒絕。（`evidence_hash` 是選用溯源欄位，不是每次都有，
-    log 的 sha256 恆可算，故取它為唯一自動化比對依據；`evidence_hash` 只作人工旁證，見模組
-    docstring 對 PREBUILD.md 「未定之處」的呼應。）"""
-    want = m0_staging.get("log_sha256")
-    if not want:
-        return False
-    return sha256_file(baseline_log_path) == want
 
 
 def build_mutant_staging(
@@ -515,12 +530,23 @@ def _cross_component_env_reasons(root) -> List[str]:
 
 
 def _attempts_stop_reasons(root) -> List[str]:
+    """§7 場 0 停止分支第 4 條（終局）：同一 `(tree_hash, run_kind)` 累積到 `ATTEMPT_CAP` 即停。
+
+    **已 staged 的元件只看它自己那棵樹的計數**——重建一棵同名樹後（tree_hash 已變），舊樹殘留的
+    無效紀錄不得把新樹鎖死（stage 端已按 hash 放行，check 端若仍看全域桶就等於沒修）。
+    尚未 staged 的元件則任一桶達上限即停（該 run-kind 至今沒有有效批次，正是第 4 條管的情形）。
+    比對一律用**完整 hash**，`@abcd1234` 只是報告文字。"""
     reasons: List[str] = []
-    for (tree, run_kind), count in sorted(attempts_summary(root).items(), key=lambda kv: (kv[0][0] or "", kv[0][1] or "")):
-        if count >= ATTEMPT_CAP:
-            # **終局**：累積到上限的那一刻場 0 就該停，不因之後再跑出一份有效批次而解除
-            # （否則無效上限可用「跑到有效為止」繞過，§10 R10）。
-            reasons.append(f"{tree}／{run_kind}：已累積 {count} 份無效嘗試（≥{ATTEMPT_CAP} 即停，終局）")
+    for (label, tree_hash, run_kind), count in sorted(attempts_summary(root).items()):
+        if count < ATTEMPT_CAP:
+            continue
+        staged = load_staging_component(root, run_kind) if run_kind in STAGING_COMPONENTS else None
+        if staged is not None:
+            staged_hash = staged.get("tree_hash") or ""
+            if tree_hash and staged_hash and tree_hash != staged_hash:
+                continue
+        bucket = format_attempt_bucket(label, tree_hash)
+        reasons.append(f"{bucket}／{run_kind}：已累積 {count} 份無效嘗試（≥{ATTEMPT_CAP} 即停，終局）")
     return reasons
 
 

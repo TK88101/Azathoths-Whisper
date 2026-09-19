@@ -334,7 +334,6 @@ def sha256_file(path) -> str:
     return sha256_bytes(Path(path).read_bytes())
 
 
-_hash_bytes = sha256_bytes  # 舊私有名（本檔既有呼叫點）
 
 
 def _canonical_bytes(data: Mapping) -> bytes:
@@ -389,8 +388,8 @@ def activate_r27(root: Path, version: str, *, allow_replace: bool = False) -> R2
             parsed[component] = _COMPONENT_PARSERS[component](data)
         except ProfileError as e:
             raise ProfileError(f"啟用拒絕：staging/{component} 無效（{e}）") from e
-        hashes[component] = _hash_bytes(_canonical_bytes(data))
-        staging_hashes[component] = _hash_bytes(_staging_path(root, component).read_bytes())
+        hashes[component] = sha256_bytes(_canonical_bytes(data))
+        staging_hashes[component] = sha256_bytes(_staging_path(root, component).read_bytes())
 
     m0_keys = set(parsed["m0"])
     if m0_keys != _ALL_M0_STEP_KEYS:
@@ -497,7 +496,7 @@ def load_active_profile(root: Path) -> Optional[R27Profile]:
             raise ProfileError(
                 f"active/{_ACTIVE_FILENAME}: staging/{name}.staging.json 已不在磁碟（無法驗證溯源）"
             )
-        actual_staging_hash = _hash_bytes(staging_file.read_bytes())
+        actual_staging_hash = sha256_bytes(staging_file.read_bytes())
         if actual_staging_hash != digest:
             raise ProfileError(
                 f"active/{_ACTIVE_FILENAME}: staging/{name}.staging.json 內容與 staging_file_hashes 不符"
@@ -507,7 +506,7 @@ def load_active_profile(root: Path) -> Optional[R27Profile]:
     parsed: Dict[str, object] = {}
     for name in _STAGING_COMPONENTS:
         raw = components[name]
-        actual = _hash_bytes(_canonical_bytes(raw)) if isinstance(raw, dict) else None
+        actual = sha256_bytes(_canonical_bytes(raw)) if isinstance(raw, dict) else None
         if actual != hashes[name]:
             raise ProfileError(
                 f"active/{_ACTIVE_FILENAME}: components.{name} 與 component_hashes 不符"
