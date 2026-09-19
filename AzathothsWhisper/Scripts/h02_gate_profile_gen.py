@@ -270,35 +270,67 @@ def _read_attempts(root) -> List[dict]:
     return entries
 
 
+def attempt_bucket_key(tree: str, tree_hash: str) -> str:
+    """無效嘗試的**桶鍵單一定義**（報告與聚合用）：有 tree_hash 就只看 hash（標籤純顯示，
+    同一棵樹換個標籤仍同桶）；舊格式沒有 hash 時才退回標籤。"""
+    return tree_hash if tree_hash else f"label:{tree or ''}"
+
+
+def _entry_bucket_key(entry: Mapping) -> str:
+    return attempt_bucket_key(entry.get("tree") or "", entry.get("tree_hash") or "")
+
+
+def _entry_matches(entry: Mapping, tree: str, tree_hash: str) -> bool:
+    """一筆紀錄是否屬於 `(tree, tree_hash)` 這棵樹。**保守**：只要任一端沒有 hash 就退回標籤
+    比對——舊格式紀錄（無 hash）仍應擋住同標籤的 stage，寧可多擋不可少擋。"""
+    entry_hash = entry.get("tree_hash") or ""
+    if entry_hash and tree_hash:
+        return entry_hash == tree_hash
+    return (entry.get("tree") or "") == tree
+
+
 def count_invalid_attempts(root, tree: str, run_kind: str, tree_hash: str = "") -> int:
-    """同一 `(tree_hash, run_kind)` 的無效次數。`tree_hash` 為空（舊格式紀錄或呼叫端沒給）時
-    退回標籤比對，保守計入——寧可多擋，不可少擋。"""
-    total = 0
-    for entry in _read_attempts(root):
-        if entry.get("run_kind") != run_kind:
-            continue
-        entry_hash = entry.get("tree_hash") or ""
-        if entry_hash and tree_hash:
-            if entry_hash == tree_hash:
-                total += 1
-        elif entry.get("tree") == tree:
-            total += 1
-    return total
+    """同一棵樹、同一 run_kind 的無效次數（比對規則見 `_entry_matches`）。"""
+    return sum(
+        1
+        for e in _read_attempts(root)
+        if e.get("run_kind") == run_kind and _entry_matches(e, tree, tree_hash)
+    )
 
 
-def attempts_summary(root) -> Dict[Tuple[str, str, str], int]:
-    """`{(tree 標籤, tree_hash, run_kind): 次數}`——**以完整 hash 聚合**（前綴相同的兩棵樹不得
-    併桶；顯示時才縮寫）。舊格式紀錄無 hash，其 `tree_hash` 為空字串，自成一桶。"""
-    counts: Dict[Tuple[str, str, str], int] = {}
+def attempt_cap_reached(root, tree: str, run_kind: str, tree_hash: str = "") -> bool:
+    """§7 第 4 條的**唯一**判定：該棵樹的該 run_kind 是否已達終局上限。CLI 的 stage 封頂與
+    `profile check` 的停止理由都經過這裡，不得各自實作（前綴碰撞與標籤不同各讓兩端不一致過一次）。"""
+    return count_invalid_attempts(root, tree, run_kind, tree_hash=tree_hash) >= ATTEMPT_CAP
+
+
+def attempts_summary(root) -> Dict[Tuple[str, str], int]:
+    """`{(桶鍵, run_kind): 次數}`；桶鍵見 `attempt_bucket_key`。"""
+    counts: Dict[Tuple[str, str], int] = {}
     for entry in _read_attempts(root):
-        key = (entry.get("tree") or "", entry.get("tree_hash") or "", entry.get("run_kind") or "")
+        key = (_entry_bucket_key(entry), entry.get("run_kind") or "")
         counts[key] = counts.get(key, 0) + 1
     return counts
 
 
-def format_attempt_bucket(label: str, tree_hash: str) -> str:
-    """報告用的桶名：`M0@abcd1234`（僅顯示用，比對一律用完整 hash）。"""
-    return f"{label}@{tree_hash[:8]}" if tree_hash else label
+def attempts_labels(root) -> Dict[str, List[str]]:
+    """`{桶鍵: [出現過的 tree 標籤…]}`，只供報告文字用。"""
+    labels: Dict[str, List[str]] = {}
+    for entry in _read_attempts(root):
+        key = _entry_bucket_key(entry)
+        label = entry.get("tree") or ""
+        seen = labels.setdefault(key, [])
+        if label and label not in seen:
+            seen.append(label)
+    return labels
+
+
+def format_attempt_bucket(bucket_key: str, labels: Optional[List[str]] = None) -> str:
+    """報告用桶名：`M0@cccccccc`（hash 桶）或 `M0`（舊格式標籤桶）。比對一律用完整桶鍵。"""
+    if bucket_key.startswith("label:"):
+        return bucket_key[len("label:"):]
+    shown = "／".join(labels or []) or "?"
+    return f"{shown}@{bucket_key[:8]}"
 
 
 # ---------------------------------------------------------------------------
@@ -360,6 +392,7 @@ def build_m0_staging(
         "tree_hash": manifest["swift_hashlist_sha256"],
         "cdhash": manifest["cdhash"],
         # §10 R13 跨元件面：四份元件須在同一環境凍結（`_cross_component_env_reasons` 逐一比對）
+        "tree": manifest["tree"],  # 人給的標籤；身分以 tree_hash 為準，標籤供報告與舊格式 attempts 比對
         "environment": {k: manifest[k] for k in ("os_build", "xcode_build", "sdk")},
         "steps": steps,
         "log_sha256": log_sha256,
@@ -422,6 +455,7 @@ def build_mutant_staging(
     data: Dict[str, object] = {
         "schema": R27_PROFILE_SCHEMA,
         "kind": name.lower(),
+        "tree": manifest["tree"],  # 人給的標籤；身分以 tree_hash 為準，標籤供報告與舊格式 attempts 比對
         "environment": {k: manifest[k] for k in ("os_build", "xcode_build", "sdk")},
         "kill_signatures": {f"{t}.{s}": list(sig) for t, s, sig in killed},
         "tree_hash": manifest["swift_hashlist_sha256"],
@@ -486,6 +520,7 @@ def build_ui_staging(results: Mapping[str, str], manifest: Mapping, evidence_has
         "schema": R27_PROFILE_SCHEMA,
         "kind": "ui_t0_prime",
         "results": dict(results),
+        "tree": manifest["tree"],  # 人給的標籤；身分以 tree_hash 為準，標籤供報告與舊格式 attempts 比對
         "environment": {k: manifest[k] for k in ("os_build", "xcode_build", "sdk")},
         "tree_hash": manifest["swift_hashlist_sha256"],
         "cdhash": manifest["cdhash"],
@@ -530,23 +565,45 @@ def _cross_component_env_reasons(root) -> List[str]:
 
 
 def _attempts_stop_reasons(root) -> List[str]:
-    """§7 場 0 停止分支第 4 條（終局）：同一 `(tree_hash, run_kind)` 累積到 `ATTEMPT_CAP` 即停。
+    """§7 場 0 停止分支第 4 條（終局）：達 `ATTEMPT_CAP` 即停。
 
-    **已 staged 的元件只看它自己那棵樹的計數**——重建一棵同名樹後（tree_hash 已變），舊樹殘留的
-    無效紀錄不得把新樹鎖死（stage 端已按 hash 放行，check 端若仍看全域桶就等於沒修）。
-    尚未 staged 的元件則任一桶達上限即停（該 run-kind 至今沒有有效批次，正是第 4 條管的情形）。
-    比對一律用**完整 hash**，`@abcd1234` 只是報告文字。"""
+    兩條互補的判定，取聯集（去重）：
+    1. **已 staged 的元件**用 `attempt_cap_reached` 對它自己那棵樹判（與 CLI 的 stage 封頂同一
+       函式；其 `_entry_matches` 會把舊格式的無 hash 紀錄按標籤一併算進來）；
+    2. **逐桶掃描**：任一桶達上限即報，只略過「明確屬於別棵樹」的 hash 桶（該 run_kind 已 staged
+       且 hash 不同）。標籤桶（舊格式、身分不全）一律不略過——寧可多擋。
+    重建同名樹（hash 已變）時 1 不會觸發、2 也會因 hash 不同而略過，新樹不被舊樹鎖死。"""
     reasons: List[str] = []
-    for (label, tree_hash, run_kind), count in sorted(attempts_summary(root).items()):
+    seen = set()
+    labels = attempts_labels(root)
+
+    def add(bucket_key: str, run_kind: str, count: int) -> None:
+        if (bucket_key, run_kind) in seen:
+            return
+        seen.add((bucket_key, run_kind))
+        bucket = format_attempt_bucket(bucket_key, labels.get(bucket_key))
+        reasons.append(f"{bucket}／{run_kind}：已累積 {count} 份無效嘗試（≥{ATTEMPT_CAP} 即停，終局）")
+
+    for component in STAGING_COMPONENTS:
+        staged = load_staging_component(root, component)
+        if staged is None:
+            continue
+        tree, tree_hash = staged.get("tree") or "", staged.get("tree_hash") or ""
+        if not tree and not tree_hash:
+            continue  # 身分不全：留給下面的逐桶掃描保守處理
+        if attempt_cap_reached(root, tree, component, tree_hash=tree_hash):
+            count = count_invalid_attempts(root, tree, component, tree_hash=tree_hash)
+            add(attempt_bucket_key(tree, tree_hash), component, count)
+
+    for (bucket_key, run_kind), count in sorted(attempts_summary(root).items()):
         if count < ATTEMPT_CAP:
             continue
         staged = load_staging_component(root, run_kind) if run_kind in STAGING_COMPONENTS else None
-        if staged is not None:
-            staged_hash = staged.get("tree_hash") or ""
-            if tree_hash and staged_hash and tree_hash != staged_hash:
-                continue
-        bucket = format_attempt_bucket(label, tree_hash)
-        reasons.append(f"{bucket}／{run_kind}：已累積 {count} 份無效嘗試（≥{ATTEMPT_CAP} 即停，終局）")
+        staged_hash = (staged or {}).get("tree_hash") or ""
+        is_hash_bucket = not bucket_key.startswith("label:")
+        if staged is not None and is_hash_bucket and staged_hash and bucket_key != staged_hash:
+            continue  # 明確屬於別棵樹的桶
+        add(bucket_key, run_kind, count)
     return reasons
 
 

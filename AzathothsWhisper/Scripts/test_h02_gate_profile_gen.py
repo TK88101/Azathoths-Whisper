@@ -101,7 +101,7 @@ class AttemptsTests(unittest.TestCase):
         pgen.record_invalid_attempt(self.tmp, "M0", "m0", ["r"])
         pgen.record_invalid_attempt(self.tmp, "M0", "m0", ["r"])
         summary = pgen.attempts_summary(self.tmp)
-        self.assertEqual(summary[("M0", "", "m0")], 2)
+        self.assertEqual(summary[("label:M0", "m0")], 2)
 
     def test_distinct_hashes_sharing_a_prefix_are_not_merged(self):
         """桶以**完整 hash** 聚合：前 8 碼相同的兩棵樹各 1 份無效，不得被併成 2 而觸發上限
@@ -110,10 +110,21 @@ class AttemptsTests(unittest.TestCase):
         pgen.record_invalid_attempt(self.tmp, "M0", "m0", ["r"], tree_hash=a)
         pgen.record_invalid_attempt(self.tmp, "M0", "m0", ["r"], tree_hash=b)
         summary = pgen.attempts_summary(self.tmp)
-        self.assertEqual(summary[("M0", a, "m0")], 1)
-        self.assertEqual(summary[("M0", b, "m0")], 1)
+        self.assertEqual(summary[(a, "m0")], 1)
+        self.assertEqual(summary[(b, "m0")], 1)
         self.assertEqual(pgen.count_invalid_attempts(self.tmp, "M0", "m0", tree_hash=a), 1)
         self.assertFalse(pgen.evaluate_scene0_check(self.tmp)["checks"]["attempts_stop_triggered"])
+
+    def test_same_hash_under_different_labels_is_one_bucket(self):
+        """桶只由 tree_hash 決定，標籤純顯示：同一棵樹被兩份 manifest 用不同標籤記錄時，
+        兩份無效要合成一桶並觸發終局上限——否則 stage 端會拒、check 端卻不報，兩端不一致
+        （Codex review Round 5，與 Round 4 的前綴碰撞互為鏡像）。"""
+        h = "cc" * 32
+        pgen.record_invalid_attempt(self.tmp, "M0", "m0", ["r"], tree_hash=h)
+        pgen.record_invalid_attempt(self.tmp, "M0-rebuilt", "m0", ["r"], tree_hash=h)
+        self.assertEqual(pgen.count_invalid_attempts(self.tmp, "M0", "m0", tree_hash=h), 2)
+        self.assertTrue(pgen.attempt_cap_reached(self.tmp, "M0", "m0", tree_hash=h))
+        self.assertTrue(pgen.evaluate_scene0_check(self.tmp)["checks"]["attempts_stop_triggered"])
 
     def test_no_file_yet_counts_zero(self):
         self.assertEqual(pgen.count_invalid_attempts(self.tmp, "M0", "m0"), 0)
@@ -464,6 +475,30 @@ class Scene0CheckTests(unittest.TestCase):
         result = pgen.evaluate_scene0_check(self.root)
         self.assertEqual(result["result"], "STOP")
         self.assertTrue(result["checks"]["attempts_stop_triggered"])
+
+    def test_legacy_attempts_still_stop_when_staging_has_hash_but_no_label(self):
+        """舊格式組合（staging 有 tree_hash 但沒有 tree 標籤 ＋ 無 hash 的舊 attempts）不得漏報：
+        staged 那側按標籤比對會比到空字串，若因此把該 run_kind 標成「已處理」，逐桶掃描就被抑制，
+        終局上限會靜默消失（Codex review Round 6）。"""
+        import json as _json
+        staging_dir = Path(self.root) / "staging"
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        (staging_dir / "m2.staging.json").write_text(
+            _json.dumps(
+                {
+                    "schema": r27.R27_PROFILE_SCHEMA,
+                    "kind": "m2",
+                    "tree_hash": "dd" * 32,
+                    "cdhash": "ee" * 20,
+                    "kill_signatures": {"T1.s1": ["C2-STACK|G=T11|over=T10|side=L"]},
+                    "checks": {"kill_ok": True, "required_baseline_pass_ok": True},
+                }
+            ),
+            encoding="utf-8",
+        )
+        for i in range(pgen.ATTEMPT_CAP):
+            pgen.record_invalid_attempt(self.root, "M2", "m2", [f"legacy {i}"])
+        self.assertTrue(pgen.evaluate_scene0_check(self.root)["checks"]["attempts_stop_triggered"])
 
     def test_two_invalid_attempts_for_never_staged_run_kind_is_stop(self):
         self._stage_m0()

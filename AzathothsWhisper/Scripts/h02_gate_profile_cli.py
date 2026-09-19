@@ -170,8 +170,8 @@ def _stage_or_invalid_attempt(root, component: str, tree: str, data: dict, tree_
 def _refuse_if_attempt_cap_reached(root, tree: str, component: str, tree_hash: str = "") -> None:
     """§7 場 0 停止分支第 4 條是**終局**的：同一 (tree, run-kind) 累積到上限後不得再 stage
     （否則「跑到有效為止」就能把停止條件抹掉，§10 R10）。場 0 當下該做的是停下上報，不是重跑。"""
-    count = pgen.count_invalid_attempts(root, tree, component, tree_hash=tree_hash)
-    if count >= pgen.ATTEMPT_CAP:
+    if pgen.attempt_cap_reached(root, tree, component, tree_hash=tree_hash):
+        count = pgen.count_invalid_attempts(root, tree, component, tree_hash=tree_hash)
         raise pgen.ProfileCliError(
             f"stage 拒絕：{tree}／{component} 已累積 {count} 份無效嘗試（≥{pgen.ATTEMPT_CAP} 即停，終局）；"
             "場 0 應在此停止並上報「環境前置未成立／待使用者裁決」，不得繼續重跑"
@@ -351,8 +351,9 @@ def _cmd_show(args) -> int:
         print("== 尚未執行過 profile check ==")
 
     print("== attempts 計數（(tree@hash, run_kind): 次數）==")
-    for (label, tree_hash, run_kind), count in sorted(pgen.attempts_summary(root).items()):
-        print(f"  ({pgen.format_attempt_bucket(label, tree_hash)}, {run_kind}): {count}")
+    labels = pgen.attempts_labels(root)
+    for (bucket_key, run_kind), count in sorted(pgen.attempts_summary(root).items()):
+        print(f"  ({pgen.format_attempt_bucket(bucket_key, labels.get(bucket_key))}, {run_kind}): {count}")
     return 0
 
 
