@@ -36,7 +36,6 @@ ui-T0.log 真實格式（`~/Developer/bjork-h02-gate/ui-T0.log`，唯讀歷史�
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from pathlib import Path
@@ -52,9 +51,14 @@ from h02_gate_model import (
     GateTable,
 )
 from h02_gate_r27_profile import (
+    ENV_FINGERPRINT_KEYS,
+    ProfileError,
     R27_PROFILE_SCHEMA,
     _STAGING_COMPONENTS,
     load_staging_component,
+    parse_env_fingerprint_text,
+    sha256_bytes,  # re-export：CLI 以 pgen.sha256_bytes 取用（雜湊單一來源在 r27_profile）
+    sha256_file,
 )
 from h02_gate_rules import (
     _cells,
@@ -68,6 +72,9 @@ from h02_gate_rules import (
 STAGING_COMPONENTS: Tuple[str, ...] = _STAGING_COMPONENTS
 _ATTEMPTS_FILENAME = "attempts.jsonl"
 _FROZEN_LEDGER_FILENAME = "frozen.jsonl"
+
+# §7 場 0 停止分支第 4 條：同一 (tree, run-kind) 累積兩份無效即停（終局）
+ATTEMPT_CAP = 2
 CHECK_FILENAME = "scene0-check.json"
 
 _MANIFEST_REQUIRED_KEYS: Tuple[str, ...] = (
@@ -78,7 +85,8 @@ _MANIFEST_REQUIRED_KEYS: Tuple[str, ...] = (
     "xcode_build",
     "sdk",
 )
-_ENV_FINGERPRINT_KEYS: Tuple[str, ...] = ("os_build", "xcode_build", "sdk")
+# 三鍵的單一來源在 h02_gate_r27_profile（§10 R13 的凍結契約，staging 期與 activate 期須同集合）
+_ENV_FINGERPRINT_KEYS: Tuple[str, ...] = ENV_FINGERPRINT_KEYS
 
 # 17 條（ShellUITests 11＋BatchUITests 5＋BatchLiveUITests 1）：逐一讀自真實歷史
 # `~/Developer/bjork-h02-gate/ui-T0.log`（唯讀，本次任務只讀不改），非臆造。ui-T0′ 的唯一用途
@@ -105,7 +113,7 @@ UI_EXPECTED_TESTS: Tuple[str, ...] = (
 assert len(UI_EXPECTED_TESTS) == 17, "ui-T0.log 實測為 17 條（Shell 11＋Batch 5＋BatchLive 1）"
 
 
-class ProfileCliError(Exception):
+class ProfileCliError(ProfileError):
     """`profile stage-*`／`check`／`activate`／`show` 的輸入或運行錯誤——CLI 對應 exit code 2。"""
 
 
@@ -114,8 +122,7 @@ class ProfileCliError(Exception):
 # ---------------------------------------------------------------------------
 
 
-def sha256_file(path) -> str:
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+# 檔案雜湊的單一來源同樣在 h02_gate_r27_profile（本模組只 re-export，見 import 區）
 
 
 def _staging_dir(root) -> Path:
@@ -214,24 +221,13 @@ def load_tree_manifest(path) -> dict:
 
 
 def parse_run_env_fingerprint(text: str) -> Dict[str, str]:
-    """`os_build=..,xcode_build=..,sdk=..` 逗號分隔語法（與既有 `h02_gate_cli` 的
-    `--run-env-fingerprint` 同格式）。空字串／解不出鍵值一律拒絕——`profile stage-*` 的
-    `--run-env-fingerprint` 是必要參數，不像既有 `v3`/`verdict` 是選用。"""
-    result: Dict[str, str] = {}
-    for pair in text.split(","):
-        pair = pair.strip()
-        if not pair:
-            continue
-        if "=" not in pair:
-            raise ProfileCliError(f"--run-env-fingerprint 格式錯誤（缺 '='）：{pair!r}")
-        key, _, value = pair.partition("=")
-        key, value = key.strip(), value.strip()
-        if not key or not value:
-            raise ProfileCliError(f"--run-env-fingerprint 格式錯誤（鍵或值為空）：{pair!r}")
-        result[key] = value
-    if not result:
-        raise ProfileCliError(f"--run-env-fingerprint 未解析出任何鍵值：{text!r}")
-    return result
+    """`profile stage-*` 的 `--run-env-fingerprint`：語法解析共用
+    `h02_gate_r27_profile.parse_env_fingerprint_text`（單一來源），本層只把 `ValueError`
+    轉成 `ProfileCliError`。與既有 `v3`／`verdict` 的差別只在這裡是必要參數，不接受 None。"""
+    try:
+        return parse_env_fingerprint_text(text)
+    except ValueError as e:
+        raise ProfileCliError(str(e)) from e
 
 
 def check_manifest_env_fingerprint(manifest: Mapping, run_env_fingerprint: Mapping[str, str], where: str) -> None:
@@ -365,6 +361,13 @@ def build_m0_staging(
 # ---------------------------------------------------------------------------
 # M2／M3 staging（§13 第 4 項 (iii)）
 # ---------------------------------------------------------------------------
+
+
+def baseline_sha256_matches_staged_m0(m0_staging: Mapping, baseline_log_sha256: str) -> bool:
+    """同 `baseline_matches_staged_m0`，但由呼叫端提供已算好的 sha256（log 只讀一次即可同時
+    建表與比對，見 `h02_gate_profile_cli._read_log_once`）。"""
+    want = m0_staging.get("log_sha256")
+    return bool(want) and baseline_log_sha256 == want
 
 
 def baseline_matches_staged_m0(m0_staging: Mapping, baseline_log_path) -> bool:
@@ -514,10 +517,10 @@ def _cross_component_env_reasons(root) -> List[str]:
 def _attempts_stop_reasons(root) -> List[str]:
     reasons: List[str] = []
     for (tree, run_kind), count in sorted(attempts_summary(root).items(), key=lambda kv: (kv[0][0] or "", kv[0][1] or "")):
-        if run_kind in STAGING_COMPONENTS and load_staging_component(root, run_kind) is not None:
-            continue  # 已有有效批次凍結；§7 第 4 條只管「尚無有效批次時」的累積
-        if count >= 2:
-            reasons.append(f"{tree}／{run_kind}：尚無有效批次時已累積 {count} 份無效嘗試（≥2 即停）")
+        if count >= ATTEMPT_CAP:
+            # **終局**：累積到上限的那一刻場 0 就該停，不因之後再跑出一份有效批次而解除
+            # （否則無效上限可用「跑到有效為止」繞過，§10 R10）。
+            reasons.append(f"{tree}／{run_kind}：已累積 {count} 份無效嘗試（≥{ATTEMPT_CAP} 即停，終局）")
     return reasons
 
 

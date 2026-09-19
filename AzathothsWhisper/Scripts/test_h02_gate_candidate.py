@@ -16,6 +16,7 @@ from pathlib import Path
 
 import h02_gate_eval as gate
 import h02_gate_cli as gate_cli
+import test_h02_gate_fixtures as fx
 from test_h02_gate_fixtures import (
     M2_KILL,
     M3_KILL,
@@ -535,10 +536,8 @@ class CandidateCliTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def run_cli(self, argv):
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            code = gate.main(argv)
-        return code, out.getvalue()
+        code, out, _ = fx.run_gate_cli(argv)
+        return code, out
 
     def test_candidate_help(self):
         with self.assertRaises(SystemExit) as ctx:

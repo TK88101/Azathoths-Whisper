@@ -10,7 +10,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, FrozenSet, List, Optional, Tuple
+
+
+def read_text_file(path) -> str:
+    """判定器讀輸入檔的**單一策略**（utf-8＋errors=replace：log 可能夾雜非 UTF-8 位元組，
+    寧可替換也不要整份讀不進來）。例外原樣拋 `OSError`，由各 CLI 包成自己的輸入錯誤型別。"""
+    return Path(path).read_text(encoding="utf-8", errors="replace")
+
+
+def read_failure_message(path, exc: Exception) -> str:
+    return f"讀取失敗（{path}）：{exc}"
 
 # 常量（凍結格式，Plan §3.7／§3.8）
 

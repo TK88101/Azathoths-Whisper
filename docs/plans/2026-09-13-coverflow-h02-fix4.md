@@ -409,6 +409,13 @@
 | **R14**（v5） | F-AX：閘門（XCUITest 讀 AX）與無 AX 真實使用走不同路徑，使候選「全綠但真實失敗」 | G6／W15 的無 AX RED→GREEN；C.6 實體輪明定無 AX 客戶端；sampler 不讀 AX；身分方案須 ON／OFF 驗證 |
 | **R15**（v5） | b′ 的成功窗口極窄（首次佈局回呼內同步才 21/21，落到下一週期即 0/48）；真實組裝多了非同步載入、tab epoch、圖片 task | F2c spike 3 六項先驗；失敗則回 Phase 1（H3-a(a)＋K3，或 H3-b／升目標） |
 
+> **R13 的兩種結論類別（2026-09-19 明文記錄，非疏漏）**：同一個 `env_fingerprint_check` 的
+> `mismatch`／`unmeasured`，在 `evaluate_negative_control`（C.2）判**無效**，在 `verdict()`／`v3`
+> 判**不可判定**。兩者都 fail-closed（都不可能變成「通過」），差別只在後續處置：無效＝修基建後重跑
+> （受無效上限），不可判定＝帶證據上報使用者裁決。**不統一成「無效」的理由**：`verdict()` 輸出的是
+> 閘門計劃的 R4-C 機械結論，其結論詞彙由 §1 N2（使用者既裁定「不改 R4-C」）凍結，加第五態等於改
+> R4-C。若日後要統一，屬回 Phase 1 的範圍。
+
 **回退**：產品源碼改動限 `CoverFlowStrip.swift`／`CoverFlowViewModel.swift`／`CoverFlowView.swift`；`git checkout` 即回 M0；測試基建新增檔可整檔刪除、修改檔還原、xcodegen 重生成。
 
 ## 11. 運行命令
@@ -676,3 +683,16 @@ Codex 結論：不核准 v1（2 P0）。逐條處置（採納＝依建議改；�
 即：**這條管線若在 2026-09-12 存在，會從原始證據一字不差地重建出 R5-5 的全部凍結常量**。這是場 0 前能做到的最強驗證（合成夾具測不到真實 log／xcresult 的解析路徑）。彩排產物在 scratchpad，不入證據包。
 
 **場 0 前置至此齊備**：四棵樹（含以歷史配置重建的 ui-T0′）＋身分記錄、判定器 R27 profile 全鏈、profile CLI、§11.1 的運行不變式。**剩下**：`/simcodex`（Phase 3 實施後評審，待 Codex 額度恢復）→ 使用者排場 0。
+
+### 2026-09-19 Phase 3 實施後評審（/simcodex，判定器鏈）
+
+**Codex review（`--base 1055ff0`）Round 1 — 1 條 P1，已修**：`attempts` 的「兩份無效即停」不是終局的——原實作在該 `(tree, run-kind)` 已有 staged 元件時跳過計數，等於「再跑一份有效的就能把停止條件抹掉」，正是 §10 R10「不得跑到綠為止」要防的。修法：`_attempts_stop_reasons` 不再因已 staged 而豁免（`ATTEMPT_CAP=2` 終局），並在 `stage-*` 端加封頂拒絕（累積到上限後連 stage 都不許）。以 `git stash` 回填舊碼驗證 RED→GREEN。
+
+**Round 1 的四視角清理（11 條 P1，已套用）**：重用——`_load_text`（收進 `h02_gate_model.read_text_file`）、`--run-env-fingerprint` 解析（收進 `h02_gate_r27_profile.parse_env_fingerprint_text`）、`ENV_FINGERPRINT_KEYS` 三鍵常量、sha256 檔雜湊（`sha256_bytes`／`sha256_file`）各自的重複實作全部收斂到單一來源；測試的 `run_cli`×5 與 `write_manifest`×2 收進 `test_h02_gate_fixtures`。簡化——argparse 預設值改引 `_SCENE0_*_ITERATIONS` 常量（預設值與校驗值同源）、`ProfileCliError` 改繼承 `ProfileError`、刪掉零消費者的 facade re-export、函式內 import 上移、provenance 三處手刻格式收成 `format_provenance`。效率——`stage-m0`／`stage-mutant` 的 log 由「建表讀一次＋算雜湊再讀一次」改為讀一次 bytes 同時 decode 與雜湊。
+
+**逐條駁回（附理由）**：
+- 效率視角 F1–F3（staging 四檔在一次 `activate` 內被讀約 7 次，建議共用快取）：**不採納**。那些重讀正是信任邊界——`frozen_ledger_mismatches` 與 `evaluate_activate_gate` 要觀察的是**當下磁碟**狀態；換成單次快取會擴大 TOCTOU 窗口，讓「中途改檔」有機會蒙混，而這條鏈花了四輪覆核才堵住。檔案是 4 個小 JSON，離線工具，效能不是問題。
+- 高度視角 P0（R13 在 `verdict()` 判不可判定、在 C.2 判無效，要求統一）：**不改代碼，改為明文記錄**（見 §10 R13 下方註記）。統一成「無效」等於給 R4-C 加第五個結論值，違反 §1 N2 的使用者既裁定。
+- Codex Round 2 唯一一條 P2（刪 facade 的 `profile_gen`／`profile_cli` re-export 是「破壞既有消費者的 API」）：**駁回**。全倉庫 grep 無任何 `gate.profile_gen`／`gate.profile_cli` 使用點；這兩個名字是本 session `6dd4df2` 才加的，分支未 push（遠端只有 `main` 與停在 `a1d3407` 的 `feat/h02-uitest-gate`，都早於這些檔案），不存在「既有消費者」。
+
+**驗收**：Python 315 條全綠（本輪 +1）；以 26.6.2 真實證據的彩排在重構後重跑，M2／M3 殺死簽名與 `FROZEN_ALLOWED_CODES` 仍逐一等於凍結常量。Swift 側未動（400 tests／8 issues＝T0′）。

@@ -430,3 +430,41 @@ def write_active_r27_profile(
         {"schema": gate.R27_PROFILE_SCHEMA, "kind": "ui_t0_prime", "results": {"ShellUITests.testFoo": "PASS"}},
     )
     return gate.activate_r27(root, version=version)
+
+# ---------------------------------------------------------------------------
+# CLI 測試共用（原本 5 份 run_cli／2 份 write_manifest 各自複製，收斂到此）
+# ---------------------------------------------------------------------------
+
+
+def run_gate_cli(argv):
+    """跑 `h02_gate_eval.main(argv)` 並捕獲輸出，回傳 `(exit_code, stdout, stderr)`。"""
+    import contextlib
+    import io
+
+    import h02_gate_eval as gate
+
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        code = gate.main(list(argv))
+    return code, out.getvalue(), err.getvalue()
+
+
+TREE_MANIFEST_ENV = {"os_build": "26A428", "xcode_build": "27A266a", "sdk": "macosx27.0"}
+TREE_MANIFEST_ENV_TEXT = "os_build=26A428,xcode_build=27A266a,sdk=macosx27.0"
+
+
+def write_tree_manifest(directory, name="M0", tree=None, **overrides):
+    """`profile stage-*` 的 `--tree-manifest` 夾具；回傳 `(path, data)`。"""
+    import json as _json
+
+    data = {
+        "tree": tree or name,
+        "swift_hashlist_sha256": "aa" * 32,
+        "cdhash": "bb" * 20,
+        "display": "Built-in Liquid Retina XDR Display, 3456x2234 Retina (2x)",
+    }
+    data.update(TREE_MANIFEST_ENV)
+    data.update(overrides)
+    path = Path(directory) / f"{name}.json"
+    path.write_text(_json.dumps(data), encoding="utf-8")
+    return str(path), data

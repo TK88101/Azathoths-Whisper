@@ -16,23 +16,10 @@ import h02_gate_r27_profile as r27
 import test_h02_gate_fixtures as fx
 
 
-def write_manifest(directory, name="M0", **overrides):
-    data = {
-        "tree": "M0",
-        "swift_hashlist_sha256": "aa" * 32,
-        "cdhash": "bb" * 20,
-        "os_build": "26A428",
-        "xcode_build": "27A266a",
-        "sdk": "macosx27.0",
-        "display": "Built-in Liquid Retina XDR Display, 3456x2234 Retina (2x)",
-    }
-    data.update(overrides)
-    path = Path(directory) / f"{name}.json"
-    path.write_text(json.dumps(data), encoding="utf-8")
-    return str(path), data
+write_manifest = fx.write_tree_manifest  # 共用夾具（回傳 (path, data)）
 
 
-VALID_ENV_TEXT = "os_build=26A428,xcode_build=27A266a,sdk=macosx27.0"
+VALID_ENV_TEXT = fx.TREE_MANIFEST_ENV_TEXT
 VALID_ENV = {"os_build": "26A428", "xcode_build": "27A266a", "sdk": "macosx27.0"}
 
 
@@ -455,14 +442,16 @@ class Scene0CheckTests(unittest.TestCase):
         self.assertEqual(result["result"], "STOP")
         self.assertFalse(result["checks"]["ui_t0_prime_staged"])
 
-    def test_two_invalid_attempts_before_any_valid_batch_is_stop(self):
-        """§7 場 0 停止分支第 4 條：尚無有效批次時，同一 (tree, run-kind) 累積兩份無效即停。"""
+    def test_two_invalid_attempts_stay_terminal_even_after_a_later_valid_batch(self):
+        """§7 場 0 停止分支第 4 條的「即停」是**終局**的：兩份無效一旦累積，場 0 當下就該結束，
+        不得靠之後再跑出一份有效批次把它抹掉——否則無效上限可以用「跑到有效為止」繞過，
+        正是 §10 R10 要防的。（Codex review 2026-09-19 指出原實作在此 fail-open。）"""
         self._stage_all_healthy()
         pgen.record_invalid_attempt(self.root, "M2", "m2", ["reason A"])
         pgen.record_invalid_attempt(self.root, "M2", "m2", ["reason B"])
         result = pgen.evaluate_scene0_check(self.root)
-        # m2 已有有效批次（已 staged）→ 不受先前無效嘗試回溯影響
-        self.assertEqual(result["result"], "PASS")
+        self.assertEqual(result["result"], "STOP")
+        self.assertTrue(result["checks"]["attempts_stop_triggered"])
 
     def test_two_invalid_attempts_for_never_staged_run_kind_is_stop(self):
         self._stage_m0()

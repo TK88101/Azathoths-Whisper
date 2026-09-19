@@ -23,13 +23,14 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 import h02_gate_profile_gen as pgen
-from h02_gate_model import MUTANT_NAMES
+from h02_gate_model import GateInputError, MUTANT_NAMES, read_failure_message, read_text_file
+from h02_gate_parse import load_xcresult_json
 from h02_gate_r27_profile import (
     _DEFAULT_R27_PROFILE_DIR,
     ProfileError,
+    format_provenance,
     activate_r27,
     load_active_profile,
     load_staging_component,
@@ -52,6 +53,11 @@ def _add_profile_dir_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
+# §6 場 0 列的固定採樣次數：cf-m0-27 ×10、M2／M3 各 ×3（baseline 仍是那份 ×10）。
+# 首份規則沒有覆蓋開關，故在 stage 端就擋住打錯的 --iterations。
+_SCENE0_M0_ITERATIONS = 10
+_SCENE0_MUTANT_ITERATIONS = 3
+
 def add_profile_subparsers(sub) -> None:
     p_profile = sub.add_parser("profile", help="R27 staging 產生器與 profile 生命週期管理（F2b）")
     profile_sub = p_profile.add_subparsers(dest="profile_command", required=True)
@@ -60,7 +66,7 @@ def add_profile_subparsers(sub) -> None:
     _add_profile_dir_arg(p_m0)
     p_m0.add_argument("--log", required=True)
     p_m0.add_argument("--xcresult", required=True)
-    p_m0.add_argument("--iterations", type=int, default=10)
+    p_m0.add_argument("--iterations", type=int, default=_SCENE0_M0_ITERATIONS)
     p_m0.add_argument("--tree-manifest", required=True)
     p_m0.add_argument("--run-env-fingerprint", required=True)
     p_m0.add_argument("--evidence-hash", default=None)
@@ -70,10 +76,10 @@ def add_profile_subparsers(sub) -> None:
     p_mutant.add_argument("--name", required=True, choices=list(MUTANT_NAMES))
     p_mutant.add_argument("--log", required=True)
     p_mutant.add_argument("--xcresult", required=True)
-    p_mutant.add_argument("--iterations", type=int, default=3)
+    p_mutant.add_argument("--iterations", type=int, default=_SCENE0_MUTANT_ITERATIONS)
     p_mutant.add_argument("--baseline-log", required=True)
     p_mutant.add_argument("--baseline-xcresult", required=True)
-    p_mutant.add_argument("--baseline-iterations", type=int, default=10)
+    p_mutant.add_argument("--baseline-iterations", type=int, default=_SCENE0_M0_ITERATIONS)
     p_mutant.add_argument("--tree-manifest", required=True)
     p_mutant.add_argument("--run-env-fingerprint", required=True)
     p_mutant.add_argument("--evidence-hash", default=None)
@@ -96,11 +102,6 @@ def add_profile_subparsers(sub) -> None:
     _add_profile_dir_arg(p_show)
 
 
-# §6 場 0 列的固定採樣次數：cf-m0-27 ×10、M2／M3 各 ×3（baseline 仍是那份 ×10）。
-# 首份規則沒有覆蓋開關，故在 stage 端就擋住打錯的 --iterations。
-_SCENE0_M0_ITERATIONS = 10
-_SCENE0_MUTANT_ITERATIONS = 3
-
 
 def _resolve_profile_dir(args) -> Path:
     return Path(args.profile_dir if args.profile_dir is not None else _DEFAULT_R27_PROFILE_DIR)
@@ -114,27 +115,36 @@ def _resolve_profile_dir(args) -> Path:
 
 def _load_text(path: str) -> str:
     try:
-        return Path(path).read_text(encoding="utf-8", errors="replace")
+        return read_text_file(path)
     except OSError as e:
-        raise pgen.ProfileCliError(f"讀取失敗（{path}）：{e}") from e
+        raise pgen.ProfileCliError(read_failure_message(path, e)) from e
 
 
 def _load_xcresult(path: str) -> dict:
-    from h02_gate_parse import load_xcresult_json
-    from h02_gate_model import GateInputError
-
     try:
         return load_xcresult_json(path)
     except GateInputError as e:
         raise pgen.ProfileCliError(str(e)) from e
 
 
+def _read_log_once(log_path: str):
+    """回傳 `(text, sha256)`：log 只讀一次原始 bytes，同一份 bytes 同時算雜湊與 decode 成文字。
+    xcodebuild 的 verbose log 可達數 MB，原本「建表讀一次、算雜湊再讀一次」是可省的重複 I/O。"""
+    try:
+        data = Path(log_path).read_bytes()
+    except OSError as e:
+        raise pgen.ProfileCliError(read_failure_message(log_path, e)) from e
+    return data.decode("utf-8", errors="replace"), pgen.sha256_bytes(data)
+
+
 def _build_and_validate_table(log_path: str, xcresult_path: str, iterations: int):
-    """回傳 `(table, valid, reasons)`；`table` 一律回傳（呼叫端仍可能需要它做進一步計算，例如
-    stage-mutant 的殺死判定即使某側無效也可能想看訊息），`valid`／`reasons` 對應 `table_valid`。"""
-    table = build_table(_load_text(log_path), _load_xcresult(xcresult_path), expected_iterations=iterations)
+    """回傳 `(table, valid, reasons, log_sha256)`；`table` 一律回傳（呼叫端仍可能需要它做進一步
+    計算，例如 stage-mutant 的殺死判定即使某側無效也可能想看訊息），`valid`／`reasons` 對應
+    `table_valid`，`log_sha256` 來自同一次讀取（見 `_read_log_once`）。"""
+    log_text, log_sha256 = _read_log_once(log_path)
+    table = build_table(log_text, _load_xcresult(xcresult_path), expected_iterations=iterations)
     valid, reasons = table_valid(table, iterations)
-    return table, valid, reasons
+    return table, valid, reasons, log_sha256
 
 
 def _stage_or_invalid_attempt(root, component: str, tree: str, data: dict) -> None:
@@ -148,6 +158,17 @@ def _stage_or_invalid_attempt(root, component: str, tree: str, data: dict) -> No
         raise pgen.ProfileCliError(f"staging/{component} 驗證失敗（{e}），已記入 attempts.jsonl") from e
     # 首份規則的絆線：凍結當下的 sha256 進 append-only 帳本，`profile check` 會逐一比對現檔
     pgen.record_frozen_component(root, component)
+
+
+def _refuse_if_attempt_cap_reached(root, tree: str, component: str) -> None:
+    """§7 場 0 停止分支第 4 條是**終局**的：同一 (tree, run-kind) 累積到上限後不得再 stage
+    （否則「跑到有效為止」就能把停止條件抹掉，§10 R10）。場 0 當下該做的是停下上報，不是重跑。"""
+    count = pgen.count_invalid_attempts(root, tree, component)
+    if count >= pgen.ATTEMPT_CAP:
+        raise pgen.ProfileCliError(
+            f"stage 拒絕：{tree}／{component} 已累積 {count} 份無效嘗試（≥{pgen.ATTEMPT_CAP} 即停，終局）；"
+            "場 0 應在此停止並上報「環境前置未成立／待使用者裁決」，不得繼續重跑"
+        )
 
 
 def _refuse_if_already_staged(root, component: str) -> None:
@@ -173,10 +194,11 @@ def _cmd_stage_m0(args) -> int:
     _refuse_if_already_staged(root, "m0")
     manifest = pgen.load_tree_manifest(args.tree_manifest)
     tree = manifest["tree"]
+    _refuse_if_attempt_cap_reached(root, tree, "m0")
     run_env = pgen.parse_run_env_fingerprint(args.run_env_fingerprint)
     pgen.check_manifest_env_fingerprint(manifest, run_env, "stage-m0")
 
-    table, valid, reasons = _build_and_validate_table(args.log, args.xcresult, args.iterations)
+    table, valid, reasons, log_sha256 = _build_and_validate_table(args.log, args.xcresult, args.iterations)
     if not valid:
         pgen.record_invalid_attempt(root, tree, "m0", reasons)
         print("stage-m0：運行無效，已記入 attempts.jsonl：", file=sys.stderr)
@@ -184,7 +206,6 @@ def _cmd_stage_m0(args) -> int:
             print(f"  - {r}", file=sys.stderr)
         return 2
 
-    log_sha256 = pgen.sha256_file(args.log)
     data = pgen.build_m0_staging(table, args.iterations, manifest, run_env, args.evidence_hash, log_sha256)
     _stage_or_invalid_attempt(root, "m0", tree, data)
     print(f"已凍結 staging/m0（tree={tree} tree_hash={data['tree_hash']} cdhash={data['cdhash']}）")
@@ -209,24 +230,25 @@ def _cmd_stage_mutant(args) -> int:
 
     manifest = pgen.load_tree_manifest(args.tree_manifest)
     tree = manifest["tree"]
+    _refuse_if_attempt_cap_reached(root, tree, component)
     run_env = pgen.parse_run_env_fingerprint(args.run_env_fingerprint)
     pgen.check_manifest_env_fingerprint(manifest, run_env, f"stage-mutant --name {name}")
 
-    if not pgen.baseline_matches_staged_m0(m0_staging, args.baseline_log):
+    # baseline log 只讀一次：同一次讀取既建表也算 sha256，再用該 sha256 比對 staging/m0 的記錄
+    baseline_table, baseline_valid, baseline_reasons, baseline_log_sha256 = _build_and_validate_table(
+        args.baseline_log, args.baseline_xcresult, args.baseline_iterations
+    )
+    if not pgen.baseline_sha256_matches_staged_m0(m0_staging, baseline_log_sha256):
         raise pgen.ProfileCliError(
             "stage-mutant 拒絕：--baseline-log 與 staging/m0 記錄的來源 log sha256 不符"
             "（baseline 必須就是被 staged 的那份 M0）"
         )
-
-    baseline_table, baseline_valid, baseline_reasons = _build_and_validate_table(
-        args.baseline_log, args.baseline_xcresult, args.baseline_iterations
-    )
     if not baseline_valid:
         raise pgen.ProfileCliError(
             "stage-mutant 拒絕：--baseline-log／--baseline-xcresult 本身不是有效運行：" + "；".join(baseline_reasons)
         )
 
-    mutant_table, mutant_valid, mutant_reasons = _build_and_validate_table(args.log, args.xcresult, args.iterations)
+    mutant_table, mutant_valid, mutant_reasons, _ = _build_and_validate_table(args.log, args.xcresult, args.iterations)
     if not mutant_valid:
         pgen.record_invalid_attempt(root, tree, component, mutant_reasons)
         print(f"stage-mutant {name}：運行無效，已記入 attempts.jsonl：", file=sys.stderr)
@@ -245,6 +267,7 @@ def _cmd_stage_ui(args) -> int:
     _refuse_if_already_staged(root, "ui_t0_prime")
     manifest = pgen.load_tree_manifest(args.tree_manifest)
     tree = manifest["tree"]
+    _refuse_if_attempt_cap_reached(root, tree, "ui_t0_prime")
 
     if not (Path(args.xcresult).is_file() or Path(args.xcresult).is_dir()):
         raise pgen.ProfileCliError(f"stage-ui 拒絕：--xcresult 不存在（{args.xcresult}）")
@@ -287,10 +310,7 @@ def _cmd_activate(args) -> int:
         profile = activate_r27(root, version=args.version)
     except ProfileError as e:
         raise pgen.ProfileCliError(f"啟用拒絕：{e}") from e
-    print(
-        f"已啟用 R27 profile version={profile.version} tree_hash={profile.tree_hash} "
-        f"cdhash={profile.cdhash} display={profile.display or '未記錄'}"
-    )
+    print("已啟用 R27 profile " + format_provenance(profile.provenance()))
     return 0
 
 
@@ -343,6 +363,6 @@ def run_profile(args) -> int:
     handler = _HANDLERS[args.profile_command]
     try:
         return handler(args)
-    except (pgen.ProfileCliError, ProfileError) as e:
+    except ProfileError as e:  # ProfileCliError 繼承 ProfileError，一個 except 就夠
         print(f"錯誤：{e}", file=sys.stderr)
         return 2

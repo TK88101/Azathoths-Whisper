@@ -6,7 +6,6 @@ v3／verdict／negative-control 三個子命令共用 `h02_gate_cli._load_active
 
 from __future__ import annotations
 
-import contextlib
 import io
 import tempfile
 import unittest
@@ -15,6 +14,7 @@ from unittest import mock
 
 import h02_gate_cli as gate_cli
 import h02_gate_eval as gate
+import test_h02_gate_fixtures as fx
 from test_h02_gate_fixtures import FROZEN_M0, M2_KILL, M3_KILL, MUTANT_KILLED, write_run
 
 C6_T3 = "SIG{T3.s1|C6-NEVER-SETTLES}"
@@ -38,10 +38,7 @@ class ProfileDirExplicitnessTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def run_cli(self, argv):
-        out, err = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            code = gate.main(argv)
-        return code, out.getvalue(), err.getvalue()
+        return fx.run_gate_cli(argv)
 
     def _v3_args(self):
         log_path, xc_path = write_run(self.tmp, "m0", n=10, overrides={("T3", "s1"): [C6_T3]}, base=FROZEN_M0)
@@ -108,10 +105,7 @@ class NegativeControlProfileDirExplicitnessTests(unittest.TestCase):
         ]
 
     def run_cli(self, argv):
-        out, err = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            code = gate.main(argv)
-        return code, out.getvalue(), err.getvalue()
+        return fx.run_gate_cli(argv)
 
     def test_default_profile_dir_without_active_is_invalid(self):
         code, out, _ = self.run_cli(self._args())

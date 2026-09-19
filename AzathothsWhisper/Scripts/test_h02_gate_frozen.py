@@ -15,6 +15,7 @@ from pathlib import Path
 import h02_gate_eval as gate
 import h02_gate_cli as gate_cli
 import h02_gate_r27_profile as r27profile
+import test_h02_gate_fixtures as fx
 from test_h02_gate_fixtures import (
     C2,
     FROZEN_M0,
@@ -202,10 +203,8 @@ class FrozenConformityFullCliTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def run_cli(self, argv):
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            code = gate.main(argv)
-        return code, out.getvalue()
+        code, out, _ = fx.run_gate_cli(argv)
+        return code, out
 
     def test_v3_cli_without_profile_dir_only_shows_deviations(self):
         """不給 `--profile-dir`（指向空目錄）時 active_profile 為 None，外來碼只計 deviations，

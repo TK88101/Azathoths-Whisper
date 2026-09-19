@@ -49,7 +49,9 @@ _UI_T0_PRIME_OUTCOMES: FrozenSet[str] = frozenset({"PASS", "FAIL", "SKIP"})
 # xcodebuild -version 的 Build version、SDK 裸值如 macosx27.0），兩端能逐字相等比對。
 # §10 R13 的「顯示設定」沒有兩端通用的標準字串，放進相等比對只會製造假 mismatch →
 # 改記在 m0 頂層的 `display` 欄，只作溯源、印進報告，不參與結論（見 `R27Profile.display`）。
-_ENV_FINGERPRINT_KEYS: Tuple[str, ...] = ("os_build", "xcode_build", "sdk")
+ENV_FINGERPRINT_KEYS: Tuple[str, ...] = ("os_build", "xcode_build", "sdk")
+# 舊私有名保留給本檔既有引用；外部一律用公開的 ENV_FINGERPRINT_KEYS（單一來源）
+_ENV_FINGERPRINT_KEYS = ENV_FINGERPRINT_KEYS
 
 # §13 第 5 項「M0 每步登記」：activate_r27 要求 staging/m0 的 steps 鍵集合恰為這 9 個
 # （由 STEPS 導出，不寫死），缺一即拒絕啟用——防止一份只登記 1 步的殘缺 profile 讓其餘
@@ -161,6 +163,43 @@ def _parse_evidence_hash(data: object, where: str) -> str:
     if not isinstance(data, str) or not data.strip():
         raise ProfileError(f"{where}: evidence_hash 須為非空字串（不記錄就整個省略）")
     return data
+
+
+def format_provenance(provenance: Mapping, *, include_evidence: bool = False) -> str:
+    """把 `R27Profile.provenance()` 格式化成一行報告文字（v3／verdict／negative-control 的
+    `active_profile:` 行、`profile activate` 成功訊息、`profile show` 共用同一格式）。
+    刻意決定：只印，不拿 tree_hash／cdhash 與受評運行相等比對（見 `R27Profile.provenance`）。"""
+    parts = [
+        f"version={provenance['version']}",
+        f"tree_hash={provenance['tree_hash']}",
+        f"cdhash={provenance['cdhash']}",
+        f"env_fingerprint={provenance.get('env_fingerprint') or '未記錄'}",
+        f"display={provenance.get('display') or '未記錄'}",
+    ]
+    if include_evidence:
+        parts.append(f"evidence_hashes={provenance.get('evidence_hashes') or '未記錄'}")
+    return " ".join(parts)
+
+
+def parse_env_fingerprint_text(text: str) -> Dict[str, str]:
+    """`os_build=..,xcode_build=..,sdk=..` 逗號分隔語法的**單一來源**（§10 R13）。
+    格式錯誤（缺 `=`、鍵或值為空、整串解不出任何鍵值）一律 `ValueError`，由呼叫端轉成各自的
+    輸入錯誤型別——不得靜默吞掉、生出一份看似合法但空的指紋。"""
+    result: Dict[str, str] = {}
+    for pair in text.split(","):
+        pair = pair.strip()
+        if not pair:
+            continue
+        if "=" not in pair:
+            raise ValueError(f"--run-env-fingerprint 格式錯誤（缺 '='）：{pair!r}")
+        key, _, value = pair.partition("=")
+        key, value = key.strip(), value.strip()
+        if not key or not value:
+            raise ValueError(f"--run-env-fingerprint 格式錯誤（鍵或值為空）：{pair!r}")
+        result[key] = value
+    if not result:
+        raise ValueError(f"--run-env-fingerprint 未解析出任何鍵值：{text!r}")
+    return result
 
 
 def _parse_env_fingerprint(data: object, where: str) -> Dict[str, str]:
@@ -286,8 +325,16 @@ def load_staging_component(root: Path, component: str) -> Optional[dict]:
         raise ProfileError(f"staging/{component}: 無法解析（{e}）") from e
 
 
-def _hash_bytes(data: bytes) -> str:
+def sha256_bytes(data: bytes) -> str:
+    """整個判定器鏈的檔案雜湊單一來源（profile manifest、凍結帳本、證據雜湊共用）。"""
     return hashlib.sha256(data).hexdigest()
+
+
+def sha256_file(path) -> str:
+    return sha256_bytes(Path(path).read_bytes())
+
+
+_hash_bytes = sha256_bytes  # 舊私有名（本檔既有呼叫點）
 
 
 def _canonical_bytes(data: Mapping) -> bytes:

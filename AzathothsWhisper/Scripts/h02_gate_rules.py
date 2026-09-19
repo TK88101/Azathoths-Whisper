@@ -129,7 +129,8 @@ def evaluate_frozen_conformity(
     有 `active_profile` 且該步驟已在 `active_profile.m0` 登記時（甲案），改以
     `active_profile.m0[(label, step)].allowed_codes` 作判據：超出 → `reasons`（不可判定）。
     未在 active profile 登記的步驟（含 active_profile 整個是 `None`）一律只計 deviations。
-    `FROZEN_ALLOWED_CODES`／`FROZEN_REGISTRATION` 的值本身不變，只降級為 deviations 的
+    **`FROZEN_ALLOWED_CODES` 已不再被本函式引用**（allowed 判據改由 active profile 的 m0 提供）；
+    它與 `FROZEN_REGISTRATION` 的值本身一律不變，其中 `FROZEN_REGISTRATION` 仍作 deviations 的
     historical 比較對象。回傳 (相符, reasons, deviations)。"""
     reasons: List[str] = []
     deviations: List[str] = []

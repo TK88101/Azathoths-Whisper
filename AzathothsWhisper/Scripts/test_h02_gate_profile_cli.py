@@ -6,7 +6,6 @@
 """
 from __future__ import annotations
 
-import contextlib
 import io
 import json
 import tempfile
@@ -17,23 +16,16 @@ import h02_gate_eval as gate
 import h02_gate_profile_gen as pgen
 import test_h02_gate_fixtures as fx
 
-RUN_ENV_TEXT = "os_build=26A428,xcode_build=27A266a,sdk=macosx27.0"
+RUN_ENV_TEXT = fx.TREE_MANIFEST_ENV_TEXT
 
 
 def write_manifest(directory, name, tree=None, **overrides):
-    data = {
-        "tree": tree or name,
-        "swift_hashlist_sha256": f"{name.lower()}" * 8,
-        "cdhash": f"{name.lower()}cd" * 8,
-        "os_build": "26A428",
-        "xcode_build": "27A266a",
-        "sdk": "macosx27.0",
-        "display": "Built-in Liquid Retina XDR Display",
-    }
-    data.update(overrides)
-    path = Path(directory) / f"{name}.json"
-    path.write_text(json.dumps(data), encoding="utf-8")
-    return str(path)
+    """薄包裝：共用 `fx.write_tree_manifest`，但逐樹給不同的 hash（CLI 測試要能分辨四棵樹），
+    並只回傳 path（本檔既有呼叫點的簽名）。"""
+    defaults = {"swift_hashlist_sha256": f"{name.lower()}" * 8, "cdhash": f"{name.lower()}cd" * 8}
+    defaults.update(overrides)
+    path, _ = fx.write_tree_manifest(directory, name, tree=tree, **defaults)
+    return path
 
 
 def ui_log_text(overrides=None, drop=(), extra=()):
@@ -62,10 +54,7 @@ class ProfileCliTestCase(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
 
     def run_cli(self, argv):
-        out, err = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            code = gate.main(argv)
-        return code, out.getvalue(), err.getvalue()
+        return fx.run_gate_cli(argv)
 
     def stage_m0(self, base=None, n=10, extra_args=()):
         log_path, xc_path = fx.write_run(self.tmp, "cf-m0-27", n=n, base=base or fx.FROZEN_M0)
@@ -489,6 +478,19 @@ class CrossComponentEnvFingerprintTests(ProfileCliTestCase):
         code, out, err = self.run_cli(["profile", "check", "--profile-dir", self.root])
         self.assertEqual(code, 1, out + err)
         self.assertIn("環境指紋", out + err)
+
+
+class AttemptCapTests(ProfileCliTestCase):
+    """§7 場 0 停止分支第 4 條的終局性（Codex review 2026-09-19）：累積到上限後連 stage 都不許，
+    場 0 當下就該停下上報，而不是再跑一份有效的把停止條件抹掉。"""
+
+    def test_stage_m0_refused_after_attempt_cap(self):
+        for i in range(pgen.ATTEMPT_CAP):
+            pgen.record_invalid_attempt(Path(self.root), "M0", "m0", [f"invalid run {i}"])
+        (code, out, err), _, _ = self.stage_m0()
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("終局", out + err)
+        self.assertFalse((Path(self.root) / "staging" / "m0.staging.json").is_file())
 
 
 if __name__ == "__main__":

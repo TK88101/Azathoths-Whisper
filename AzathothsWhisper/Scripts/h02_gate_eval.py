@@ -79,8 +79,6 @@ from h02_gate_r27_profile import (
     env_fingerprint_check,
     load_active_profile,
 )
-import h02_gate_profile_gen as profile_gen
-import h02_gate_profile_cli as profile_cli
 from h02_gate_parse import (
     _classify_gate_token,
     _collect_failure_texts,
@@ -169,7 +167,6 @@ __all__ = [
     "has_non_strip_coverflow_change", "non_strip_coverflow_changes",
     "R27Profile", "ProfileError", "R27_PROFILE_SCHEMA",
     "activate_r27", "load_active_profile", "active_profile_deviations", "env_fingerprint_check",
-    "profile_gen", "profile_cli",
     "main",
 ]
 

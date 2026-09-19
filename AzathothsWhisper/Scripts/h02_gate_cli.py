@@ -10,9 +10,16 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from h02_gate_model import GateInputError, GateTable
+from h02_gate_model import GateInputError, GateTable, read_failure_message, read_text_file
 from h02_gate_parse import load_xcresult_json
-from h02_gate_r27_profile import _DEFAULT_R27_PROFILE_DIR, ProfileError, R27Profile, load_active_profile
+from h02_gate_r27_profile import (
+    _DEFAULT_R27_PROFILE_DIR,
+    ProfileError,
+    R27Profile,
+    format_provenance,
+    load_active_profile,
+    parse_env_fingerprint_text,
+)
 from h02_gate_rules import (
     evaluate_candidate,
     evaluate_negative_control,
@@ -41,11 +48,7 @@ def _print_profile_provenance(provenance: Optional[dict]) -> None:
     if provenance is None:
         print("active_profile: 無")
         return
-    print(
-        f"active_profile: version={provenance['version']} tree_hash={provenance['tree_hash']} "
-        f"cdhash={provenance['cdhash']} env_fingerprint={provenance['env_fingerprint'] or '未記錄'} "
-        f"display={provenance.get('display') or '未記錄'}"
-    )
+    print("active_profile: " + format_provenance(provenance))
 
 
 def _print_v3(v3: dict) -> None:
@@ -152,9 +155,9 @@ def _print_negative_control(result: dict) -> None:
 
 def _load_text(path: str) -> str:
     try:
-        return Path(path).read_text(encoding="utf-8", errors="replace")
+        return read_text_file(path)
     except OSError as e:
-        raise GateInputError(f"讀取失敗（{path}）：{e}") from e
+        raise GateInputError(read_failure_message(path, e)) from e
 
 
 def _load_product_files(path: Optional[str]) -> Optional[List[str]]:
@@ -276,27 +279,15 @@ def _load_active_profile_arg(profile_dir: Optional[str]) -> Optional[R27Profile]
 
 
 def _parse_run_env_fingerprint(text: Optional[str]) -> Optional[Dict[str, str]]:
-    """`--run-env-fingerprint` 的 `os_build=...,xcode_build=...,sdk=...` 語法解析（§10 R13）。
-    未給 → `None`（呼叫端沒量測，交由 `env_fingerprint_check` 依 profile 是否已記錄指紋判斷
-    `unknown`／`unmeasured`）。格式錯誤（缺 `=`、鍵或值為空、整串解不出任何鍵值）一律
-    `GateInputError`，不得靜默吞掉、生出一份看似合法但是空的指紋。"""
+    """`--run-env-fingerprint` 的語法解析（§10 R13）：共用
+    `h02_gate_r27_profile.parse_env_fingerprint_text`（單一來源），本層只做「未給＝None」的
+    語義（呼叫端沒量測，交由 `env_fingerprint_check` 判 `unknown`／`unmeasured`）與例外轉換。"""
     if text is None:
         return None
-    result: Dict[str, str] = {}
-    for pair in text.split(","):
-        pair = pair.strip()
-        if not pair:
-            continue
-        if "=" not in pair:
-            raise GateInputError(f"--run-env-fingerprint 格式錯誤（缺 '='）：{pair!r}")
-        key, _, value = pair.partition("=")
-        key, value = key.strip(), value.strip()
-        if not key or not value:
-            raise GateInputError(f"--run-env-fingerprint 格式錯誤（鍵或值為空）：{pair!r}")
-        result[key] = value
-    if not result:
-        raise GateInputError(f"--run-env-fingerprint 未解析出任何鍵值：{text!r}")
-    return result
+    try:
+        return parse_env_fingerprint_text(text)
+    except ValueError as e:
+        raise GateInputError(str(e)) from e
 
 
 def _run_candidate(args) -> int:
