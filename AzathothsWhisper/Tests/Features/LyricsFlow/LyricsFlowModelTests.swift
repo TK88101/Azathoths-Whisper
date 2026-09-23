@@ -291,6 +291,30 @@ struct LyricsFlowModelTests {
         #expect(!h.coverFlow.cards.contains { $0.side == .upcoming })
     }
 
+    /// §1／AC8b（simcodex R1 採納 Codex）：Queue.dat 消失 → 右側退回（空＋讀不到），不沿用舊清單；
+    /// 檔案回來（即使內容與屬性和先前相同）→ 恢復
+    @Test func queueFileDisappearingFallsBackInsteadOfShowingAStaleQueue() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        let items = [Item(1, itemID: 10), Item(2, itemID: 11), Item(3, itemID: 12)]
+        try h.writeQueue(items)
+        await play(h, 1, lyrics: "words")
+        #expect(h.model.upcoming == .available)
+
+        let queueFile = h.directory.appendingPathComponent(QueueFileSource.queueFileName)
+        let attributes = try FileManager.default.attributesOfItem(atPath: queueFile.path)
+        try FileManager.default.removeItem(at: queueFile)
+        await h.model.refreshSources()
+        #expect(!h.coverFlow.cards.contains { $0.side == .upcoming })
+        #expect(h.model.upcoming == .unavailable)
+
+        try h.writeQueue(items)
+        try FileManager.default.setAttributes([.modificationDate: attributes[.modificationDate]!], ofItemAtPath: queueFile.path)
+        await h.model.refreshSources()
+        #expect(h.model.upcoming == .available)
+        #expect(h.coverFlow.cards.map(\.side) == [.current, .upcoming, .upcoming])
+    }
+
     // MARK: AC8d 卡片詳情
 
     @Test func detailsAreFetchedForTheDeck() async throws {

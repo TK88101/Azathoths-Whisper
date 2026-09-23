@@ -67,6 +67,35 @@ struct TrackDetails: Equatable, Sendable {
     let lyrics: String?
 }
 
+extension TrackDetails {
+    /// 批次讀取的欄位順序（`MusicAppleEventsClient.trackDetails` 依此送 AE）
+    enum Column: Int, CaseIterable {
+        case persistentID, artist, title, album, discNumber, trackNumber, lyrics
+    }
+
+    /// 各欄（依 `Column` 順序）→ 卡片詳情。欄數不對或各欄長度不一致＝批次讀取不完整，整批不採用（卡片退為 unknown）；
+    /// 沒有 persistentID 的列略過
+    static func fromColumns(_ columns: [[Any]]) -> [TrackDetails] {
+        guard columns.count == Column.allCases.count,
+              let count = columns.first?.count,
+              columns.allSatisfy({ $0.count == count })
+        else { return [] }
+        return (0..<count).compactMap { row in
+            func value(_ column: Column) -> Any { columns[column.rawValue][row] }
+            guard let id = value(.persistentID) as? String, !id.isEmpty else { return nil }
+            return TrackDetails(
+                persistentID: id,
+                artist: value(.artist) as? String ?? "",
+                title: value(.title) as? String ?? "",
+                album: value(.album) as? String ?? "",
+                discNumber: (value(.discNumber) as? NSNumber)?.intValue ?? 0,
+                trackNumber: (value(.trackNumber) as? NSNumber)?.intValue ?? 0,
+                lyrics: value(.lyrics) as? String
+            )
+        }
+    }
+}
+
 enum PlayerState: Equatable, Sendable {
     case playing
     case paused

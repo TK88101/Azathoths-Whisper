@@ -79,15 +79,26 @@ struct MusicAppleEventsClient: MusicControlling {
     func trackDetails(persistentIDs: [String]) async throws -> [TrackDetails] {
         let ids = Array(Set(persistentIDs.filter { !$0.isEmpty })).sorted()
         guard !ids.isEmpty else { return [] }
-        return try await run(aeTimeoutTicks: Self.detailsTimeoutTicks) { app in
-            guard let all = app.tracks?() else { return [] }
+        return try await run { app in
+            // 預算從輪到本批執行時起算：量的是本批佔住 AE 佇列的時間。篩選也在同一預算內——
+            // 實測它不另送 AE（S6：5 欄≈5 AE），但萬一送了也不得沒有上限
+            let budget = AEBudget(total: Self.detailsBudget, start: .now)
+            let sbApp = app as? SBApplication
+            let setTimeout: (Int) -> Void = { sbApp?.timeout = $0 }
+            guard budget.spend(setTimeout: setTimeout), let all = app.tracks?() else { return [] }
             let predicate = NSCompoundPredicate(
                 orPredicateWithSubpredicates: ids.map { NSPredicate(format: "persistentID == %@", $0) }
             )
             // S6：OR 串接的 whose 一次取回元素，再逐屬性各一次批次取值（21 首約 5 AE、p50 51ms；逐首讀要 1 秒）。
             // Swift 端 filtered(using:) 回傳 [Any]，需轉回 SBElementArray 才能批次取值
             guard let matches = (all.filtered(using: predicate) as NSArray) as? SBElementArray else { return [] }
-            return Self.details(of: matches)
+            // 每欄一個 AE（依 `TrackDetails.Column` 的順序）；送出前以剩餘預算當它的 timeout，用完整批作廢
+            let columns = budget.readColumns(
+                TrackDetails.Column.allCases.map(Self.selector),
+                setTimeout: setTimeout,
+                read: { matches.array(byApplying: $0) }
+            )
+            return columns.map(TrackDetails.fromColumns) ?? []
         }
     }
 
@@ -152,29 +163,15 @@ struct MusicAppleEventsClient: MusicControlling {
         }
     }
 
-    private static func details(of tracks: SBElementArray) -> [TrackDetails] {
-        func column(_ selector: Selector) -> [Any] { tracks.array(byApplying: selector) }
-        let ids = column(#selector(getter: MusicTrackProto.persistentID))
-        let artists = column(#selector(getter: MusicTrackProto.artist))
-        let titles = column(#selector(getter: MusicTrackProto.name))
-        let albums = column(#selector(getter: MusicTrackProto.album))
-        let discs = column(#selector(getter: MusicTrackProto.discNumber))
-        let numbers = column(#selector(getter: MusicTrackProto.trackNumber))
-        let lyrics = column(#selector(getter: MusicTrackProto.lyrics))
-        let count = ids.count
-        // 各欄長度不一致＝批次讀取不完整，整批不採用（卡片退為 unknown）
-        guard [artists, titles, albums, discs, numbers, lyrics].allSatisfy({ $0.count == count }) else { return [] }
-        return (0..<count).compactMap { index in
-            guard let id = ids[index] as? String, !id.isEmpty else { return nil }
-            return TrackDetails(
-                persistentID: id,
-                artist: artists[index] as? String ?? "",
-                title: titles[index] as? String ?? "",
-                album: albums[index] as? String ?? "",
-                discNumber: (discs[index] as? NSNumber)?.intValue ?? 0,
-                trackNumber: (numbers[index] as? NSNumber)?.intValue ?? 0,
-                lyrics: lyrics[index] as? String
-            )
+    private static func selector(_ column: TrackDetails.Column) -> Selector {
+        switch column {
+        case .persistentID: return #selector(getter: MusicTrackProto.persistentID)
+        case .artist: return #selector(getter: MusicTrackProto.artist)
+        case .title: return #selector(getter: MusicTrackProto.name)
+        case .album: return #selector(getter: MusicTrackProto.album)
+        case .discNumber: return #selector(getter: MusicTrackProto.discNumber)
+        case .trackNumber: return #selector(getter: MusicTrackProto.trackNumber)
+        case .lyrics: return #selector(getter: MusicTrackProto.lyrics)
         }
     }
 
@@ -219,8 +216,9 @@ struct MusicAppleEventsClient: MusicControlling {
     /// 誠實邊界：這只保證 client 端 bounded wait，**不保證**遠端操作被撤銷——
     /// Music.app 可能仍在服務端處理已送出的 Apple Event。
     static let artworkTimeoutTicks: Int = 90    // 1.5 秒；與 currentTrack() 合計須留在 H-04 的 3 秒內
-    /// 卡片詳情批次讀取的每個 AE 上限（約 7 個 AE；S6 實測整批 p95 76ms）
-    static let detailsTimeoutTicks: Int = 90
+    /// 卡片詳情一批的**總**時限（AC8d；約 7 個 AE，S6 實測整批 p95 76ms）：與 artwork 同為 1.5 秒，
+    /// monitor 最多多等一批（見 `AEBudget`）
+    static let detailsBudget: Duration = .milliseconds(1500)
 
     private func run<T: Sendable>(
         aeTimeoutTicks: Int? = nil,

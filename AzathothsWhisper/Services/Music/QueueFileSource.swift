@@ -4,7 +4,8 @@ import Foundation
 ///
 /// - 單一 actor＝單一串行讀取工人：兩個檔案共用，同時至多一個 plist 解碼（20MB 的 Queue.dat 解析 p50 59ms，S9）
 /// - 只在檔案屬性（大小＋修改時間）變了才重讀；讀前讀後屬性不同＝正被寫入，本次放棄、下次再讀（R3-3）
-/// - 解析失敗回報 `.failed`，由 `QueueSession` 保留上一份有效快照
+/// - 讀不出內容或解析失敗回報 `.failed`，由 `QueueSession` 保留上一份有效快照（AC8b 單次讀取失敗）；
+///   `.missing` 只表示檔案不存在（計劃 §1：退回），此時一併忘掉屬性戳，檔案回來即使屬性相同也重讀
 /// - 結果只保留精簡快照，不留原始 `Data`
 /// - 本檔不得出現任何寫入／移動／刪除 API（`Scripts/no_playback_gate.sh` 檢查）
 actor QueueFileSource {
@@ -40,7 +41,10 @@ actor QueueFileSource {
     func readQueue() -> Read<QueueSnapshot> {
         guard let url = directory?.appendingPathComponent(Self.queueFileName) else { return .missing }
         switch Self.readStable(url, previous: queueStamp) {
-        case .missing: return .missing
+        case .missing:
+            queueStamp = nil
+            return .missing
+        case .unreadable: return .failed
         case .unchanged: return .unchanged
         case .unstable: return .unchanged
         case .data(let data, let stamp):
@@ -60,7 +64,10 @@ actor QueueFileSource {
         // 窗口大小變了要重讀，即使檔案沒變
         let previous = historyKeepLast == keepLast ? historyStamp : nil
         switch Self.readStable(url, previous: previous) {
-        case .missing: return .missing
+        case .missing:
+            historyStamp = nil
+            return .missing
+        case .unreadable: return .failed
         case .unchanged: return .unchanged
         case .unstable: return .unchanged
         case .data(let data, let stamp):
@@ -75,6 +82,8 @@ actor QueueFileSource {
 
     private enum RawRead {
         case missing
+        /// 檔案在、內容讀不出來（權限、I/O 錯誤）——不是「不存在」
+        case unreadable
         case unchanged
         /// 讀的過程中檔案變了（Music 正在寫）
         case unstable
@@ -84,7 +93,7 @@ actor QueueFileSource {
     private static func readStable(_ url: URL, previous: Stamp?) -> RawRead {
         guard let before = stamp(of: url) else { return .missing }
         guard before != previous else { return .unchanged }
-        guard let data = try? Data(contentsOf: url) else { return .missing }
+        guard let data = try? Data(contentsOf: url) else { return .unreadable }
         guard stamp(of: url) == before else { return .unstable }
         return .data(data, before)
     }

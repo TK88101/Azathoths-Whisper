@@ -181,12 +181,7 @@ struct CoverFlowView: View {
     @ViewBuilder
     private var centerStatus: some View {
         if let card = model.cards.first(where: { $0.id == model.centerID }) {
-            let status = model.status(for: card)
-            (Text(verbatim: LyricsBadge.symbol(for: status) + " ") + Text(LocalizedStringKey(LyricsBadge.statusKey(for: status))))
-                .font(Theme.Fonts.mono(11))
-                .tracking(1.6)
-                .textCase(.uppercase)
-                .foregroundStyle(LyricsBadge.tone(for: status).color)
+            LyricsStatusLabel(status: model.status(for: card))
         }
     }
 }

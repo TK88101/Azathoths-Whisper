@@ -2,7 +2,9 @@ import Foundation
 import Testing
 
 // 計劃 AC9 ③、AC8c：`Scripts/no_playback_gate.sh` 對 repo 退出 0；每條禁止模式各一負對照退出非 0
-@Suite("NoPlaybackGateScript")
+// 已移到 Scripts/test_no_playback_gate.py（simcodex R1）：app 宿主的子行程開 ~/Documents 下的專案檔會卡在系統存取授權上。
+// 本檔待使用者批准後刪除
+@Suite("NoPlaybackGateScript", .disabled("移到 Scripts/test_no_playback_gate.py：app 宿主讀 ~/Documents 會卡在存取授權"))
 struct NoPlaybackGateScriptTests {
     private static let projectRoot = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

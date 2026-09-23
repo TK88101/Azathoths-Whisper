@@ -265,7 +265,10 @@ final class LyricsFlowModel {
         case .snapshot(let snapshot):
             queue = queue.applying(snapshot)
             queueRewritten = true
-        case .missing, .failed:
+        case .missing:
+            // 計劃 §1：Queue.dat 不存在 → 右側退回（空＋讀不到），不沿用舊清單
+            queue = queue.invalidated().markingReadFailed()
+        case .failed:
             queue = queue.markingReadFailed()
         case .unchanged:
             break

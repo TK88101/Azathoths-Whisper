@@ -40,9 +40,9 @@ struct QueueSnapshot: Equatable, Sendable {
               let raw = list["iar"] as? [[String: Any]]
         else { return nil }
 
-        // 不在本機曲庫的項（例如串流）沒有 `tID`，無從對到曲目——略過，不影響其他項的身分
+        // 任何一項讀不出 `tID` → 整份不可用（D13）。跳過它會把排在後面的歌當成「下一首」——不捏造
         let entries = raw.compactMap(entry)
-        guard raw.isEmpty || !entries.isEmpty else { return nil }
+        guard entries.count == raw.count else { return nil }
         return QueueSnapshot(entries: entries, sequenceKind: kind, contentHash: hash(kind: kind, entries: entries))
     }
 

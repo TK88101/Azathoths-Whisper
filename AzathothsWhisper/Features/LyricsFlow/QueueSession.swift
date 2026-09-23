@@ -48,9 +48,7 @@ struct QueueSession: Equatable, Sendable {
 
     func resolvingCurrent(persistentID: String, isRealChange: Bool) -> QueueSession {
         var next = self
-        let matches = snapshot.map { snapshot in
-            snapshot.entries.indices.filter { snapshot.entries[$0].persistentID == persistentID }
-        } ?? []
+        let matches = occurrences(of: persistentID, isRealChange: isRealChange)
         if !persistentID.isEmpty, let resolved = Self.pick(matches, previous: currentIndex, isRealChange: isRealChange) {
             next.currentIndex = resolved
             next.consecutiveMisses = 0
@@ -79,6 +77,17 @@ struct QueueSession: Equatable, Sendable {
     }
 
     // MARK: - 內部
+
+    /// 當前曲在清單中的所有出現位置。輪詢時多半仍停在上次位置：只回那一個（`pick` 照樣會選它），
+    /// 免得每 3 秒在主執行緒掃一次整份清單（整庫隨機可達 1.2 萬項，事實 24）
+    private func occurrences(of persistentID: String, isRealChange: Bool) -> [Int] {
+        guard let snapshot else { return [] }
+        if !isRealChange, let currentIndex, snapshot.entries.indices.contains(currentIndex),
+           snapshot.entries[currentIndex].persistentID == persistentID {
+            return [currentIndex]
+        }
+        return snapshot.entries.indices.filter { snapshot.entries[$0].persistentID == persistentID }
+    }
 
     private static func pick(_ matches: [Int], previous: Int?, isRealChange: Bool) -> Int? {
         guard !matches.isEmpty else { return nil }

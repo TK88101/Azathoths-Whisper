@@ -68,10 +68,11 @@ struct QueueSnapshotTests {
         #expect(snapshot.entries.map(\.itemID) == [10, 11])
     }
 
-    @Test func entriesWithoutTrackIDAreSkipped() throws {
+    /// D13（simcodex R1 採納 Codex）：任何一項缺 tID → 整份不可用。
+    /// 跳過它會讓右側把其實排在後面的歌當成「下一首」——不捏造
+    @Test func anEntryWithoutTrackIDMakesTheSnapshotUnusable() {
         let data = QueueFixtures.queue(list: [Item(1, itemID: 10), Item(nil, itemID: 11), Item(2, itemID: 12)])
-        let snapshot = try #require(QueueSnapshot.parse(data))
-        #expect(snapshot.entries.map(\.itemID) == [10, 12])
+        #expect(QueueSnapshot.parse(data) == nil)
     }
 
     @Test func allEntriesWithoutTrackIDIsUnusable() {

@@ -33,6 +33,20 @@ struct QueueFileSourceTests {
         #expect(await source.readHistory(keepLast: 10) == .missing)
     }
 
+    /// 檔在、讀不出來 ≠ 檔不存在（simcodex R1）：回報 failed，由 session 沿用上一份有效快照（AC8b 單次讀取失敗）
+    @Test func unreadableFileIsAFailedReadNotAMissingFile() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        // 同名目錄：屬性讀得到、內容讀不出來
+        for name in [QueueFileSource.queueFileName, QueueFileSource.historyFileName] {
+            try FileManager.default.createDirectory(at: directory.appendingPathComponent(name), withIntermediateDirectories: false)
+        }
+        let source = QueueFileSource(directory: directory)
+
+        #expect(await source.readQueue() == .failed)
+        #expect(await source.readHistory(keepLast: 10) == .failed)
+    }
+
     @Test func readsOnceThenReportsUnchanged() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

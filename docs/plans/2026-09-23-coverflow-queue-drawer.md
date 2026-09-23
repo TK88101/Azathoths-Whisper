@@ -231,6 +231,7 @@ xcodebuild test -project AzathothsWhisper.xcodeproj -scheme AzathothsWhisper \
 (cd Scripts && /usr/bin/python3 -m unittest test_coverage_gate)   # 閘門自身的黑箱測試（不在 test_h02_gate* 探索規則內）
 xcrun xccov view --report --files-for-target "Azathoth's Whisper.app" <scratch>/unit.xcresult   # 新檔與改動檔逐檔
 ./Scripts/no_playback_gate.sh
+(cd Scripts && /usr/bin/python3 -m unittest test_no_playback_gate)   # 閘門負對照（原 Swift 版在 app 宿主內會卡在 ~/Documents 存取授權，simcodex R1）
 (cd Scripts && /usr/bin/python3 -m unittest discover -s . -p 'test_h02_gate*.py')
 # UITests（使用者在場；先關 Paste 等會彈窗的常駐 app；輸入法切 ABC——拼音等輸入法會改寫 XCUITest 的鍵入）
 xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
@@ -383,6 +384,14 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
   - 三態截圖（XCUITest 內只拍 app 視窗、假 Music、無憑證欄位）：scratchpad `u3-shots/lyricsflow-{present-raised,missing-lowered,marked-raised}.png`；目視與 AC1／AC2／AC5 一致。
   - **觀察（未修）**：① 左側（播過的）卡的徽章在右上角，被較靠中心的卡蓋住看不到（右側卡可見）——交使用者定；② M5 起既有的無障礙瑕疵：噪點層是全視窗無標籤 AXImage、`ActionButton` 的 AX 框含懸停遮罩（高 2 倍）——範圍外，記 P2。
 
+- **Phase 3 /simcodex（2026-09-23 22:2x–09-24，自 `ddb07c3`，範圍＝分岔點 `ec3fd4d` 起的整個分支）**：3 輪 simplify（每輪 4 視角：重用／簡化／效率／高度）＋ Codex（`codex exec` 唯讀，讀凍結快照；`codex review --base` 不能帶自訂提示，改用 exec 才能回餵 R7-③）。第 3 輪 simplify 0 P1、Codex 0／0／0 → 提前結束。辯論見 §14 R9。
+  - **修正（產品）**：① Queue.dat 任一項缺 tID → 整份不可用（D13 原文；原碼「略過」的理由未驗證，會把後面的歌當成下一首）；② Queue.dat 消失 → 右側退回＋提示（§1），檔案「在但讀不出」改回報 `.failed`（沿用上一份，AC8b），檔案消失時來源忘掉屬性戳（回來時即使屬性相同也重讀；履歴同）；③ 卡片詳情一批 1.5 秒總時限（AC8d）：`AEBudget.spend` 為送任何 AE 前的唯一扣預算步驟（篩選與逐欄共用），用完整批放棄；④ `LyricsStatusLabel` 取代 Editor 與 Cover Flow 兩份相同的狀態字；⑤ 佇列位置先比對上次位置（O(1)，仍經 `pick` 同一條規則），免得每 3 秒在主執行緒掃整份清單（整庫隨機可達 1.2 萬項）。
+  - **覆蓋率閘門擋下了我方**：接上總時限後 AE client 由 384 增到 404 行，超過豁免上限 400 → 把可測的純邏輯搬出（`AEBudget.readColumns`、`TrackDetails.fromColumns`，皆有單元測試），豁免檔降為 378 行。上限如設計地擋住「邏輯往豁免檔裡長」。
+  - **`NoPlaybackGateScriptTests` 逾時的真因**：全量中由 3 秒惡化到 40、87 秒、終至 120 秒逾時；單獨跑也逾時。當場取樣：9 支孤兒 `no_playback_gate.sh`（最久 25 分鐘）全停在 `getcwd → open()`——app 宿主的子行程打開 `~/Documents` 下的專案目錄時被系統擋住等待（推測為每次重建換新簽章後的「文件」資料夾存取授權，無人按就一直卡）。先試「子行程用乾淨環境」→ 無效（推測被推翻，已撤回該改動）。處置：測試移到 `Scripts/test_no_playback_gate.py`（終端機跑 1 秒；變異 2 組各被抓到），§9.3 列入必跑；Swift 版以 `.disabled` 停用，**刪除待使用者批准**；孤兒行程以 PID 清除。副作用：全量單元由 107 秒降到 20 秒。
+  - 最終：全量單元 609 條只剩基線紅（RenderGeometry 2 條／8 斷言）；`coverage_gate.sh` 豁免前 78.3%、豁免後 95.5%（豁免檔 378／400）；`no_playback_gate.sh`、`test_no_playback_gate`、`test_coverage_gate`、H-02 Python 閘門全過。
+  - **既存缺口（未修，待定）**：本分支改過的 View 檔逐檔覆蓋有 3 個低於 AC11 的 80%——`CoverFlowView` 35%、`CoverFlowItem` 73%、`LyricsFlowHandleView` 75%（另 `UI/ConfettiView` 44%）；Q4 結束時即如此、當時未記錄，主要由 UITests 驗證。
+  - **P2（延後）**：串行任務鏈兩處重複（`LyricsFlowModel.enqueue` 與分支前既有的 `CoverFlowViewModel.dispatchPrefetch`）；`CoverFlowItem.reflectionRatio` 的 private 包裝；把手兩個配色函式同名易混；`spike_gate.sh` 與 `no_playback_gate.sh` 正則重複；Python 測試的 `run` 形狀重複。
+
 ## 14. 附錄：評審辯論記錄
 
 ### R1（2026-09-23）：Codex（12 條：2 P0／7 P1／3 P2）＋Opus 5 三視角（SA 約 25 條、SM 約 30 條、ST 23 條）
@@ -482,3 +491,9 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
 ### 使用者裁定（2026-09-23 22:0x，在場 #3 後）
 - R8 收斂結論：**照做**（`approvedOn` 2026-09-23）。實作：`coverage_gate.sh` 讀 JSON 報表模式＋豁免清單與護欄；`Scripts/test_coverage_gate.py` 9 條（先紅 9/9，後綠）；變異 4 組（關預算、放寬 target、子字串比對、關重複檢查）各被抓到；真實報表：豁免前 77.6%（1546／1992）、豁免後 95.5%（1536／1608）通過。
 - 左側卡徽章被蓋住：**改到露出的一角**——以「相對當下正中」判定：正中左側的卡放左上、其餘右上（方向鍵瀏覽時跟著換邊）；`LyricsBadge.corner(of:in:centerID:)` 純函數＋3 條單元測試（先紅：編譯失敗）。
+### R9（2026-09-23～24 Phase 3 /simcodex）：Codex 3 輪＋simplify 3 輪
+- **R7-P1-③（回餵）**：Codex 第 1 輪即**撤回**，第 2、3 輪再確認不堅持（可點值出自同一條幾何路徑、macOS 14 無捲動階段 API）→ 我方勝，維持。
+- **第 1 輪 Codex 3 條 P1 全採納**（各自讀碼驗證屬實）：缺 tID 應整份不可用（D13 原文）；Queue.dat 消失不得沿用舊清單（§1）、讀取出錯不是「不存在」；卡片詳情缺總時限（AC8d）。simplify 另採 2 條（狀態字重複、每 tick 全清單掃描）；**暫緩** 1 條（串行任務鏈重複：另一處是分支前既有碼，超出本次 diff）。
+- **第 2 輪 Codex 2 條 P1**：① 篩選步驟不在預算內——S6 實測篩選不另送 AE（5 欄≈5 AE），但 Round 1 拿掉了原本的單一 AE 上限，這一步反而無上限 → 採納（高度視角獨立指出同一點）；② Python 版閘門測試未被必跑命令呼叫 → **部分採納**：§9.3 列入；其餘駁回（本專案無 CI，必跑清單即 §9.3；第三層防線 `no_playback_gate.sh` 掃 repo 一直在 §9.3，搬走的只是自我測試；Swift 版在 app 宿主內必卡）。第 3 輪 Codex **撤回** → 我方勝。
+- **第 3 輪**：Codex 0／0／0；simplify 無 P1。重用與高度兩個視角各自指出「篩選前扣預算」與逐欄那段是同一語義的第二份實作、且用完時的處理不一致（1 tick 硬送 vs 整批放棄）→ 雖為 P2，依「同一語義只留一處定義」收斂為 `AEBudget.spend`；簡化視角建議刪掉篩選前的扣預算（P2）→ **駁回**（Codex 與高度視角上一輪都要求此防線，刪掉等於退回無上限）。
+- 全採納／全駁回檢查：Codex 共 5 條 P1——4 條採納（含 1 條部分）、1 條部分駁回並經對方撤回；simplify 共 9 條（P1 3 條採納、1 條暫緩；P2 1 條駁回、2 條收斂、其餘延後）。非一面倒。

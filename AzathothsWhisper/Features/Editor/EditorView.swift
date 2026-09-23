@@ -70,12 +70,7 @@ struct EditorView: View {
     @ViewBuilder
     private var statusChip: some View {
         if let lyricsStatus {
-            (Text(verbatim: LyricsBadge.symbol(for: lyricsStatus) + " ")
-                + Text(LocalizedStringKey(LyricsBadge.statusKey(for: lyricsStatus))))
-                .font(Theme.Fonts.mono(11))
-                .tracking(1.6)
-                .textCase(.uppercase)
-                .foregroundStyle(LyricsBadge.tone(for: lyricsStatus).color)
+            LyricsStatusLabel(status: lyricsStatus)
         }
     }
 
