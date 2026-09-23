@@ -77,10 +77,9 @@ private struct CoverFlowStripCell<Card: View>: View {
     let viewportMidX: CGFloat
     @ViewBuilder let card: Card
 
-    /// 量到位置之前壓在最底：捲動動畫中新具現的卡會先被 SwiftUI 暫放在別張的位置上幾幀，
-    /// 預設 0（＝正中那層）會讓它蓋住正中那張
-    @State private var stackingOrder = CoverFlowGeometry.unplacedStackingOrder
-    /// 同理：新具現的卡在量到自己的位置前不顯示，免得在錯的位置上閃一下
+    @State private var stackingOrder: Double = 0
+    /// 量到自己的位置前不顯示。滑動中新具現的卡，SwiftUI 偶爾會先把它放在別張的位置、
+    /// 且畫在最上層 1–3 幀（以純色卡辨識身分實測；原始代碼同樣存在，屬間歇現象）
     @State private var isPlaced = false
 
     var body: some View {
@@ -91,14 +90,8 @@ private struct CoverFlowStripCell<Card: View>: View {
                     viewportMidX: viewportMidX
                 ))
             } action: { order in
-                // 換層必須即時、不得帶動畫：捲動動畫期間的寫入會繼承動畫交易，
-                // SwiftUI 便以淡入淡出重排——新舊兩層並存約 0.1 秒，鄰張的那層蓋在正中那張上面
-                var transaction = Transaction(animation: nil)
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    stackingOrder = order
-                    isPlaced = true
-                }
+                stackingOrder = order
+                isPlaced = true
             }
             .opacity(isPlaced ? 1 : 0)
             .zIndex(stackingOrder)
