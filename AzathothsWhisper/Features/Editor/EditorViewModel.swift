@@ -95,7 +95,7 @@ final class EditorViewModel {
             return
         }
 
-        if existingLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if LyricsText.isBlank(existingLyrics) {
             lyricsText = ""
             // D8①：使用者已標記「沒有歌詞」的曲不再自動抓詞
             if isMarkedNoLyrics(track.persistentID) {

@@ -11,10 +11,10 @@ enum LyricsStatus: Equatable, Sendable {
     case unknown
 
     /// 優先序：檔內有詞 ＞ 已標記 ＞ 缺詞。`lyrics == nil`＝讀取失敗。
-    /// 純空白＝缺詞（C-29，與 `AlbumTrack.hasLyrics` 同口徑）
+    /// 純空白＝缺詞（C-29，判定見 `LyricsText`）
     static func resolve(lyrics: String?, isMarked: Bool) -> LyricsStatus {
         guard let lyrics else { return .unknown }
-        if !lyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .present }
+        if !LyricsText.isBlank(lyrics) { return .present }
         return isMarked ? .markedNone : .missing
     }
 }

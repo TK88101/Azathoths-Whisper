@@ -1,4 +1,4 @@
-# Cover Flow × 找歌詞 —— 實施計劃（v3.4 定稿，2026-09-23；v3.2 經 Codex R4（8 條：7 採納、1 修改後採納）、R5（接受裁決、2 條矛盾修正）修訂）
+# Cover Flow × 找歌詞 —— 實施計劃（v3.5，2026-09-23；v3.4 定稿後依 Q3b 使用者拍板①②與 Codex R6 裁決修訂 AC5／AC6／AC8／§6，見 §14 R6）
 
 - 分支：`wip/coverflow-lyrics`（自 `wip/h02-fix4`@`ec3fd4d` 分出；只做本地 wip checkpoint，不 commit 到 `feat/*`／`main`、不 push）
 - 設計稿（互動原型）：https://claude.ai/artifact/GZSFdZEvyoshP48owh7c5G
@@ -88,10 +88,10 @@
 | AC2 | 真實換歌到缺詞且未標記曲 → 降下、把手（`lyricsflow-handle`）可見、Editor 自動抓詞（B-05） | 同上＋XCUITest `missingLyricsShowsEditor` |
 | AC3 | 點「正中且正在播」的那張 → Editor；點其他卡（含播放中但不在正中）→ 畫面、綁定曲、hydrate 計數皆不變；捲動跨中點途中沒有卡可點 | reducer 單元＋`isCentered` 幾何單元（含跨中點的逐幀取樣，沿用 `StackSession` 滑動手法）＋XCUITest `clickingPlayingCardOpensEditor`／`clickingOtherCardsDoesNothing`（非播放卡元素型別不是 button） |
 | AC4 | 寫入成功（寫入後 trim 非空）→ 延遲 `riseDelay` 後升回；期間任何使用者操作（把手、點卡、標記、編輯文字）或真實換歌 → 取消升回；A 寫入→換 B→回 A 不得被舊計時升回（ABA）；寫空字串或失敗 → 不升 | reducer 單元（GatedPollClock）＋整合＋XCUITest `writingLyricsRaisesCoverFlow` |
-| AC5 | 按「No lyrics for this song」→ 標記綁定曲（非空 ID）→ 若為當前曲則升回、取消自動抓詞；重啟後同曲不跳 Editor、不自動抓詞；該曲日後寫入成功（非空）清除標記 | 單元（注入 defaults suite）＋XCUITest `markingNoLyricsPersistsAcrossRelaunch`（第一次啟動帶 reset env、重啟不帶） |
-| AC6 | 同曲重發（forceRefresh、notPlaying 後再播）→ 只更新狀態與徽章，**不動畫面、不取消待升回** | reducer 單元＋整合（`sameTrackRefreshKeepsSurface`） |
+| AC5 | 按「No lyrics for this song」→ **只接受已知缺詞的當前曲**（非空 ID；有詞或讀不到時整個動作不生效——「沒讀到」不能當成「沒有」，R6-B3）→ 記標記、升回、取消自動抓詞；重啟後同曲不跳 Editor、不自動抓詞；該曲日後寫入成功（非空）清除標記。寫入空白（含只有空格）＝仍缺詞、留在 Editor | 單元（注入 defaults suite）＋XCUITest `markingNoLyricsPersistsAcrossRelaunch`（第一次啟動帶 reset env、重啟不帶） |
+| AC6 | 同曲重發（forceRefresh、notPlaying 後再播）→ 只更新狀態與徽章，**不動畫面、不取消待升回**。兩個例外（使用者 2026-09-23 拍板）：① 待升回期間讀回仍缺詞＝寫入沒生效 → 取消升回、留在 Editor、狀態欄提示「寫入沒有生效」；② 由「讀不到」變「缺詞」、且本場次使用者沒親手選過畫面（有效的把手、點正中播放卡）→ 降下露出 Editor | reducer 單元＋整合（`sameTrackRefreshKeepsSurface`） |
 | AC7 | 徽章 ✓／✗／—／?（unknown）與 `LyricsStatus` 一致；優先序 present ＞ markedNone ＞ missing；歌詞讀取失敗＝unknown → 不降下、不自動抓詞 | `LyricsStatus.resolve` 全真值表＋整合 |
-| AC8 | 佇列模式：牌組＝Queue.dat 清單中當前曲前 K 首＋當前＋後 K 首，播放中置中。換歌（同一份清單）→ **不重讀整份清單、不重置 Cover Flow**，以增量窗口更新：未離窗的卡保留身分、中心平移（R3-4）。Queue.dat 內容變更（Genius／插歌）→ 依新清單重建窗口。**卡 ID 規則（唯一規格）**：右側＝`q:<epoch>:<itID>`；中心＝`now:<epoch>:<itID>`；左側＝`h:<History 項在檔中的序號>`（History 由舊到新只追加，序號即該次完成的身分）；History 不可讀而改用本 app 觀察到的歷史時＝`hl:<persistentID>#<真實換歌場次>`（每次真實換歌場次唯一，同曲重播為不同卡，R5-2）。`itID` 只視為「佇列 session 內身分」（R4-4）：新快照中若同一 `itID` 對應到不同 persistentID，該 `itID` 的 epoch 加一；同 itID 同 PID 維持 epoch（保住插歌穩定性）。itID 缺失 → `q:pid:<persistentID>#<第幾次出現>`；退回模式中心＝`now:pid:<persistentID>#<真實換歌場次>`。左側與中心**不以 persistentID 互相去重**（同曲重播可同時在左與中，R4-7）。**序列種類**（R4-5）：`shuffleMode == tracks` 時只接受完整有效的 `shuffledList`，否則保留最後有效快照或進 AC8b，**絕不改用 `list`**；`QueueSnapshot` 記錄 `sequenceKind` 與所選序列的內容雜湊。**當前出現位置解析**（R3-1）：真實換歌時取「上次已解析位置之後第一個相符出現」；清單重寫後若相符出現唯一→採用；多個→以上次位置為提示取最近者，仍無法唯一→退回模式（AC8b），不猜 | `QueueSnapshot`／`DeckSnapshot`／`OccurrenceResolver` 單元（fixture plist：本次三種實測形狀、同曲重複、同曲插入、前進／跳播／窗口邊界） |
+| AC8 | 佇列模式：牌組＝Queue.dat 清單中當前曲前 K 首＋當前＋後 K 首，播放中置中。換歌（同一份清單）→ **不重讀整份清單、不重置 Cover Flow**，以增量窗口更新：未離窗的卡保留身分、中心平移（R3-4）。Queue.dat 內容變更（Genius／插歌）→ 依新清單重建窗口。**卡 ID 規則（唯一規格；v3.5 起以程式 `DeckSnapshot`／`QueueSession` 為準，R6-P1③）**：佇列項＝`q:<epoch>:<itID>`，**中心與右側共用**（下一首成為中心時 ID 不變，條帶才能平滑平移，S5）；同一快照內重複的 itID 自第 2 次起加 `#<n>`（R6-B7）；中心在未解析（退回）時＝`o:<persistentID>#<真實換歌場次>`，播完移到左側時 ID 不變；左側 History＝`h:<persistentID>#<自最新起第幾次>`（新的一筆追加時其他卡 ID 不動）；History 不可讀而改用本 app 觀察到的歷史時＝`o:<persistentID>#<真實換歌場次>`（同曲重播為不同卡，R5-2）；兩側若出現與中心同 ID 的卡，剔兩側、保中心（R6-B8）。`itID` 只視為「佇列 session 內身分」（R4-4）：新快照中若同一 `itID` 對應到不同 persistentID，該 `itID` 的 epoch 加一；同 itID 同 PID 維持 epoch（保住插歌穩定性）。itID 缺失 → `q:p:<persistentID>#<該快照內第幾次出現>`。左側與中心**不以 persistentID 互相去重**（同曲重播可同時在左與中，R4-7）。**序列種類**（R4-5）：`shuffleMode == tracks` 時只接受完整有效的 `shuffledList`，否則保留最後有效快照或進 AC8b，**絕不改用 `list`**；`shuffleMode` 型別錯、兩處不一致、或兩處都沒寫卻有 `shuffledList` → 不可用（R6-P1①；兩處都沒寫且只有 `list` → 順序，U10）；`QueueSnapshot` 記錄 `sequenceKind` 與所選序列的內容雜湊。**當前出現位置解析**（R3-1，R6-B1／B2 修正）：真實換歌只接受「上次位置的下一項」；不相鄰（往回跳、跳播、專輯點播後檔案尚未重寫）→ 事件當下不猜（右側 pending），下一次輪詢依唯一性定位；無上次位置 → 唯一才採用；清單重寫以 itID 帶回上次位置，帶不回則依唯一性；仍無法唯一 → 退回模式（AC8b），不猜 | `QueueSnapshot`／`DeckSnapshot`／`OccurrenceResolver` 單元（fixture plist：本次三種實測形狀、同曲重複、同曲插入、前進／跳播／窗口邊界） |
 | AC8e | 左側＝`History.dat` 最近 K 筆（由舊到新排向中心）；新播完的歌在檔案更新後出現在中心左側；檔案不可讀 → 左側改用本 app 觀察到的歷史 | 單元（fixture：本次實測形狀、壞檔） |
 | AC8b | 右側退回模式（**只管右側**；左側由 AC8e 獨立決定，R5-1）：**沒有任何已驗證的有效快照**、或最後一份有效快照中找不到當前曲（連續 2 次輪詢）、或當前出現位置無法唯一解析、或 Music 未執行 → 右＝空＋「接下來的歌暫時讀不到」小字；條件恢復後自動回到佇列模式。**單次讀取失敗或讀到寫入中的檔案 → 保留最後一份有效快照，不切模式**（R3-3）。歷史＝有序集合：真實換歌時把「前一首」移到尾端；當前曲不進左側；同曲重發不更新；上限 50；空 persistentID 不進（R3-7） | 單元（含 A→B→A、半份 plist、同 mtime 內容變化、原子替換）＋整合 |
 | AC8c | Queue.dat 只讀：讀取碼只用 `Data(contentsOf:)`；該檔所在模組不得出現任何寫入／移動／刪除／建立檔案或設定屬性的 API；解析失敗不重試寫入、不拋到 UI | 腳本閘門（AC9 ③ 增列）＋單元 |
@@ -132,20 +132,20 @@ CQ1 當前曲需不需要處理？／CQ2 某張卡顯示哪個徽章？／CQ3 �
 
 ## 6. 畫面狀態機（`LyricsFlowModel` 內的純函數 `reduce(state, event) -> (state, [Effect])`）
 
-**State**＝`surface`、`nowPlayingID: NowPlayingIdentity?`、`occurrence`、`status`、`pendingRise: Token?`、`isDenied`。事件中的 `id` 一律是 `NowPlayingIdentity`（N1）；`writeSucceeded`／`markedNone` 的 `id` 是非空 persistentID，與當前曲比對時用其 identity。**初始**＝`editor`、無當前曲（啟動時未收到事件 → Editor 顯示 NO ARTIST／NO TRACK，與現行一致）。
+**State**＝`surface`、`nowPlayingID: NowPlayingIdentity?`、`occurrence`、`status`、`pendingRise: Token?`、`isDenied`、`hasUserChosenSurface`（本場次使用者是否親手選過畫面，真實換歌時清除；v3.5）。事件中的 `id` 一律是 `NowPlayingIdentity`（N1）；`writeSucceeded`／`markedNone` 的 `id` 是非空 persistentID，與當前曲比對時用其 identity。**初始**＝`editor`、無當前曲（啟動時未收到事件 → Editor 顯示 NO ARTIST／NO TRACK，與現行一致）。
 
 | 事件 | 前置 | 結果 | Effect |
 |---|---|---|---|
 | `nowPlaying(id, status)`，`id ≠ nowPlayingID`（真實換歌） | — | `occurrence += 1`；`status == .missing` → `editor`，其餘（`present`／`markedNone`／`unknown`）→ `coverFlow`；清 `pendingRise`；`isDenied = false` | 取消升回計時 |
-| `nowPlaying(id, status)`，`id == nowPlayingID`（同曲重發） | — | 只更新 `status`；畫面與 `pendingRise` 不動；若 `isDenied` 則同真實換歌處理（權限恢復） | — |
-| `tapPlayingCard` | 有當前曲 ∧ 畫面＝`coverFlow` ∧ 該卡位於幾何正中 | `editor`；清 `pendingRise` | 取消升回計時 |
-| `toggleHandle` | — | 翻轉畫面；清 `pendingRise` | 取消升回計時 |
+| `nowPlaying(id, status)`，`id == nowPlayingID`（同曲重發） | — | 只更新 `status`；畫面與 `pendingRise` 不動；若 `isDenied` 則同真實換歌處理（權限恢復）。例外①：`status == missing ∧ pendingRise ≠ nil` → 清 `pendingRise`；例外②：舊 `status == unknown ∧ status == missing ∧ !hasUserChosenSurface ∧ 畫面＝coverFlow` → `editor` | ①：取消升回計時＋`writeNotConfirmed`（狀態欄提示） |
+| `tapPlayingCard` | 有當前曲 ∧ 畫面＝`coverFlow` ∧ 該卡位於幾何正中 | `editor`；清 `pendingRise`；`hasUserChosenSurface = true` | 取消升回計時 |
+| `toggleHandle` | — | 翻轉畫面；清 `pendingRise`；`hasUserChosenSurface = true` | 取消升回計時 |
 | `editorTextEdited` | `pendingRise ≠ nil` | 清 `pendingRise` | 取消升回計時 |
 | `writeSucceeded(id, text)` | trim(`text`) 非空 | 該曲狀態＝`present`、清該曲標記、更新歷史卡徽章；若 `id == nowPlayingID` ∧ 畫面＝`editor` → `pendingRise = Token(occurrence)` | 排程 `riseDue(token)`；觸發 `forceRefresh`（唯讀，補上 busy 期間漏掉的換歌） |
-| `writeSucceeded(id, text)` | trim(`text`) 為空 | 該曲狀態＝`missing`（若未標記）；畫面不動 | `forceRefresh` |
+| `writeSucceeded(id, text)` | trim(`text`) 為空（空白判定＝`LyricsText.isBlank`，與 Python `strip()` 同字元集） | 該曲狀態＝`missing`（若未標記）；畫面不動；清 `pendingRise`（R6-P1②：先前寫入排下的升回一併取消） | 取消升回計時；`forceRefresh` |
 | `writeFailed(id)` | — | 不動 | `forceRefresh` |
 | `riseDue(token)` | `token == pendingRise` ∧ `token.occurrence == occurrence` | `coverFlow`；清 `pendingRise` | — |
-| `markedNone(id)` | 非空 `id` | 記標記；若 `id == nowPlayingID` → `coverFlow`、清 `pendingRise` | 取消該曲自動抓詞 |
+| `markedNone(id)` | 非空 `id`；當前曲須 `status == missing`（否則整個動作不生效，R6-B3） | 記標記；若 `id == nowPlayingID` → `coverFlow`、清 `pendingRise` | 取消該曲自動抓詞 |
 | `permissionDenied` | `!isDenied` | `editor`；`isDenied = true` | — |
 | `permissionDenied` | `isDenied` | 不動（每 tick 重發不覆蓋使用者的把手操作） | — |
 | `notPlaying` | — | 不動；`nowPlayingID` 保留（再播同曲＝同曲重發） | — |
@@ -301,6 +301,7 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
 - **L6** 執行中撤權後再授權、歌沒換：monitor 不重發事件，Editor 顯示 ACCESS DENIED 直到換歌或點 Now Editing 卡片（既有行為）。
 - **L7** 曲庫不在預設位置（`~/Music/Music/Music Library.musiclibrary`）時一律退回模式。
 - **L8** 左側只含 Music 視為「播完」的歌（跳過的不出現），與 Music 自己的「履歴」一致。History.dat 於歌曲自然結束時同秒更新（事實 25）；app 端在每次真實換歌與每次輪詢檢查其屬性，最壞晚一次輪詢（3s）才出現在左側——接受，不做暫存交接層（R4-2 修改後採納，理由見 §14 R4）。
+- **L9** 從專輯頁點播、且新曲恰好是舊清單中「上次位置的下一項」時，與正常連播無從區分：右側可能短暫顯示舊清單的接下來，直到 Music 重寫 Queue.dat（實測約 3 秒，事實 22）後自我修正（R6-B2）。其餘不相鄰的情況事件當下不猜。
 
 ## 11. Unknowns 賬本（slipknot 29）
 
@@ -314,6 +315,7 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
 | U8 | Queue.dat 在清單播到尾、關閉 Music 再開、從專輯頁直接點播、插入同一首時的行為 | **已消解（S8）**：專輯點播、同曲插入、曲庫隨機、重開重洗皆可；清單播到尾／自動續播未測（依 AC8b 退回） | — | AC8／AC8b |
 | U9 | app 本身的檔案讀取權限 | **已消解（S7）**：獨立 ad-hoc app 可讀、無提示 | — | R9 |
 | U7 | 本分支上 H-02 閘門 `CoverFlowUITests` 的處置 | **已裁決（2026-09-23）：本分支退役＋替代證據**。內容：本分支正式退役（資料模型已由整張專輯變為歷史，20 首 fixture 與探針前提不成立），ACCEPTANCE H-02 改附替代證據：`CoverFlowStripStackingTests`（缺陷 2，CALayer 無 AX）、S5 轉成的追加居中測試、D2 結構消除缺陷 3 的觸發條件、`LyricsFlowUITests` 升降；檔案保留（Python 閘門測試讀它）但移出回歸集合；fix4 在 `wip/h02-fix4` 另行延續與否由使用者定 | 使用者在場 #1 | Q5 回歸集合、H-02 條目 |
+| U10 | 順序模式（非隨機）的 Queue.dat 是否寫 `shuffleMode` 鍵 | 已知的未知（目前唯一實檔樣本為整庫隨機；S8 當時未記此鍵） | 使用者在場 #2 時以唯讀方式看一次循序播放時的檔案鍵 | P1① 的「兩處都沒寫」分支（沒寫且只有 `list` → 順序；若實檔一律有寫，該分支只是防禦） |
 
 **Premortem**：① 歷史追加居中停錯卡（→ S5／R1）；② 掛載結構改動打壞外殼（→ R3、回歸集合）；③ 讀取競態讓 Editor 在有詞曲上出現並被使用者覆寫（→ D9／AC12）；④ 同曲重發把使用者踢出 Editor（→ AC6）。
 
@@ -345,6 +347,12 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
   - **定案（D6）**：換牌與設 `centerID` 在同一次更新內完成（direct），不帶動畫、不做兩段式。
 - **使用者在場 #1：UITests 基線（2026-09-23 18:00–18:06，HEAD `94123ac`；app 原始碼與分支點 `ec3fd4d` 相同，僅測試／腳本／文件變動）**：Paste 已退出；暖身 `ShellUITests/testWindowGeometryAndTitle` 通過（26.4s）；正式輪 `ShellUITests`＋`BatchUITests` 16 條：**14 過／2 敗**——`ShellUITests/testQuitMenuItemTerminatesApp`（A-10，既知不穩定：`XCUIApplicationState 3≠1`）、`BatchUITests/testBatchShellInEnglish`（`C-21 col_artist`）；後者單獨重跑 2/2 通過 → 判定為與執行順序有關的偶發，非基線回歸。回歸判準：之後同集合不得出現此兩條以外的失敗；此兩條若失敗需單獨重跑 2 次再判。產物：scratchpad `ui-baseline.xcresult`／`.log`。
 - **決策**：thecure 辯論（Codex gpt-5.6-terra medium）原結論為「只顯示歷史」；Queue.dat 發現後前提改變，改依使用者裁定走佇列模式（本版 v3）。
+- **Q3b（2026-09-23 19:5x–20:2x，`c50213a` 起）**：
+  - 紅燈：`LyricsFlowModelTests` 17 條＋`AppModelTests` 整合 4 條（上一 session 已寫）；本 session 補 AppModel 整合 AC4／AC5／AC6／「換歌同時畫面翻轉時接管解除」4 條、monitor 2 條、R6 修正 20 餘條，先紅（編譯失敗或斷言失敗）後綠。
+  - 實作：`LyricsFlowModel`（換歌當下同步推進佇列位置並重建牌組，讀檔排進串行工作鏈、讀回後以最新當前曲重建；卡片詳情最新者勝）；`AppModel` 接線（editor → lyricsFlow → batch）、可見性＝Editor 分頁 ∧ 畫面＝Cover Flow、來源輪詢（`start()` 才啟動）；移除 `AppTab.coverFlow`。**過渡**：Editor 分頁暫以「畫面＝Cover Flow 就整頁顯示它」切換，升降層、把手、可點的中心卡在 Q4（D2）。
+  - **新發現並修正的缺陷**：寫入成功後的補讀（`forceRefresh`）發生在 Editor 解除 busy 之前，monitor 會因 busy 直接跳過——補讀被靜默吞掉。改為 busy 期間記下、全部來源空閒時補做一次（`NowPlayingMonitor.pendingForceRefresh`；`forceRefreshWhileBusyRunsOnceIdle`／`pendingForceRefreshWaitsForEveryBusySource`）。
+  - **變異驗證（實際執行）**：把 R6 各修正改回舊邏輯（保留接口）後跑 9 組測試：新測試 19 條紅（含 window 溢位直接崩潰重啟、時鐘取消競態逾時），`git checkout` 復原後全綠。唯一未被抓到的是 AppModel 層 AC4 對 monitor 修正的依賴（時序競態不必然觸發），由 monitor 單元測試兜住。
+  - 全量單元：571 條，只剩基線紅（RenderGeometry 2 條／8 斷言）；「運行時變更 centerID」一條在全量中偶紅一次，單獨重跑 2/2 綠（與 Q3a 同一條負載偶發）。
 
 ## 14. 附錄：評審辯論記錄
 
@@ -420,3 +428,12 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
 - **Q3b 進行中（本 commit，測試紅）**：已寫紅燈測試（`LyricsFlowModelTests`、Editor D8 三處、AppModel 整合 4 條）；已實作 Editor D8（標記判斷、取消自動抓詞、寫入前擷取目標、寫入回報、使用者輸入回報）、`ConfettiTiming` 單一來源、`StatusText` 兩條。**未做**：`LyricsFlowModel` 本體、`AppModel` 接線（事件分發、可見性、輪詢）、移除 `AppTab.coverFlow`。
 - **Q0＋Q1 對抗覆核（Opus 5，實際執行 10 支 harness）**：無 P0；**P1 三條待修**——① `QueueSnapshot` 缺 `shuffleMode` 時預設 `off` 會改讀未打亂的 `list`（違反 R4-5）；② 寫入後讀回仍缺詞／再寫空字串時，待升回未取消，到期把缺詞曲升回（違反「缺詞＝Editor」）；③ 卡 ID 規格與 AC8 文字不一致（程式較合理，改 AC8）。P2 十二條（上一首／跳播時的位置推算、重複 itID、GatedPollClock 取消競態、標記陣列混入非字串等）。**兩條需使用者拍板**：同曲重發讀回缺詞時要不要取消升回（牽動 AC6 措辭）；同曲重發由「讀不到」變「缺詞」要不要降下 Editor。
 - **未開始**：Q3.5（UI 測試組裝）、使用者在場 #2（新畫面測試紅燈）、Q4（畫面：Editor 內的 Cover Flow 層、升降動畫、把手、徽章、可點的中心卡、無詞按鈕、三語字串）、使用者在場 #3、Q6（/simcodex 評審、全量測試、ACCEPTANCE 改寫、證據包、實機試用）。
+
+### R6（2026-09-23 Q3b）：待拍板兩題＋Q0／Q1 對抗覆核 P2 裁決（Codex 2 輪）
+- **使用者拍板①**（寫入後讀回仍缺詞）：Codex 與我方同為「要」。使用者補充：這就是「寫入沒生效」→ 留在 Editor **並提示寫入沒有生效**；另確認「寫一個空格不算有詞」（空白寫入留在 Editor、不升回），純音樂曲用「No lyrics for this song」。→ AC6 例外①、§6、狀態欄文案 `writeNotConfirmed`。
+- **使用者拍板②**（讀不到 → 缺詞）：有條件降下（Codex 精化：以本場次「使用者是否親手選過畫面」旗標判定；無效的點擊不算選擇）。→ AC6 例外②、§6 `hasUserChosenSurface`。
+- **P1**：① shuffleMode 不明不得讀 `list`——採納，但實檔未證實順序模式是否寫此鍵，故「兩處都沒寫且只有 `list`」照讀為順序（U10）；② 空白寫入取消待升回——採納；③ 卡 ID 規格——以程式為準改寫 AC8（Codex 亦指出此為 P1，同向）。
+- **P2 逐條**：B1 往回跳位置——採納（真實換歌只接受下一項）；B2 專輯點播短暫錯的右側——**Codex 部分勝**：不相鄰一律事件當下不猜，只剩「新曲恰好是舊清單下一項」不可辨識 → L9；B3 標記有詞曲——**Codex 勝**：只接受已知缺詞的當前曲，有詞／讀不到整個動作不生效（防潛伏標記）；B4＝拍板②；B5 測試時鐘取消競態——採納（鎖記錄取消、release 跳過）；B6 標記壞項——採納；B7 重複 itID——採納（中心與右側一致加序號，epoch 只看第一次出現）；B8 中心卡保護——採納（兩側皆剔除同 ID）；B9 window 溢位——**Codex 修正版**（先算剩餘容量再相加）。
+- **B10**（只含 BOM 的歌詞）：第 1 輪 Codex 反對我方駁回；第 2 輪我方補證 Python 版 `bool(lyrics.strip())`（py:2254）同樣判為有詞、本版以 Python 為對照 → Codex **接受駁回**，但要求三處空白判定收斂為一處、且改用既有 `PythonCompat`（與 CPython `strip()` 逐字元一致）→ 採納：`LyricsText.isBlank`（`LyricsStatus`、Editor 自動抓詞、`AlbumTrack.hasLyrics` 共用；只含 U+200B 者改判有詞、U+001C–1F 改判空白，皆與 Python 一致）。
+- **Codex 新提**：P0「取消升回須驗計時真的被取消、不只驗狀態」→ 採納（`readBackMissingAfterAWriteStaysInTheEditor` 以可控時鐘驗等待者歸零、放行後不升回）；P2 `NowPlayingIdentity` 註解與實作雙重定義 → 註解改指 `TrackInfo.signature` 單一來源。
+- 全採納／全駁回檢查：B2、B3、B9、B10 為修改或對方勝，B10 經第 2 輪收斂；非一面倒。
