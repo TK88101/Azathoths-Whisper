@@ -317,6 +317,35 @@ struct LyricsFlowModelTests {
 
     // MARK: AC8d 卡片詳情
 
+    /// AC8d：詳情批次最新者勝——較早發出的一批晚回來不得套用（世代號）。
+    /// 還有卡缺詳情時，每次發布牌組都會發新的一批；不用 `play`（它的 settle 會等被閘門擋住的批次）
+    @Test func anOlderDetailsBatchArrivingLateIsDropped() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        let first = LyricsGate(), second = LyricsGate()
+        await h.music.setTrackDetailsGateQueue([first, second])
+        func details(_ title: String) -> TrackDetails {
+            TrackDetails(persistentID: QueueFixtures.pid(2), artist: "B", title: title, album: "L",
+                         discNumber: 1, trackNumber: 2, lyrics: "")
+        }
+        await h.music.setTrackDetails([details("Old")])
+        try h.writeQueue([Item(1, itemID: 10), Item(2, itemID: 11)])
+        h.model.handle(.trackChanged(track(1), existingLyrics: "words"))
+        await waitFor { await h.music.trackDetailsRequests.count == 1 }
+
+        await h.music.setTrackDetails([details("New")])
+        await h.model.refreshSources()
+        await waitFor { await h.music.trackDetailsRequests.count == 2 }
+
+        await second.open()
+        await waitUntil { h.coverFlow.details[QueueFixtures.pid(2)]?.title == "New" }
+        await first.open()
+        // 舊批次的任務不在 settleForTesting 的追蹤內：等它真的回來、再讓它有機會套用
+        await waitFor { await h.music.trackDetailsCompleted == 2 }
+        await settle(300)
+        #expect(h.coverFlow.details[QueueFixtures.pid(2)]?.title == "New", "較早的一批晚回來不得覆蓋")
+    }
+
     @Test func detailsAreFetchedForTheDeck() async throws {
         let h = try makeHarness()
         defer { h.tearDown() }

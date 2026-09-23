@@ -20,11 +20,15 @@ actor MockMusicClient: MusicControlling {
     private var trackDetailsOutcome: Result<[TrackDetails], MusicError>?
     /// 每次 `trackDetails` 請求的 ID（依請求順序）
     private(set) var trackDetailsRequests: [[String]] = []
+    /// 已回傳（通過閘門）的 `trackDetails` 次數
+    private(set) var trackDetailsCompleted = 0
     private(set) var writes: [String: String] = [:]
     private var albumTracksResult: [AlbumTrack] = []
     private(set) var albumTracksCalls = 0
     /// 最後一次 albumTracks 的查詢參數——驗「用事件的 albumKey 而非重讀 currentTrack」
     private(set) var lastAlbumTracksQuery: (artist: String, album: String)?
+    /// 逐次閘門：第 n 次 `trackDetails` 等第 n 個閘門（結果在請求當下取定，較早的請求可以較晚回來）
+    private var trackDetailsGateQueue: [LyricsGate] = []
     private var albumTracksGate: LyricsGate?
     /// 按調用序號分派的閘門：第 n 次 albumTracks() 用第 n 個。
     /// 用途：重疊載入場景需要讓兩個載入**分別**完成（單一 broadcast gate 會同時放行兩者，
@@ -55,6 +59,10 @@ actor MockMusicClient: MusicControlling {
     }
 
     /// 覆寫整體結果（優先於 `setTrackDetails`）：製造批次讀取失敗；nil＝取消覆寫
+    func setTrackDetailsGateQueue(_ gates: [LyricsGate]) {
+        trackDetailsGateQueue = gates
+    }
+
     func setTrackDetailsOutcome(_ outcome: Result<[TrackDetails], MusicError>?) {
         trackDetailsOutcome = outcome
     }
@@ -147,9 +155,14 @@ actor MockMusicClient: MusicControlling {
 
     func trackDetails(persistentIDs: [String]) async throws -> [TrackDetails] {
         trackDetailsRequests.append(persistentIDs)
-        if let trackDetailsOutcome { return try trackDetailsOutcome.get() }
+        let call = trackDetailsRequests.count - 1
         let wanted = Set(persistentIDs)
-        return trackDetailsResult.filter { wanted.contains($0.persistentID) }
+        let outcome = trackDetailsOutcome ?? .success(trackDetailsResult.filter { wanted.contains($0.persistentID) })
+        if call < trackDetailsGateQueue.count {
+            await trackDetailsGateQueue[call].wait()
+        }
+        trackDetailsCompleted += 1
+        return try outcome.get()
     }
 
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] {

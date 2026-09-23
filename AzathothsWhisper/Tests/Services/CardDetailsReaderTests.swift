@@ -21,6 +21,48 @@ struct CardDetailsReaderTests {
         #expect(await music.trackDetailsRequests == [["P1", "P2", "P3"]])
     }
 
+    /// AC8d：較早發出、較晚回來的一批不得蓋掉較新的快取
+    @Test func aBatchArrivingLateDoesNotOverwriteANewerOne() async {
+        let music = MockMusicClient()
+        let first = LyricsGate(), second = LyricsGate()
+        await music.setTrackDetailsGateQueue([first, second])
+        await music.setTrackDetails([details("P1", lyrics: "")])
+        let reader = CardDetailsReader(music: music)
+
+        let older = Task { await reader.details(for: ["P1"]) }
+        await waitFor { await music.trackDetailsRequests.count == 1 }
+        await music.setTrackDetails([details("P1", lyrics: "new words")])
+        let newer = Task { await reader.details(for: ["P1"]) }
+        await waitFor { await music.trackDetailsRequests.count == 2 }
+
+        await second.open()
+        #expect(await newer.value["P1"]?.lyrics == "new words")
+        await first.open()
+        _ = await older.value
+        #expect(await reader.details(for: ["P1"])["P1"]?.lyrics == "new words", "晚回來的舊批次不得蓋掉快取")
+    }
+
+    /// 寫入成功後就地更新的歌詞，比寫入前就已發出的批次新
+    @Test func writtenLyricsSurviveABatchIssuedBeforeTheWrite() async {
+        let music = MockMusicClient()
+        let first = LyricsGate(), second = LyricsGate()
+        await music.setTrackDetailsGateQueue([first, second])
+        await music.setTrackDetails([details("P1", lyrics: "")])
+        let reader = CardDetailsReader(music: music)
+
+        let a = Task { await reader.details(for: ["P1"]) }
+        await waitFor { await music.trackDetailsRequests.count == 1 }
+        let b = Task { await reader.details(for: ["P1"]) }
+        await waitFor { await music.trackDetailsRequests.count == 2 }
+        await first.open()
+        _ = await a.value
+        await reader.updateLyrics("written", for: "P1")
+        await second.open()
+        _ = await b.value
+
+        #expect(await reader.details(for: ["P1"])["P1"]?.lyrics == "written")
+    }
+
     @Test func cachedDetailsAreNotRefetched() async {
         let music = MockMusicClient()
         await music.setTrackDetails([details("P1"), details("P2")])
