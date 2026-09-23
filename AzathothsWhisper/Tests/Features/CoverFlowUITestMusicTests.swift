@@ -93,15 +93,15 @@ struct CoverFlowUITestMusicTests {
         #expect(AppModel.makeCoverFlowUITestModelIfRequested(environment: [Fixture.launchFlag: "0"]) == nil)
     }
 
-    /// 旗標名的單一來源接線：AppModel 讀的就是共用檔裡的常數，而且組裝出來的 VM 真的吃假 Music
-    @Test @MainActor func assemblyWiresTheFakeMusicIntoCoverFlow() async throws {
+    /// 旗標名的單一來源接線：AppModel 讀的就是共用檔裡的常數；組裝不得讀到任何真實 token。
+    /// （Cover Flow 已不再自己載入整張專輯——牌組由 LyricsFlowModel 給，見計劃 Q3a；
+    /// 組裝的場景化改寫在 Q3.5）
+    @Test @MainActor func assemblyIsOnWithTheFlagAndCarriesNoToken() throws {
         let model = try #require(AppModel.makeCoverFlowUITestModelIfRequested(
             environment: [Fixture.launchFlag: "1", Fixture.albumDelayVariable: "0"]
         ))
-        model.select(.coverFlow)
-        await model.coverFlow.loadTask?.value
-        #expect(model.coverFlow.items.count == Fixture.trackCount)
         #expect(model.token.isEmpty, "測試組裝不得讀到任何真實 token")
+        #expect(model.coverFlow.cards.isEmpty, "首個事件之前牌組為空")
     }
 
     // MARK: 取樣

@@ -30,7 +30,7 @@ struct CoverFlowView: View {
 
     private var strip: some View {
         CoverFlowStrip(
-            items: model.items,
+            items: model.cards,
             itemWidth: Self.itemWidth,
             centerID: Binding(
                 get: { model.centerID },
@@ -43,8 +43,8 @@ struct CoverFlowView: View {
                     model.scrollPositionDidChange(to: newValue)
                 }
             )
-        ) { track in
-            CoverFlowItemContainer(model: model, track: track, size: Self.itemWidth)
+        ) { card in
+            CoverFlowItemContainer(model: model, card: card, size: Self.itemWidth)
         }
         .frame(maxHeight: .infinity)
         // H-02 UI 測試閘門的 AX 探針：strip 外框＝視口，其 midX 是「居中」的基準
@@ -72,7 +72,7 @@ struct CoverFlowView: View {
     }
 
     private var centerText: String {
-        CoverFlowCenterLabel.text(centerID: model.centerID, items: model.items)
+        model.centerLabel
     }
 }
 
@@ -81,21 +81,21 @@ struct CoverFlowView: View {
 /// 這正是 P1 不需要 VM 層 artworkToken 的原因。
 private struct CoverFlowItemContainer: View {
     let model: CoverFlowViewModel
-    let track: AlbumTrack
+    let card: DeckCard
     let size: CGFloat
 
     @State private var image: NSImage?
 
     var body: some View {
         CoverFlowItem(artwork: image, size: size)
-            .accessibilityIdentifier("coverflow-item-\(track.persistentID)")
+            .accessibilityIdentifier("coverflow-item-\(card.id)")
             // key 帶版本號：取圖失敗時先顯示佔位，退避到期重取成功後 service 會通知 VM
             // 遞增**該 ID** 的版本，只讓這一項重讀（命中記憶體，不驚動其他可見項）
             .task(id: ItemTaskKey(
-                persistentID: track.persistentID,
-                revision: model.artworkRevision(for: track.persistentID)
+                persistentID: card.persistentID,
+                revision: model.artworkRevision(for: card.persistentID)
             )) {
-                image = await model.artwork(for: track.persistentID)
+                image = await model.artwork(for: card.persistentID)
             }
     }
 }

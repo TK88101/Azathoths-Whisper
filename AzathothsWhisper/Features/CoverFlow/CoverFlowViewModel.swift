@@ -1,147 +1,104 @@
 import AppKit
 import Foundation
-import OSLog
 
-/// Cover Flow 的狀態機（ACCEPTANCE H 段）。**純展示——不含任何播控**（決策 6）。
+/// Cover Flow 的狀態（計劃 Q3a）。**純展示——不含任何播控**。
 ///
-/// 併發守衛只有兩個（草案原列三個）：
-/// - `albumGeneration`：清單回寫前校驗，擋過期載入
-/// - `centerTrackID`：自動居中的目標身分（用 persistentID 而非索引，重建後仍有效）
+/// 不自己讀 Music：牌組（左播過、中正在播、右接下來）、卡片詳情與無詞標記都由 `LyricsFlowModel` 給。
+/// 本型別負責：居中、使用者接管（H-05）、鍵盤步進（H-09）、預取、封面版本。
 ///
-/// per-item artworkToken **P2 判定不需要**：預取的回寫目標是 service 的快取，不是 VM 狀態。
-/// VM 唯一的封面相關狀態是 `artworkRevisions`——它只記版本計數、不存圖片內容，
-/// 且只接受目前 `items` 內的 ID，故沒有可被過期預取污染的回寫路徑。
+/// - D6：換牌與設中心在同一次更新內完成、不帶動畫（S5：direct 16/16；兩段式在首次給牌 0/5）
+/// - H-05：使用者拖曳或步進後不搶控制；**真實換歌**才解除。使用者停著的那張若已不在新牌組，回到當前那張
 @MainActor
 @Observable
 final class CoverFlowViewModel {
-    private(set) var items: [AlbumTrack] = []
+    private(set) var deck: DeckSnapshot = .empty
     /// 綁給 `CoverFlowStrip` 的 scrollPosition
     var centerID: String?
-    private(set) var isTabActive = false
+    /// Editor 分頁在前且畫面＝Cover Flow（計劃 Q3b 接線）；不可見時不預取
+    private(set) var isVisible = false
+    /// 卡片詳情（名稱、歌詞），以 persistentID 為鍵；只保留牌組內的歌
+    private(set) var details: [String: TrackDetails] = [:]
+    /// 無詞標記（persistentID）
+    private(set) var marks: Set<String> = []
 
-    private let music: any MusicControlling
+    var cards: [DeckCard] { deck.cards }
+
     private let artworkProvider: any ArtworkProviding
 
-    /// 每次清單重建遞增；載入回寫前校驗
-    private var albumGeneration = 0
-    /// 目前**播放**的曲目（≠ centerID，後者可能被使用者滑走）
-    private var playingTrackID: String?
     /// H-05：使用者拖曳或鍵盤步進後為 true，抑制自動居中
     private var userHasOverriddenAutoCenter = false
     /// 程式化居中期間為 true——SwiftUI 會因程式化捲動回呼 scrollPosition binding，
     /// 若不區分就會把自己的動作誤判為使用者滑動
     private var isCenteringProgrammatically = false
 
-    /// 每個 ID 的封面版本號。取圖失敗時 View 拿到 nil 並顯示佔位；
-    /// 之後退避到期重取成功時，provider 會通知，靠它讓該項的 `.task(id:)` 重跑。
-    ///
-    /// 精確邊界：Observation 是**屬性粒度**，寫這個字典仍會讓所有讀過它的 View body
-    /// 重新求值；被真正限縮的是「哪一項的 `.task` 會重跑」（key 只有該項會變）。
-    /// 通知本身已由 provider 收窄成「僅從失敗中恢復時才發」，故頻率極低
+    /// 每首歌的封面版本號（persistentID 為鍵）。取圖失敗時 View 顯示佔位；
+    /// 之後退避到期重取成功，provider 通知 → 遞增該歌的版本，只讓這張卡的 `.task(id:)` 重讀
     private(set) var artworkRevisions: [String: Int] = [:]
 
-    /// 預取命令的世代。過時命令在送達 provider 前自行退出——
-    /// 只取消前一個 Task 並不保證它的 closure 不執行，會送出一串過時集合
+    /// 預取命令的世代：過時命令在送達 provider 前自行退出
     private var prefetchGeneration = 0
     @ObservationIgnored private var prefetchTask: Task<Void, Never>?
 
-    /// 測試用：等預取命令實際送達 provider（與 `loadTask` 同一慣例）
+    /// 測試用：等預取命令實際送達 provider
     @ObservationIgnored var prefetchTaskForTesting: Task<Void, Never>? { prefetchTask }
 
-    /// 不可見時收到的專輯變更：記住 key，等切回 tab 才載入。
-    /// 若在此期間直接載入，既違反 H-01 懶載入，也會往共用的串行 AE 佇列塞查詢、
-    /// 拖慢 monitor 與 Editor（對齊 Batch 的 C-17）
-    private var pendingAlbumKey: String?
-
-    @ObservationIgnored private(set) var loadTask: Task<Void, Never>?
-
-    private static let log = Logger(
-        subsystem: "com.ibridgezhao.azathothswhisper", category: "coverflow"
-    )
-
-    init(music: any MusicControlling, artwork: any ArtworkProviding) {
-        self.music = music
+    init(artwork: any ArtworkProviding) {
         self.artworkProvider = artwork
     }
 
-    /// 由組裝根接上取圖完成通知。
-    ///
-    /// 吃**協議**而非具體型別：收窄成 `ArtworkService` 會讓測試替身無法傳入，
-    /// 這條 actor→MainActor 的橋接就再也沒有測試能跑到
-    func observeArtworkStores(from provider: any ArtworkProviding) {
-        Task { [weak self] in
-            await provider.setOnStored { [weak self] id in
-                // `[weak self]` **不會**自動傳進巢狀 closure：內層若直接用外層解出的
-                // optional，捕獲的是它的強副本，存進 provider 的 handler 就永久持有整個 VM
-                Task { @MainActor in self?.artworkDidStore(id) }
-            }
+    // MARK: - 牌組
+
+    /// - Parameter isRealChange: 真實換歌（persistentID 變更）才解除 H-05 抑制；同曲重發不算
+    func apply(_ newDeck: DeckSnapshot, isRealChange: Bool) {
+        let previousCenter = centerID
+        deck = newDeck
+        let livePIDs = Set(newDeck.cards.map(\.persistentID))
+        artworkRevisions = artworkRevisions.filter { livePIDs.contains($0.key) }
+        details = details.filter { livePIDs.contains($0.key) }
+
+        if isRealChange {
+            userHasOverriddenAutoCenter = false
         }
-    }
-
-    /// provider 回報某項從失敗中恢復。**「是否為恢復」由 provider 判定**——
-    /// 它的退避表本就記著誰失敗過，VM 再建一份「誰在顯示佔位」的鏡像狀態
-    /// 只會多出需要人工同步的第二份真相
-    func artworkDidStore(_ persistentID: String) {
-        // 舊專輯的殘留通知不得寫進字典，否則長時間切歌會讓它無界增長
-        guard items.contains(where: { $0.persistentID == persistentID }) else { return }
-        artworkRevisions[persistentID, default: 0] += 1
-    }
-
-    /// View 的 `.task(id:)` key。版本變更即重讀（命中記憶體，成本是一次字典查找）
-    func artworkRevision(for persistentID: String) -> Int {
-        artworkRevisions[persistentID] ?? 0
-    }
-
-    // MARK: - 導航
-
-    /// H-01：資料為空才載入（對齊 Batch 的 C-01）
-    func tabActivated() {
-        isTabActive = true
-        guard items.isEmpty else {
-            schedulePrefetch()          // 已有資料：回到此 tab 就重排中心兩側
+        let liveIDs = Set(newDeck.cards.map(\.id))
+        if userHasOverriddenAutoCenter, let centerID, liveIDs.contains(centerID) {
+            schedulePrefetch(movingFrom: previousCenter)
             return
         }
-        // 有 pending key 就用它（不可見期間切過專輯）；否則讀當前曲
-        startLoad(albumKey: pendingAlbumKey)
+        // 使用者停著的那張已不在牌組 → 回到當前那張，抑制隨之解除
+        userHasOverriddenAutoCenter = false
+        centerProgrammatically(on: newDeck.currentCardID ?? newDeck.cards.last?.id)
+        schedulePrefetch(movingFrom: previousCenter)
     }
 
-    func tabDeactivated() {
-        isTabActive = false
-        cancelPrefetch()                // 看不見的 tab 不該佔用 AE
-    }
-
-    // MARK: - 事件
-
-    func handle(_ event: PlaybackEvent) async {
-        switch event {
-        case .albumChanged(let albumKey):
-            // H-06：切專輯重建。**明確重置抑制**——新專輯應回到目前播放曲
-            userHasOverriddenAutoCenter = false
-            items = []
-            centerID = nil
-            playingTrackID = nil
-            artworkRevisions = [:]
-            cancelPrefetch()            // H-06：切專輯取消舊批次
-            // C-17 同構：無條件清空，但**只有可見時才重載**
-            guard isTabActive else {
-                pendingAlbumKey = albumKey
-                return
-            }
-            startLoad(albumKey: albumKey)
-
-        case .trackChanged(let info, _):
-            // H-05 的解除條件＝**真實切歌**（persistentID 變更）。
-            // forceRefresh() 會對同一曲重發此事件，那不算。
-            let isRealChange = info.persistentID != playingTrackID
-            playingTrackID = info.persistentID
-            if isRealChange {
-                userHasOverriddenAutoCenter = false
-            }
-            centerIfAllowed(on: info.persistentID)
-
-        case .notPlaying, .permissionDenied:
-            break
+    func setVisible(_ visible: Bool) {
+        guard visible != isVisible else { return }
+        isVisible = visible
+        if visible {
+            schedulePrefetch()
+        } else {
+            cancelPrefetch()        // 看不見的層不該佔用 AE
         }
+    }
+
+    func updateDetails(_ newDetails: [String: TrackDetails]) {
+        details.merge(newDetails) { _, new in new }
+    }
+
+    func updateMarks(_ newMarks: Set<String>) {
+        marks = newMarks
+    }
+
+    /// 徽章狀態（AC7）：詳情還沒讀到＝unknown，不是缺詞
+    func status(for card: DeckCard) -> LyricsStatus {
+        LyricsStatus.resolve(
+            lyrics: details[card.persistentID].flatMap(\.lyrics),
+            isMarked: marks.contains(card.persistentID)
+        )
+    }
+
+    /// H-03：中心下方標籤 `ARTIST // TITLE`
+    var centerLabel: String {
+        CoverFlowCenterLabel.text(centerID: centerID, cards: cards, details: details)
     }
 
     // MARK: - 使用者互動
@@ -162,12 +119,10 @@ final class CoverFlowViewModel {
 
     /// H-09：鍵盤步進。與拖曳同樣算「使用者接管」
     func stepCenter(by offset: Int) {
-        guard let centerID,
-              let index = items.firstIndex(where: { $0.persistentID == centerID })
-        else { return }
-        let target = min(max(index + offset, 0), items.count - 1)
+        guard let centerID, let index = cards.firstIndex(where: { $0.id == centerID }) else { return }
+        let target = min(max(index + offset, 0), cards.count - 1)
         guard target != index else { return }
-        userDidScroll(to: items[target].persistentID)
+        userDidScroll(to: cards[target].id)
     }
 
     // MARK: - 封面
@@ -176,95 +131,52 @@ final class CoverFlowViewModel {
         await artworkProvider.artwork(for: persistentID)
     }
 
-    // MARK: - 載入
-
-    private func startLoad(albumKey: String?) {
-        albumGeneration += 1
-        let generation = albumGeneration
-        loadTask = Task { [weak self] in
-            await self?.load(albumKey: albumKey, generation: generation)
+    /// 由組裝根接上取圖完成通知。吃**協議**而非具體型別：否則測試替身無法傳入
+    func observeArtworkStores(from provider: any ArtworkProviding) {
+        Task { [weak self] in
+            await provider.setOnStored { [weak self] id in
+                // `[weak self]` **不會**自動傳進巢狀 closure：內層若直接用外層解出的
+                // optional，捕獲的是它的強副本，存進 provider 的 handler 就永久持有整個 VM
+                Task { @MainActor in self?.artworkDidStore(id) }
+            }
         }
     }
 
-    /// `albumKey` 為 nil＝首次載入，此時才讀 currentTrack()。
-    /// **切專輯路徑一律用事件攜帶的 key**：事件發布後再讀 currentTrack()，
-    /// 使用者若已快速切歌，拿到的會是**下一張**專輯。
-    private func load(albumKey: String?, generation: Int) async {
-        let query: (artist: String, album: String)?
-        if let albumKey {
-            query = Self.parse(albumKey: albumKey)
-        } else {
-            let current = try? await music.currentTrack()
-            query = current.map { ($0.artist, $0.album) }
-        }
-        guard let query else { return }
-
-        let loaded: [AlbumTrack]
-        do {
-            loaded = try await music.albumTracks(artist: query.artist, album: query.album)
-        } catch {
-            Self.log.error("album load failed: \(String(describing: error), privacy: .public)")
-            return
-        }
-
-        guard generation == albumGeneration else { return }   // 過期載入不回寫
-        pendingAlbumKey = nil
-        items = loaded.sortedForDisplay()                     // H-11
-        // H-06：重建後預取中心兩側。`centerIfAllowed` 成功時自己就會排程，
-        // 這裡只補它沒排到的情況（無播放曲、曲目不在本專輯、使用者已接管）
-        if let playingTrackID, centerIfAllowed(on: playingTrackID) {
-            return
-        }
-        schedulePrefetch()
+    /// provider 回報某首歌從失敗中恢復（「是否為恢復」由 provider 判定）
+    func artworkDidStore(_ persistentID: String) {
+        // 牌組外的殘留通知不得寫進字典，否則長時間聽歌會讓它無界增長
+        guard cards.contains(where: { $0.persistentID == persistentID }) else { return }
+        artworkRevisions[persistentID, default: 0] += 1
     }
 
-    /// `albumKey` 格式為 `artist\u{1}album`（`TrackInfo.albumKey`）
-    private static func parse(albumKey: String) -> (artist: String, album: String)? {
-        let parts = albumKey.split(separator: "\u{1}", maxSplits: 1, omittingEmptySubsequences: false)
-        guard parts.count == 2 else { return nil }
-        return (String(parts[0]), String(parts[1]))
+    /// View 的 `.task(id:)` key。版本變更即重讀（命中記憶體，成本是一次字典查找）
+    func artworkRevision(for persistentID: String) -> Int {
+        artworkRevisions[persistentID] ?? 0
     }
 
-    // MARK: - 居中
+    // MARK: - 內部
 
-    /// - Returns: 是否真的居中了（連帶已排好預取）
-    @discardableResult
-    private func centerIfAllowed(on persistentID: String) -> Bool {
-        guard !userHasOverriddenAutoCenter else { return false }
-        guard items.contains(where: { $0.persistentID == persistentID }) else { return false }
-        let previous = centerID
+    private func centerProgrammatically(on id: String?) {
         isCenteringProgrammatically = true
-        centerID = persistentID
+        centerID = id
         isCenteringProgrammatically = false
-        schedulePrefetch(movingFrom: previous)
-        return true
     }
-
-    // MARK: - 預取
 
     /// 以中心兩側的 window 取代目前的預取集合。`movingFrom` 決定哪一側先取
     private func schedulePrefetch(movingFrom previous: String? = nil) {
-        guard isTabActive, let centerID,
-              let centerIndex = items.firstIndex(where: { $0.persistentID == centerID })
-        else { return }
-
-        let previousIndex = previous.flatMap { id in
-            items.firstIndex(where: { $0.persistentID == id })
-        }
+        guard isVisible, let centerID, let centerIndex = cards.firstIndex(where: { $0.id == centerID }) else { return }
+        let previousIndex = previous.flatMap { id in cards.firstIndex(where: { $0.id == id }) }
         let direction = previousIndex.map { centerIndex >= $0 ? 1 : -1 } ?? 1
-        dispatchPrefetch(
-            CoverFlowPrefetchWindow.ids(
-                items: items, centerIndex: centerIndex, direction: direction
-            )
-        )
+        dispatchPrefetch(CoverFlowPrefetchWindow.ids(
+            persistentIDs: cards.map(\.persistentID), centerIndex: centerIndex, direction: direction
+        ))
     }
 
     private func cancelPrefetch() {
         dispatchPrefetch([])
     }
 
-    /// 串鏈 ＋ 世代門：串鏈保證送達順序，世代門讓過時命令在呼叫 provider 前退出。
-    /// 只做前者會送出一長串過時集合，只做後者則無法保證先後
+    /// 串鏈 ＋ 世代門：串鏈保證送達順序，世代門讓過時命令在呼叫 provider 前退出
     private func dispatchPrefetch(_ ids: [String]) {
         prefetchGeneration += 1
         let generation = prefetchGeneration

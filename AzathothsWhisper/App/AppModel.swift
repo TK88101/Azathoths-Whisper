@@ -62,7 +62,7 @@ final class AppModel {
             music: music,
             disk: artworkDiskDirectory.map { ArtworkDiskCache(directory: $0) }
         )
-        self.coverFlow = CoverFlowViewModel(music: music, artwork: artworkService)
+        self.coverFlow = CoverFlowViewModel(artwork: artworkService)
         // 退避到期後重取成功時，讓已顯示佔位的那一項重讀
         // （屬 H-07 的「損毀/失敗容錯」語義；H-06 是重建＋預取，勿混）
         self.coverFlow.observeArtworkStores(from: artworkService)
@@ -216,7 +216,6 @@ final class AppModel {
             for await event in self.monitor.events {
                 self.editor.handle(event)
                 self.batch.handle(event)      // C-17：albumChanged 由 Batch 消費
-                await self.coverFlow.handle(event)   // H-04／H-06
             }
         }
     }
@@ -238,17 +237,8 @@ final class AppModel {
         } else {
             batch.tabDeactivated()
         }
-        // H-01：Cover Flow 的懶載入同樣走「資料為空才載入」（tabActivated 內判定）。
-        // **單一入口**：與 Batch 同構，activate／deactivate 都由此處管。
-        // 原先把 tabActivated 交給 CoverFlowView 的 .task、只在這裡管 deactivate，
-        // 會讓同一次切 tab 觸發兩次 deactivate，且「tab 生命週期」變成兩處各管一半。
-        // （曾以「避免 tab 尚未渲染就先載入」為由——該理由站不住：Batch 同樣在此同步呼叫、
-        //   早於 View 掛載，而 tabActivated 只是起一個 Task 抓清單，不依賴渲染。）
-        if tab == .coverFlow {
-            coverFlow.tabActivated()
-        } else {
-            coverFlow.tabDeactivated()
-        }
+        // Cover Flow 不再自己載入（牌組由 LyricsFlowModel 給，計劃 Q3a）；不可見時不預取
+        coverFlow.setVisible(tab == .coverFlow)
     }
 
     func openSettings(_ group: SettingsViewModel.Group) {

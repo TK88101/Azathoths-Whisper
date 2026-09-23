@@ -9,23 +9,28 @@ enum CoverFlowPrefetchWindow {
     static let defaultLimit = 5
 
     /// - Parameters:
+    ///   - persistentIDs: 牌組中每張卡的 persistentID（依畫面順序；同曲可出現多次）
     ///   - direction: 移動方向。`>= 0` 先取右側；`< 0` 先取左側。使用者往哪滑，
     ///     那一側就是他即將看到的
+    /// - Returns: 去重後的 persistentID；與中心同曲者不取（中心由 View 的 explicit 請求取）
     static func ids(
-        items: [AlbumTrack],
+        persistentIDs: [String],
         centerIndex: Int,
         direction: Int = 1,
         limit: Int = defaultLimit
     ) -> [String] {
-        guard items.indices.contains(centerIndex), limit > 0 else { return [] }
+        guard persistentIDs.indices.contains(centerIndex), limit > 0 else { return [] }
 
         let forwardFirst = direction >= 0
+        var seen: Set<String> = [persistentIDs[centerIndex]]
         var result: [String] = []
         for distance in 1...limit {
             let near = centerIndex + (forwardFirst ? distance : -distance)
             let far = centerIndex + (forwardFirst ? -distance : distance)
-            for index in [near, far] where items.indices.contains(index) {
-                result.append(items[index].persistentID)
+            for index in [near, far] where persistentIDs.indices.contains(index) {
+                if seen.insert(persistentIDs[index]).inserted {
+                    result.append(persistentIDs[index])
+                }
             }
         }
         return result
