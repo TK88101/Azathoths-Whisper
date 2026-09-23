@@ -63,6 +63,25 @@ struct CardDetailsReaderTests {
         #expect(await reader.details(for: ["P1"])["P1"]?.lyrics == "written")
     }
 
+    /// 還沒進快取就寫入（佇列卡成為當前曲、批次仍在路上）：舊批次回來不得收，下次重讀
+    @Test func aWriteBeforeTheFirstBatchLandsDiscardsThatBatch() async {
+        let music = MockMusicClient()
+        let gate = LyricsGate()
+        await music.setTrackDetailsGateQueue([gate])
+        await music.setTrackDetails([details("P1", lyrics: "")])
+        let reader = CardDetailsReader(music: music)
+
+        let inFlight = Task { await reader.details(for: ["P1"]) }
+        await waitFor { await music.trackDetailsRequests.count == 1 }
+        await reader.updateLyrics("written", for: "P1")
+        await music.setTrackDetails([details("P1", lyrics: "written")])
+        await gate.open()
+        _ = await inFlight.value
+
+        #expect(await reader.details(for: ["P1"])["P1"]?.lyrics == "written", "寫入前發出的批次不得收進快取")
+        #expect(await music.trackDetailsRequests.count == 2, "被丟掉的那首下次重讀")
+    }
+
     @Test func cachedDetailsAreNotRefetched() async {
         let music = MockMusicClient()
         await music.setTrackDetails([details("P1"), details("P2")])

@@ -392,6 +392,8 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
   - **既存缺口（未修，待定）**：本分支改過的 View 檔逐檔覆蓋有 3 個低於 AC11 的 80%——`CoverFlowView` 35%、`CoverFlowItem` 73%、`LyricsFlowHandleView` 75%（另 `UI/ConfettiView` 44%）；Q4 結束時即如此、當時未記錄，主要由 UITests 驗證。
   - **P2（延後）**：串行任務鏈兩處重複（`LyricsFlowModel.enqueue` 與分支前既有的 `CoverFlowViewModel.dispatchPrefetch`）；`CoverFlowItem.reflectionRatio` 的 private 包裝；把手兩個配色函式同名易混；`spike_gate.sh` 與 `no_playback_gate.sh` 正則重複；Python 測試的 `run` 形狀重複。
 
+- **收官前補強（2026-09-24，`adb119e` 之後）**：① R10：View 內判斷抽成純函數（見 §14 R10）；② AC8d「最新者勝」原本只有整合測試間接覆蓋——補 `LyricsFlowModelTests.anOlderDetailsBatchArrivingLateIsDropped`（套用層世代號；首版測試有洞，`settleForTesting` 只等最新一批，變異拿掉世代比對仍綠 → 補等舊批次真的回來，變異即紅）；讀碼另發現 `CardDetailsReader` 快取會被較早發出、較晚回來的批次覆蓋（actor 在 await 可重入）→ 以每首序號只收較新者（先紅 2 條後綠）；Codex 補審這段差異 0／0／1：尚未進快取就寫入時舊批次仍會被收 → 寫入一律推進序號（先紅後綠）。③ ACCEPTANCE 補 H-12–H-25（引用的測試名逐一核實），總計 146 條。全量單元 618 條只剩基線紅；各閘門通過。
+
 ## 14. 附錄：評審辯論記錄
 
 ### R1（2026-09-23）：Codex（12 條：2 P0／7 P1／3 P2）＋Opus 5 三視角（SA 約 25 條、SM 約 30 條、ST 23 條）

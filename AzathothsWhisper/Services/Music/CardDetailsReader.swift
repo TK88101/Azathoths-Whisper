@@ -37,10 +37,11 @@ actor CardDetailsReader {
     }
 
     /// 本 app 寫入成功後更新快取中的歌詞（狀態由呼叫端依此重算）
+    /// 還沒進快取時也推進序號：寫入前就發出、還在路上的批次回來時不收（該首下次重讀）
     func updateLyrics(_ lyrics: String, for persistentID: String) {
-        guard let current = cache[persistentID] else { return }
         sequence += 1
         stamps[persistentID] = sequence
+        guard let current = cache[persistentID] else { return }
         cache[persistentID] = TrackDetails(
             persistentID: current.persistentID, artist: current.artist, title: current.title, album: current.album,
             discNumber: current.discNumber, trackNumber: current.trackNumber, lyrics: lyrics
