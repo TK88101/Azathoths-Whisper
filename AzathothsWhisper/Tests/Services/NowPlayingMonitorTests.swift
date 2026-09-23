@@ -60,6 +60,24 @@ struct NowPlayingMonitorTests {
         #expect(trackEvents.count == 2)
     }
 
+    /// 替身的歌詞必須屬於同一輪輪詢送出的那首（2026-09-23 計劃 §3 事實 11 的錯位鎖定）：
+    /// 舊實作 `currentLyrics()` 讀的是 `currentTrack()` 消耗後剩下的腳本頭，A 會帶上 B 的歌詞
+    @Test func lyricsBelongToTheTrackServedInTheSameTick() async {
+        let first = TrackInfo.fixture(id: "PID1")
+        let second = TrackInfo.fixture(id: "PID2")
+        let music = MockMusicClient(
+            script: [.track(first, lyrics: "first lyrics"), .track(second, lyrics: "")],
+            repeatLast: false
+        )
+        let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
+
+        async let collected = collect(monitor, expecting: 2)
+        await monitor.tick()
+        let events = await collected
+
+        #expect(events.last == .trackChanged(first, existingLyrics: "first lyrics"))
+    }
+
     @Test func emitsAlbumChangedOnlyWhenArtistAlbumPairChanges() async {
         let first = TrackInfo.fixture(id: "PID1", title: "One", album: "Damage Done")
         let sameAlbum = TrackInfo.fixture(id: "PID2", title: "Two", album: "Damage Done")

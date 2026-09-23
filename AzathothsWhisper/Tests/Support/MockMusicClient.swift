@@ -94,10 +94,20 @@ actor MockMusicClient: MusicControlling {
     /// artworkData() 的實際調用順序，供「explicit 插隊在預取之前」斷言
     private(set) var artworkOrder: [String] = []
 
+    /// 最近一次 `currentTrack()` 送出的回應：同一輪的歌詞必須取自它
+    private var lastServed: Response?
+
     private func next() -> Response {
-        guard !script.isEmpty else { return .notPlaying }
-        if script.count == 1 && repeatLast { return script[0] }
-        return script.removeFirst()
+        let response: Response
+        if script.isEmpty {
+            response = .notPlaying
+        } else if script.count == 1 && repeatLast {
+            response = script[0]
+        } else {
+            response = script.removeFirst()
+        }
+        lastServed = response
+        return response
     }
 
     // MARK: MusicControlling
@@ -115,8 +125,9 @@ actor MockMusicClient: MusicControlling {
 
     func currentLyrics() async throws -> String {
         lyricsCalls += 1
-        // 不消耗腳本：讀當前曲歌詞與 currentTrack() 同屬一輪
-        guard let first = script.first, case .track(_, let lyrics) = first else { return "" }
+        // 不消耗腳本：歌詞屬於同一輪 currentTrack() 送出的那首。
+        // 舊寫法讀 `script.first`——那是 removeFirst() 之後**剩下的**腳本頭，多曲腳本時 A 會帶上 B 的歌詞
+        guard let lastServed, case .track(_, let lyrics) = lastServed else { return "" }
         return lyrics
     }
 

@@ -137,6 +137,37 @@ struct AppModelTests {
     /// 可達性：Editor 的 busy 區間橫跨 `await resolveAndFetch()`，而原版 `toggleBusy`
     /// 禁用的 5 個元素**不含 tab 導航**（py:407，上游 §8.2 已核實），故使用者可在抓詞中
     /// 切到 Batch → 觸發載入 → 載入完成送 false → Editor 仍在抓詞但輪詢已恢復，違反 B-02。
+    /// 整合測試入口（計劃 Q0）：只接事件、不啟動輪詢，由測試逐次驅動 `monitor.tick()`
+    @Test func eventLoopAppliesManuallyTickedTrackWithoutStartingPolling() async {
+        let track = TrackInfo.fixture(title: "Punish My Heaven")
+        let music = MockMusicClient(script: [.track(track, lyrics: "lyric")])
+        let fixture = makeFixture(music: music)
+        defer { fixture.tearDown() }
+
+        fixture.model.startEventLoop()
+        await fixture.monitor.tick()
+        await waitUntil { fixture.model.editor.lyricsText == "lyric" }
+
+        #expect(fixture.model.editor.lyricsText == "lyric")
+        #expect(await music.currentTrackCalls == 1, "未啟動輪詢：只有手動那一次 tick")
+    }
+
+    /// D11：單元測試 host 不得輪詢使用者的 Music（以不回應的替身取代）
+    @Test func unitTestHostUsesInertMusicClient() {
+        #expect(AppModel.makeLiveMusic(isUnitTestHost: true) is InertMusicClient)
+        #expect(AppModel.makeLiveMusic(isUnitTestHost: false) is MusicAppleEventsClient)
+    }
+
+    @Test func inertMusicClientReportsNothingPlayingAndNeverWrites() async throws {
+        let music = InertMusicClient()
+        #expect(try await music.currentTrack() == nil)
+        #expect(try await music.playerState() == .stopped)
+        #expect(try await music.currentLyrics() == "")
+        #expect(try await music.albumTracks(artist: "a", album: "b").isEmpty)
+        #expect(try await music.setLyrics(persistentID: "PID1", lyrics: "x") == false)
+        #expect(try await music.artworkData(persistentID: "PID1") == nil)
+    }
+
     @Test func batchLoadCompletionMustNotClearEditorBusy() async {
         let music = MockMusicClient(script: [.track(.fixture(), lyrics: "")])
         await music.setAlbumTracks([.fixture(id: "T1", title: "Alpha", lyrics: "")])

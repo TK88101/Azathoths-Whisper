@@ -162,7 +162,11 @@ final class AppModel {
         }
 
         let client = URLSessionHTTPClient()
+        #if DEBUG
+        let music = makeLiveMusic(isUnitTestHost: isTestHost)
+        #else
         let music = MusicAppleEventsClient()
+        #endif
         return AppModel(
             configStore: store,
             httpClient: client,
@@ -174,6 +178,14 @@ final class AppModel {
             artworkDiskDirectory: artworkCacheDirectory
         )
     }
+
+    #if DEBUG
+    /// D11：單元測試 host 不得輪詢使用者的 Music——換成不回應的替身。
+    /// 測試 host 啟動即走 `live()`，否則整輪單元測試期間都在讀使用者正在聽的歌
+    static func makeLiveMusic(isUnitTestHost: Bool) -> any MusicControlling {
+        isUnitTestHost ? InertMusicClient() : MusicAppleEventsClient()
+    }
+    #endif
 
     static func makeLyricsService(client: any HTTPClient, token: String) -> LyricsService {
         LyricsService(
@@ -188,6 +200,17 @@ final class AppModel {
         guard !didStart else { return }
         didStart = true
 
+        startEventLoop()
+        await monitor.start()
+
+        try? await Task.sleep(for: splashDuration)
+        isSplashVisible = false
+    }
+
+    /// 只接上事件分發、不啟動輪詢。整合測試以 `monitor.tick()` 逐次驅動（計劃 Q0）；
+    /// `start()` 也經由這裡接線，兩條路徑的分發順序因此只有一份定義
+    func startEventLoop() {
+        guard eventTask == nil else { return }
         eventTask = Task { [weak self] in
             guard let self else { return }
             for await event in self.monitor.events {
@@ -196,10 +219,6 @@ final class AppModel {
                 await self.coverFlow.handle(event)   // H-04／H-06
             }
         }
-        await monitor.start()
-
-        try? await Task.sleep(for: splashDuration)
-        isSplashVisible = false
     }
 
     func stop() {
