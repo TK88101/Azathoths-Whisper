@@ -112,11 +112,43 @@ class AppUITestCase: XCTestCase {
         _ editorLabel: String = "EDITOR",
         file: StaticString = #filePath, line: UInt = #line
     ) {
+        let editor = navButton("editor")
         XCTAssertTrue(
-            app.buttons[editorLabel].waitForExistence(timeout: Self.mainUITimeout),
+            editor.waitForExistence(timeout: Self.mainUITimeout),
             "splash 後應出現主 UI 導航",
             file: file, line: line
         )
+        assertNavLabel(editor, editorLabel, file: file, line: line)
+    }
+
+    /// 視窗截圖（只拍 app 視窗；呼叫端不得在 Token modal 開著時拍，見 memory no-credential-fields-in-ui-screenshots）
+    func attach(_ name: String) {
+        let screenshot = app.windows.firstMatch.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        guard let directory = ProcessInfo.processInfo.environment["AZW_UI_SHOT_DIR"] else { return }
+        let url = URL(fileURLWithPath: directory).appendingPathComponent("\(name).png")
+        try? screenshot.pngRepresentation.write(to: url)
+    }
+
+    /// 導航按鈕以 identifier 定位：按鈕帶 identifier 後，XCUITest 的 label 不再帶 `.textCase(.uppercase)`
+    /// （2026-09-23 U#3：XCUI 讀到 "Editor"；同一版 app 的 AXDescription 仍是 "EDITOR"），以字樣定位會找不到
+    func navButton(_ tab: String) -> XCUIElement {
+        app.buttons[AccessibilityID.nav(tab)]
+    }
+
+    /// 導航字樣（含 i18n）不分大小寫比對；大寫的畫面呈現由截圖佐證
+    func assertNavLabel(
+        _ button: XCUIElement, _ expected: String,
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        guard button.exists else {
+            XCTFail("導航按鈕不存在（期待字樣 \(expected)）", file: file, line: line)
+            return
+        }
+        XCTAssertEqual(button.label.uppercased(), expected.uppercased(), "導航字樣", file: file, line: line)
     }
 }
 

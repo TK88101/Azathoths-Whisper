@@ -231,7 +231,7 @@ xcodebuild test -project AzathothsWhisper.xcodeproj -scheme AzathothsWhisper \
 xcrun xccov view --report --files-for-target "Azathoth's Whisper.app" <scratch>/unit.xcresult   # 新檔與改動檔逐檔
 ./Scripts/no_playback_gate.sh
 (cd Scripts && /usr/bin/python3 -m unittest discover -s . -p 'test_h02_gate*.py')
-# UITests（使用者在場；先關 Paste 等會彈窗的常駐 app）
+# UITests（使用者在場；先關 Paste 等會彈窗的常駐 app；輸入法切 ABC——拼音等輸入法會改寫 XCUITest 的鍵入）
 xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
   -only-testing:AzathothsWhisperUITests/ShellUITests -only-testing:AzathothsWhisperUITests/BatchUITests \
   -test-timeouts-enabled YES -default-test-execution-time-allowance 300
@@ -375,6 +375,13 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
 【紅線】絕不加任何播放控制，不改變 Music.app 的任何狀態（含啟動 Music、改 UI、寫它的檔案）；每段 TDD、每段全量單元只容許基線紅（RenderGeometry 2 條／8 斷言）；條帶內的卡片不得掛任何手勢（會打亂捲動定位，§13 E1–E11）；只在 wip/coverflow-lyrics 做 checkpoint，不 commit 到 feat／main，不 push；對我講結論用白話和我畫面上看得到的東西。
 ```
 
+- **使用者在場 #3（2026-09-23 21:2x–22:0x，HEAD `4601bb9`＋UITests 修正；只動 UITests target，產品碼未改）**：
+  - 暖身 `BatchUITests/testPreviewPaneIsReadOnly` 紅：Q4 給導覽按鈕加 identifier 後，XCUITest 讀到的 label 由「EDITOR」變「Editor」（界面樹探針：同一版 app 的 AXDescription 在真實啟動與假 Music 場景皆仍是「EDITOR」→ 產品無退化；與 `ActionButton` 既有註解「identifier 會改變 XCUITest 的比對」同源），以字樣定位的 `waitForMainUI` 全數找不到 → 改以 identifier 定位、字樣不分大小寫比對（`AppUITestCase.navButton`／`assertNavLabel`；Batch、Shell、BatchLive 跟進）。
+  - 正式輪 24 條 19 綠。新紅 3 條皆為測試的點擊手法：① 兩側的卡畫在條帶捲動框（寬＝一張卡）之外，`element.click()` 找不到命中點 → 點**左側卡**露出的左上四分之一（步進後先等 AX 框穩定）；② 歌詞框是 NSTextView（AX 無 enabled，`waitUntilHittable` 恆假）且 NSScrollView 容器無 hit point → 沿用 C-07 的歸一化座標點入；③ Write 的 AX 框含位移的懸停白遮罩（未懸停 84pt、實際 42pt），全視窗噪點層又讓 XCUITest 驗不了命中點、退回點框正中＝按鈕下緣而落空 → 點上四分之一處。另：使用者當時的輸入法（繁體拼音）把鍵入的 "the " 轉成漢字、Write 未生效 → 加鍵入核對斷言；**UITests 前提新增「輸入法切 ABC」**（§9.3）。
+  - 結果：`LyricsFlowUITests` **8/8 綠**（同一輪 `u3-lf8.xcresult`）；`BatchUITests` 5/5——C-21 家族兩輪各紅一條（英文版於正式輪、繁中版於證據輪），單獨各重跑 2/2 綠 → 順序相關偶發，同基線；`ShellUITests` 10/11，A-10 紅（正式輪＋證據輪＋單獨 3 次）。**A-10 定性**：旁掛進程監看，點 Quit（21:47:47.2）後進程於 21:47:48.5 前消失，XCUITest 仍回報 runningBackground 10 秒、收尾還去結束已不存在的 pid（`Unable to monitor event loop`，#2 紅那次同簽名）；另以 PID 定界 `NSRunningApplication.terminate()` 兩場景各 0.08–0.09s 退出 → 產品會退出，是 XCUITest 狀態回報卡住，非本分支回歸。**回歸判準（基線兩條以外不新增紅）：達成**。
+  - 三態截圖（XCUITest 內只拍 app 視窗、假 Music、無憑證欄位）：scratchpad `u3-shots/lyricsflow-{present-raised,missing-lowered,marked-raised}.png`；目視與 AC1／AC2／AC5 一致。
+  - **觀察（未修）**：① 左側（播過的）卡的徽章在右上角，被較靠中心的卡蓋住看不到（右側卡可見）——交使用者定；② M5 起既有的無障礙瑕疵：噪點層是全視窗無標籤 AXImage、`ActionButton` 的 AX 框含懸停遮罩（高 2 倍）——範圍外，記 P2。
+
 ## 14. 附錄：評審辯論記錄
 
 ### R1（2026-09-23）：Codex（12 條：2 P0／7 P1／3 P2）＋Opus 5 三視角（SA 約 25 條、SM 約 30 條、ST 23 條）
@@ -464,3 +471,10 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
 - **P1-③ 幾何回報與畫面有一幀落差、動作寫死 `isCentered: true`** → **修改後採納**：改傳實際判定值（`coverFlow.isPlayingCardCentered`）。「捲動中整體停用」**駁回**：deployment target macOS 14 無捲動階段 API（`onScrollPhaseChange` 需 macOS 15）；落差約一幀（120Hz ≈8ms），可點狀態與畫面出自同一條幾何路徑；自製「最近 N ms 有位移」判定屬過度設計。→ Phase 3（/simcodex）回餵複審。
 - **推測：開場淡出 0.2s 與 A-01 斷言競態** → **採納**：A-01 改為等 splash 消失（`waitForNonExistence`），語義不變。
 - Codex 確認：Q3.5 組裝未碰 `.standard`、Keychain、Music，支援碼全在 `#if DEBUG`。
+### R8（2026-09-23 在場 #3 期間）：thecure——`coverage_gate.sh` 77.6% 的處置（Codex gpt-5.6-terra medium，3 輪）
+- 事實：Services＋Infra＝1546／1992＝77.6%；`MusicAppleEventsClient` 10／384（2.6%，只有 `mapError` 有覆蓋）；排除它＝1536／1608＝95.5%；其餘各檔 ≥75%。xccov 報表 3 個 target，Services／Infra 的非測試檔只在 app 本體、無重複計數。`LiveMusicTests` 已存在（opt-in，Q2 已補 `nowPlaying`／`trackDetails`），其中 `writesLyricsByPersistentIDVerbatim` 會對使用者正在播的曲送 `set lyrics`。
+- 第 1 輪：我方主張「閘門加豁免清單（改良版）、不把 opt-in 實機結果併入閘門」→ Codex **判定正確**，但 B 應保留為閘門外的手動 smoke；護欄須強化（完全一致的相對路徑、只在 app 本體且唯一、executable>0；行數預算由 450 收緊到 400；免除前後數字並列）；`decodeState` 抽出今次不做（同意）。
+- 第 2 輪（我方反駁 3 條，Codex **全部接受**）：不設到期自動失敗（同一輸入不因時間變紅）；Features 新檔／改動檔逐檔 ≥80% 不進閘門（閘門只定義 Services／Infra，逐檔檢查走 §9.3 xccov 手順並記錄基準 commit、檔案清單、各檔數字、xcresult 位置）；寫入測試不改碼（範圍外），改為文件明定「只在使用者明示許可時執行，平時 `-skip-testing` 且整個參數加引號」。
+- 第 3 輪（整體確認）：Codex 補兩處，**皆採納**——分子分母限定 app 本體（實測數字不變：1546／1992）；新測試檔 `test_coverage_gate.py` 不會被 `test_h02_gate*.py` 的探索規則找到 → §9.3 另列執行命令。`approvedOn` 以使用者批准當日填實。
+- Codex 最擔心：豁免清單變成藏未測邏輯的永久箱子——以「僅 1 檔、行數上限 400、報表必印理由與批准日」防範。
+- 收斂結論（待使用者拍板）：閘門加豁免清單（僅 `Services/Music/MusicAppleEventsClient.swift`）＋上述護欄＋合成 JSON 的黑箱測試（先紅）；AC11 文字同步；`LiveMusicTests` 與 AE client 程式碼不動。

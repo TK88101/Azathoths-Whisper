@@ -57,6 +57,30 @@ final class LyricsFlowUITests: AppUITestCase {
         XCTAssertTrue(app.buttons[ID.writeButton].exists, file: file, line: line)
     }
 
+    /// 側邊的卡畫在條帶捲動框（寬＝一張卡）之外（疊放、不裁切），`element.click()` 要求命中點落在祖先捲動框內而失敗
+    /// （2026-09-23 U#3）；改點**左側卡**露出的左上四分之一：不被較靠中心的卡蓋住、落在封面正面而非倒影
+    private func clickExposedAreaOfLeftCard(_ card: XCUIElement) {
+        card.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.25)).click()
+    }
+
+    /// 方向鍵步進後條帶仍在捲動：等卡片的 AX 框連續兩次相同再點
+    private func waitForStableFrame(_ element: XCUIElement, timeout: TimeInterval = 3) {
+        let deadline = Date().addingTimeInterval(timeout)
+        var previous = element.frame
+        while Date() < deadline {
+            usleep(300_000)
+            let current = element.frame
+            if current == previous { return }
+            previous = current
+        }
+    }
+
+    /// 三態截圖（證據包）：升降值在動畫開始時就翻轉，留一段時間讓位移動畫走完再拍（不作斷言用）
+    private func attachAfterMotion(_ name: String) {
+        usleep(800_000)
+        attach(name)
+    }
+
     /// 負向斷言需要一段觀察窗：條件在窗內一旦成立即失敗
     private func assertStaysFalse(
         _ condition: @autoclosure () -> Bool, for seconds: TimeInterval, _ message: String,
@@ -79,6 +103,7 @@ final class LyricsFlowUITests: AppUITestCase {
         start(.present)
         waitForRaisedAndSettled()
         XCTAssertTrue(element(ID.lyricsFlowHandle).exists, "把手升降兩態皆顯示")
+        attachAfterMotion("lyricsflow-present-raised")
     }
 
     /// AC2：缺詞 → 降下、把手可見、Editor 自動抓詞
@@ -91,6 +116,7 @@ final class LyricsFlowUITests: AppUITestCase {
         let fetched = NSPredicate(format: "value == %@", "1")
         let expectation = XCTNSPredicateExpectation(predicate: fetched, object: element(ID.fetchCount))
         XCTAssertEqual(XCTWaiter().wait(for: [expectation], timeout: 5), .completed, "缺詞曲自動抓詞一次（B-05）")
+        attachAfterMotion("lyricsflow-missing-lowered")
     }
 
     // MARK: AC3
@@ -115,7 +141,7 @@ final class LyricsFlowUITests: AppUITestCase {
         // 點最左那張播過的歌（履歴第 0 首）：AX 子元素的次序不是牌組次序，取第 0 個可能落在視窗邊緣
         let neighbour = element(ID.cardPrefix + "h:" + Scenario.persistentID(at: 0) + "#0")
         XCTAssertTrue(neighbour.waitForExistence(timeout: 5), "牌組應有鄰張（假 Queue.dat／History.dat）")
-        neighbour.click()
+        clickExposedAreaOfLeftCard(neighbour)
         assertStaysFalse(element(ID.editorLayer).exists, for: 2, "點非播放卡不得進 Editor")
         XCTAssertEqual(fetchCount() ?? "0", "0")
         XCTAssertEqual(hydrateCount() ?? "0", "0", "點非播放卡不得觸發重讀")
@@ -131,7 +157,8 @@ final class LyricsFlowUITests: AppUITestCase {
         let playing = element(ID.cardPrefix + "q:0:" + String(Scenario.itemID(at: Scenario.playingIndex)))
         XCTAssertTrue(playing.waitForExistence(timeout: 5))
         XCTAssertNotEqual(playing.elementType, .button)
-        playing.click()
+        waitForStableFrame(playing)
+        clickExposedAreaOfLeftCard(playing)
         assertStaysFalse(element(ID.editorLayer).exists, for: 2, "播放中但不在正中的卡不得進 Editor")
         XCTAssertEqual(hydrateCount() ?? "0", "0")
     }
@@ -142,12 +169,24 @@ final class LyricsFlowUITests: AppUITestCase {
     func testWritingLyricsRaisesCoverFlow() {
         start(.missing)
         let lyrics = element(ID.lyricsText)
-        XCTAssertTrue(waitUntilHittable(lyrics, timeout: Self.surfaceTimeout))
-        lyrics.click()
-        lyrics.typeText("found the words")
+        // 歌詞框是 NSTextView，AX 上沒有 enabled 屬性（isEnabled 恆 false），不能用 waitUntilHittable 判定
+        XCTAssertTrue(lyrics.waitForExistence(timeout: Self.surfaceTimeout))
+        // 等自動抓詞（假 HTTP 恆 404）收尾、Fetch 恢復可用再輸入，免得抓詞收尾與輸入交錯
+        let fetched = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "1"),
+                                                object: element(ID.fetchCount))
+        XCTAssertEqual(XCTWaiter().wait(for: [fetched], timeout: Self.surfaceTimeout), .completed, "缺詞曲先自動抓詞一次")
+        XCTAssertTrue(waitUntilHittable(app.buttons[ID.fetchButton], timeout: Self.surfaceTimeout))
+        // 同 C-07：PlainTextEditor 回傳 NSScrollView 容器、本身沒有 hit point——以歸一化座標點入取得焦點
+        lyrics.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        app.typeText("found the words")
+        // XCUITest 的鍵入經過使用者當下的輸入法：拼音輸入法會把 "the " 轉成漢字、組字未確認時 Write 點不下去
+        //（2026-09-23 U#3 實測 "found彈劾words"）。先核對，失敗時直接指出環境前提
+        XCTAssertEqual(lyrics.value as? String, "found the words", "鍵入被輸入法改寫：跑 UITests 前請切到英文輸入（ABC）")
         let write = app.buttons[ID.writeButton]
         XCTAssertTrue(waitUntilHittable(write))
-        write.click()
+        // ActionButton 的懸停白遮罩平時位移到按鈕下方，AX 框把它算進去（未懸停 84pt、實際按鈕 42pt）；
+        // 全視窗噪點層又讓 XCUITest 驗不了命中點、退回點 AX 框正中＝按鈕下緣而落空（2026-09-23 U#3）。點上四分之一處
+        write.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).click()
 
         waitForRaisedAndSettled(timeout: Self.riseTimeout)
     }
@@ -168,6 +207,7 @@ final class LyricsFlowUITests: AppUITestCase {
 
         waitForRaisedAndSettled()
         assertStaysFalse((fetchCount() ?? "0") != "0", for: 2, "標記過的曲不自動抓詞")
+        attachAfterMotion("lyricsflow-marked-raised")
     }
 
     // MARK: AC14

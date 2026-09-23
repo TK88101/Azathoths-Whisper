@@ -31,17 +31,6 @@ final class ShellUITests: AppUITestCase {
             .exists
     }
 
-    private func attach(_ name: String) {
-        let screenshot = app.windows.firstMatch.screenshot()
-        let attachment = XCTAttachment(screenshot: screenshot)
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
-        guard let directory = ProcessInfo.processInfo.environment["AZW_UI_SHOT_DIR"] else { return }
-        let url = URL(fileURLWithPath: directory).appendingPathComponent("\(name).png")
-        try? screenshot.pngRepresentation.write(to: url)
-    }
-
     // MARK: 外殼
 
     /// A-01：啟動首屏＝splash（同一視窗，稍後換成主 UI）
@@ -71,7 +60,7 @@ final class ShellUITests: AppUITestCase {
     func testLaunchShowsEditorShellAfterSplash() {
         launchShell()
         waitForMainUI()
-        XCTAssertTrue(app.buttons["BATCH"].exists)
+        assertNavLabel(navButton("batch"), "BATCH")
         // AC10：導覽區恰好兩個按鈕（Editor｜Batch，以 identifier 判定）；Cover Flow 已改為 Editor 內的一層
         let navButtons = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", ID.navPrefix))
         XCTAssertEqual(navButtons.count, 2, "導覽只剩 Editor 與 Batch")
@@ -196,7 +185,7 @@ final class ShellUITests: AppUITestCase {
         launchShell(language: "ja")
         waitForMainUI("エディタ")
 
-        XCTAssertTrue(app.buttons["一括処理"].exists)
+        assertNavLabel(navButton("batch"), "一括処理")
         XCTAssertTrue(containsLabel("カバーフロー"), "E-10：nav_coverflow 保留作把手標題（D12）")
         XCTAssertTrue(app.staticTexts["ステータス:"].exists)
         XCTAssertTrue(menuBar()["Settings"].exists, "A-07 菜單硬編碼英文")
@@ -209,7 +198,7 @@ final class ShellUITests: AppUITestCase {
         launchShell(language: "zh-Hant")
         waitForMainUI("編輯器")
 
-        XCTAssertTrue(app.buttons["批量處理"].exists)
+        assertNavLabel(navButton("batch"), "批量處理")
         XCTAssertTrue(containsLabel("封面瀏覽"), "E-10：nav_coverflow 保留作把手標題（D12）")
         XCTAssertTrue(app.staticTexts["狀態:"].exists)
         XCTAssertTrue(menuBar()["Settings"].exists)

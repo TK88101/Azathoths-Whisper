@@ -15,8 +15,9 @@ final class BatchUITests: AppUITestCase {
         launch(language: language)
         waitForMainUI(editorLabel, file: file, line: line)
 
-        let batchTab = app.buttons[batchTabLabel]
+        let batchTab = navButton("batch")
         XCTAssertTrue(batchTab.exists, "導航應有 Batch 分頁", file: file, line: line)
+        assertNavLabel(batchTab, batchTabLabel, file: file, line: line)
         batchTab.click()
     }
 
