@@ -65,6 +65,30 @@ struct HandleTick: Equatable, Sendable {
     let tone: LyricsBadge.Tone
 }
 
+/// 刻度的外觀（意義層；畫面只把 palette 對到顏色）：中心白色發光、播過的短、接下來的長；缺詞紅、已標記暗、其餘淡
+struct TickAppearance: Equatable, Sendable {
+    enum Palette: Equatable, Sendable {
+        case bright, danger, dim, muted
+    }
+
+    let width: CGFloat
+    let height: CGFloat
+    let palette: Palette
+    let glows: Bool
+}
+
+extension HandleTick {
+    var appearance: TickAppearance {
+        guard side != .current else { return TickAppearance(width: 3, height: 20, palette: .bright, glows: true) }
+        let palette: TickAppearance.Palette = switch tone {
+        case .missing: .danger
+        case .marked: .dim
+        case .present, .unknown: .muted     // 有詞不必另外強調
+        }
+        return TickAppearance(width: 2, height: side == .played ? 8 : 11, palette: palette, glows: false)
+    }
+}
+
 enum LyricsFlowHandle {
     static func ticks(cards: [DeckCard], status: (DeckCard) -> LyricsStatus) -> [HandleTick] {
         cards.map { HandleTick(side: $0.side, tone: LyricsBadge.tone(for: status($0))) }

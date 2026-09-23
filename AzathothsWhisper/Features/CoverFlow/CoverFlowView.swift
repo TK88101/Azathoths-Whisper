@@ -76,7 +76,9 @@ struct CoverFlowView: View {
         .onGeometryChange(for: CGSize.self) { $0.size } action: { stripSize = $0 }
         // 點擊與懸停在條帶層判定，只認「正中播放卡的封面正面」；其他卡點了無效（AC3）
         .onTapGesture(coordinateSpace: .local) { location in
-            guard model.isPlayingCardCentered, centreFace.contains(location) else { return }
+            guard CoverFlowGeometry.acceptsPlayingCardTap(
+                isCentered: model.isPlayingCardCentered, location: location, face: centreFace
+            ) else { return }
             onTapPlayingCard()
         }
         .onContinuousHover(coordinateSpace: .local) { phase in
@@ -91,11 +93,8 @@ struct CoverFlowView: View {
         .accessibilityIdentifier("coverflow-strip")
     }
 
-    /// 正中那張的封面正面（不含倒影）：卡片在條帶內垂直置中，高＝邊長 ×（1＋倒影比）
     private var centreFace: CGRect {
-        let size = Self.itemWidth
-        let cardHeight = size * (1 + CoverFlowItem.reflectionRatio)
-        return CGRect(x: (stripSize.width - size) / 2, y: (stripSize.height - cardHeight) / 2, width: size, height: size)
+        CoverFlowGeometry(itemWidth: Self.itemWidth).centreFace(in: stripSize, reflectionRatio: CoverFlowItem.reflectionRatio)
     }
 
     /// 正中播放卡的無障礙按鈕與懸停提示。**不接收滑鼠**：觸控板捲動照常落到條帶，點擊由條帶層判定；
@@ -124,18 +123,13 @@ struct CoverFlowView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(AccessibilityID.playingCard)
-                .accessibilityLabel(Text("edit_lyrics_of \(playingTitle)"))
+                .accessibilityLabel(Text("edit_lyrics_of \(model.playingCardTitle)"))
                 Color.clear
                     .frame(width: Self.itemWidth, height: Self.itemWidth * CoverFlowItem.reflectionRatio)
                     .accessibilityHidden(true)
             }
             .allowsHitTesting(false)
         }
-    }
-
-    private var playingTitle: String {
-        guard let id = model.deck.currentCardID, let card = model.cards.first(where: { $0.id == id }) else { return "" }
-        return model.details[card.persistentID]?.title ?? ""
     }
 
     /// 退回模式：右側留空並明示讀不到，不捏造（AC8b）

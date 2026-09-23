@@ -131,6 +131,27 @@ final class LyricsFlowUITests: AppUITestCase {
         waitForLoweredAndUsable()
     }
 
+    /// AC3：無障礙按鈕恰好蓋住播放卡的封面正面（四邊對齊，不只中心重疊）；
+    /// 點擊判定在條帶層——正面內的角落會開 Editor，正下方的倒影不會
+    func testOnlyTheFrontFaceOfThePlayingCardIsClickable() {
+        start(.present)
+        waitForRaisedAndSettled()
+        let button = app.buttons[ID.playingCard]
+        let card = element(ID.cardPrefix + "q:0:" + String(Scenario.itemID(at: Scenario.playingIndex)))
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        waitForStableFrame(card)
+        let face = button.frame, cardFrame = card.frame
+        XCTAssertEqual(face.minX, cardFrame.minX, accuracy: 1, "按鈕左緣＝封面左緣")
+        XCTAssertEqual(face.minY, cardFrame.minY, accuracy: 1, "按鈕上緣＝封面上緣")
+        XCTAssertEqual(face.width, cardFrame.width, accuracy: 1)
+        XCTAssertEqual(face.height, face.width, accuracy: 1, "正面是正方形（不含倒影）")
+
+        button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.15)).click()     // 倒影
+        assertStaysFalse(element(ID.editorLayer).exists, for: 2, "點倒影不得進 Editor")
+        button.coordinate(withNormalizedOffset: CGVector(dx: 0.06, dy: 0.06)).click()    // 正面左上角內側
+        XCTAssertTrue(element(ID.editorLayer).waitForExistence(timeout: Self.surfaceTimeout), "正面內任一點都可點")
+    }
+
     /// AC3：其他卡不是按鈕；點了畫面不變、不抓詞
     func testClickingOtherCardsDoesNothing() {
         start(.present)

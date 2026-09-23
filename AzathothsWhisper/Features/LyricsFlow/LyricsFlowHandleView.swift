@@ -64,27 +64,21 @@ struct LyricsFlowHandleView: View {
         .accessibilityHidden(true)
     }
 
-    @ViewBuilder
     private func tickMark(_ tick: HandleTick) -> some View {
-        switch tick.side {
-        case .current:
-            Rectangle()
-                .fill(Color.white)
-                .frame(width: 3, height: 20)
-                .shadow(color: .white.opacity(0.6), radius: 4)
-        case .played, .upcoming:
-            Rectangle()
-                .fill(color(of: tick.tone))
-                .frame(width: 2, height: tick.side == .played ? 8 : 11)
-        }
+        let look = tick.appearance
+        return Rectangle()
+            .fill(tickColor(look.palette))
+            .frame(width: look.width, height: look.height)
+            .shadow(color: look.glows ? .white.opacity(0.6) : .clear, radius: 4)
     }
 
-    /// 刻度色：缺詞紅、已標記暗灰，其餘淡灰（有詞不必另外強調）
-    private func color(of tone: LyricsBadge.Tone) -> Color {
-        switch tone {
-        case .missing: return Theme.danger
-        case .marked: return Theme.Gray.g600
-        case .present, .unknown: return Theme.Gray.g400
+    /// 刻度的色票（與徽章的 `LyricsBadge.Tone.color` 是兩套：刻度不強調「有詞」）
+    private func tickColor(_ palette: TickAppearance.Palette) -> Color {
+        switch palette {
+        case .bright: return .white
+        case .danger: return Theme.danger
+        case .dim: return Theme.Gray.g600
+        case .muted: return Theme.Gray.g400
         }
     }
 }

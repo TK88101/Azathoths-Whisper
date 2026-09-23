@@ -28,6 +28,20 @@ struct CoverFlowViewModelDeckTests {
         #expect(!model.isPlayingCardCentered)
     }
 
+    /// AC3 無障礙標籤「Edit lyrics of %@」的曲名：只取播放卡的詳情，任何一環缺了就是空字串
+    @Test func playingCardTitleComesOnlyFromThePlayingCardsDetails() {
+        let model = makeModel()
+        model.apply(F.deck([1, 2, 3], current: 2), isRealChange: true)
+        #expect(model.playingCardTitle == "", "詳情未到")
+        model.updateDetails(["T2": TrackDetails(persistentID: "T2", artist: "A", title: "Two", album: "L",
+                                                discNumber: 1, trackNumber: 2, lyrics: nil)])
+        #expect(model.playingCardTitle == "Two")
+        model.apply(DeckSnapshot(cards: [F.card(1)], currentCardID: "C9", upcoming: .pending), isRealChange: true)
+        #expect(model.playingCardTitle == "", "播放卡不在牌組")
+        model.apply(F.deck([1, 3], current: nil), isRealChange: true)
+        #expect(model.playingCardTitle == "", "沒有播放卡")
+    }
+
     @Test func aReportForAnotherCardDoesNotCount() {
         let model = makeModel()
         model.apply(F.deck([1, 2, 3], current: 2), isRealChange: true)

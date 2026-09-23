@@ -65,6 +65,19 @@ struct CoverFlowGeometry {
         abs(d) <= Self.centeredTolerance
     }
 
+    /// 正中那張的封面正面（不含倒影）：卡片在條帶內垂直置中，高＝邊長 ×（1＋倒影比）。
+    /// 點擊、懸停、無障礙按鈕都以它為準（D6、AC3）
+    func centreFace(in stripSize: CGSize, reflectionRatio: CGFloat) -> CGRect {
+        let cardHeight = itemWidth * (1 + reflectionRatio)
+        return CGRect(x: (stripSize.width - itemWidth) / 2, y: (stripSize.height - cardHeight) / 2,
+                      width: itemWidth, height: itemWidth)
+    }
+
+    /// AC3 的最終許可：播放卡位於幾何正中（條帶回報給 VM）∧ 點在它的封面正面內
+    static func acceptsPlayingCardTap(isCentered: Bool, location: CGPoint, face: CGRect) -> Bool {
+        isCentered && face.contains(location)
+    }
+
     /// 旋轉錨點：左側項目繞右緣轉、右側項目繞左緣轉，才有「向中心翻開」的觀感
     func anchorIsTrailing(forDistance d: CGFloat) -> Bool {
         d < 0

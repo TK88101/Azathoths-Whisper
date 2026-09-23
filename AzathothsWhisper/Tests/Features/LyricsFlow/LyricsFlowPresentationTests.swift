@@ -70,6 +70,31 @@ struct LyricsFlowPresentationTests {
 
     // MARK: 把手刻度（設計稿：播過的較短、接下來的較長、中心白色；缺詞紅、已標記暗灰）
 
+    /// 把手刻度的外觀（設計稿：中心白色發光、播過的短、接下來的長；缺詞紅、已標記暗、其餘淡）。只比意義，不比 Color
+    @Test("刻度外觀＝位置 × 歌詞狀態", arguments: [
+        (DeckCard.Side.current, LyricsBadge.Tone.present, TickAppearance(width: 3, height: 20, palette: .bright, glows: true)),
+        (.current, .missing, TickAppearance(width: 3, height: 20, palette: .bright, glows: true)),
+        (.current, .marked, TickAppearance(width: 3, height: 20, palette: .bright, glows: true)),
+        (.current, .unknown, TickAppearance(width: 3, height: 20, palette: .bright, glows: true)),
+        (.played, .present, TickAppearance(width: 2, height: 8, palette: .muted, glows: false)),
+        (.played, .missing, TickAppearance(width: 2, height: 8, palette: .danger, glows: false)),
+        (.played, .marked, TickAppearance(width: 2, height: 8, palette: .dim, glows: false)),
+        (.played, .unknown, TickAppearance(width: 2, height: 8, palette: .muted, glows: false)),
+        (.upcoming, .present, TickAppearance(width: 2, height: 11, palette: .muted, glows: false)),
+        (.upcoming, .missing, TickAppearance(width: 2, height: 11, palette: .danger, glows: false)),
+        (.upcoming, .marked, TickAppearance(width: 2, height: 11, palette: .dim, glows: false)),
+        (.upcoming, .unknown, TickAppearance(width: 2, height: 11, palette: .muted, glows: false)),
+    ])
+    func tickAppearance(side: DeckCard.Side, tone: LyricsBadge.Tone, expected: TickAppearance) {
+        #expect(HandleTick(side: side, tone: tone).appearance == expected)
+    }
+
+    /// D5／U6：升回延遲＝彩帶名義壽命，與 ConfettiView 的步進共用同一組常數
+    @MainActor @Test func riseDelayIsTheConfettiLifetime() {
+        #expect(LyricsFlowModel.riseDelay == ConfettiTiming.frameInterval * ConfettiTiming.ticks)
+        #expect(LyricsFlowModel.riseDelay == .milliseconds(3200))
+    }
+
     @Test func handleTicksFollowTheDeck() {
         let cards = [
             DeckCard(id: "h:A#0", persistentID: "A", side: .played),

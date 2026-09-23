@@ -147,4 +147,28 @@ struct CoverFlowGeometryTests {
         let g = CoverFlowGeometry(itemWidth: itemWidth)
         #expect(abs(g.perspective - 0.55) < 0.0001)
     }
+
+    // MARK: D6／AC3：正中那張的封面正面＝點擊與懸停的判定區，也是無障礙按鈕蓋住的範圍
+
+    @Test func centreFaceIsTheSquareFrontOfTheCentredCard() {
+        let ratio = CoverFlowItem.reflectionRatio
+        let face = CoverFlowGeometry(itemWidth: 260).centreFace(in: CGSize(width: 1000, height: 600), reflectionRatio: ratio)
+        let cardHeight = 260 * (1 + ratio)
+        #expect(face == CGRect(x: 370, y: (600 - cardHeight) / 2, width: 260, height: 260))
+        // 正面在卡片上端、下方留倒影：無障礙層的空白高度（寬 × 倒影比）與此同一比例
+        #expect(face.maxY + 260 * ratio == (600 + cardHeight) / 2)
+    }
+
+    @Test("點擊只在播放卡位於正中、且落在正面內才算（CGRect 半開區間）", arguments: [
+        (false, CGPoint(x: 500, y: 300), false),
+        (true, CGPoint(x: 369, y: 300), false),
+        (true, CGPoint(x: 500, y: 300), true),
+        (true, CGPoint(x: 370, y: 200), true),
+        (true, CGPoint(x: 630, y: 300), false),
+        (true, CGPoint(x: 500, y: 460), false),
+    ])
+    func playingCardTapNeedsCentreAndFace(isCentered: Bool, location: CGPoint, accepted: Bool) {
+        let face = CGRect(x: 370, y: 200, width: 260, height: 260)
+        #expect(CoverFlowGeometry.acceptsPlayingCardTap(isCentered: isCentered, location: location, face: face) == accepted)
+    }
 }

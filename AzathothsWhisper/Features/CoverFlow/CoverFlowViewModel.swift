@@ -89,6 +89,12 @@ final class CoverFlowViewModel {
         }
     }
 
+    /// 播放卡的曲名（AC3 無障礙標籤「Edit lyrics of %@」）；沒有播放卡、不在牌組或詳情未到 → 空字串
+    var playingCardTitle: String {
+        guard let id = deck.currentCardID, let card = cards.first(where: { $0.id == id }) else { return "" }
+        return details[card.persistentID]?.title ?? ""
+    }
+
     func updateDetails(_ newDetails: [String: TrackDetails]) {
         details.merge(newDetails) { _, new in new }
     }
