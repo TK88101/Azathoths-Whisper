@@ -203,12 +203,9 @@ private struct CoverFlowItemContainer: View {
     var body: some View {
         ZStack(alignment: .top) {
             CoverFlowItem(artwork: image, size: size)
-            // 徽章疊在封面正面上（H-08：不改變封面尺寸）
-            HStack {
-                Spacer(minLength: 0)
-                badge
-            }
-            .frame(width: size, height: size, alignment: .top)
+            // 徽章疊在封面正面上（H-08：不改變封面尺寸），放在露出的那一角
+            badge
+                .frame(width: size, height: size, alignment: badgeAlignment)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(AccessibilityID.cardPrefix + card.id)
@@ -219,6 +216,13 @@ private struct CoverFlowItemContainer: View {
             revision: model.artworkRevision(for: card.persistentID)
         )) {
             image = await model.artwork(for: card.persistentID)
+        }
+    }
+
+    private var badgeAlignment: Alignment {
+        switch LyricsBadge.corner(of: card.id, in: model.cards.map(\.id), centerID: model.centerID) {
+        case .leading: return .topLeading
+        case .trailing: return .topTrailing
         }
     }
 

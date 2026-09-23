@@ -98,7 +98,7 @@
 | AC8d | 卡片詳情（曲名、歌手、專輯、歌詞狀態）以 persistentID 批次讀取（去重後 ≤ 21 首一批）：單一背景 actor、最新者勝（帶快照版本 token，舊任務不得覆蓋新版）、總 deadline、快取（寫入／標記時更新該卡）；部分失敗 → 該卡狀態 `unknown`、只顯示封面；不阻塞事件分發、不餓死輪詢（R3-8） | 單元（`SerialAEQueueMusicClient` 公平性、版本 token）；時間界＝真機 |
 | AC9 | **無播控（三層）**：① `MusicControlling` 不含播控方法（類型層）；② 執行期測試以 `protocol_copyMethodDescriptionList` 列出 Music `@objc` 協議的全部選擇器，必須 ⊆ 允許清單、`set*:` 只許 `setLyrics:`、required 方法＝0；`SBObject`／`SBApplication` 上帶 `AZW` 前綴的協議只能是允許的那幾個；負對照協議（`playpause`／`playOnce:`／`{get set}` 的 `shuffleEnabled`／`@objc(nextTrack)` 改名）必須回報 4 個違規；③ `Scripts/no_playback_gate.sh`（grep，stdin 可餵負對照）：`import ScriptingBridge` 只許出現在 `Services/Music/MusicAppleEventsClient.swift` 與 spike 檔；全部 target 目錄（`App Features Services Infra UI`）＋spike 禁 `NSAppleScript|NSUserAppleScriptTask|OSAScript|osascript|AESend|NSAppleEventDescriptor\(eventClass|sendEvent\(options:|MediaRemote|NX_KEYTYPE|import (OSAKit|Carbon)`；SB 檔內禁 `perform\(|NSSelectorFromString|Selector\(\(|setValue\(|makeObjectsPerform|byApplying:[^)]*with:|\.(add|insert|remove|replace)(Object)?\(`，`value(forKey: "…")` 的 key ⊆ {`rawData`} | 執行期測試隨全量單元跑；腳本退出碼；每條禁止模式各一負對照 |
 | AC10 | 導覽區恰好兩個按鈕（Editor｜Batch，以 identifier 判定）；新字串三語齊（新鍵加入 `LocalizationTests` 清單） | `LocalizationTests`＋`ShellUITests` |
-| AC11 | 每個 Q 結束：全量單元綠（skip 已知 flaky 一條）；新檔與改動過的 Features 檔每檔行覆蓋 ≥ 80%（AE client 新方法豁免、另補 opt-in 唯讀 `LiveMusicTests`）；UITests 回歸集合（`ShellUITests`＋`BatchUITests`）對分支點基線不新增紅燈（A-10 已知 flaky 除外）；`test_h02_gate_*.py` 綠 | `xcodebuild test`＋`xccov`＋`coverage_gate.sh <xcresult>`＋pytest |
+| AC11 | 每個 Q 結束：全量單元綠（skip 已知 flaky 一條）；Services＋Infra 由 `coverage_gate.sh` 判定 ≥ 80%（只算 app 本體；豁免清單僅 AE client 一檔，理由、批准日、行數上限 400 寫在腳本內，R8）；新檔與改動過的 Features 檔每檔行覆蓋 ≥ 80% 走 §9.3 的 xccov 手順，記錄基準 commit、檔案清單、各檔數字、xcresult 位置；`LiveMusicTests` 在閘門外、為手動 smoke——讀取類隨時可跑，寫入類（`writesLyricsByPersistentIDVerbatim`）只在使用者明示許可時執行，平時加 `"-skip-testing:AzathothsWhisperTests/LiveMusicTests/writesLyricsByPersistentIDVerbatim()"`；UITests 回歸集合（`ShellUITests`＋`BatchUITests`）對分支點基線不新增紅燈（A-10 已知 flaky 除外）；`test_h02_gate_*.py` 綠 | `xcodebuild test`＋`xccov`＋`coverage_gate.sh <xcresult>`＋pytest |
 | AC12 | 當前曲的曲目欄位與歌詞只來自同一個 `NowPlayingRead`（單一來源，由同一次 `run` 對釘住的 track 物件讀出）；`NowPlayingRead` 是事件身分的唯一來源；替身回傳不完整讀取（歌詞讀取失敗）→ `unreadable` → 狀態 `unknown` | monitor／Editor 單元（替身逐欄注入失敗）＋S1 實測（釘住物件連讀 20 次屬性一致）＋opt-in `LiveMusicTests` |
 | AC13 | Music 未執行時任何路徑都不啟動它；執行中途 Music 退出 → AE 以錯誤返回（不重啟 Music） | 代碼審查＋`SBApplication(processIdentifier:)` 用法測試；中途退出情境＝使用者在場時手動驗 |
 | AC14 | 升起時方向鍵步進 Cover Flow、打字不進被遮住的 Editor；降下時 Cover Flow 不持有焦點 | XCUITest `keyboardFocusFollowsSurface` |
@@ -227,7 +227,8 @@ xcodebuild test -project AzathothsWhisper.xcodeproj -scheme AzathothsWhisper \
   -skip-testing:"AzathothsWhisperTests/BatchOverlappingLoadTests/overlappingLoadSuspendsPollingUntilLastCompletes()" \
   -test-timeouts-enabled YES -default-test-execution-time-allowance 120 \
   -enableCodeCoverage YES -resultBundlePath <scratch>/unit.xcresult
-./Scripts/coverage_gate.sh <scratch>/unit.xcresult          # Services／Infra 既有門檻
+./Scripts/coverage_gate.sh <scratch>/unit.xcresult          # Services／Infra 門檻（app 本體、豁免清單見腳本，R8）
+(cd Scripts && /usr/bin/python3 -m unittest test_coverage_gate)   # 閘門自身的黑箱測試（不在 test_h02_gate* 探索規則內）
 xcrun xccov view --report --files-for-target "Azathoth's Whisper.app" <scratch>/unit.xcresult   # 新檔與改動檔逐檔
 ./Scripts/no_playback_gate.sh
 (cd Scripts && /usr/bin/python3 -m unittest discover -s . -p 'test_h02_gate*.py')
@@ -478,3 +479,6 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
 - 第 3 輪（整體確認）：Codex 補兩處，**皆採納**——分子分母限定 app 本體（實測數字不變：1546／1992）；新測試檔 `test_coverage_gate.py` 不會被 `test_h02_gate*.py` 的探索規則找到 → §9.3 另列執行命令。`approvedOn` 以使用者批准當日填實。
 - Codex 最擔心：豁免清單變成藏未測邏輯的永久箱子——以「僅 1 檔、行數上限 400、報表必印理由與批准日」防範。
 - 收斂結論（待使用者拍板）：閘門加豁免清單（僅 `Services/Music/MusicAppleEventsClient.swift`）＋上述護欄＋合成 JSON 的黑箱測試（先紅）；AC11 文字同步；`LiveMusicTests` 與 AE client 程式碼不動。
+### 使用者裁定（2026-09-23 22:0x，在場 #3 後）
+- R8 收斂結論：**照做**（`approvedOn` 2026-09-23）。實作：`coverage_gate.sh` 讀 JSON 報表模式＋豁免清單與護欄；`Scripts/test_coverage_gate.py` 9 條（先紅 9/9，後綠）；變異 4 組（關預算、放寬 target、子字串比對、關重複檢查）各被抓到；真實報表：豁免前 77.6%（1546／1992）、豁免後 95.5%（1536／1608）通過。
+- 左側卡徽章被蓋住：**改到露出的一角**——以「相對當下正中」判定：正中左側的卡放左上、其餘右上（方向鍵瀏覽時跟著換邊）；`LyricsBadge.corner(of:in:centerID:)` 純函數＋3 條單元測試（先紅：編譯失敗）。

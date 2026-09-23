@@ -34,6 +34,20 @@ enum LyricsBadge {
         return "\(symbol) \(String(format: "%02d", trackNumber))"
     }
 
+    enum Corner: Equatable, Sendable {
+        case leading
+        case trailing
+    }
+
+    /// 徽章放在卡片露出的那一角（使用者 2026-09-23 拍板）：正中左側的卡右上角被較靠中心的卡蓋住 → 左上；
+    /// 其餘（正中、右側、找不到中心或卡）→ 右上。以「相對當下正中」判定，方向鍵瀏覽時跟著換邊
+    static func corner(of cardID: String, in cardIDs: [String], centerID: String?) -> Corner {
+        guard let centerID,
+              let centerIndex = cardIDs.firstIndex(of: centerID),
+              let cardIndex = cardIDs.firstIndex(of: cardID) else { return .trailing }
+        return cardIndex < centerIndex ? .leading : .trailing
+    }
+
     /// 狀態字的 i18n 鍵（§9.5）
     static func statusKey(for status: LyricsStatus) -> String {
         switch status {

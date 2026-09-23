@@ -40,6 +40,26 @@ struct LyricsFlowPresentationTests {
         #expect(LyricsBadge.text(for: .present, trackNumber: 7, isCurrent: false) == "✓", "非中心卡不帶軌號")
     }
 
+    /// 使用者 2026-09-23 拍板：正中左側的卡，右上角被較靠中心的卡蓋住 → 徽章放左上角（露出的外側）
+    @Test func badgeSitsOnTheExposedCornerRelativeToTheCentre() {
+        let ids = ["h1", "h0", "now", "q1", "q2"]
+        #expect(ids.map { LyricsBadge.corner(of: $0, in: ids, centerID: "now") }
+            == [.leading, .leading, .trailing, .trailing, .trailing])
+    }
+
+    @Test func badgeCornerFollowsTheCentreWhileBrowsing() {
+        let ids = ["h1", "h0", "now", "q1", "q2"]
+        #expect(LyricsBadge.corner(of: "now", in: ids, centerID: "q1") == .leading, "播放卡被瀏覽移到左側")
+        #expect(LyricsBadge.corner(of: "q1", in: ids, centerID: "q1") == .trailing)
+    }
+
+    @Test func badgeCornerDefaultsToTrailingWithoutACentre() {
+        let ids = ["h1", "now"]
+        #expect(LyricsBadge.corner(of: "h1", in: ids, centerID: nil) == .trailing)
+        #expect(LyricsBadge.corner(of: "gone", in: ids, centerID: "now") == .trailing, "不在牌組的卡")
+        #expect(LyricsBadge.corner(of: "h1", in: ids, centerID: "gone") == .trailing, "中心不在牌組")
+    }
+
     @Test("狀態字的 i18n 鍵", arguments: [
         (LyricsStatus.present, "lyrics_status_present"), (.missing, "lyrics_status_missing"),
         (.markedNone, "lyrics_status_marked"), (.unknown, "lyrics_status_unknown"),
