@@ -49,6 +49,49 @@ struct LyricsFlowReducerTests {
         #expect(refreshed.pendingRise != nil)
     }
 
+    /// 使用者拍板①（2026-09-23）：寫入後讀回仍缺詞＝寫入沒生效 → 取消待升回、留在 Editor、提示寫入沒生效
+    @Test func readBackMissingCancelsThePendingRise() {
+        let (written, _) = reduce(playing("A", .missing), .writeSucceeded(persistentID: "A", resultingStatus: .present))
+        let (next, effects) = reduce(written, .nowPlaying(identity("A"), persistentID: "A", status: .missing))
+        #expect(next.pendingRise == nil)
+        #expect(next.surface == .editor)
+        #expect(effects == [.cancelRise, .writeNotConfirmed(persistentID: "A")])
+    }
+
+    /// 沒有待升回時，同曲讀回缺詞仍照 AC6 不動畫面
+    @Test func sameTrackMissingWithoutAPendingRiseKeepsTheSurface() {
+        let refreshed = playing("A", .missing, from: playing("A", .present))
+        #expect(refreshed.surface == .coverFlow)
+        #expect(refreshed.status == .missing)
+    }
+
+    /// 使用者拍板②（2026-09-23）：讀不到 → 確定缺詞，且本場次使用者沒親手選過畫面 → 降下露出 Editor
+    @Test func unknownThenMissingLowersTheEditor() {
+        let refreshed = playing("A", .missing, from: playing("A", .unknown))
+        #expect(refreshed.surface == .editor)
+    }
+
+    @Test func unknownThenMissingRespectsTheUsersOwnChoice() {
+        let (down, _) = reduce(playing("A", .unknown), .toggleHandle)
+        let (up, _) = reduce(down, .toggleHandle)
+        let refreshed = playing("A", .missing, from: up)
+        #expect(refreshed.surface == .coverFlow, "使用者親手升起過，尊重使用者")
+    }
+
+    @Test func anIneffectiveTapIsNotAChoice() {
+        let (tapped, _) = reduce(playing("A", .unknown), .tapPlayingCard(isCentered: false))
+        let refreshed = playing("A", .missing, from: tapped)
+        #expect(refreshed.surface == .editor)
+    }
+
+    @Test func aRealChangeForgetsThePreviousChoice() {
+        let (down, _) = reduce(playing("A", .unknown), .toggleHandle)
+        let (up, _) = reduce(down, .toggleHandle)
+        let onB = playing("B", .unknown, from: up)
+        let refreshed = playing("B", .missing, from: onB)
+        #expect(refreshed.surface == .editor)
+    }
+
     @Test func realChangeCancelsAPendingRise() {
         let (written, _) = reduce(playing("A", .missing), .writeSucceeded(persistentID: "A", resultingStatus: .present))
         let (next, effects) = reduce(written, .nowPlaying(identity("B"), persistentID: "B", status: .present))
@@ -129,6 +172,16 @@ struct LyricsFlowReducerTests {
         #expect(effects == [.forceRefresh])
     }
 
+    /// 對抗覆核 P1②：寫入有詞（待升回）後又寫入空字串——待升回必須取消，否則到期把缺詞曲升回
+    @Test func emptyWriteAfterASuccessfulWriteCancelsThePendingRise() {
+        let (written, _) = reduce(playing("A", .missing), .writeSucceeded(persistentID: "A", resultingStatus: .present))
+        let (cleared, effects) = reduce(written, .writeSucceeded(persistentID: "A", resultingStatus: .missing))
+        #expect(cleared.pendingRise == nil)
+        #expect(effects == [.cancelRise, .forceRefresh])
+        let (after, _) = reduce(cleared, .riseDue(written.pendingRise!))
+        #expect(after.surface == .editor, "缺詞＝Editor")
+    }
+
     @Test func writeOfANonCurrentTrackDoesNotMoveTheSurface() {
         let onB = playing("B", .missing)
         let (state, effects) = reduce(onB, .writeSucceeded(persistentID: "A", resultingStatus: .present))
@@ -151,6 +204,16 @@ struct LyricsFlowReducerTests {
         #expect(state.surface == .coverFlow)
         #expect(state.status == .markedNone)
         #expect(effects.contains(.cancelAutoFetch(persistentID: "A")))
+    }
+
+    /// 對抗覆核 P2（Codex 修正版）：只有已知「缺詞」的當前曲可標記；有詞或讀不到時整個動作不生效
+    /// （不改狀態、不動畫面、不取消待升回）——「沒讀到」不能當成「沒有」
+    @Test("有詞與讀不到的當前曲不可標記", arguments: [LyricsStatus.present, LyricsStatus.unknown])
+    func markingIsIgnoredUnlessTheCurrentTrackIsMissing(status: LyricsStatus) {
+        let (editing, _) = reduce(playing("A", status), .toggleHandle)
+        let (state, effects) = reduce(editing, .markedNone(persistentID: "A"))
+        #expect(state == editing)
+        #expect(effects.isEmpty)
     }
 
     @Test func markingANonCurrentTrackOnlyCancelsItsAutoFetch() {

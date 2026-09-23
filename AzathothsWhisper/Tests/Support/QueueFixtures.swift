@@ -15,17 +15,27 @@ enum QueueFixtures {
         }
     }
 
-    /// `shuffled` 為 nil ＝ 不寫 `shuffledList`；`shuffleMode` 寫在 items 與頂層兩處（與實檔同）
+    /// `shuffleMode` 欄位的異常形狀（對抗覆核 P1①）：各自為 nil＝不寫該鍵；值可為非字串
+    struct ModeFields: @unchecked Sendable {   // 只裝 plist 字面量，建立後不變
+        let items: Any?
+        let root: Any?
+    }
+
+    /// `shuffled` 為 nil ＝ 不寫 `shuffledList`；`shuffleMode` 寫在 items 與頂層兩處（與實檔同）；
+    /// `modeFields` 非 nil 時改寫這兩處（製造缺鍵、型別錯、兩處不一致）
     static func queue(
         list: [Item],
         shuffled: [Item]? = nil,
         shuffleMode: String = "off",
-        segments: Int = 1
+        segments: Int = 1,
+        modeFields: ModeFields? = nil
     ) -> Data {
+        let itemsMode = modeFields.map(\.items) ?? shuffleMode
+        let rootMode = modeFields.map(\.root) ?? shuffleMode
         var items: [String: Any] = [
             "list": ["items": ["iar": list.map(entry)]],
-            "shuffleMode": shuffleMode,
         ]
+        if let itemsMode { items["shuffleMode"] = itemsMode }
         if let shuffled {
             items["shuffledList"] = [
                 "items": ["iar": shuffled.map(entry)],
@@ -34,11 +44,11 @@ enum QueueFixtures {
             ]
         }
         let segment: [String: Any] = ["items": items, "scID": 1, "subcKind": 1]
-        let root: [String: Any] = [
+        var root: [String: Any] = [
             "sega": Array(repeating: segment, count: segments),
-            "shuffleMode": shuffleMode,
             "version": 1,
         ]
+        if let rootMode { root["shuffleMode"] = rootMode }
         return try! PropertyListSerialization.data(fromPropertyList: root, format: .xml, options: 0)
     }
 

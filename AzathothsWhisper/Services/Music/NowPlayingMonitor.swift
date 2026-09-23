@@ -45,6 +45,8 @@ actor NowPlayingMonitor {
     private var lastAlbumKey: String?
     private var lastWasNotPlaying = false
     private var busySources: Set<BusySource> = []
+    /// busy 期間收到的強制重讀：不得吞掉，全部來源空閒時補做一次
+    private var pendingForceRefresh = false
     private var pollTask: Task<Void, Never>?
 
     init(music: any MusicControlling, clock: any PollClock = SystemPollClock()) {
@@ -63,11 +65,16 @@ actor NowPlayingMonitor {
     /// Batch 載入完成送 false → Editor 仍在抓詞但輪詢已恢復。
     /// 由本型別自己記錄「誰還忙著」，而非讓組裝根替它記帳；新增來源（如 M7 Cover Flow）
     /// 只需擴 `BusySource`，不必動 `AppModel`。
-    func setBusy(_ busy: Bool, source: BusySource) {
+    func setBusy(_ busy: Bool, source: BusySource) async {
         if busy {
             busySources.insert(source)
         } else {
             busySources.remove(source)
+            // Editor 寫入成功後要求的補讀發生在它解除 busy 之前（計劃 §6 `writeSucceeded`）
+            if busySources.isEmpty, pendingForceRefresh {
+                pendingForceRefresh = false
+                await forceRefresh()
+            }
         }
     }
 
@@ -124,8 +131,13 @@ actor NowPlayingMonitor {
         }
     }
 
-    /// 使用者手動點擊「Now Editing」卡片時強制重新讀取（py:745）
+    /// 使用者手動點擊「Now Editing」卡片時強制重新讀取（py:745）；寫入成功後的補讀也走這裡。
+    /// busy 期間不讀 Music（B-02），記下來待全部來源空閒時補做
     func forceRefresh() async {
+        guard busySources.isEmpty else {
+            pendingForceRefresh = true
+            return
+        }
         lastSignature = nil
         lastWasNotPlaying = false
         await tick()

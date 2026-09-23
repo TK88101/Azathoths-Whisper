@@ -181,6 +181,42 @@ struct NowPlayingMonitorTests {
         #expect(events.last == .trackChanged(track, existingLyrics: "l"))
     }
 
+    /// 寫入成功的回報發生在 Editor 仍 busy 的區間內（先回報、後解除 busy），
+    /// 此時要求的補讀不得被 busy 靜默吞掉——記下來，全部來源空閒時補做（計劃 §6 `writeSucceeded`）
+    @Test func forceRefreshWhileBusyRunsOnceIdle() async {
+        let track = TrackInfo.fixture()
+        let music = MockMusicClient(script: [.track(track, lyrics: "l")])
+        let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
+
+        async let collected = collect(monitor, expecting: 3)
+        await monitor.tick()
+        await monitor.setBusy(true, source: .editor)
+        await monitor.forceRefresh()
+        #expect(await music.currentTrackCalls == 1, "busy 期間不得查詢 Music")
+
+        await monitor.setBusy(false, source: .editor)
+        let events = await collected
+
+        #expect(events.last == .trackChanged(track, existingLyrics: "l"))
+        #expect(await music.currentTrackCalls == 2)
+    }
+
+    @Test func pendingForceRefreshWaitsForEveryBusySource() async {
+        let music = MockMusicClient(script: [.track(.fixture(), lyrics: "l")])
+        let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
+
+        await monitor.setBusy(true, source: .editor)
+        await monitor.setBusy(true, source: .batch)
+        await monitor.forceRefresh()
+        await monitor.setBusy(false, source: .editor)
+        #expect(await music.currentTrackCalls == 0, "Batch 仍 busy")
+
+        await monitor.setBusy(false, source: .batch)
+        #expect(await music.currentTrackCalls == 1, "最後一個來源空閒時補做一次")
+        await monitor.setBusy(false, source: .batch)
+        #expect(await music.currentTrackCalls == 1, "只補一次")
+    }
+
     // ACCEPTANCE H-11：Cover Flow 穩定排序（disc → track → AE 返回序）
     @Test func albumTracksSortStably() {
         let unsorted = [

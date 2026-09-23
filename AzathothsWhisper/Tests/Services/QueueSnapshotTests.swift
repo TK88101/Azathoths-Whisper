@@ -37,6 +37,37 @@ struct QueueSnapshotTests {
         #expect(QueueSnapshot.parse(data) == nil)
     }
 
+    /// 對抗覆核 P1①：shuffleMode 缺失、型別錯或兩處不一致時，只要檔內有打乱序列就不可用——
+    /// 無從判斷正在播哪一支，絕不退回未打亂的 list
+    @Test("隨機狀態不明時不可用", arguments: [
+        QueueFixtures.ModeFields(items: nil, root: nil),
+        QueueFixtures.ModeFields(items: 1, root: 1),
+        QueueFixtures.ModeFields(items: true, root: nil),
+        QueueFixtures.ModeFields(items: "off", root: "tracks"),
+    ])
+    func unclearShuffleStateIsUnusable(fields: QueueFixtures.ModeFields) {
+        let data = QueueFixtures.queue(
+            list: [Item(1, itemID: 10), Item(2, itemID: 11)],
+            shuffled: [Item(2, itemID: 11), Item(1, itemID: 10)],
+            modeFields: fields
+        )
+        #expect(QueueSnapshot.parse(data) == nil)
+    }
+
+    /// 型別錯或兩處不一致：即使沒有打乱序列也不可用（檔案形狀已超出實測）
+    @Test func malformedShuffleModeIsUnusableEvenWithoutAShuffledList() {
+        let data = QueueFixtures.queue(list: [Item(1, itemID: 10)], modeFields: .init(items: 1, root: "off"))
+        #expect(QueueSnapshot.parse(data) == nil)
+    }
+
+    /// 兩處都沒寫、也沒有打乱序列：只有原順序這一支，照讀（順序模式的實檔是否寫 shuffleMode 尚未實測，U10）
+    @Test func noShuffleModeAndNoShuffledListReadsTheOnlySequence() throws {
+        let data = QueueFixtures.queue(list: [Item(1, itemID: 10), Item(2, itemID: 11)], modeFields: .init(items: nil, root: nil))
+        let snapshot = try #require(QueueSnapshot.parse(data))
+        #expect(snapshot.sequenceKind == .ordered)
+        #expect(snapshot.entries.map(\.itemID) == [10, 11])
+    }
+
     @Test func entriesWithoutTrackIDAreSkipped() throws {
         let data = QueueFixtures.queue(list: [Item(1, itemID: 10), Item(nil, itemID: 11), Item(2, itemID: 12)])
         let snapshot = try #require(QueueSnapshot.parse(data))

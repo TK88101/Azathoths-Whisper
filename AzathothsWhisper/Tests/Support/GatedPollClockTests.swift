@@ -55,6 +55,24 @@ struct GatedPollClockTests {
         try await second.value
     }
 
+    /// 對抗覆核 P2：取消後立刻 releaseNext——被取消者不得被「正常喚醒」，放行應落到下一個仍在等的人
+    @Test func releaseNextSkipsACancelledSleeper() async throws {
+        let clock = GatedPollClock()
+        let secondDone = Atomic()
+        let first = Task { try await clock.sleep(for: .seconds(1)) }
+        await clock.waitUntilPending(1)
+        let second = Task { try await clock.sleep(for: .seconds(1)); await secondDone.set() }
+        await clock.waitUntilPending(2)
+
+        first.cancel()
+        await clock.releaseNext()
+
+        await #expect(throws: CancellationError.self) { try await first.value }
+        try await second.value
+        #expect(await secondDone.value)
+        #expect(await clock.pendingCount == 0)
+    }
+
     @Test func cancellingTheSleeperThrowsCancellationError() async {
         let clock = GatedPollClock()
         let task = Task { try await clock.sleep(for: .seconds(5)) }

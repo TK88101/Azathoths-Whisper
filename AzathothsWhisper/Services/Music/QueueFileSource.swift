@@ -50,6 +50,11 @@ actor QueueFileSource {
         }
     }
 
+    /// D15：Music 未執行時佇列 session 失效——忘掉屬性戳，下次即使檔案沒變也重讀重建
+    func forgetQueue() {
+        queueStamp = nil
+    }
+
     func readHistory(keepLast: Int) -> Read<HistorySnapshot> {
         guard let url = directory?.appendingPathComponent(Self.historyFileName) else { return .missing }
         // 窗口大小變了要重讀，即使檔案沒變

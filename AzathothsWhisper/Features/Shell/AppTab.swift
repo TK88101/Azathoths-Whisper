@@ -1,11 +1,10 @@
 import Foundation
 import SwiftUI
 
-// 導航頁籤（py:135-136 兩個，Cover Flow 為 Plan §4.8 新增第三個）
+// 導航頁籤（py:135-136 兩個）。Cover Flow 已改為 Editor 頁內的一層（計劃 §2.1、Q3b）
 enum AppTab: String, CaseIterable, Identifiable {
     case editor
     case batch
-    case coverFlow
 
     var id: String { rawValue }
 
@@ -13,7 +12,6 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .editor: return "nav_editor"
         case .batch: return "nav_batch"
-        case .coverFlow: return "nav_coverflow"
         }
     }
 }

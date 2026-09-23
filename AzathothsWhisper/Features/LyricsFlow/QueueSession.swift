@@ -3,8 +3,9 @@ import Foundation
 /// 佇列 session：最後一份有效的 `QueueSnapshot`＋當前出現位置＋itID epoch（計劃 AC8、R3-1、R4-4、AC8b）。
 /// 值型別：每個操作回傳新值。
 ///
-/// - 位置推進（R3-1）：按下一首時 Music **不重寫**檔案（事實 21），當前位置只能由「上次位置之後第一個相符」
-///   推算；同曲在清單出現多次、又沒有上次位置可參考 → 不猜，視為未解析。
+/// - 位置推進（R3-1，對抗覆核 P2 修正）：按下一首時 Music **不重寫**檔案（事實 21），真實換歌只接受
+///   「上次位置的下一項」；不相鄰（往回跳、跳播、專輯點播後檔案尚未重寫）→ 事件當下不猜，
+///   交給下一次同曲解析依唯一性定位；同曲在清單出現多次又無從判斷 → 視為未解析。
 /// - 重寫（插歌／Genius）時以 itID 把上次位置帶到新清單（事實 23：既有項 itID 不變）。
 /// - itID 只是 session 內身分：同一 itID 在新快照指向別首歌 → epoch 加一，卡 ID 隨之不同（R4-4）。
 struct QueueSession: Equatable, Sendable {
@@ -68,7 +69,10 @@ struct QueueSession: Equatable, Sendable {
         guard let snapshot, snapshot.entries.indices.contains(index) else { return "q:?:\(index)" }
         let entry = snapshot.entries[index]
         if let itemID = entry.itemID {
-            return "q:\(epochs[itemID]?.value ?? 0):\(itemID)"
+            let base = "q:\(epochs[itemID]?.value ?? 0):\(itemID)"
+            // 同一快照內重複的 itID（對抗覆核 P2）：第 2 次起加序號，牌內 ID 才唯一、不被去重丟卡
+            let nth = snapshot.entries[..<index].filter { $0.itemID == itemID }.count
+            return nth == 0 ? base : "\(base)#\(nth)"
         }
         let nth = snapshot.entries[..<index].filter { $0.persistentID == entry.persistentID }.count
         return "q:p:\(entry.persistentID)#\(nth)"
@@ -79,15 +83,17 @@ struct QueueSession: Equatable, Sendable {
     private static func pick(_ matches: [Int], previous: Int?, isRealChange: Bool) -> Int? {
         guard !matches.isEmpty else { return nil }
         if let previous {
-            if isRealChange, let after = matches.first(where: { $0 > previous }) { return after }
-            if !isRealChange, matches.contains(previous) { return previous }
+            if isRealChange { return matches.contains(previous + 1) ? previous + 1 : nil }
+            if matches.contains(previous) { return previous }
         }
         return matches.count == 1 ? matches[0] : nil
     }
 
     private static func epochs(_ current: [Int64: ItemEpoch], updatedWith snapshot: QueueSnapshot) -> [Int64: ItemEpoch] {
-        snapshot.entries.reduce(into: current) { epochs, entry in
-            guard let itemID = entry.itemID else { return }
+        // 同一快照內重複的 itID 只看第一次出現，否則同檔內兩首不同的歌會讓 epoch 每次重寫都跳
+        var seen = Set<Int64>()
+        return snapshot.entries.reduce(into: current) { epochs, entry in
+            guard let itemID = entry.itemID, seen.insert(itemID).inserted else { return }
             if let known = epochs[itemID] {
                 if known.persistentID != entry.persistentID {
                     epochs[itemID] = ItemEpoch(persistentID: entry.persistentID, value: known.value + 1)

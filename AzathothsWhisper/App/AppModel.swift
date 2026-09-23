@@ -18,6 +18,8 @@ final class AppModel {
     let editor: EditorViewModel
     let batch: BatchViewModel
     let coverFlow: CoverFlowViewModel
+    /// Editor 頁內的 Cover Flow 升降（計劃 §6、Q3b）
+    let lyricsFlow: LyricsFlowModel
     private(set) var settings: SettingsViewModel!
 
     /// Editor 與 Batch 任一存檔成功都要放紙花（py:545／701／737）
@@ -41,7 +43,13 @@ final class AppModel {
         splashDuration: Duration = .milliseconds(3500),    // py:1896
         /// 封面磁碟快取的目錄。**nil＝純記憶體**——單元測試預設走這條，
         /// 絕不碰使用者真實的 Caches 目錄
-        artworkDiskDirectory: URL? = nil
+        artworkDiskDirectory: URL? = nil,
+        /// Music 的 Queue.dat／History.dat 所在目錄。**nil＝不讀**——單元測試預設走這條，
+        /// 絕不讀使用者的曲庫
+        queueDirectory: URL? = nil,
+        /// 升回計時（寫入成功後等彩帶撒完）
+        lyricsFlowClock: any PollClock = SystemPollClock(),
+        isMusicRunning: @escaping () -> Bool = MusicProcess.isRunning
     ) {
         self.configStore = configStore
         self.httpClient = httpClient
@@ -67,6 +75,19 @@ final class AppModel {
         // （屬 H-07 的「損毀/失敗容錯」語義；H-06 是重建＋預取，勿混）
         self.coverFlow.observeArtworkStores(from: artworkService)
 
+        let editor = self.editor
+        self.lyricsFlow = LyricsFlowModel(
+            configStore: configStore,
+            detailsReader: CardDetailsReader(music: music),
+            queueSource: QueueFileSource(directory: queueDirectory),
+            clock: lyricsFlowClock,
+            coverFlow: coverFlow,
+            isMusicRunning: isMusicRunning,
+            // 寫入期間 monitor 為 busy、換歌會漏掉：寫入後唯讀補讀一次（Codex R1-4）
+            forceRefresh: { Task { await monitor.forceRefresh() } },
+            cancelAutoFetch: { editor.cancelAutoFetch(for: $0) }
+        )
+
         self.settings = SettingsViewModel(
             validator: validator,
             onTokenSaved: { [weak self] token in self?.saveToken(token) },
@@ -81,6 +102,19 @@ final class AppModel {
         editor.onRequestHydrate = { [weak self] in
             guard let self else { return }
             Task { await self.monitor.forceRefresh() }
+        }
+        // D8：Editor 只拿唯讀判斷式與回報出口，不持有標記 store 與狀態機
+        editor.isMarkedNoLyrics = { [weak self] in self?.lyricsFlow.isMarkedNoLyrics($0) ?? false }
+        editor.onSaved = { [weak self] persistentID, text in
+            self?.lyricsFlow.saved(persistentID: persistentID, text: text)
+        }
+        editor.onSaveFailed = { [weak self] persistentID in
+            self?.lyricsFlow.saveFailed(persistentID: persistentID)
+        }
+        editor.onUserEditedLyrics = { [weak self] in self?.lyricsFlow.userEditedLyrics() }
+        lyricsFlow.onSurfaceChanged = { [weak self] _ in self?.updateCoverFlowVisibility() }
+        lyricsFlow.onWriteNotConfirmed = { [weak self] _ in
+            self?.editor.setExternalStatus(StatusText.writeNotConfirmed)
         }
 
         // C-18：只有「載入專輯」會停輪詢，Fetch Missing／Import 期間輪詢照跑
@@ -167,6 +201,12 @@ final class AppModel {
         #else
         let music = MusicAppleEventsClient()
         #endif
+        #if DEBUG
+        // D11：單元測試 host 不讀使用者的曲庫
+        let queueDirectory: URL? = isTestHost ? nil : QueueFileSource.defaultDirectory
+        #else
+        let queueDirectory: URL? = QueueFileSource.defaultDirectory
+        #endif
         return AppModel(
             configStore: store,
             httpClient: client,
@@ -175,7 +215,8 @@ final class AppModel {
             validator: GeniusTokenValidator(client: client),
             initialToken: store.token,
             initialLanguage: store.language,
-            artworkDiskDirectory: artworkCacheDirectory
+            artworkDiskDirectory: artworkCacheDirectory,
+            queueDirectory: queueDirectory
         )
     }
 
@@ -202,6 +243,7 @@ final class AppModel {
 
         startEventLoop()
         await monitor.start()
+        lyricsFlow.startPolling()
 
         try? await Task.sleep(for: splashDuration)
         isSplashVisible = false
@@ -213,8 +255,10 @@ final class AppModel {
         guard eventTask == nil else { return }
         eventTask = Task { [weak self] in
             guard let self else { return }
+            // D7：editor → lyricsFlow（同步）→ batch；迴圈內不 await 任何 AE
             for await event in self.monitor.events {
                 self.editor.handle(event)
+                self.lyricsFlow.handle(event)
                 self.batch.handle(event)      // C-17：albumChanged 由 Batch 消費
             }
         }
@@ -223,6 +267,7 @@ final class AppModel {
     func stop() {
         eventTask?.cancel()
         eventTask = nil
+        lyricsFlow.stopPolling()
         Task { await monitor.stop() }
     }
 
@@ -237,8 +282,13 @@ final class AppModel {
         } else {
             batch.tabDeactivated()
         }
-        // Cover Flow 不再自己載入（牌組由 LyricsFlowModel 給，計劃 Q3a）；不可見時不預取
-        coverFlow.setVisible(tab == .coverFlow)
+        updateCoverFlowVisibility()
+    }
+
+    /// Cover Flow 可見＝Editor 分頁在前 ∧ 畫面＝Cover Flow（不可見時不預取、不佔 AE）。
+    /// 由 `select` 與畫面變更兩處呼叫
+    private func updateCoverFlowVisibility() {
+        coverFlow.setVisible(tab == .editor && lyricsFlow.surface == .coverFlow)
     }
 
     func openSettings(_ group: SettingsViewModel.Group) {

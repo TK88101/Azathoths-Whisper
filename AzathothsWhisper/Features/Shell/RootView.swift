@@ -109,14 +109,17 @@ struct RootView: View {
     private var content: some View {
         switch model.tab {
         case .editor:
-            EditorView(model: model.editor)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            footer
+            // Q3b 過渡：畫面＝Cover Flow 時整頁顯示它。Editor 內常駐的升降層、把手、可點的中心卡在 Q4（D2）
+            if model.lyricsFlow.surface == .coverFlow {
+                CoverFlowView(model: model.coverFlow)
+            } else {
+                EditorView(model: model.editor)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                footer
+            }
         case .batch:
             // Batch 自帶狀態欄與按鈕列，不套 Editor 的 footer（py:240-262）
             BatchView(model: model.batch)
-        case .coverFlow:
-            CoverFlowView(model: model.coverFlow)
         }
     }
 

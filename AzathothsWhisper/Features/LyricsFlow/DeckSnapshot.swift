@@ -51,11 +51,12 @@ struct DeckSnapshot: Equatable, Sendable {
         if let snapshot = queue.snapshot, let index = queue.currentIndex,
            snapshot.entries[index].persistentID == nowPlaying.persistentID {
             let current = DeckCard(id: queue.cardID(at: index), persistentID: nowPlaying.persistentID, side: .current)
-            let upper = min(snapshot.entries.count, index + 1 + max(0, window))
-            let right = ((index + 1)..<max(index + 1, upper)).map {
+            // 先算剩餘容量再相加：window 可能極大，直接相加會溢位（對抗覆核 P2）
+            let rightCount = min(max(window, 0), snapshot.entries.count - index - 1)
+            let right = ((index + 1)..<(index + 1 + rightCount)).map {
                 DeckCard(id: queue.cardID(at: $0), persistentID: snapshot.entries[$0].persistentID, side: .upcoming)
             }
-            return DeckSnapshot(cards: unique(left + [current] + right), currentCardID: current.id, upcoming: .available)
+            return DeckSnapshot(cards: around(current, left: left, right: right), currentCardID: current.id, upcoming: .available)
         }
         let current = DeckCard(
             id: "o:\(nowPlaying.persistentID)#\(nowPlaying.occurrence)",
@@ -63,7 +64,13 @@ struct DeckSnapshot: Equatable, Sendable {
             side: .current
         )
         let upcoming: Upcoming = queue.upcoming == .available ? .pending : queue.upcoming
-        return DeckSnapshot(cards: unique(left + [current]), currentCardID: current.id, upcoming: upcoming)
+        return DeckSnapshot(cards: around(current, left: left, right: []), currentCardID: current.id, upcoming: upcoming)
+    }
+
+    /// 中心卡＝播放中，永遠在：兩側若有與它同 ID 的卡，剔兩側、保中心（對抗覆核 P2）
+    private static func around(_ current: DeckCard, left: [DeckCard], right: [DeckCard]) -> [DeckCard] {
+        let others = { (cards: [DeckCard]) in cards.filter { $0.id != current.id } }
+        return unique(others(left) + [current] + others(right))
     }
 
     private static func playedCards(_ source: PlayedSource, window: Int) -> [DeckCard] {

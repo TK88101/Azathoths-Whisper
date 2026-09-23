@@ -14,6 +14,7 @@ struct QueueEntry: Equatable, Sendable {
 ///
 /// 選序列的規則（R4-5）：`shuffleMode == off` 讀 `items.list`；其餘一律讀 `items.shuffledList`，
 /// 缺失或壞型別就**整份不可用**——絕不退回 `list`（那是未打亂的原始順序，會顯示錯的「接下來」）。
+/// `shuffleMode` 本身不明（型別錯、兩處不一致，或沒寫卻有打乱序列）同樣不可用（對抗覆核 P1①）。
 struct QueueSnapshot: Equatable, Sendable {
     enum SequenceKind: String, Equatable, Sendable {
         case ordered
@@ -33,8 +34,7 @@ struct QueueSnapshot: Equatable, Sendable {
               let items = segments[0]["items"] as? [String: Any]
         else { return nil }
 
-        let shuffleMode = (items["shuffleMode"] as? String) ?? (root["shuffleMode"] as? String) ?? "off"
-        let kind: SequenceKind = shuffleMode == "off" ? .ordered : .shuffled
+        guard let kind = sequenceKind(items: items, root: root) else { return nil }
         let listKey = kind == .ordered ? "list" : "shuffledList"
         guard let list = (items[listKey] as? [String: Any])?["items"] as? [String: Any],
               let raw = list["iar"] as? [[String: Any]]
@@ -44,6 +44,19 @@ struct QueueSnapshot: Equatable, Sendable {
         let entries = raw.compactMap(entry)
         guard raw.isEmpty || !entries.isEmpty else { return nil }
         return QueueSnapshot(entries: entries, sequenceKind: kind, contentHash: hash(kind: kind, entries: entries))
+    }
+
+    /// `shuffleMode` 寫在 items 與頂層兩處（實檔兩處皆有、值相同）。
+    /// 兩處都沒寫時：只有 `list` 一支 → 順序；另有 `shuffledList` → 無從判斷正在播哪一支，不可用。
+    /// （順序模式的實檔是否寫 `shuffleMode` 尚未實測，計劃 U10）
+    private static func sequenceKind(items: [String: Any], root: [String: Any]) -> SequenceKind? {
+        let fields = [items["shuffleMode"], root["shuffleMode"]].compactMap { $0 }
+        let modes = fields.compactMap { $0 as? String }
+        guard modes.count == fields.count, Set(modes).count <= 1 else { return nil }
+        guard let mode = modes.first else {
+            return items["shuffledList"] == nil ? .ordered : nil
+        }
+        return mode == "off" ? .ordered : .shuffled
     }
 
     private static func entry(_ raw: [String: Any]) -> QueueEntry? {

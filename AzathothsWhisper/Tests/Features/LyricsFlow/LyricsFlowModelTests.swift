@@ -16,6 +16,7 @@ struct LyricsFlowModelTests {
         var forceRefreshes = 0
         var cancelledAutoFetches: [String] = []
         var surfaces: [LyricsSurface] = []
+        var notConfirmed: [String] = []
         var musicRunning = true
     }
 
@@ -67,6 +68,7 @@ struct LyricsFlowModelTests {
             cancelAutoFetch: { recorder.cancelledAutoFetches.append($0) }
         )
         model.onSurfaceChanged = { recorder.surfaces.append($0) }
+        model.onWriteNotConfirmed = { recorder.notConfirmed.append($0) }
         return Harness(model: model, coverFlow: coverFlow, store: store, music: music, clock: clock,
                        recorder: recorder, directory: directory, suiteName: suiteName)
     }
@@ -149,6 +151,24 @@ struct LyricsFlowModelTests {
         #expect(h.model.surface == .editor, "新曲缺詞，照新曲的規則")
     }
 
+    /// 使用者拍板①＋Codex P0：讀回仍缺詞 → 計時真的被取消（不只是狀態），到期也不升回，並回報寫入沒生效
+    @Test func readBackMissingAfterAWriteStaysInTheEditor() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        await play(h, 1, lyrics: "")
+        h.model.saved(persistentID: QueueFixtures.pid(1), text: "new words")
+        await h.clock.waitUntilPending(1)
+
+        await play(h, 1, lyrics: "")
+        await waitFor { await h.clock.pendingCount == 0 }
+        #expect(await h.clock.pendingCount == 0, "計時已取消")
+        await h.clock.releaseAll()
+        await settle()
+        #expect(h.model.surface == .editor)
+        #expect(h.model.status == .missing)
+        #expect(h.recorder.notConfirmed == [QueueFixtures.pid(1)])
+    }
+
     @Test func emptyWriteDoesNotRise() async throws {
         let h = try makeHarness()
         defer { h.tearDown() }
@@ -189,6 +209,21 @@ struct LyricsFlowModelTests {
         await play(h, 1, lyrics: "")
         h.model.saved(persistentID: QueueFixtures.pid(1), text: "found them after all")
         #expect(h.store.noLyricsMarks.isEmpty)
+    }
+
+    /// Codex 修正版 B3：有詞或讀不到的歌不記標記（否則日後詞被清空時會潛伏生效）
+    @Test func onlyAMissingCurrentTrackCanBeMarked() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        await play(h, 1, lyrics: "words")
+        h.model.tapPlayingCard(isCentered: true)
+        h.model.markNoLyrics(persistentID: QueueFixtures.pid(1))
+        #expect(h.store.noLyricsMarks.isEmpty)
+        #expect(h.model.surface == .editor)
+
+        await play(h, 2, lyrics: nil)
+        h.model.markNoLyrics(persistentID: QueueFixtures.pid(2))
+        #expect(h.store.noLyricsMarks.isEmpty, "讀不到不等於沒有")
     }
 
     @Test func emptyPersistentIDCannotBeMarked() async throws {

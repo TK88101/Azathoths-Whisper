@@ -7,8 +7,11 @@ extension ConfigStore {
         static let markedTrackIDs = "NoLyricsMarkedTrackIDs"
     }
 
+    /// 逐項取字串、略過壞項：`stringArray(forKey:)` 遇到一個非字串就整組回 nil，
+    /// 下一次標記便會以空集合覆寫、抹掉其他標記（對抗覆核 P2）
     var noLyricsMarks: Set<String> {
-        Set(defaults.stringArray(forKey: NoLyricsMarksKey.markedTrackIDs) ?? [])
+        let raw = defaults.array(forKey: NoLyricsMarksKey.markedTrackIDs) ?? []
+        return Set(raw.compactMap { $0 as? String }.filter { !$0.isEmpty })
     }
 
     /// - Returns: 是否真的記下了（空 ID 拒絕）

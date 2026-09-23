@@ -33,6 +33,32 @@ struct DeckSnapshotTests {
         #expect(deck.upcoming == .available)
     }
 
+    /// 對抗覆核 P2：左側若出現與中心同 ID 的卡，保中心、剔左側（中心＝播放中，永遠在）
+    @Test func theCentreCardSurvivesACollidingPlayedCard() {
+        let early = ListeningHistory()
+            .recording(.init(persistentID: pid(1), occurrence: 1))
+            .recording(.init(persistentID: pid(2), occurrence: 2))
+        let deck = DeckSnapshot.build(
+            nowPlaying: DeckSnapshot.NowPlaying(persistentID: pid(2), occurrence: 2),
+            played: .observed(early),
+            queue: QueueSession(),
+            window: 10
+        )
+        #expect(deck.cards.map(\.id).contains(deck.currentCardID ?? "-"))
+        #expect(deck.cards.last?.side == .current)
+        #expect(deck.cards.count == 2)
+    }
+
+    @Test func aHugeWindowDoesNotOverflow() {
+        let deck = DeckSnapshot.build(
+            nowPlaying: DeckSnapshot.NowPlaying(persistentID: pid(1), occurrence: 1),
+            played: history([7]),
+            queue: session([Item(1, itemID: 10), Item(2, itemID: 11)], current: 1),
+            window: .max
+        )
+        #expect(deck.cards.map(\.persistentID) == [pid(7), pid(1), pid(2)])
+    }
+
     @Test func windowLimitsBothSides() {
         let items = (1...30).map { Item(Int64($0), itemID: Int64(100 + $0)) }
         let deck = DeckSnapshot.build(

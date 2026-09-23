@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 @testable import AzathothsWhisper
 
@@ -13,10 +14,13 @@ actor GatedPollClock: PollClock {
     }
 
     private var sleepers: [Sleeper] = []
+    /// 已取消的等待者。取消在呼叫端**同步**發生，而 actor 內的移除要等排程——中間若有人 release，
+    /// 會把已取消者當成正常喚醒（對抗覆核 P2）。故以鎖同步記錄，release 時即可跳過
+    private nonisolated let cancelledIDs = OSAllocatedUnfairLock(initialState: Set<UUID>())
     /// 每次 `sleep` 請求的時長，依請求順序
     private(set) var requested: [Duration] = []
 
-    var pendingCount: Int { sleepers.count }
+    var pendingCount: Int { sleepers.filter { !isCancelled($0.id) }.count }
 
     func sleep(for interval: Duration) async throws {
         requested.append(interval)
@@ -24,6 +28,7 @@ actor GatedPollClock: PollClock {
         try await withTaskCancellationHandler {
             try await suspend(id: id)
         } onCancel: { [weak self] in
+            self?.cancelledIDs.withLock { _ = $0.insert(id) }
             Task { await self?.cancel(id) }
         }
     }
@@ -39,16 +44,29 @@ actor GatedPollClock: PollClock {
         }
     }
 
-    /// 喚醒最早的一個等待者
+    /// 喚醒最早的一個仍在等的等待者（途中遇到已取消者，以 CancellationError 結束它）
     func releaseNext() {
-        guard !sleepers.isEmpty else { return }
-        sleepers.removeFirst().continuation.resume()
+        while !sleepers.isEmpty {
+            let sleeper = sleepers.removeFirst()
+            if isCancelled(sleeper.id) {
+                sleeper.continuation.resume(throwing: CancellationError())
+                continue
+            }
+            sleeper.continuation.resume()
+            return
+        }
     }
 
     func releaseAll() {
         let woken = sleepers
         sleepers = []
-        woken.forEach { $0.continuation.resume() }
+        for sleeper in woken {
+            if isCancelled(sleeper.id) {
+                sleeper.continuation.resume(throwing: CancellationError())
+            } else {
+                sleeper.continuation.resume()
+            }
+        }
     }
 
     /// 讓出直到至少 `count` 個等待者已掛上（有界：超過輪數即返回，由呼叫端的斷言暴露）
@@ -59,6 +77,11 @@ actor GatedPollClock: PollClock {
         }
     }
 
+    private nonisolated func isCancelled(_ id: UUID) -> Bool {
+        cancelledIDs.withLock { $0.contains(id) }
+    }
+
+    /// 每個 continuation 只會被 resume 一次：只有從 `sleepers` 移出的那一方會 resume 它
     private func cancel(_ id: UUID) {
         guard let index = sleepers.firstIndex(where: { $0.id == id }) else { return }
         sleepers.remove(at: index).continuation.resume(throwing: CancellationError())

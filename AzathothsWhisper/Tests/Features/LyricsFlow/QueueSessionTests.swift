@@ -22,8 +22,8 @@ struct QueueSessionTests {
         #expect(session.upcoming == .available)
     }
 
-    /// 實測（S8）：按下一首時檔案不重寫，位置由「上次位置之後第一個相符」推進
-    @Test func realChangeAdvancesToTheFirstMatchAfterThePreviousPosition() {
+    /// 實測（S8）：按下一首時檔案不重寫，位置由「上次位置的下一項」推進
+    @Test func realChangeAdvancesToTheNextPosition() {
         // 同一首在清單出現兩次（插歌）：P2 在 1 與 4
         var session = QueueSession()
             .applying(snapshot([Item(1, itemID: 10), Item(2, itemID: 50), Item(3, itemID: 11), Item(4, itemID: 12), Item(2, itemID: 13)]))
@@ -43,6 +43,27 @@ struct QueueSessionTests {
             .resolvingCurrent(persistentID: pid(2), isRealChange: true)
             .resolvingCurrent(persistentID: pid(2), isRealChange: false)
         #expect(session.currentIndex == 2)
+    }
+
+    /// 對抗覆核 P2：往回跳到清單中重複的歌——不猜成後面那一個（舊邏輯選 index 3）
+    @Test func backSkipOntoADuplicateIsUnresolved() {
+        let session = QueueSession()
+            .applying(snapshot([Item(1, itemID: 10), Item(2, itemID: 11), Item(3, itemID: 12), Item(1, itemID: 13)]))
+            .resolvingCurrent(persistentID: pid(2), isRealChange: true)
+            .resolvingCurrent(persistentID: pid(1), isRealChange: true)
+        #expect(session.currentIndex == nil)
+        #expect(session.upcoming == .pending, "先不顯示右側，也不宣稱讀不到")
+    }
+
+    /// 跳播到不相鄰的歌（或從專輯頁點播，檔案尚未重寫）：事件當下不猜，下一次輪詢再依唯一性定位
+    @Test func nonAdjacentJumpWaitsForTheNextPoll() {
+        var session = QueueSession()
+            .applying(snapshot([Item(1, itemID: 10), Item(2, itemID: 11), Item(3, itemID: 12), Item(4, itemID: 13)]))
+            .resolvingCurrent(persistentID: pid(1), isRealChange: true)
+            .resolvingCurrent(persistentID: pid(4), isRealChange: true)
+        #expect(session.currentIndex == nil)
+        session = session.resolvingCurrent(persistentID: pid(4), isRealChange: false)
+        #expect(session.currentIndex == 3)
     }
 
     /// 無上次位置、同曲出現多次 → 無法唯一 → 不猜（退回）
@@ -89,6 +110,16 @@ struct QueueSessionTests {
             .applying(snapshot([Item(1, itemID: 10), Item(2, itemID: 11)]))
             .applying(snapshot([Item(5, itemID: 20), Item(1, itemID: 10), Item(2, itemID: 11)]))
         #expect(session.cardID(at: 1) == "q:0:10")
+    }
+
+    /// 對抗覆核 P2：同一快照內重複的 itID 不得產生相同的卡 ID（否則牌組去重會靜默丟卡）
+    @Test func duplicateItemIDsGetDistinctCardIDs() {
+        let session = QueueSession().applying(snapshot([Item(1, itemID: 10), Item(2, itemID: 10), Item(3, itemID: 11)]))
+        #expect(session.cardID(at: 0) == "q:0:10")
+        #expect(session.cardID(at: 1) == "q:0:10#1")
+        let rewritten = session.applying(snapshot([Item(1, itemID: 10), Item(2, itemID: 10), Item(9, itemID: 12)]))
+        #expect(rewritten.cardID(at: 0) == "q:0:10", "重複項不得讓 epoch 每次重寫都跳")
+        #expect(rewritten.cardID(at: 1) == "q:0:10#1")
     }
 
     @Test func entriesWithoutItemIDUseOccurrenceWithinTheSnapshot() {
