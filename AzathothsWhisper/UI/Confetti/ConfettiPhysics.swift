@@ -105,6 +105,16 @@ struct ConfettiColor: Equatable, Sendable {
     ]
 }
 
+/// 彩帶的時間常數（單一來源）：`ConfettiView` 的步進與「寫入成功後幾秒升回 Cover Flow」都由此推導（計劃 D5）
+enum ConfettiTiming {
+    /// 每步間隔（≈ requestAnimationFrame）
+    static let frameInterval: Duration = .milliseconds(16)
+    /// 單發粒子壽命（canvas-confetti 預設 200 幀）
+    static let ticks = 200
+    /// 名義壽命 ≈ 3.2s（實際略長：`Task.sleep` 不與螢幕刷新同步）
+    static let lifetime: Duration = frameInterval * ticks
+}
+
 /// 單次 confetti() 呼叫的參數（未指定者取 canvas-confetti 預設）
 struct ConfettiBurst: Sendable {
     var particleCount: Int
@@ -114,7 +124,7 @@ struct ConfettiBurst: Sendable {
     var decay: Double = 0.9
     var gravity: Double = 1
     var drift: Double = 0
-    var ticks: Int = 200
+    var ticks: Int = ConfettiTiming.ticks
     var scalar: Double = 1
     var originX: Double = 0.5
     var originY: Double = 0.5

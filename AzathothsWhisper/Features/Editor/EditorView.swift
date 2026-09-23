@@ -125,7 +125,8 @@ struct EditorView: View {
     private var lyricsBox: some View {
         ZStack(alignment: .topLeading) {
             PlainTextEditor(
-                text: $model.lyricsText,
+                // setter 只在使用者輸入時被呼叫（程式寫入走 model → view）：據此取消待升回
+                text: Binding(get: { model.lyricsText }, set: { model.userEditedLyrics($0) }),
                 font: .monospacedSystemFont(ofSize: 16, weight: .regular),
                 textColor: NSColor(Theme.Gray.g300),
                 insets: NSSize(width: 24, height: 24)

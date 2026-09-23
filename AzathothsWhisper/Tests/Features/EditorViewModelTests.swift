@@ -72,6 +72,76 @@ struct EditorViewModelTests {
         #expect(model.statusText == StatusText.lyricsUnreadable)
     }
 
+    /// D8①：已標記「沒有歌詞」的曲不自動抓詞
+    @Test func markedTrackDoesNotAutoFetch() {
+        let model = makeModel(genius: .found("body"))
+        model.isMarkedNoLyrics = { $0 == "PID1" }
+        model.handle(.trackChanged(.fixture(id: "PID1"), existingLyrics: ""))
+        #expect(model.autoFetchTask == nil)
+        #expect(model.statusText == StatusText.markedNoLyrics)
+    }
+
+    /// D8②：標記時取消該曲尚未完成的自動抓詞
+    @Test func cancellingAutoFetchStopsThePendingFetch() async {
+        let model = makeModel(genius: .found("fetched"))
+        model.handle(.trackChanged(.fixture(id: "PID1"), existingLyrics: ""))
+        model.cancelAutoFetch(for: "PID1")
+        await model.autoFetchTask?.value
+        #expect(model.lyricsText == "", "取消後抓詞結果不得寫進已升起、看不見的 Editor")
+    }
+
+    @Test func cancellingAutoFetchForAnotherTrackKeepsIt() async {
+        let model = makeModel(genius: .found("fetched"))
+        model.handle(.trackChanged(.fixture(id: "PID1"), existingLyrics: ""))
+        model.cancelAutoFetch(for: "OTHER")
+        await model.autoFetchTask?.value
+        #expect(model.lyricsText == "fetched")
+    }
+
+    /// D8③：寫入目標與文字在 busy 的 actor hop **之前**擷取——
+    /// 寫入等待期間換歌，不得把 A 的詞寫給 B、也不得回報成 B
+    @Test func saveReportsTheTargetCapturedBeforeTheBusyHop() async {
+        let music = MockMusicClient()
+        let gate = LyricsGate()
+        await music.setWriteGate(gate)
+        let model = makeModel(music: music)
+        var reported: [(String, String)] = []
+        model.onSaved = { reported.append(($0, $1)) }
+        model.handle(.trackChanged(.fixture(id: "A"), existingLyrics: "a words"))
+
+        let saving = Task { await model.save() }
+        await settle()
+        model.handle(.trackChanged(.fixture(id: "B"), existingLyrics: "b words"))
+        await gate.open()
+        await saving.value
+
+        #expect(await music.writes["A"] == "a words")
+        #expect(await music.writes["B"] == nil)
+        #expect(reported.count == 1)
+        #expect(reported.first?.0 == "A")
+        #expect(reported.first?.1 == "a words")
+    }
+
+    @Test func failedSaveIsReported() async {
+        let music = MockMusicClient()
+        await music.setSetLyricsOutcome(.failure(.scriptingFailure("x")))
+        let model = makeModel(music: music)
+        var failed: [String] = []
+        model.onSaveFailed = { failed.append($0) }
+        model.handle(.trackChanged(.fixture(id: "A"), existingLyrics: "w"))
+        await model.save()
+        #expect(failed == ["A"])
+    }
+
+    @Test func userEditsAreReported() {
+        let model = makeModel()
+        var edits = 0
+        model.onUserEditedLyrics = { edits += 1 }
+        model.userEditedLyrics("typed")
+        #expect(model.lyricsText == "typed")
+        #expect(edits == 1)
+    }
+
     // B-05（後半）：非 Editor tab 時不自動抓
     @Test func autoFetchSkippedWhenEditorTabInactive() {
         let model = makeModel(genius: .found("body"))

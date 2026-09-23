@@ -41,7 +41,9 @@ struct AppModelTests {
             validator: AlwaysValidValidator(),
             initialToken: token,
             initialLanguage: .system,
-            splashDuration: .milliseconds(1)
+            splashDuration: .milliseconds(1),
+            lyricsFlowClock: GatedPollClock(),
+            isMusicRunning: { true }
         )
         return Fixture(
             model: model, store: store, defaults: defaults,
@@ -85,7 +87,7 @@ struct AppModelTests {
         fixture.model.select(.batch)
         #expect(fixture.model.editor.isEditorTabActive == false)
 
-        fixture.model.select(.coverFlow)
+        fixture.model.select(.batch)
         #expect(fixture.model.editor.isEditorTabActive == false)
 
         fixture.model.select(.editor)
@@ -150,6 +152,55 @@ struct AppModelTests {
 
         #expect(fixture.model.editor.lyricsText == "lyric")
         #expect(await music.currentTrackCalls == 1, "未啟動輪詢：只有手動那一次 tick")
+    }
+
+    /// AC1（整合）：輪詢到有詞的歌 → Cover Flow 升起、可見、置中於它
+    @Test func tickedTrackWithLyricsRaisesCoverFlow() async {
+        let music = MockMusicClient(script: [.track(.fixture(id: "PID1"), lyrics: "words")])
+        let fixture = makeFixture(music: music)
+        defer { fixture.tearDown() }
+        fixture.model.startEventLoop()
+
+        await fixture.monitor.tick()
+        await waitUntil { fixture.model.lyricsFlow.surface == .coverFlow }
+
+        #expect(fixture.model.lyricsFlow.surface == .coverFlow)
+        #expect(fixture.model.coverFlow.isVisible)
+        #expect(fixture.model.coverFlow.centerID != nil)
+    }
+
+    /// AC2（整合）：缺詞 → Editor；Cover Flow 不可見
+    @Test func tickedMissingTrackShowsTheEditor() async {
+        let music = MockMusicClient(script: [.track(.fixture(id: "PID1"), lyrics: "")])
+        let fixture = makeFixture(music: music)
+        defer { fixture.tearDown() }
+        fixture.model.startEventLoop()
+
+        await fixture.monitor.tick()
+        await waitUntil { fixture.model.lyricsFlow.status == .missing }
+
+        #expect(fixture.model.lyricsFlow.surface == .editor)
+        #expect(!fixture.model.coverFlow.isVisible)
+    }
+
+    /// Cover Flow 可見＝Editor 分頁在前 ∧ 畫面＝Cover Flow
+    @Test func coverFlowIsHiddenOnTheBatchTab() async {
+        let music = MockMusicClient(script: [.track(.fixture(id: "PID1"), lyrics: "words")])
+        let fixture = makeFixture(music: music)
+        defer { fixture.tearDown() }
+        fixture.model.startEventLoop()
+        await fixture.monitor.tick()
+        await waitUntil { fixture.model.coverFlow.isVisible }
+
+        fixture.model.select(.batch)
+        #expect(!fixture.model.coverFlow.isVisible)
+        fixture.model.select(.editor)
+        #expect(fixture.model.coverFlow.isVisible)
+    }
+
+    /// D10：分頁只剩 Editor 與 Batch（Cover Flow 改為 Editor 內的一層）
+    @Test func tabsAreEditorAndBatchOnly() {
+        #expect(AppTab.allCases == [.editor, .batch])
     }
 
     /// D11：單元測試 host 不得輪詢使用者的 Music（以不回應的替身取代）

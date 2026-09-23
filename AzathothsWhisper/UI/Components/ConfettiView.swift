@@ -43,7 +43,7 @@ struct ConfettiView: View {
                 engine.fire(ConfettiBurst.saveCelebration, canvasSize: proxy.size)
                 while engine.isRunning, !Task.isCancelled {
                     engine.step()
-                    try? await Task.sleep(for: .milliseconds(16))   // ≈ requestAnimationFrame
+                    try? await Task.sleep(for: ConfettiTiming.frameInterval)
                 }
             }
         }

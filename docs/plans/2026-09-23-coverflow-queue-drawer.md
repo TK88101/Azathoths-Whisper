@@ -414,3 +414,9 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
 - R4-2：**接受裁決，不重提**（以 Music 履歴語義為唯一真相；同秒更新＋換歌即查，3 秒空窗可接受）。
 - 新矛盾 2 條，採納：R5-1 AC8b 改為只管右側；R5-2 補退回模式左卡 ID `hl:<persistentID>#<場次>`。
 - 結論：v3.4 定稿，繼續 Phase 2（S5 → Q0）。
+
+### 2026-09-23 18:4x 暫停點（使用者要求盤點剩餘工作）
+- **已完成並存檔**：Phase 1 計劃 v3.4；spike S0–S9、UITests 基線（14/16，2 條既知偶發）、單元基線（分支點 407 條，RenderGeometry 2 條／8 斷言既紅）；Q0、Q1（`211926d`）、Q2（`f6d3f0e`）、Q3a（`c5c8c04`），每段全量單元只剩基線紅（Q3a 另有 1 條負載偶發，單獨重跑 2/2 綠）。
+- **Q3b 進行中（本 commit，測試紅）**：已寫紅燈測試（`LyricsFlowModelTests`、Editor D8 三處、AppModel 整合 4 條）；已實作 Editor D8（標記判斷、取消自動抓詞、寫入前擷取目標、寫入回報、使用者輸入回報）、`ConfettiTiming` 單一來源、`StatusText` 兩條。**未做**：`LyricsFlowModel` 本體、`AppModel` 接線（事件分發、可見性、輪詢）、移除 `AppTab.coverFlow`。
+- **Q0＋Q1 對抗覆核（Opus 5，實際執行 10 支 harness）**：無 P0；**P1 三條待修**——① `QueueSnapshot` 缺 `shuffleMode` 時預設 `off` 會改讀未打亂的 `list`（違反 R4-5）；② 寫入後讀回仍缺詞／再寫空字串時，待升回未取消，到期把缺詞曲升回（違反「缺詞＝Editor」）；③ 卡 ID 規格與 AC8 文字不一致（程式較合理，改 AC8）。P2 十二條（上一首／跳播時的位置推算、重複 itID、GatedPollClock 取消競態、標記陣列混入非字串等）。**兩條需使用者拍板**：同曲重發讀回缺詞時要不要取消升回（牽動 AC6 措辭）；同曲重發由「讀不到」變「缺詞」要不要降下 Editor。
+- **未開始**：Q3.5（UI 測試組裝）、使用者在場 #2（新畫面測試紅燈）、Q4（畫面：Editor 內的 Cover Flow 層、升降動畫、把手、徽章、可點的中心卡、無詞按鈕、三語字串）、使用者在場 #3、Q6（/simcodex 評審、全量測試、ACCEPTANCE 改寫、證據包、實機試用）。
