@@ -170,6 +170,10 @@ final class AppModel {
         // 物理上不可能被任何環境變數觸發（見 unitTestHostFlag 的說明）。
         #if DEBUG
         let environment = ProcessInfo.processInfo.environment   // 每次讀都會從 environ 重建整份字典，綁一次
+        // Cover Flow × 找歌詞的 UI 測試：場景化的假 Music＋測試專屬設定（見 AppModel+LyricsFlowUITest.swift）
+        if let lyricsFlowModel = makeLyricsFlowUITestModelIfRequested(environment: environment) {
+            return lyricsFlowModel
+        }
         // H-02 UI 測試閘門：只換 Music 的真實組裝（見 AppModel+CoverFlowUITest.swift）
         if let uiTestModel = makeCoverFlowUITestModelIfRequested(environment: environment) {
             return uiTestModel

@@ -230,7 +230,7 @@ xcodebuild test -project AzathothsWhisper.xcodeproj -scheme AzathothsWhisper \
 ./Scripts/coverage_gate.sh <scratch>/unit.xcresult          # Services／Infra 既有門檻
 xcrun xccov view --report --files-for-target "Azathoth's Whisper.app" <scratch>/unit.xcresult   # 新檔與改動檔逐檔
 ./Scripts/no_playback_gate.sh
-python3 -m pytest Scripts/test_h02_gate_*.py -q
+(cd Scripts && /usr/bin/python3 -m unittest discover -s . -p 'test_h02_gate*.py')
 # UITests（使用者在場；先關 Paste 等會彈窗的常駐 app）
 xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
   -only-testing:AzathothsWhisperUITests/ShellUITests -only-testing:AzathothsWhisperUITests/BatchUITests \
@@ -353,6 +353,9 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
   - **新發現並修正的缺陷**：寫入成功後的補讀（`forceRefresh`）發生在 Editor 解除 busy 之前，monitor 會因 busy 直接跳過——補讀被靜默吞掉。改為 busy 期間記下、全部來源空閒時補做一次（`NowPlayingMonitor.pendingForceRefresh`；`forceRefreshWhileBusyRunsOnceIdle`／`pendingForceRefreshWaitsForEveryBusySource`）。
   - **變異驗證（實際執行）**：把 R6 各修正改回舊邏輯（保留接口）後跑 9 組測試：新測試 19 條紅（含 window 溢位直接崩潰重啟、時鐘取消競態逾時），`git checkout` 復原後全綠。唯一未被抓到的是 AppModel 層 AC4 對 monitor 修正的依賴（時序競態不必然觸發），由 monitor 單元測試兜住。
   - 全量單元：571 條，只剩基線紅（RenderGeometry 2 條／8 斷言）；「運行時變更 centerID」一條在全量中偶紅一次，單獨重跑 2/2 綠（與 Q3a 同一條負載偶發）。
+- **Q3.5（2026-09-23 20:2x）**：UI 測試組裝＝場景 env `AZW_UITEST_SCENARIO=present|missing|marked|notPlaying`（`App/UITestSupport/LyricsFlowUITestScenario.swift`：場景、旗標、假資料 ID、a11y identifier 的單一來源，app 與 UITests 同編）；假 Music `LyricsFlowUITestMusic`（actor、`setLyrics` 只寫記憶體）、恆 404 的 `UITestStubHTTPClient`、測試專屬設定 suite（reset／seed env，從不碰 `.standard`）、app 暫存目錄裡的假 Queue.dat／History.dat（牌組 5 張：左 2、中 1、右 2）。組裝單元測試 9 條綠；`LyricsFlowUITests` 7 條（AC1–AC5、AC14）與 `ShellUITests` 改動（改走 `notPlaying` 場景、AC10 以 identifier 判定導覽只剩兩個、E-10 鍵改驗把手標題）已寫；`xcodegen generate` 後 `build-for-testing` 綠（N3）。這些 UITests 在 Q4 前必紅（identifier、把手、標記按鈕、抓詞計數都還不存在），紅燈於使用者在場 #2 取得。
+  - 全量單元 582 條只剩基線紅；`no_playback_gate.sh` 通過；H-02 Python 閘門 321 條 OK（實際命令為 `cd Scripts && /usr/bin/python3 -m unittest discover -s . -p 'test_h02_gate*.py'`，§9.3 原寫 pytest，已更正）。
+  - 新檔與改動檔逐檔行覆蓋全部 ≥ 90%。**`coverage_gate.sh`（Services＋Infra 整體 ≥ 80%）＝77.6% 不過**：非本 session 造成——Q1 為 81.4%，Q2 起 77.2%，原因是 AE client（`MusicAppleEventsClient`，AC11 明文豁免）Q2 新增方法擴大分母（覆蓋 10／384 行）；閘門腳本不認得豁免。處置（加豁免清單或補 opt-in `LiveMusicTests`）留 Q6 交使用者定。
 
 ## 14. 附錄：評審辯論記錄
 
