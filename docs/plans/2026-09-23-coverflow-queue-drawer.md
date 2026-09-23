@@ -364,6 +364,16 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
   - **界面樹實機預檢**（Opus agent＋我，假 Music 場景、只用元素定界的 AXPress，不經 XCUITest、不碰 Music）：抓到兩個會讓 7 條 `LyricsFlowUITests` 全紅的問題——① `children: .contain` 容器上的 AXValue 被 SwiftUI 吞掉 → 改由 DEBUG 1pt 透明文字探針 `lyricsflow-surface` 承載升降值；② **產品缺陷：有歌在播時條帶停在第一張履歴卡、沒捲到播放卡**（VM 的中心已是播放卡，畫面卻停在第 0 張，不回寫——初始值路徑的症狀）。對照實驗：E1 Cover Flow 恆可聚焦 → 仍錯；E2 播放卡不變 Button → **正確**；E3 固定結構＋點擊手勢＋無障礙按鈕特徵 → 仍錯；E4 只留點擊手勢與懸停 → 仍錯；E5 卡片不掛任何手勢 → **正確 2/2**。結論：**條帶內容一帶手勢（Button、點擊、懸停），換牌後的捲動定位就失效**。改為卡片純展示、互動全在條帶層：條帶層的點擊手勢只認「正中播放卡的封面正面」；無障礙按鈕與懸停提示是條帶旁的並列層（掛在條帶 `.overlay` 上會被併進捲動區、不出現在 AX 樹——E7／E9 實測），`allowsHitTesting(false)` 讓觸控板捲動照常落到條帶；「播放卡是否在正中」由條帶的佈局幾何回報 VM（`CoverFlowViewModel.isPlayingCardCentered`）。E11 實測：播放卡置中、唯一按鈕、AX 框＝封面正面 260×260、按下降下；missing／重啟／marked／notPlaying 皆符合。另修 `edit_lyrics_of %@` 鍵名（SwiftUI 以插值格式字串查找）。
   - **Codex R7**（評審修復前版本，3 P1＋1 推測）裁決見 §14 R7。
   - 全量單元 595 條只剩基線紅；`no_playback_gate.sh` 通過；UITests `build-for-testing` 綠。
+- **暫停點（2026-09-23 21:3x，HEAD `2d6c903`）**：剩使用者在場 #3、Q6 收官、使用者實機試用。下一個 session 的開工口令（整段複製貼上）：
+
+```
+/fatboyslim 繼續「Cover Flow × 找歌詞」。
+【最終目標】Editor 頁內的 Cover Flow：播放中那張永遠置中，左＝Music 的「履歴」（History.dat），右＝接下來的歌（Queue.dat，隨機時讀 shuffledList）。有詞＝Cover Flow 升起；缺詞＝降下露出 Editor；寫入成功、彩帶撒完後升回（讀回仍缺詞＝寫入沒生效→留在 Editor 並提示）；「No lyrics for this song」標記後升回，下次不跳 Editor；只有正中且正在播的那張可點（點了進 Editor）；每張卡標 ✓／✗／—；Cover Flow 分頁已移除。
+【本 session 目標】依序：① 使用者在場 #3（先問我）：跑 LyricsFlowUITests（8 條）＋ShellUITests＋BatchUITests，目標全綠；回歸集合對基線不新增紅（A-10、C-21 既知偶發，失敗就單獨重跑 2 次再判）；三態截圖（裁切到視窗、不拍憑證欄位）。紅了先定位，必要時用「界面樹實機預檢」手法（§13 U#3 前預檢，假 Music 場景＋元素定界 AXPress）。② Q6 收官：Phase 3 /simcodex（把 R7-③ 的駁回理由回餵複審）、全量測試、ACCEPTANCE 補 H-12 起（AC1–AC14）、證據包；③ 我實機試用：riseDelay 手感（U6）、AC13 中途退出 Music、U10（循序播放時唯讀看一次 Queue.dat 有沒有 shuffleMode 鍵）。
+【先讀】docs/plans/2026-09-23-coverflow-queue-drawer.md（v3.6；§13 最後幾條＝Q3b／Q3.5／在場 #2／Q4／U#3 前預檢；§14 R6、R7＝辯論記錄）。分支 wip/coverflow-lyrics，HEAD 2d6c903。
+【待我拍板】coverage_gate.sh（Services＋Infra ≥80%）目前 77.6% 不過：Q2 起 AE client（AC11 豁免）擴大分母所致——給閘門加豁免清單，還是補 opt-in LiveMusicTests？先與 Codex 辯論，再給我單一結論。
+【紅線】絕不加任何播放控制，不改變 Music.app 的任何狀態（含啟動 Music、改 UI、寫它的檔案）；每段 TDD、每段全量單元只容許基線紅（RenderGeometry 2 條／8 斷言）；條帶內的卡片不得掛任何手勢（會打亂捲動定位，§13 E1–E11）；只在 wip/coverflow-lyrics 做 checkpoint，不 commit 到 feat／main，不 push；對我講結論用白話和我畫面上看得到的東西。
+```
 
 ## 14. 附錄：評審辯論記錄
 
