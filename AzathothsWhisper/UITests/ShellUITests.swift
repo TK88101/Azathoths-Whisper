@@ -52,7 +52,8 @@ final class ShellUITests: AppUITestCase {
         attach("splash")
 
         waitForMainUI()
-        XCTAssertFalse(splashSubtitle.exists, "主 UI 出現後 splash 應消失")
+        // splash 以 0.2s 淡出；主 UI 已在 AX 樹上時它可能還在淡出途中
+        XCTAssertTrue(splashSubtitle.waitForNonExistence(timeout: 2), "主 UI 出現後 splash 應消失")
         XCTAssertEqual(app.windows.count, 1, "A-02：同窗切換，不得開新視窗")
     }
 

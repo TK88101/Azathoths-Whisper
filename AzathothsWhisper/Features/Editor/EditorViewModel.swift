@@ -51,6 +51,8 @@ final class EditorViewModel {
     #if DEBUG
     /// 本次啟動的抓詞次數：UITests 以 a11y value 判定「未自動抓詞」（計劃 §9.4）
     private(set) var fetchCount = 0
+    /// 本次啟動的強制重讀請求次數（AC3：點非播放卡不得觸發）
+    private(set) var hydrateRequestCount = 0
     #endif
 
     init(lyricsService: LyricsService, music: any MusicControlling, clock: any PollClock = SystemPollClock()) {
@@ -135,6 +137,9 @@ final class EditorViewModel {
     }
 
     func requestHydrate() {
+        #if DEBUG
+        hydrateRequestCount += 1
+        #endif
         onRequestHydrate?()
     }
 

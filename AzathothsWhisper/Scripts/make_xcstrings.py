@@ -38,7 +38,8 @@ NEW_KEYS = {
     "upnext_unavailable": {"en": "Up next isn't available right now", "zh_TW": "接下來的歌暫時讀不到", "ja": "次の曲を読み取れません"},
     "coverflow_show": {"en": "Show Cover Flow", "zh_TW": "顯示封面瀏覽", "ja": "カバーフローを表示"},
     "coverflow_hide": {"en": "Hide Cover Flow", "zh_TW": "隱藏封面瀏覽", "ja": "カバーフローを隠す"},
-    "edit_lyrics_of": {"en": "Edit lyrics of %@", "zh_TW": "編輯「%@」的歌詞", "ja": "「%@」の歌詞を編集"},
+    # 鍵名帶 %@：SwiftUI 的 Text("edit_lyrics_of \(title)") 以插值後的格式字串當鍵查找
+    "edit_lyrics_of %@": {"en": "Edit lyrics of %@", "zh_TW": "編輯「%@」的歌詞", "ja": "「%@」の歌詞を編集"},
 }
 LANG_MAP = {"en": "en", "zh_TW": "zh-Hant", "ja": "ja"}
 

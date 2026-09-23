@@ -7,8 +7,11 @@ enum AccessibilityID {
     static let navBatch = "nav-batch"
 
     static let lyricsFlowHandle = "lyricsflow-handle"
-    /// Cover Flow 層常駐（降下時只露把手），故以 value 表示升降：`raised`／`lowered`
+    /// Cover Flow 層常駐（降下時只露把手），只看「存在」判斷不了升降
     static let coverFlowLayer = "lyricsflow-coverflow"
+    /// DEBUG 限定的升降探針：value＝`raised`／`lowered`。容器（`children: .contain`）上的 value
+    /// 會被 SwiftUI 吞掉（2026-09-23 實測），故另設 1pt 透明文字承載
+    static let surfaceProbe = "lyricsflow-surface"
     static let raised = "raised"
     static let lowered = "lowered"
     /// Editor 層條件掛載：只在畫面＝Editor 時存在（D2）
@@ -25,4 +28,6 @@ enum AccessibilityID {
     static let lyricsText = "editor-lyrics"
     /// DEBUG 限定：a11y value＝本次啟動的抓詞次數（「未自動抓詞」的判定）
     static let fetchCount = "editor-fetch-count"
+    /// DEBUG 限定：a11y value＝本次啟動的強制重讀請求次數（AC3：點非播放卡不得觸發）
+    static let hydrateCount = "editor-hydrate-count"
 }

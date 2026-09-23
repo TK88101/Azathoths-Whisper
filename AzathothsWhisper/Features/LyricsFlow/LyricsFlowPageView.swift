@@ -43,7 +43,24 @@ struct LyricsFlowPageView: View {
         .onChange(of: isRaised && isActive, initial: true) { _, focusable in
             coverFlowFocused = focusable
         }
+        #if DEBUG
+        .overlay(alignment: .topTrailing) { surfaceProbe }
+        #endif
     }
+
+    #if DEBUG
+    /// UITests 判定升降用（見 `AccessibilityID.surfaceProbe`）
+    private var surfaceProbe: some View {
+        let value = isRaised ? AccessibilityID.raised : AccessibilityID.lowered
+        return Text(verbatim: value)
+            .font(.system(size: 1))
+            .foregroundStyle(Color.clear)
+            .frame(width: 1, height: 1)
+            .allowsHitTesting(false)
+            .accessibilityIdentifier(AccessibilityID.surfaceProbe)
+            .accessibilityValue(value)
+    }
+    #endif
 
     private var editorLayer: some View {
         EditorView(
@@ -68,13 +85,13 @@ struct LyricsFlowPageView: View {
                 isInteractive: isRaised && isActive,
                 focus: $coverFlowFocused,
                 upcoming: lyricsFlow.upcoming,
-                onTapPlayingCard: { lyricsFlow.tapPlayingCard(isCentered: true) }
+                // 傳實際判定值給狀態機（Codex R7-③）：可點資格以條帶最新回報的幾何為準
+                onTapPlayingCard: { lyricsFlow.tapPlayingCard(isCentered: coverFlow.isPlayingCardCentered) }
             )
         }
         .background(Theme.background)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(AccessibilityID.coverFlowLayer)
-        .accessibilityValue(isRaised ? AccessibilityID.raised : AccessibilityID.lowered)
     }
 
     /// Editor 綁定曲＝當前曲時才顯示狀態（B-13：綁定曲可能落後於當前曲）

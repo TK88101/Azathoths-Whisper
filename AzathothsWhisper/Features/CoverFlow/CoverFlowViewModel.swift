@@ -23,6 +23,15 @@ final class CoverFlowViewModel {
 
     var cards: [DeckCard] { deck.cards }
 
+    /// 條帶回報「此刻位於幾何正中」的播放卡（D6）。不用 `centerID`：捲動途中它落後於畫面
+    private var centredPlayingCardID: String?
+
+    /// 可點＝播放中 ∧ 幾何正中（AC3）。牌組換了播放卡時舊回報自動失效
+    var isPlayingCardCentered: Bool {
+        guard let centredPlayingCardID else { return false }
+        return centredPlayingCardID == deck.currentCardID
+    }
+
     private let artworkProvider: any ArtworkProviding
 
     /// H-05：使用者拖曳或鍵盤步進後為 true，抑制自動居中
@@ -99,6 +108,15 @@ final class CoverFlowViewModel {
     /// H-03：中心下方標籤 `ARTIST // TITLE`
     var centerLabel: String {
         CoverFlowCenterLabel.text(centerID: centerID, cards: cards, details: details)
+    }
+
+    /// 條帶依佈局幾何回報播放卡是否在正中（容差見 `CoverFlowGeometry.isCentered`）
+    func playingCardCentering(cardID: String, isCentered: Bool) {
+        if isCentered {
+            centredPlayingCardID = cardID
+        } else if centredPlayingCardID == cardID {
+            centredPlayingCardID = nil
+        }
     }
 
     // MARK: - 使用者互動

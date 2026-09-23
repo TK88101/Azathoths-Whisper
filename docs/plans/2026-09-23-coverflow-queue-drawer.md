@@ -1,4 +1,4 @@
-# Cover Flow × 找歌詞 —— 實施計劃（v3.5，2026-09-23；v3.4 定稿後依 Q3b 使用者拍板①②與 Codex R6 裁決修訂 AC5／AC6／AC8／§6，見 §14 R6）
+# Cover Flow × 找歌詞 —— 實施計劃（v3.6，2026-09-23；v3.4 定稿後依 Q3b 使用者拍板①②與 Codex R6 裁決修訂 AC5／AC6／AC8／§6，見 §14 R6；v3.6 依 U#3 前預檢修 D6 可點的實作方式，見 §13、§14 R7）
 
 - 分支：`wip/coverflow-lyrics`（自 `wip/h02-fix4`@`ec3fd4d` 分出；只做本地 wip checkpoint，不 commit 到 `feat/*`／`main`、不 push）
 - 設計稿（互動原型）：https://claude.ai/artifact/GZSFdZEvyoshP48owh7c5G
@@ -168,7 +168,7 @@ CQ1 當前曲需不需要處理？／CQ2 某張卡顯示哪個徽章？／CQ3 �
 - **D14 卡片詳情讀取**：`CardDetailsReader` actor：以 persistentID 批次讀名稱／歌手／專輯／歌詞（S6 定案：OR 串接的 whose 一次取元素＋`array(byApplying:)` 逐屬性批次取值，20 首約 5 AE／47ms）；單槽最新者勝、總 deadline、每首間讓出 AE 佇列；結果快取於 VM，寫入成功／標記時更新該卡。
 - **D4 無詞標記**：`ConfigStore` 擴充（鍵 `NoLyricsMarkedTrackIDs`，字串陣列）；`LyricsFlowModel` 持有其可觀察鏡像供按鈕／徽章讀取。UI 測試組裝用專屬 suite：第一次啟動帶 `AZW_UITEST_RESET_DEFAULTS=1` 清空、需要時以 `AZW_UITEST_SEED_MARKS` 預植標記；**從不碰使用者的 `.standard`**。
 - **D5 升回延遲**：§6 `riseDelay`。
-- **D6 滑動保留、可點＝播放中 ∧ 幾何正中**：保留拖曳／方向鍵瀏覽（使用者上個 session 剛目視確認「滑動是對了」）；`CoverFlowStrip` 的內容閉包多傳 `isCentered`：在 `CoverFlowStripCell` 的**同一個** `onGeometryChange` 路徑內，以正規化距離 `|d| ≤ 0.2` 判定（帶容差；捲動跨中點途中沒有任何卡可點；不用 `centerID`、不用四捨五入後的 `stackingOrder`）（N2）；只有 `isPlaying ∧ isCentered` 的卡包成 `Button(.plain)`。牌組轉場（換歌、清單重寫、首次給牌）一律在同一次更新內換牌並設 `centerID`、不帶動畫（S5：direct 16/16；兩段式在首次給牌 0/5、動畫在換歌 5/6）。
+- **D6 滑動保留、可點＝播放中 ∧ 幾何正中**：保留拖曳／方向鍵瀏覽（使用者上個 session 剛目視確認「滑動是對了」）；`CoverFlowStrip` 的內容閉包多傳 `isCentered`：在 `CoverFlowStripCell` 的**同一個** `onGeometryChange` 路徑內，以正規化距離 `|d| ≤ 0.2` 判定（帶容差；捲動跨中點途中沒有任何卡可點；不用 `centerID`、不用四捨五入後的 `stackingOrder`）（N2）；~~只有 `isPlaying ∧ isCentered` 的卡包成 `Button(.plain)`~~ **（v3.6 改，§13 U#3 前預檢 E1–E11）卡片純展示、不掛任何手勢——條帶內容帶手勢會讓換牌後的捲動定位失效；可點改在條帶層判定（點擊只認正中播放卡的封面正面），無障礙按鈕為條帶旁不接收滑鼠的並列層，只在播放卡位於正中時存在（AC3 語義不變：它是唯一的按鈕）**。牌組轉場（換歌、清單重寫、首次給牌）一律在同一次更新內換牌並設 `centerID`、不帶動畫（S5：direct 16/16；兩段式在首次給牌 0/5、動畫在換歌 5/6）。
 - **D7 事件分發順序**：editor → lyricsFlow（同步）→ batch → coverFlow；事件迴圈內不 await 任何 AE（v1 的 Cover Flow 不需新 AE：歷史卡零額外讀取）。
 - **D8 Editor 改動**：① 自動抓詞前查標記（注入唯讀判斷式 `isMarkedNoLyrics`，Editor 不持有 store）；歌詞 `unreadable` → 不自動抓詞；② `markedNone` 取消 `autoFetchTask`；③ `save()` 在 `withBusy` **之前**擷取 `target = boundTrackID`、`text = lyricsText`，與 `confettiTrigger += 1` 同一段同步碼發 `onSaved(target, text)`（修 SM-2-2 的 actor-hop 競態）；④ 升回用 `onSaved`，不用 `AppModel.confettiTrigger`（那是 Editor＋Batch 之和）。
 - **D9 當前曲讀取**（SA-D4／D5、Codex-3）：新增 `MusicControlling.nowPlaying() -> NowPlayingRead?`，一次 `run` 內 `currentTrack.get()` 釘住 → 從同一物件讀 6 個屬性＋歌詞；歌詞讀取失敗 → `unreadable`。`PlaybackEvent.trackChanged` 的歌詞改為 `String?`（nil＝unreadable；既有 `existingLyrics: "x"` 呼叫點原樣可編譯）。monitor 改用新方法（`NowPlayingMonitor` 由「不動」改為「最小改動」）。
@@ -357,6 +357,13 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
   - 全量單元 582 條只剩基線紅；`no_playback_gate.sh` 通過；H-02 Python 閘門 321 條 OK（實際命令為 `cd Scripts && /usr/bin/python3 -m unittest discover -s . -p 'test_h02_gate*.py'`，§9.3 原寫 pytest，已更正）。
   - 新檔與改動檔逐檔行覆蓋全部 ≥ 90%。**`coverage_gate.sh`（Services＋Infra 整體 ≥ 80%）＝77.6% 不過**：非本 session 造成——Q1 為 81.4%，Q2 起 77.2%，原因是 AE client（`MusicAppleEventsClient`，AC11 明文豁免）Q2 新增方法擴大分母（覆蓋 10／384 行）；閘門腳本不認得豁免。處置（加豁免清單或補 opt-in `LiveMusicTests`）留 Q6 交使用者定。
 - **使用者在場 #2（2026-09-23 20:31–20:45，HEAD `10d8b40`）**：xctestrun 的 `SystemAttachmentLifetime=keepNever`（失敗不錄全螢幕，本分支 scheme 原狀即如此）。預檢 `BatchUITests/testPreviewPaneIsReadOnly` 綠（12.8s，未被鑰匙串框卡住）。正式輪 23 條、11 紅：`LyricsFlowUITests` **7/7 紅**（全部停在畫面元素尚不存在——TDD 紅燈）；`ShellUITests` 預期紅 3 條（AC10 導覽 identifier、ja／zh-Hant 把手標題）；`BatchUITests` 5/5 綠（無新增紅）；A-10 `testQuitMenuItemTerminatesApp` 紅（`XCUIApplicationState 3≠1`，與基線同一簽名），單獨重跑 2 次＝1 紅 1 綠 → 判定為既知不穩定，使用者在場 #3 再觀察。產物：scratchpad `u2-*.xcresult`／`.log`。
+- **Q4（2026-09-23 20:3x–20:4x，`08cf9dd` 起）**：D2 掛載結構（外殼常駐、開場畫面改覆蓋層並在開場期間 `accessibilityHidden`；Editor 頁常駐於分頁切換之外、Batch 以覆蓋層顯示）；`LyricsFlowPageView`（Cover Flow 以 offset 升降，動畫以 `.animation(_:body:)` 只包 offset——換歌時「畫面翻轉＋換牌」同一次更新，value 版動畫會把捲動位置捲進去、觸發 K5 誤判；焦點隨畫面；減少動態效果時無位移動畫；Editor 條件掛載）；把手（設計稿 64pt、兩態、刻度）；徽章 ✓／✗／—／?（中心卡附軌號）；中心狀態字；退回模式右側「接下來的歌暫時讀不到」；可點＝播放中 ∧ 幾何正中（`CoverFlowGeometry.isCentered`，容差 ±0.2 卡寬，與疊放同一 `onGeometryChange` 路徑）；Editor 的 Now Editing 狀態字＋缺詞紅條、「No lyrics for this song」（只接受已知缺詞的當前曲）、控件 identifier、DEBUG 抓詞計數（頁層 1pt 透明文字，Editor 升起時也在）；`AccessibilityID` 單一來源（app 與 UITests 同編，Release 也需要）；UITests 改以 `lyricsflow-coverflow` 的 value（`raised`／`lowered`）判定升降（該層常駐，只看「存在」會假綠）；§9.5 新鍵三語（`make_xcstrings.py` 重生，只新增）。
+  - 測試：`LyricsFlowPresentationTests`（容差、徽章、狀態鍵、把手刻度）、`LocalizationTests` 新鍵三語、`EditorViewModelTests.fetchCountTracksEveryFetch`、`CoverFlowStripStackingTests.atMostOneCardIsCentredWhileSwiping`（觸控板滑動途中至多一張判為正中、落定恰好一張；**變異**：容差改 0.35 → `maxConcurrent=2` 紅，已復原）。全量單元 591 條只剩基線紅；`no_playback_gate.sh` 通過。一次全量中 `repositoryPassesTheGate` 耗時 40s（腳本單跑 0.9s、前兩輪 2.5–3.6s）——疑與同時跑的滑動測試搶資源，記錄待觀察。
+  - U#3 前預檢：界面樹實機預檢（假 Music 場景、無障礙動作，不經 XCUITest）＋Codex 評審 Q3.5／Q4 差異，結果見下一條。
+- **U#3 前預檢（2026-09-23 20:5x–21:2x）**：
+  - **界面樹實機預檢**（Opus agent＋我，假 Music 場景、只用元素定界的 AXPress，不經 XCUITest、不碰 Music）：抓到兩個會讓 7 條 `LyricsFlowUITests` 全紅的問題——① `children: .contain` 容器上的 AXValue 被 SwiftUI 吞掉 → 改由 DEBUG 1pt 透明文字探針 `lyricsflow-surface` 承載升降值；② **產品缺陷：有歌在播時條帶停在第一張履歴卡、沒捲到播放卡**（VM 的中心已是播放卡，畫面卻停在第 0 張，不回寫——初始值路徑的症狀）。對照實驗：E1 Cover Flow 恆可聚焦 → 仍錯；E2 播放卡不變 Button → **正確**；E3 固定結構＋點擊手勢＋無障礙按鈕特徵 → 仍錯；E4 只留點擊手勢與懸停 → 仍錯；E5 卡片不掛任何手勢 → **正確 2/2**。結論：**條帶內容一帶手勢（Button、點擊、懸停），換牌後的捲動定位就失效**。改為卡片純展示、互動全在條帶層：條帶層的點擊手勢只認「正中播放卡的封面正面」；無障礙按鈕與懸停提示是條帶旁的並列層（掛在條帶 `.overlay` 上會被併進捲動區、不出現在 AX 樹——E7／E9 實測），`allowsHitTesting(false)` 讓觸控板捲動照常落到條帶；「播放卡是否在正中」由條帶的佈局幾何回報 VM（`CoverFlowViewModel.isPlayingCardCentered`）。E11 實測：播放卡置中、唯一按鈕、AX 框＝封面正面 260×260、按下降下；missing／重啟／marked／notPlaying 皆符合。另修 `edit_lyrics_of %@` 鍵名（SwiftUI 以插值格式字串查找）。
+  - **Codex R7**（評審修復前版本，3 P1＋1 推測）裁決見 §14 R7。
+  - 全量單元 595 條只剩基線紅；`no_playback_gate.sh` 通過；UITests `build-for-testing` 綠。
 
 ## 14. 附錄：評審辯論記錄
 
@@ -441,3 +448,9 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
 - **B10**（只含 BOM 的歌詞）：第 1 輪 Codex 反對我方駁回；第 2 輪我方補證 Python 版 `bool(lyrics.strip())`（py:2254）同樣判為有詞、本版以 Python 為對照 → Codex **接受駁回**，但要求三處空白判定收斂為一處、且改用既有 `PythonCompat`（與 CPython `strip()` 逐字元一致）→ 採納：`LyricsText.isBlank`（`LyricsStatus`、Editor 自動抓詞、`AlbumTrack.hasLyrics` 共用；只含 U+200B 者改判有詞、U+001C–1F 改判空白，皆與 Python 一致）。
 - **Codex 新提**：P0「取消升回須驗計時真的被取消、不只驗狀態」→ 採納（`readBackMissingAfterAWriteStaysInTheEditor` 以可控時鐘驗等待者歸零、放行後不升回）；P2 `NowPlayingIdentity` 註解與實作雙重定義 → 註解改指 `TrackInfo.signature` 單一來源。
 - 全採納／全駁回檢查：B2、B3、B9、B10 為修改或對方勝，B10 經第 2 輪收斂；非一面倒。
+### R7（2026-09-23 Q4 後、U#3 前）：Codex 評審 Q3.5＋Q4
+- **P1-① 升降測試可假綠**（value 隨 reducer 立即變、offset 還在動畫）→ **修改後採納**：UITests 改為「升起＝升降值 raised ∧ 正中播放卡按鈕出現 ∧ Editor 不存在」「降下＝lowered ∧ Editor 歌詞框與 Write 出現」。正中播放卡按鈕只在條帶真的捲到播放卡時存在，恰好也守住 U#3 前預檢抓到的置中缺陷。位移動畫本身的觀感留給 U#3 截圖目視。
+- **P1-② AC3 反向測試不完整** → **採納**：新增 `testPlayingCardAwayFromTheCentreIsNotClickable`（方向鍵把中心移走後，播放卡不再是按鈕、點了不進 Editor）；新增 DEBUG 重讀請求計數探針 `editor-hydrate-count`，點非播放卡前後不變。
+- **P1-③ 幾何回報與畫面有一幀落差、動作寫死 `isCentered: true`** → **修改後採納**：改傳實際判定值（`coverFlow.isPlayingCardCentered`）。「捲動中整體停用」**駁回**：deployment target macOS 14 無捲動階段 API（`onScrollPhaseChange` 需 macOS 15）；落差約一幀（120Hz ≈8ms），可點狀態與畫面出自同一條幾何路徑；自製「最近 N ms 有位移」判定屬過度設計。→ Phase 3（/simcodex）回餵複審。
+- **推測：開場淡出 0.2s 與 A-01 斷言競態** → **採納**：A-01 改為等 splash 消失（`waitForNonExistence`），語義不變。
+- Codex 確認：Q3.5 組裝未碰 `.standard`、Keychain、Music，支援碼全在 `#if DEBUG`。

@@ -11,14 +11,22 @@ struct CoverFlowView: View {
     let upcoming: DeckSnapshot.Upcoming
     let onTapPlayingCard: () -> Void
 
+    /// 條帶的實際尺寸：推算正中那張封面正面的位置（點擊、懸停、無障碍按鈕都以它為準）
+    @State private var stripSize: CGSize = .zero
+    @State private var isHoveringCentre = false
+
     /// 單張封面邊長。負間距與邊距都由 `CoverFlowGeometry` 依此推導。
     /// `static`（非 private）是為了讓 H-02 UI 測試閘門的 fixture 以單元測試釘住同源，見 `CoverFlowUITestFixtureTests`
     static let itemWidth: CGFloat = 260
 
     var body: some View {
         VStack(spacing: 0) {
-            strip
-                .overlay(alignment: .trailing) { upNextNotice }
+            // 播放卡按鈕與條帶並列（不掛在條帶的 overlay 上：那會被併進捲動區、不出現在 AX 樹）
+            ZStack {
+                strip
+                playingCardOverlay
+            }
+            .overlay(alignment: .trailing) { upNextNotice }
             centerLabel
             centerStatus
                 .padding(.bottom, 20)
@@ -55,18 +63,79 @@ struct CoverFlowView: View {
                 }
             )
         ) { card, isCentered in
-            CoverFlowItemContainer(
-                model: model,
-                card: card,
-                size: Self.itemWidth,
-                // D6：可點＝播放中 ∧ 幾何正中（容差 ±0.2 卡寬，捲動跨中點途中沒有卡可點）
-                isPlayingAndCentered: card.side == .current && isCentered,
-                onTap: onTapPlayingCard
-            )
+            // 卡片純展示、**不掛任何手勢**：實測（2026-09-23 E1–E5）條帶內容一帶手勢（Button、點擊、懸停），
+            // 換牌後的捲動定位就失效——VM 的中心已是播放卡，畫面卻停在第一張
+            CoverFlowItemContainer(model: model, card: card, size: Self.itemWidth)
+                // D6：可點＝播放中 ∧ 幾何正中（容差 ±0.2 卡寬，與疊放同一條幾何路徑）
+                .onChange(of: isCentered, initial: true) { _, centred in
+                    guard card.side == .current else { return }
+                    model.playingCardCentering(cardID: card.id, isCentered: centred)
+                }
         }
         .frame(maxHeight: .infinity)
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { stripSize = $0 }
+        // 點擊與懸停在條帶層判定，只認「正中播放卡的封面正面」；其他卡點了無效（AC3）
+        .onTapGesture(coordinateSpace: .local) { location in
+            guard model.isPlayingCardCentered, centreFace.contains(location) else { return }
+            onTapPlayingCard()
+        }
+        .onContinuousHover(coordinateSpace: .local) { phase in
+            switch phase {
+            case .active(let location):
+                isHoveringCentre = centreFace.contains(location)
+            case .ended:
+                isHoveringCentre = false
+            }
+        }
         // H-02 UI 測試閘門的 AX 探針：strip 外框＝視口，其 midX 是「居中」的基準
         .accessibilityIdentifier("coverflow-strip")
+    }
+
+    /// 正中那張的封面正面（不含倒影）：卡片在條帶內垂直置中，高＝邊長 ×（1＋倒影比）
+    private var centreFace: CGRect {
+        let size = Self.itemWidth
+        let cardHeight = size * (1 + CoverFlowItem.reflectionRatio)
+        return CGRect(x: (stripSize.width - size) / 2, y: (stripSize.height - cardHeight) / 2, width: size, height: size)
+    }
+
+    /// 正中播放卡的無障礙按鈕與懸停提示。**不接收滑鼠**：觸控板捲動照常落到條帶，點擊由條帶層判定；
+    /// VoiceOver 與 UITests 仍看得到、按得到它（AC3：唯一的按鈕）
+    @ViewBuilder
+    private var playingCardOverlay: some View {
+        if model.isPlayingCardCentered {
+            // 按鈕＋倒影高度的空白直排、整體在 ZStack 中置中：按鈕恰好蓋住封面正面（AX 框也對齊；
+            // `offset` 只移繪製、不移 AX 框）
+            VStack(spacing: 0) {
+                Button(action: onTapPlayingCard) {
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        if isHoveringCentre {
+                            Text("edit_lyrics_hint")
+                                .font(Theme.Fonts.mono(11))
+                                .tracking(1.8)
+                                .textCase(.uppercase)
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(Color.black.opacity(0.72))
+                        }
+                    }
+                    .frame(width: Self.itemWidth, height: Self.itemWidth)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(AccessibilityID.playingCard)
+                .accessibilityLabel(Text("edit_lyrics_of \(playingTitle)"))
+                Color.clear
+                    .frame(width: Self.itemWidth, height: Self.itemWidth * CoverFlowItem.reflectionRatio)
+                    .accessibilityHidden(true)
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
+    private var playingTitle: String {
+        guard let id = model.deck.currentCardID, let card = model.cards.first(where: { $0.id == id }) else { return "" }
+        return model.details[card.persistentID]?.title ?? ""
     }
 
     /// 退回模式：右側留空並明示讀不到，不捏造（AC8b）
@@ -122,33 +191,27 @@ struct CoverFlowView: View {
     }
 }
 
-/// 單項容器：取圖、生命週期、徽章、可點與否。
+/// 單項容器：取圖、生命週期、徽章。**純展示**——可點與否不在這裡（見 `CoverFlowView.playingCardOverlay`）。
 /// 圖片用 `.task(id:)` 按需取——view 消失時 SwiftUI 自動取消，這正是 VM 層不需要 artworkToken 的原因。
 private struct CoverFlowItemContainer: View {
     let model: CoverFlowViewModel
     let card: DeckCard
     let size: CGFloat
-    let isPlayingAndCentered: Bool
-    let onTap: () -> Void
 
     @State private var image: NSImage?
-    @State private var isHovering = false
 
     var body: some View {
-        Group {
-            if isPlayingAndCentered {
-                Button(action: onTap) { item }
-                    .buttonStyle(.plain)
-                    .onHover { isHovering = $0 }
-                    .accessibilityIdentifier(AccessibilityID.playingCard)
-                    .accessibilityLabel(Text("edit_lyrics_of \(title)"))
-            } else {
-                // 非播放中的卡不是按鈕（AC3）：沒有點擊處理，點了畫面、綁定曲、抓詞都不變
-                item
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier(AccessibilityID.cardPrefix + card.id)
+        ZStack(alignment: .top) {
+            CoverFlowItem(artwork: image, size: size)
+            // 徽章疊在封面正面上（H-08：不改變封面尺寸）
+            HStack {
+                Spacer(minLength: 0)
+                badge
             }
+            .frame(width: size, height: size, alignment: .top)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(AccessibilityID.cardPrefix + card.id)
         // key 帶版本號：取圖失敗時先顯示佔位，退避到期重取成功後 service 會通知 VM
         // 遞增**該 ID** 的版本，只讓這一項重讀（命中記憶體，不驚動其他可見項）
         .task(id: ItemTaskKey(
@@ -156,39 +219,6 @@ private struct CoverFlowItemContainer: View {
             revision: model.artworkRevision(for: card.persistentID)
         )) {
             image = await model.artwork(for: card.persistentID)
-        }
-    }
-
-    private var title: String {
-        model.details[card.persistentID]?.title ?? ""
-    }
-
-    /// 徽章與提示疊在封面正面上（H-08：不改變封面尺寸）
-    private var item: some View {
-        ZStack(alignment: .top) {
-            CoverFlowItem(artwork: image, size: size)
-            faceOverlay
-                .frame(width: size, height: size)
-        }
-    }
-
-    private var faceOverlay: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Spacer(minLength: 0)
-                badge
-            }
-            Spacer(minLength: 0)
-            if isPlayingAndCentered, isHovering {
-                Text("edit_lyrics_hint")
-                    .font(Theme.Fonts.mono(11))
-                    .tracking(1.8)
-                    .textCase(.uppercase)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(Color.black.opacity(0.72))
-            }
         }
     }
 

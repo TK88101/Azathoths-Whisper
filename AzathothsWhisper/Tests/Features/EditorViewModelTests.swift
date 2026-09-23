@@ -29,6 +29,13 @@ struct EditorViewModelTests {
         #expect(model.fetchCount == 2)
     }
 
+    @Test func hydrateRequestCountTracksCardClicks() {
+        let model = makeModel()
+        #expect(model.hydrateRequestCount == 0)
+        model.requestHydrate()
+        #expect(model.hydrateRequestCount == 1)
+    }
+
     // B-15
     @Test func lineCountFollowsPythonSplitSemantics() {
         let model = makeModel()

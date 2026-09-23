@@ -16,6 +16,34 @@ struct CoverFlowViewModelDeckTests {
 
     // MARK: H-04／D6
 
+    // MARK: D6 播放卡是否在幾何正中（條帶回報；可點與否只看這個，不看 centerID）
+
+    @Test func playingCardCountsAsCentredOnlyWhenTheStripSaysSo() {
+        let model = makeModel()
+        model.apply(F.deck([1, 2, 3], current: 2), isRealChange: true)
+        #expect(!model.isPlayingCardCentered, "centerID 已是它，但條帶還沒回報：不算")
+        model.playingCardCentering(cardID: "C2", isCentered: true)
+        #expect(model.isPlayingCardCentered)
+        model.playingCardCentering(cardID: "C2", isCentered: false)
+        #expect(!model.isPlayingCardCentered)
+    }
+
+    @Test func aReportForAnotherCardDoesNotCount() {
+        let model = makeModel()
+        model.apply(F.deck([1, 2, 3], current: 2), isRealChange: true)
+        model.playingCardCentering(cardID: "C3", isCentered: true)
+        #expect(!model.isPlayingCardCentered)
+    }
+
+    /// 換了播放卡：舊的回報失效，等新卡自己回報
+    @Test func aNewPlayingCardStartsUncentred() {
+        let model = makeModel()
+        model.apply(F.deck([1, 2, 3], current: 2), isRealChange: true)
+        model.playingCardCentering(cardID: "C2", isCentered: true)
+        model.apply(F.deck([2, 3, 4], current: 3), isRealChange: true)
+        #expect(!model.isPlayingCardCentered)
+    }
+
     @Test func applyingADeckCentresOnItsCurrentCard() {
         let model = makeModel()
         model.apply(F.deck([0, 1, 2], current: 1), isRealChange: true)

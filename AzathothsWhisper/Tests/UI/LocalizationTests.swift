@@ -50,7 +50,7 @@ struct LocalizationTests {
             // Cover Flow × 找歌詞（計劃 §9.5）
             "mark_no_lyrics", "lyrics_status_present", "lyrics_status_missing", "lyrics_status_marked",
             "lyrics_status_unknown", "edit_lyrics_hint", "upnext_unavailable", "coverflow_show",
-            "coverflow_hide", "edit_lyrics_of",
+            "coverflow_hide", "edit_lyrics_of %@",
         ]
         for language in ["en", "zh-Hant", "ja"] {
             for key in keys {
@@ -77,7 +77,7 @@ struct LocalizationTests {
         ("upnext_unavailable", "Up next isn't available right now", "接下來的歌暫時讀不到", "次の曲を読み取れません"),
         ("coverflow_show", "Show Cover Flow", "顯示封面瀏覽", "カバーフローを表示"),
         ("coverflow_hide", "Hide Cover Flow", "隱藏封面瀏覽", "カバーフローを隠す"),
-        ("edit_lyrics_of", "Edit lyrics of %@", "編輯「%@」的歌詞", "「%@」の歌詞を編集"),
+        ("edit_lyrics_of %@", "Edit lyrics of %@", "編輯「%@」的歌詞", "「%@」の歌詞を編集"),
     ])
     func lyricsFlowKeysAreTranslated(key: String, en: String, zhHant: String, ja: String) throws {
         #expect(try value(key, "en") == en)

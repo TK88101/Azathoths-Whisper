@@ -277,7 +277,7 @@
         }
       }
     },
-    "edit_lyrics_of": {
+    "edit_lyrics_of %@": {
       "extractionState": "manual",
       "localizations": {
         "en": {
