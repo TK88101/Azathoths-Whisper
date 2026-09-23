@@ -48,6 +48,10 @@ final class EditorViewModel {
     @ObservationIgnored private(set) var autoFetchTask: Task<Void, Never>?
     /// 自動抓詞是為哪一首排的（`cancelAutoFetch(for:)` 只取消那一首的）
     @ObservationIgnored private var autoFetchTrackID: String?
+    #if DEBUG
+    /// 本次啟動的抓詞次數：UITests 以 a11y value 判定「未自動抓詞」（計劃 §9.4）
+    private(set) var fetchCount = 0
+    #endif
 
     init(lyricsService: LyricsService, music: any MusicControlling, clock: any PollClock = SystemPollClock()) {
         self.lyricsService = lyricsService
@@ -160,6 +164,9 @@ final class EditorViewModel {
     // MARK: - 動作
 
     func fetch() async {
+        #if DEBUG
+        fetchCount += 1
+        #endif
         fetchSeq += 1
         let mySeq = fetchSeq
         let myGeneration = generation

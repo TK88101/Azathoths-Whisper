@@ -2,9 +2,9 @@
 #if DEBUG
 import Foundation
 
-/// 「Cover Flow × 找歌詞」UI 測試的場景、環境變數、假資料與 a11y identifier（計劃 Q3.5、§9.4）。
+/// 「Cover Flow × 找歌詞」UI 測試的場景、環境變數與假資料（計劃 Q3.5）。a11y identifier 見 `AccessibilityID`。
 ///
-/// **app 與 UITests 兩個 target 同編此檔**（見 project.yml）：場景名、旗標名、identifier 都只有一個來源，
+/// **app 與 UITests 兩個 target 同編此檔**（見 project.yml）：場景名、旗標名都只有一個來源，
 /// 不重演兩邊各寫一份、再用測試釘住的模式。
 enum LyricsFlowUITestScenario: String, CaseIterable, Sendable {
     /// 正在播的歌檔內有詞 → Cover Flow（AC1、AC3、AC14）
@@ -69,26 +69,6 @@ enum LyricsFlowUITestScenario: String, CaseIterable, Sendable {
     /// 非播放中各卡的檔內歌詞：0、3 有詞，1、4 缺詞（徽章 ✓／✗ 都看得到）；播放中那首由場景決定
     static func fixtureLyrics(at index: Int) -> String {
         [0, 3].contains(index) ? "fixture lyrics \(index)" : ""
-    }
-
-    // MARK: a11y identifier（計劃 §9.4；View 與 UITests 共用這一組常數）
-
-    enum Identifier {
-        static let handle = "lyricsflow-handle"
-        static let coverFlowLayer = "lyricsflow-coverflow"
-        static let editorLayer = "lyricsflow-editor"
-        static let playingCard = "coverflow-playing-card"
-        static let cardPrefix = "coverflow-item-"
-        static let centerLabel = "coverflow-center-label"
-        static let upNextUnavailable = "coverflow-upnext-unavailable"
-        static let navEditor = "nav-editor"
-        static let navBatch = "nav-batch"
-        static let navPrefix = "nav-"
-        static let markNoLyrics = "editor-mark-no-lyrics"
-        static let writeButton = "editor-write"
-        static let lyricsText = "editor-lyrics"
-        /// DEBUG 限定：a11y value＝本次啟動的抓詞次數（「未自動抓詞」的判定，§9.4）
-        static let fetchCount = "editor-fetch-count"
     }
 }
 #endif

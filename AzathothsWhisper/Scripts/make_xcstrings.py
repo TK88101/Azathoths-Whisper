@@ -28,6 +28,17 @@ EN_FIXES = {
 }
 NEW_KEYS = {
     "nav_coverflow": {"en": "Cover Flow", "zh_TW": "封面瀏覽", "ja": "カバーフロー"},
+    # Cover Flow × 找歌詞（docs/plans/2026-09-23-coverflow-queue-drawer.md §9.5）
+    "mark_no_lyrics": {"en": "No lyrics for this song", "zh_TW": "這首沒有歌詞", "ja": "この曲は歌詞なし"},
+    "lyrics_status_present": {"en": "Lyrics in file", "zh_TW": "已有歌詞", "ja": "歌詞あり"},
+    "lyrics_status_missing": {"en": "Missing lyrics", "zh_TW": "缺少歌詞", "ja": "歌詞なし"},
+    "lyrics_status_marked": {"en": "Marked: no lyrics", "zh_TW": "已標記：沒有歌詞", "ja": "歌詞なしとして記録済み"},
+    "lyrics_status_unknown": {"en": "Lyrics unreadable", "zh_TW": "讀不到歌詞", "ja": "歌詞を読み取れません"},
+    "edit_lyrics_hint": {"en": "Edit lyrics", "zh_TW": "編輯歌詞", "ja": "歌詞を編集"},
+    "upnext_unavailable": {"en": "Up next isn't available right now", "zh_TW": "接下來的歌暫時讀不到", "ja": "次の曲を読み取れません"},
+    "coverflow_show": {"en": "Show Cover Flow", "zh_TW": "顯示封面瀏覽", "ja": "カバーフローを表示"},
+    "coverflow_hide": {"en": "Hide Cover Flow", "zh_TW": "隱藏封面瀏覽", "ja": "カバーフローを隠す"},
+    "edit_lyrics_of": {"en": "Edit lyrics of %@", "zh_TW": "編輯「%@」的歌詞", "ja": "「%@」の歌詞を編集"},
 }
 LANG_MAP = {"en": "en", "zh_TW": "zh-Hant", "ja": "ja"}
 

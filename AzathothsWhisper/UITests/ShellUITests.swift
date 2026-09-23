@@ -9,7 +9,7 @@ import XCTest
 // 有詞的歌時，Editor 頁會升起 Cover Flow、遮住本組要驗的 Editor 外殼。
 final class ShellUITests: AppUITestCase {
     private typealias Scenario = LyricsFlowUITestScenario
-    private typealias ID = LyricsFlowUITestScenario.Identifier
+    private typealias ID = AccessibilityID
 
     private func launchShell(language: String? = nil) {
         launch(language: language, environment: Scenario.environment(.notPlaying, resetDefaults: true))

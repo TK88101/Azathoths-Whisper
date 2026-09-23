@@ -4,6 +4,11 @@ import SwiftUI
 // Editor 主面板（py:139-189）：Now Editing 卡片 → 控制列 → 歌詞框
 struct EditorView: View {
     @Bindable var model: EditorViewModel
+    /// 綁定曲的歌詞狀態（計劃 AC7）；nil＝沒在播或綁定曲不是當前曲
+    let lyricsStatus: LyricsStatus?
+    /// 「No lyrics for this song」只接受已知缺詞的當前曲（AC5、R6-B3）
+    let canMarkNoLyrics: Bool
+    let onMarkNoLyrics: () -> Void
 
     var body: some View {
         VStack(spacing: 24) {                 // gap-6
@@ -22,11 +27,15 @@ struct EditorView: View {
     private var nowEditingCard: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(verbatim: StatusText.nowEditing)
-                    .font(Theme.Fonts.display(12))
-                    .textCase(.uppercase)
-                    .tracking(2.4)            // 0.2em @12px
-                    .foregroundStyle(Theme.Gray.g500)
+                HStack {
+                    Text(verbatim: StatusText.nowEditing)
+                        .font(Theme.Fonts.display(12))
+                        .textCase(.uppercase)
+                        .tracking(2.4)            // 0.2em @12px
+                        .foregroundStyle(Theme.Gray.g500)
+                    Spacer(minLength: 0)
+                    statusChip
+                }
 
                 HStack(spacing: 0) {
                     Text(verbatim: model.artistLine)
@@ -48,12 +57,26 @@ struct EditorView: View {
         .background(Theme.cardBackground)
         .overlay(alignment: .leading) {
             Rectangle()
-                .fill(Color.white.opacity(0.1))
+                // 缺詞＝紅色色條（設計稿）；其餘沿用 py:141 的淡白
+                .fill(lyricsStatus == .missing ? Theme.danger : Color.white.opacity(0.1))
                 .frame(width: 4)              // w-1
         }
         .overlay(Rectangle().strokeBorder(Theme.Gray.g800, lineWidth: 1))
         .contentShape(Rectangle())
         .onTapGesture { model.requestHydrate() }   // py:745 headerClick → hydrate
+    }
+
+    /// 設計稿：卡片右上角的狀態字（✓ Lyrics in file／✗ Missing lyrics／— Marked: no lyrics）
+    @ViewBuilder
+    private var statusChip: some View {
+        if let lyricsStatus {
+            (Text(verbatim: LyricsBadge.symbol(for: lyricsStatus) + " ")
+                + Text(LocalizedStringKey(LyricsBadge.statusKey(for: lyricsStatus))))
+                .font(Theme.Fonts.mono(11))
+                .tracking(1.6)
+                .textCase(.uppercase)
+                .foregroundStyle(LyricsBadge.tone(for: lyricsStatus).color)
+        }
     }
 
     // MARK: 控制列（py:150-180）
@@ -75,20 +98,42 @@ struct EditorView: View {
                 ActionButton(
                     symbol: .cloudDownload,
                     title: String(localized: "fetch_btn"),
-                    isEnabled: !model.isBusy
+                    isEnabled: !model.isBusy,
+                    accessibilityID: AccessibilityID.fetchButton
                 ) {
                     Task { await model.fetch() }
                 }
                 ActionButton(
                     symbol: .saveAlt,
                     title: String(localized: "write_btn"),
-                    isEnabled: !model.isBusy
+                    isEnabled: !model.isBusy,
+                    accessibilityID: AccessibilityID.writeButton
                 ) {
                     Task { await model.save() }
                 }
             }
             Spacer(minLength: 0)
+            markNoLyricsButton
         }
+    }
+
+    /// AC5：純音樂／找不到——記為已處理、升回，下次播不再跳 Editor（設計稿：右側、細框、灰字）
+    private var markNoLyricsButton: some View {
+        Button(action: onMarkNoLyrics) {
+            Text("mark_no_lyrics")
+                .font(Theme.Fonts.display(11))
+                .tracking(1.4)
+                .textCase(.uppercase)
+                .foregroundStyle(Theme.Gray.g400)
+                .padding(.horizontal, 16)
+                .frame(height: 40)
+                .overlay(Rectangle().strokeBorder(Theme.Gray.g800, lineWidth: 1))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!canMarkNoLyrics)
+        .opacity(canMarkNoLyrics ? 1 : 0.35)
+        .accessibilityIdentifier(AccessibilityID.markNoLyrics)
     }
 
     /// py:154-162 的裝飾性下拉（B-19：切換不影響抓詞路徑）
@@ -129,7 +174,8 @@ struct EditorView: View {
                 text: Binding(get: { model.lyricsText }, set: { model.userEditedLyrics($0) }),
                 font: .monospacedSystemFont(ofSize: 16, weight: .regular),
                 textColor: NSColor(Theme.Gray.g300),
-                insets: NSSize(width: 24, height: 24)
+                insets: NSSize(width: 24, height: 24),
+                accessibilityID: AccessibilityID.lyricsText
             )
 
             if model.lyricsText.isEmpty {

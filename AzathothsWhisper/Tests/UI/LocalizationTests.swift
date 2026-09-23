@@ -47,6 +47,10 @@ struct LocalizationTests {
             "settings_title", "token_label", "lang_label", "save_btn",
             "col_artist", "col_title", "col_stat", "col_preview",
             "batch_fetch", "batch_import", "batch_all",
+            // Cover Flow × 找歌詞（計劃 §9.5）
+            "mark_no_lyrics", "lyrics_status_present", "lyrics_status_missing", "lyrics_status_marked",
+            "lyrics_status_unknown", "edit_lyrics_hint", "upnext_unavailable", "coverflow_show",
+            "coverflow_hide", "edit_lyrics_of",
         ]
         for language in ["en", "zh-Hant", "ja"] {
             for key in keys {
@@ -60,6 +64,25 @@ struct LocalizationTests {
         #expect(try value("nav_coverflow", "en") == "Cover Flow")
         #expect(try value("nav_coverflow", "zh-Hant") == "封面瀏覽")
         #expect(try value("nav_coverflow", "ja") == "カバーフロー")
+    }
+
+    // 計劃 §9.5：Cover Flow × 找歌詞新鍵的三語譯文（表格即規格）
+    @Test("新鍵三語", arguments: [
+        ("mark_no_lyrics", "No lyrics for this song", "這首沒有歌詞", "この曲は歌詞なし"),
+        ("lyrics_status_present", "Lyrics in file", "已有歌詞", "歌詞あり"),
+        ("lyrics_status_missing", "Missing lyrics", "缺少歌詞", "歌詞なし"),
+        ("lyrics_status_marked", "Marked: no lyrics", "已標記：沒有歌詞", "歌詞なしとして記録済み"),
+        ("lyrics_status_unknown", "Lyrics unreadable", "讀不到歌詞", "歌詞を読み取れません"),
+        ("edit_lyrics_hint", "Edit lyrics", "編輯歌詞", "歌詞を編集"),
+        ("upnext_unavailable", "Up next isn't available right now", "接下來的歌暫時讀不到", "次の曲を読み取れません"),
+        ("coverflow_show", "Show Cover Flow", "顯示封面瀏覽", "カバーフローを表示"),
+        ("coverflow_hide", "Hide Cover Flow", "隱藏封面瀏覽", "カバーフローを隠す"),
+        ("edit_lyrics_of", "Edit lyrics of %@", "編輯「%@」的歌詞", "「%@」の歌詞を編集"),
+    ])
+    func lyricsFlowKeysAreTranslated(key: String, en: String, zhHant: String, ja: String) throws {
+        #expect(try value(key, "en") == en)
+        #expect(try value(key, "zh-Hant") == zhHant)
+        #expect(try value(key, "ja") == ja)
     }
 
     // E-05：運行時狀態文案是常量而非 catalog 鍵（避免日後誤本地化）

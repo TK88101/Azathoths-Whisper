@@ -1,6 +1,10 @@
 import SwiftUI
 
 // 外殼：頁首導航 → 內容 → 頁尾狀態列，外加噪點層／modal／confetti（py:126-263）
+//
+// 掛載結構（Cover Flow × 找歌詞 D2）：外殼從啟動起常駐，開場畫面是**覆蓋層**；Editor 頁（Editor＋Cover Flow）
+// 常駐在分頁切換之外，Batch 以覆蓋層顯示。Cover Flow 條帶因此只建立一次（空牌組、無中心），
+// 此後只走運行時路徑，不再經過初始值路徑（H-02 缺陷 3 的觸發條件）。
 struct RootView: View {
     @Bindable var model: AppModel
 
@@ -8,10 +12,15 @@ struct RootView: View {
         ZStack {
             Theme.background
 
+            shell
+                // 開場期間外殼不可見、不可點、不在 AX 樹上（A-01／A-02：首屏＝splash，之後同窗換成主 UI）
+                .opacity(model.isSplashVisible ? 0 : 1)
+                .allowsHitTesting(!model.isSplashVisible)
+                .accessibilityHidden(model.isSplashVisible)
+
             if model.isSplashVisible {
                 SplashView()
-            } else {
-                shell
+                    .transition(.opacity)
             }
 
             NoiseOverlay()
@@ -101,27 +110,51 @@ struct RootView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(AccessibilityID.nav(tab.rawValue))
     }
 
     // MARK: 內容
 
-    @ViewBuilder
     private var content: some View {
-        switch model.tab {
-        case .editor:
-            // Q3b 過渡：畫面＝Cover Flow 時整頁顯示它。Editor 內常駐的升降層、把手、可點的中心卡在 Q4（D2）
-            if model.lyricsFlow.surface == .coverFlow {
-                CoverFlowView(model: model.coverFlow)
-            } else {
-                EditorView(model: model.editor)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                footer
+        ZStack {
+            editorPage
+                // Batch 覆蓋時 Editor 頁仍常駐，但不可點、不在 AX 樹上
+                .allowsHitTesting(model.tab == .editor)
+                .accessibilityHidden(model.tab != .editor)
+            if model.tab == .batch {
+                // Batch 自帶狀態欄與按鈕列，不套 Editor 的 footer（py:240-262）
+                BatchView(model: model.batch)
+                    .background(Theme.background)
             }
-        case .batch:
-            // Batch 自帶狀態欄與按鈕列，不套 Editor 的 footer（py:240-262）
-            BatchView(model: model.batch)
         }
     }
+
+    private var editorPage: some View {
+        VStack(spacing: 0) {
+            LyricsFlowPageView(
+                editor: model.editor,
+                lyricsFlow: model.lyricsFlow,
+                coverFlow: model.coverFlow,
+                isActive: model.tab == .editor && !model.isSplashVisible
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            footer
+        }
+        #if DEBUG
+        .overlay(alignment: .topLeading) { fetchCountProbe }
+        #endif
+    }
+
+    #if DEBUG
+    /// 計劃 §9.4：「未自動抓詞」以抓詞計數判定——Editor 升起時不掛載，故探針放在頁層、恆存在
+    private var fetchCountProbe: some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .accessibilityElement()
+            .accessibilityIdentifier(AccessibilityID.fetchCount)
+            .accessibilityValue("\(model.editor.fetchCount)")
+    }
+    #endif
 
     // MARK: 頁尾（py:190-203）
 

@@ -18,6 +18,17 @@ struct EditorViewModelTests {
         )
     }
 
+    /// 計劃 §9.4：「未自動抓詞」以 DEBUG 抓詞計數判定（UITests 讀 a11y value）
+    @Test func fetchCountTracksEveryFetch() async {
+        let model = makeModel()
+        #expect(model.fetchCount == 0)
+        model.handle(.trackChanged(.fixture(), existingLyrics: ""))
+        await model.autoFetchTask?.value
+        #expect(model.fetchCount == 1, "缺詞曲自動抓一次")
+        await model.fetch()
+        #expect(model.fetchCount == 2)
+    }
+
     // B-15
     @Test func lineCountFollowsPythonSplitSemantics() {
         let model = makeModel()

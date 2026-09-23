@@ -72,6 +72,27 @@ struct CoverFlowStripStackingTests {
         Self.expectCenterOnTopThroughout(frames, label: "step")
     }
 
+    /// 計劃 AC3／D6：可點＝播放中 ∧ 幾何正中（容差 ±0.2 卡寬）。滑動途中「正中」的判定一路交棒，
+    /// 但任何一次畫面更新之後都至多一張卡在正中；落定後恰好一張
+    @Test("觸控板滑動途中至多一張卡判為正中，落定後恰好一張")
+    func atMostOneCardIsCentredWhileSwiping() async throws {
+        let session = StackSession.open(itemCount: 20, initialCenter: nil)
+        defer { session.close() }
+        _ = try #require(await session.settledFrame(), "起始狀態未穩定")
+        CentredLog.shared.reset()
+
+        _ = await session.sampling {
+            await StackGesture.swipe(session.window, fingerDeltaX: -24, fingerEvents: 25, momentumEvents: 45)
+            try? await Task.sleep(for: .milliseconds(1200))
+        }
+        let log = CentredLog.shared
+        let summary = "handoffs=\(log.centredCards.count) maxConcurrent=\(log.maxConcurrent) final=\(log.current.sorted())"
+        print("CENTRED-swipe  \(summary)")
+        #expect(log.centredCards.count >= 3, "滑動途中「正中」應一路交棒給多張卡。\(summary)")
+        #expect(log.maxConcurrent <= 1, "同一次畫面更新後有兩張以上的卡判為正中。\(summary)")
+        #expect(log.current.count == 1, "落定後應恰好一張在正中。\(summary)")
+    }
+
     /// 容許：每次換人時最多落後 1 幀（120Hz 下 ≈8ms，肉眼不可辨）
     private static func expectCenterOnTopThroughout(_ sampled: [StackFrame], label: String) {
         let frames = sampled.filter { $0.cards.count >= 3 }
@@ -143,11 +164,55 @@ private struct StackHarness: View {
     let images: [NSImage]
 
     var body: some View {
-        CoverFlowStrip(items: cards, itemWidth: stackItemWidth, centerID: center.binding()) { card in
+        CoverFlowStrip(items: cards, itemWidth: stackItemWidth, centerID: center.binding()) { card, isCentered in
             CoverFlowItem(artwork: images[card.id], size: stackItemWidth)
+                .onChange(of: isCentered, initial: true) { _, centred in
+                    CentredLog.shared.record(card.id, isCentered: centred)
+                }
         }
         .frame(width: stackViewSize.width, height: stackViewSize.height)
         .background(Color.black)
+    }
+}
+
+/// 記錄每張卡「正中」判定的變化。同一次畫面更新內的回呼次序不定（A 退出與 B 進入可能顛倒），
+/// 故按更新批次結算：同一個 run loop 週期內的事件先合併、再計數
+@MainActor
+private final class CentredLog {
+    static let shared = CentredLog()
+
+    private(set) var current: Set<Int> = []
+    private(set) var centredCards: Set<Int> = []
+    private(set) var maxConcurrent = 0
+    private var pending: [(id: Int, isCentered: Bool)] = []
+    private var isFlushScheduled = false
+
+    func reset() {
+        current = []
+        centredCards = []
+        maxConcurrent = 0
+        pending = []
+    }
+
+    func record(_ id: Int, isCentered: Bool) {
+        pending.append((id, isCentered))
+        guard !isFlushScheduled else { return }
+        isFlushScheduled = true
+        DispatchQueue.main.async { MainActor.assumeIsolated { self.flush() } }
+    }
+
+    private func flush() {
+        isFlushScheduled = false
+        for event in pending {
+            if event.isCentered {
+                current.insert(event.id)
+                centredCards.insert(event.id)
+            } else {
+                current.remove(event.id)
+            }
+        }
+        pending = []
+        maxConcurrent = max(maxConcurrent, current.count)
     }
 }
 

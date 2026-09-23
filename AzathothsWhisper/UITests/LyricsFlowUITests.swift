@@ -6,7 +6,7 @@ import XCTest
 // 紀律同 AppUITestCase：不模擬全域按鍵——按鍵一律經 XCUIElement 送進被測 app。
 final class LyricsFlowUITests: AppUITestCase {
     private typealias Scenario = LyricsFlowUITestScenario
-    private typealias ID = LyricsFlowUITestScenario.Identifier
+    private typealias ID = AccessibilityID
 
     /// 升回＝彩帶撒完（約 3.2 秒）＋一次補讀；留足餘量
     private static let riseTimeout: TimeInterval = 15
@@ -19,6 +19,17 @@ final class LyricsFlowUITests: AppUITestCase {
 
     private func element(_ identifier: String) -> XCUIElement {
         app.descendants(matching: .any)[identifier]
+    }
+
+    /// Cover Flow 層常駐（降下時只露把手）：以 value 判定升降，不能只看「存在」
+    @discardableResult
+    private func waitForSurface(raised: Bool, timeout: TimeInterval = surfaceTimeout,
+                                file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        let layer = element(ID.coverFlowLayer)
+        let predicate = NSPredicate(format: "value == %@", raised ? ID.raised : ID.lowered)
+        let result = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: layer)], timeout: timeout)
+        XCTAssertEqual(result, .completed, raised ? "Cover Flow 應升起" : "Cover Flow 應降下", file: file, line: line)
+        return result == .completed
     }
 
     private func fetchCount() -> String? {
@@ -45,8 +56,8 @@ final class LyricsFlowUITests: AppUITestCase {
     /// AC1：正在播的歌有詞 → Cover Flow；把手可見
     func testPresentLyricsShowsCoverFlow() {
         start(.present)
-        XCTAssertTrue(element(ID.coverFlowLayer).waitForExistence(timeout: Self.surfaceTimeout), "有詞＝Cover Flow")
-        XCTAssertTrue(element(ID.handle).exists, "把手升降兩態皆顯示")
+        waitForSurface(raised: true)
+        XCTAssertTrue(element(ID.lyricsFlowHandle).exists, "把手升降兩態皆顯示")
         XCTAssertFalse(element(ID.editorLayer).exists, "Editor 條件掛載：升起時不存在（D2）")
     }
 
@@ -54,7 +65,8 @@ final class LyricsFlowUITests: AppUITestCase {
     func testMissingLyricsShowsEditor() {
         start(.missing)
         XCTAssertTrue(element(ID.editorLayer).waitForExistence(timeout: Self.surfaceTimeout), "缺詞＝Editor")
-        XCTAssertTrue(element(ID.handle).exists)
+        waitForSurface(raised: false)
+        XCTAssertTrue(element(ID.lyricsFlowHandle).exists)
         XCTAssertTrue(element(ID.fetchCount).waitForExistence(timeout: 5))
         let fetched = NSPredicate(format: "value == %@", "1")
         let expectation = XCTNSPredicateExpectation(predicate: fetched, object: element(ID.fetchCount))
@@ -75,7 +87,7 @@ final class LyricsFlowUITests: AppUITestCase {
     /// AC3：其他卡不是按鈕；點了畫面不變、不抓詞
     func testClickingOtherCardsDoesNothing() {
         start(.present)
-        XCTAssertTrue(element(ID.coverFlowLayer).waitForExistence(timeout: Self.surfaceTimeout))
+        waitForSurface(raised: true)
         let cardButtons = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", ID.cardPrefix))
         XCTAssertEqual(cardButtons.count, 0, "非播放中的卡不得是按鈕")
 
@@ -101,7 +113,7 @@ final class LyricsFlowUITests: AppUITestCase {
         XCTAssertTrue(waitUntilHittable(write))
         write.click()
 
-        XCTAssertTrue(element(ID.coverFlowLayer).waitForExistence(timeout: Self.riseTimeout), "寫入成功後升回")
+        waitForSurface(raised: true, timeout: Self.riseTimeout)
     }
 
     // MARK: AC5
@@ -112,13 +124,13 @@ final class LyricsFlowUITests: AppUITestCase {
         let mark = app.buttons[ID.markNoLyrics]
         XCTAssertTrue(waitUntilHittable(mark, timeout: Self.surfaceTimeout))
         mark.click()
-        XCTAssertTrue(element(ID.coverFlowLayer).waitForExistence(timeout: Self.surfaceTimeout), "標記後升回")
+        waitForSurface(raised: true)
 
         app.terminate()
         _ = app.wait(for: .notRunning, timeout: Self.terminationTimeout)
         start(.missing, resetDefaults: false)
 
-        XCTAssertTrue(element(ID.coverFlowLayer).waitForExistence(timeout: Self.surfaceTimeout), "重啟後同曲不跳 Editor")
+        waitForSurface(raised: true)
         assertStaysFalse((fetchCount() ?? "0") != "0", for: 2, "標記過的曲不自動抓詞")
     }
 
@@ -127,6 +139,7 @@ final class LyricsFlowUITests: AppUITestCase {
     /// AC14：升起時方向鍵步進 Cover Flow、打字不進被遮住的 Editor；降下時 Cover Flow 不持有焦點
     func testKeyboardFocusFollowsSurface() {
         start(.present)
+        waitForSurface(raised: true)
         let label = element(ID.centerLabel)
         XCTAssertTrue(label.waitForExistence(timeout: Self.surfaceTimeout))
         let before = label.value as? String
@@ -139,7 +152,7 @@ final class LyricsFlowUITests: AppUITestCase {
         app.typeText("abc")
         XCTAssertFalse(element(ID.editorLayer).exists, "打字不得讓 Editor 出現或收到文字")
 
-        app.buttons[ID.handle].click()
+        app.buttons[ID.lyricsFlowHandle].click()
         XCTAssertTrue(element(ID.editorLayer).waitForExistence(timeout: Self.surfaceTimeout))
         let centred = label.value as? String
         app.typeKey(.rightArrow, modifierFlags: [])

@@ -98,6 +98,7 @@ targets:
       - path: App/UITestSupport/CoverFlowReportTelemetry.swift
       # Cover Flow × 找歌詞：場景名、旗標、假資料 ID、a11y identifier 的單一來源（計劃 Q3.5）
       - path: App/UITestSupport/LyricsFlowUITestScenario.swift
+      - path: UI/AccessibilityID.swift
     dependencies:
       - target: AzathothsWhisper
     settings:

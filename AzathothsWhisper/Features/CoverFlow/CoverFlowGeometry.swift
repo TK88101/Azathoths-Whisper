@@ -57,6 +57,14 @@ struct CoverFlowGeometry {
         return zIndex(forDistance: (d / strideRatio).rounded())
     }
 
+    /// 可點判定的容差（計劃 D6、N2）：|d| ≤ 0.2 個卡寬才算「在正中」。
+    /// 相鄰兩卡相距 0.58 個卡寬，捲動跨中點途中沒有任何卡落在容差內——不會點到正在滑過的卡
+    static let centeredTolerance: CGFloat = 0.2
+
+    func isCentered(forDistance d: CGFloat) -> Bool {
+        abs(d) <= Self.centeredTolerance
+    }
+
     /// 旋轉錨點：左側項目繞右緣轉、右側項目繞左緣轉，才有「向中心翻開」的觀感
     func anchorIsTrailing(forDistance d: CGFloat) -> Bool {
         d < 0
