@@ -28,8 +28,21 @@ struct CoverFlowUITestMusic: MusicControlling {
         )
     }
 
-    /// 非空：Editor 在歌詞為空時會自動上網抓詞
-    func currentLyrics() async throws -> String { Self.lyrics }
+    /// 歌詞非空：Editor 在歌詞為空時會自動上網抓詞
+    func nowPlaying() async throws -> NowPlayingRead? {
+        guard let track = try await currentTrack() else { return nil }
+        return NowPlayingRead(track: track, lyrics: Self.lyrics)
+    }
+
+    func trackDetails(persistentIDs: [String]) async throws -> [TrackDetails] {
+        persistentIDs.compactMap { id in
+            guard let index = Fixture.index(of: id) else { return nil }
+            return TrackDetails(
+                persistentID: id, artist: Fixture.artist, title: Fixture.title(at: index), album: Fixture.album,
+                discNumber: 1, trackNumber: index + 1, lyrics: Self.lyrics
+            )
+        }
+    }
 
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] {
         try await Task.sleep(for: albumDelay)

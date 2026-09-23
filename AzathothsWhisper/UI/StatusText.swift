@@ -14,6 +14,7 @@ enum StatusText {
     static let noTrackPlaying = "No track playing"
     static let writeFailed = "Write failed"
     static let lyricsLoadedFromMusicApp = "Lyrics loaded from music app"
+    static let lyricsUnreadable = "Could not read lyrics from Music"     // 計劃 D8：讀取失敗≠缺詞
 
     // 曲目卡片（py:441-453）
     static let noArtist = "No Artist"

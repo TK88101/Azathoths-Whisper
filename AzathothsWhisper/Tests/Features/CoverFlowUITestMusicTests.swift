@@ -36,8 +36,23 @@ struct CoverFlowUITestMusicTests {
 
     /// 歌詞必須非空：Editor 在歌詞為空時會自動上網抓詞（EditorViewModel.swift:82-88）
     @Test func lyricsAreNonEmptySoEditorNeverFetches() async throws {
-        let lyrics = try await music.currentLyrics()
+        let lyrics = try #require(try await music.nowPlaying()?.lyrics)
         #expect(!lyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    /// 卡片詳情：已知 ID 回傳 fixture 資料（歌詞非空＝有詞），未知 ID 不回傳
+    @Test func trackDetailsCoverKnownIDsOnly() async throws {
+        let known = Fixture.persistentID(at: 3)
+        let details = try await music.trackDetails(persistentIDs: [known, "NOT-A-FIXTURE"])
+        #expect(details.map(\.persistentID) == [known])
+        #expect(details.first?.title == Fixture.title(at: 3))
+        #expect(details.first?.trackNumber == 4)
+        #expect(details.first?.lyrics?.isEmpty == false)
+    }
+
+    @Test func nowPlayingPairsTheFixedTrackWithItsLyrics() async throws {
+        let read = try #require(try await music.nowPlaying())
+        #expect(read.track.persistentID == Fixture.persistentID(at: Fixture.playingIndex))
     }
 
     @Test func writesAreRefused() async throws {

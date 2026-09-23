@@ -1,9 +1,12 @@
+import AppKit
+import CoreServices
 import Foundation
 import ScriptingBridge
 
 // ScriptingBridge 對 Music.app 的介面宣告（手寫，免 sdp 產生標頭）。
 // 由 M1 spike 實測確立（Scripts/spike/FINDINGS.md）。
-@objc private protocol MusicTrackProto {
+// 明確的 ObjC 名稱讓執行期內省找得到這兩個 private 協議（計劃 AC9 ②：選擇器白名單測試）
+@objc(AZWMusicTrackProto) private protocol MusicTrackProto {
     @objc optional var name: String { get }
     @objc optional var artist: String { get }
     @objc optional var album: String { get }
@@ -15,7 +18,7 @@ import ScriptingBridge
     @objc optional func artworks() -> SBElementArray
 }
 
-@objc private protocol MusicAppProto {
+@objc(AZWMusicAppProto) private protocol MusicAppProto {
     @objc optional var playerState: UInt32 { get }
     @objc optional var currentTrack: SBObject { get }
     @objc optional func tracks() -> SBElementArray
@@ -51,12 +54,40 @@ struct MusicAppleEventsClient: MusicControlling {
         }
     }
 
-    func currentLyrics() async throws -> String {
-        try await run { app in
+    func nowPlaying() async throws -> NowPlayingRead? {
+        // 自行檢查 lastError：歌詞讀取失敗只讓歌詞成為 nil，曲目仍有效（run 的預設檢查會讓整次失敗）
+        try await run(checksLastError: false) { app in
             guard Self.decodeState(app.playerState ?? 0).hasCurrentTrack,
-                  let track = app.currentTrack
-            else { return "" }
-            return (track as MusicTrackProto).lyrics ?? ""
+                  let reference = app.currentTrack
+            else {
+                try Self.throwIfFailed(app)
+                return nil
+            }
+            // D9：get() 把 `current track` 釘成 `file track id … of …`，之後每個屬性都讀同一首
+            guard let pinned = reference.get() as? SBObject else {
+                try Self.throwIfFailed(app)
+                return nil
+            }
+            let track = Self.makeTrackInfo(pinned)
+            try Self.throwIfFailed(app)
+            let lyrics = (pinned as MusicTrackProto).lyrics
+            let lyricsFailed = Self.lastError(of: app) != nil
+            return NowPlayingRead(track: track, lyrics: lyricsFailed ? nil : (lyrics ?? ""))
+        }
+    }
+
+    func trackDetails(persistentIDs: [String]) async throws -> [TrackDetails] {
+        let ids = Array(Set(persistentIDs.filter { !$0.isEmpty })).sorted()
+        guard !ids.isEmpty else { return [] }
+        return try await run(aeTimeoutTicks: Self.detailsTimeoutTicks) { app in
+            guard let all = app.tracks?() else { return [] }
+            let predicate = NSCompoundPredicate(
+                orPredicateWithSubpredicates: ids.map { NSPredicate(format: "persistentID == %@", $0) }
+            )
+            // S6：OR 串接的 whose 一次取回元素，再逐屬性各一次批次取值（21 首約 5 AE、p50 51ms；逐首讀要 1 秒）。
+            // Swift 端 filtered(using:) 回傳 [Any]，需轉回 SBElementArray 才能批次取值
+            guard let matches = (all.filtered(using: predicate) as NSArray) as? SBElementArray else { return [] }
+            return Self.details(of: matches)
         }
     }
 
@@ -121,6 +152,43 @@ struct MusicAppleEventsClient: MusicControlling {
         }
     }
 
+    private static func details(of tracks: SBElementArray) -> [TrackDetails] {
+        func column(_ selector: Selector) -> [Any] { tracks.array(byApplying: selector) }
+        let ids = column(#selector(getter: MusicTrackProto.persistentID))
+        let artists = column(#selector(getter: MusicTrackProto.artist))
+        let titles = column(#selector(getter: MusicTrackProto.name))
+        let albums = column(#selector(getter: MusicTrackProto.album))
+        let discs = column(#selector(getter: MusicTrackProto.discNumber))
+        let numbers = column(#selector(getter: MusicTrackProto.trackNumber))
+        let lyrics = column(#selector(getter: MusicTrackProto.lyrics))
+        let count = ids.count
+        // 各欄長度不一致＝批次讀取不完整，整批不採用（卡片退為 unknown）
+        guard [artists, titles, albums, discs, numbers, lyrics].allSatisfy({ $0.count == count }) else { return [] }
+        return (0..<count).compactMap { index in
+            guard let id = ids[index] as? String, !id.isEmpty else { return nil }
+            return TrackDetails(
+                persistentID: id,
+                artist: artists[index] as? String ?? "",
+                title: titles[index] as? String ?? "",
+                album: albums[index] as? String ?? "",
+                discNumber: (discs[index] as? NSNumber)?.intValue ?? 0,
+                trackNumber: (numbers[index] as? NSNumber)?.intValue ?? 0,
+                lyrics: lyrics[index] as? String
+            )
+        }
+    }
+
+    private static func throwIfFailed(_ app: MusicAppProto) throws {
+        if let error = lastError(of: app) {
+            throw mapError(error)
+        }
+    }
+
+    /// 協議存在值底下就是 run() 建的那個 SBApplication（@objc 協議，執行期可轉回）
+    private static func lastError(of app: MusicAppProto) -> NSError? {
+        (app as? SBApplication)?.lastError() as NSError?
+    }
+
     private static func makeTrackInfo(_ track: SBObject) -> TrackInfo {
         let proto = track as MusicTrackProto
         return TrackInfo(
@@ -151,18 +219,28 @@ struct MusicAppleEventsClient: MusicControlling {
     /// 誠實邊界：這只保證 client 端 bounded wait，**不保證**遠端操作被撤銷——
     /// Music.app 可能仍在服務端處理已送出的 Apple Event。
     static let artworkTimeoutTicks: Int = 90    // 1.5 秒；與 currentTrack() 合計須留在 H-04 的 3 秒內
+    /// 卡片詳情批次讀取的每個 AE 上限（約 7 個 AE；S6 實測整批 p95 76ms）
+    static let detailsTimeoutTicks: Int = 90
 
     private func run<T: Sendable>(
         aeTimeoutTicks: Int? = nil,
+        checksLastError: Bool = true,
         _ body: @escaping @Sendable (MusicAppProto) throws -> T
     ) async throws -> T {
         let identifier = bundleIdentifier
         return try await withCheckedThrowingContinuation { continuation in
             Self.queue.async {
-                guard let app = SBApplication(bundleIdentifier: identifier), app.isRunning else {
+                // D10：以 pid 定址——Music 中途退出時 AE 以 -600 失敗，而不是把 Music 重新叫起來
+                // （以 bundle ID 定址的 SBApplication 會啟動目標 app，那就改變了使用者的 Music 狀態）
+                guard let running = NSRunningApplication.runningApplications(withBundleIdentifier: identifier).first,
+                      !running.isTerminated,
+                      let app = SBApplication(processIdentifier: running.processIdentifier)
+                else {
                     continuation.resume(throwing: MusicError.notRunning)
                     return
                 }
+                // Music 端不得彈出任何需要使用者回應的互動（例如離線檔的提示）
+                app.sendMode = AESendMode(kAEWaitReply | kAENeverInteract | kAEDontRecord)
                 // 每次 run 都新建 SBApplication，故此設定是 per-call 的
                 if let aeTimeoutTicks {
                     app.timeout = aeTimeoutTicks
@@ -170,7 +248,7 @@ struct MusicAppleEventsClient: MusicControlling {
                 do {
                     let value = try body(app as MusicAppProto)
                     // SBApplication 不拋錯，改用 lastError() 偵測 AE 失敗（-1743＝自動化權限被拒）
-                    if let error = app.lastError() as NSError? {
+                    if checksLastError, let error = app.lastError() as NSError? {
                         continuation.resume(throwing: Self.mapError(error))
                         return
                     }
@@ -183,6 +261,10 @@ struct MusicAppleEventsClient: MusicControlling {
     }
 
     static func mapError(_ error: NSError) -> MusicError {
-        error.code == -1743 ? .permissionDenied : .scriptingFailure("AE error \(error.code)")
+        switch error.code {
+        case -1743: return .permissionDenied                 // errAEEventNotPermitted
+        case -600, -609: return .notRunning                  // procNotFound／connectionInvalid（D10：Music 已退出）
+        default: return .scriptingFailure("AE error \(error.code)")
+        }
     }
 }

@@ -7,7 +7,8 @@ import Foundation
 struct InertMusicClient: MusicControlling {
     func playerState() async throws -> PlayerState { .stopped }
     func currentTrack() async throws -> TrackInfo? { nil }
-    func currentLyrics() async throws -> String { "" }
+    func nowPlaying() async throws -> NowPlayingRead? { nil }
+    func trackDetails(persistentIDs: [String]) async throws -> [TrackDetails] { [] }
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] { [] }
     func setLyrics(persistentID: String, lyrics: String) async throws -> Bool { false }
     func artworkData(persistentID: String) async throws -> Data? { nil }

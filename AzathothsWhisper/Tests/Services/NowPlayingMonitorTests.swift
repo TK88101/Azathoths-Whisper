@@ -60,8 +60,7 @@ struct NowPlayingMonitorTests {
         #expect(trackEvents.count == 2)
     }
 
-    /// 替身的歌詞必須屬於同一輪輪詢送出的那首（2026-09-23 計劃 §3 事實 11 的錯位鎖定）：
-    /// 舊實作 `currentLyrics()` 讀的是 `currentTrack()` 消耗後剩下的腳本頭，A 會帶上 B 的歌詞
+    /// 歌詞必須屬於同一輪送出的那首（計劃 §3 事實 11 的錯位鎖定：舊替身把 B 的歌詞配給 A）
     @Test func lyricsBelongToTheTrackServedInTheSameTick() async {
         let first = TrackInfo.fixture(id: "PID1")
         let second = TrackInfo.fixture(id: "PID2")
@@ -76,6 +75,33 @@ struct NowPlayingMonitorTests {
         let events = await collected
 
         #expect(events.last == .trackChanged(first, existingLyrics: "first lyrics"))
+    }
+
+    /// 計劃 D9／AC12：曲目欄位與歌詞只來自同一次讀取（不再先讀曲目、再另讀歌詞）
+    @Test func trackAndLyricsComeFromASingleRead() async {
+        let track = TrackInfo.fixture()
+        let music = MockMusicClient(script: [.track(track, lyrics: "verse")])
+        let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
+
+        async let collected = collect(monitor, expecting: 2)
+        await monitor.tick()
+        let events = await collected
+
+        #expect(events.last == .trackChanged(track, existingLyrics: "verse"))
+        #expect(await music.nowPlayingCalls == 1, "一輪只讀一次（曲目與歌詞同一次讀取）")
+    }
+
+    /// 歌詞讀取失敗＝nil（unknown），不得折疊成空字串（那會被當成缺詞而降下 Editor）
+    @Test func unreadableLyricsArriveAsNil() async {
+        let track = TrackInfo.fixture()
+        let music = MockMusicClient(script: [.track(track, lyrics: nil)])
+        let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
+
+        async let collected = collect(monitor, expecting: 2)
+        await monitor.tick()
+        let events = await collected
+
+        #expect(events.last == .trackChanged(track, existingLyrics: nil))
     }
 
     @Test func emitsAlbumChangedOnlyWhenArtistAlbumPairChanges() async {

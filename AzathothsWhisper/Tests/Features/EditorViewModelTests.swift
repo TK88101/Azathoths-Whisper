@@ -61,6 +61,17 @@ struct EditorViewModelTests {
         #expect(model.statusText == StatusText.lyricsFetched)
     }
 
+    /// 計劃 D8／AC7：讀不到歌詞 → 不自動抓詞、不宣稱缺詞（否則使用者按 Write 會覆蓋掉原本的詞）
+    @Test func unreadableLyricsNeitherAutoFetchNorClaimMissing() {
+        let model = makeModel(genius: .found("body"))
+        model.lyricsText = "stale"
+        model.handle(.trackChanged(.fixture(), existingLyrics: nil))
+
+        #expect(model.autoFetchTask == nil)
+        #expect(model.lyricsText == "")
+        #expect(model.statusText == StatusText.lyricsUnreadable)
+    }
+
     // B-05（後半）：非 Editor tab 時不自動抓
     @Test func autoFetchSkippedWhenEditorTabInactive() {
         let model = makeModel(genius: .found("body"))

@@ -66,7 +66,7 @@ final class EditorViewModel {
         }
     }
 
-    private func apply(track: TrackInfo, existingLyrics: String) {
+    private func apply(track: TrackInfo, existingLyrics: String?) {
         isAccessDenied = false
         let lines = TrackLabel.lines(artist: track.artist, title: track.title)
         artistLine = lines.artist
@@ -78,6 +78,13 @@ final class EditorViewModel {
         boundTrackID = track.persistentID
         generation += 1
         autoFetchTask?.cancel()
+
+        // D8：讀不到歌詞 ≠ 沒有歌詞。不自動抓詞、不宣稱缺詞——否則使用者一按 Write 就覆蓋掉原本的詞
+        guard let existingLyrics else {
+            lyricsText = ""
+            statusText = StatusText.lyricsUnreadable
+            return
+        }
 
         if existingLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             lyricsText = ""

@@ -5,7 +5,8 @@ import Foundation
 // 可編程的 Music 替身：測試以腳本方式安排每次 currentTrack() 的回應（Plan §7：AE 層走 mock）
 actor MockMusicClient: MusicControlling {
     enum Response: Sendable {
-        case track(TrackInfo, lyrics: String)
+        /// `lyrics` 為 nil＝歌詞讀取失敗
+        case track(TrackInfo, lyrics: String?)
         case notPlaying
         case failure(MusicError)
     }
@@ -13,7 +14,12 @@ actor MockMusicClient: MusicControlling {
     private var script: [Response]
     private var repeatLast: Bool
     private(set) var currentTrackCalls = 0
-    private(set) var lyricsCalls = 0
+    /// `nowPlaying()` 的呼叫次數（`currentTrackCalls` 也會加一：兩者都是「查一次當前曲」）
+    private(set) var nowPlayingCalls = 0
+    private var trackDetailsResult: [TrackDetails] = []
+    private var trackDetailsOutcome: Result<[TrackDetails], MusicError>?
+    /// 每次 `trackDetails` 請求的 ID（依請求順序）
+    private(set) var trackDetailsRequests: [[String]] = []
     private(set) var writes: [String: String] = [:]
     private var albumTracksResult: [AlbumTrack] = []
     private(set) var albumTracksCalls = 0
@@ -42,6 +48,15 @@ actor MockMusicClient: MusicControlling {
     init(script: [Response] = [], repeatLast: Bool = true) {
         self.script = script
         self.repeatLast = repeatLast
+    }
+
+    func setTrackDetails(_ details: [TrackDetails]) {
+        trackDetailsResult = details
+    }
+
+    /// 覆寫整體結果（優先於 `setTrackDetails`）：製造批次讀取失敗；nil＝取消覆寫
+    func setTrackDetailsOutcome(_ outcome: Result<[TrackDetails], MusicError>?) {
+        trackDetailsOutcome = outcome
     }
 
     func setAlbumTracks(_ tracks: [AlbumTrack]) {
@@ -94,9 +109,6 @@ actor MockMusicClient: MusicControlling {
     /// artworkData() 的實際調用順序，供「explicit 插隊在預取之前」斷言
     private(set) var artworkOrder: [String] = []
 
-    /// 最近一次 `currentTrack()` 送出的回應：同一輪的歌詞必須取自它
-    private var lastServed: Response?
-
     private func next() -> Response {
         let response: Response
         if script.isEmpty {
@@ -106,7 +118,6 @@ actor MockMusicClient: MusicControlling {
         } else {
             response = script.removeFirst()
         }
-        lastServed = response
         return response
     }
 
@@ -123,12 +134,22 @@ actor MockMusicClient: MusicControlling {
         }
     }
 
-    func currentLyrics() async throws -> String {
-        lyricsCalls += 1
-        // 不消耗腳本：歌詞屬於同一輪 currentTrack() 送出的那首。
-        // 舊寫法讀 `script.first`——那是 removeFirst() 之後**剩下的**腳本頭，多曲腳本時 A 會帶上 B 的歌詞
-        guard let lastServed, case .track(_, let lyrics) = lastServed else { return "" }
-        return lyrics
+    /// 一次回應同時帶曲目與歌詞（取自同一個腳本項，D9）
+    func nowPlaying() async throws -> NowPlayingRead? {
+        nowPlayingCalls += 1
+        currentTrackCalls += 1
+        switch next() {
+        case .track(let info, let lyrics): return NowPlayingRead(track: info, lyrics: lyrics)
+        case .notPlaying: return nil
+        case .failure(let error): throw error
+        }
+    }
+
+    func trackDetails(persistentIDs: [String]) async throws -> [TrackDetails] {
+        trackDetailsRequests.append(persistentIDs)
+        if let trackDetailsOutcome { return try trackDetailsOutcome.get() }
+        let wanted = Set(persistentIDs)
+        return trackDetailsResult.filter { wanted.contains($0.persistentID) }
     }
 
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] {

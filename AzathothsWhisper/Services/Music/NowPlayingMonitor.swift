@@ -4,7 +4,8 @@ import Foundation
 // 差異（已批准的安全修正）：曲目身分用 persistentID，專輯鍵用 (artist, album)。
 
 enum PlaybackEvent: Equatable, Sendable {
-    case trackChanged(TrackInfo, existingLyrics: String)
+    /// `existingLyrics` 為 nil＝歌詞讀取失敗（unknown），與空字串（缺詞）不同（計劃 D9）
+    case trackChanged(TrackInfo, existingLyrics: String?)
     case albumChanged(String)          // albumKey
     case notPlaying
     case permissionDenied
@@ -96,7 +97,8 @@ actor NowPlayingMonitor {
         guard busySources.isEmpty else { return }
 
         do {
-            guard let track = try await music.currentTrack() else {
+            // D9：曲目＋歌詞一次讀完（同一個釘住的 specifier），不再分兩次各自解析 current track
+            guard let read = try await music.nowPlaying() else {
                 if !lastWasNotPlaying {
                     lastWasNotPlaying = true
                     lastSignature = nil
@@ -105,6 +107,7 @@ actor NowPlayingMonitor {
                 return
             }
             lastWasNotPlaying = false
+            let track = read.track
 
             if track.albumKey != lastAlbumKey {
                 lastAlbumKey = track.albumKey
@@ -113,8 +116,7 @@ actor NowPlayingMonitor {
 
             guard track.signature != lastSignature else { return }
             lastSignature = track.signature
-            let lyrics = (try? await music.currentLyrics()) ?? ""
-            continuation.yield(.trackChanged(track, existingLyrics: lyrics))
+            continuation.yield(.trackChanged(track, existingLyrics: read.lyrics))
         } catch MusicError.permissionDenied {
             continuation.yield(.permissionDenied)
         } catch {
