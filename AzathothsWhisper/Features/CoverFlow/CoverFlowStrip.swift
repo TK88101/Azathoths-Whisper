@@ -15,7 +15,11 @@ private let coverFlowViewportSpace = "coverflow.viewport"
 /// **實作限制（P1-0 spike 發現）**：`zIndex` 不能寫在 `.visualEffect` 閉包內——
 /// 該閉包回傳 `VisualEffect` 而非 `View`，而 `zIndex` 是 View modifier。
 /// 故拆成兩路：旋轉／縮放走 `.visualEffect`（需要連續的視口距離），
-/// 疊放次序走 `scrollPosition` 追蹤到的**離散**中心索引（視覺上只需正確的前後次序）。
+/// 疊放次序由每張卡自己的佈局位置決定（`CoverFlowStripCell`）。
+///
+/// **疊放不得跟 `centerID` 走（H-02 缺陷 2）**：`centerID` 是「選中哪張」，
+/// 與「畫面上哪張在正中」不同步——捲動途中它落後於畫面，初始值路徑還會整個對不上
+/// ——這時歪斜的鄰張就壓在正中那張上面。疊放與旋轉必須讀同一份佈局幾何。
 struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
     let items: [Item]
     let itemWidth: CGFloat
@@ -31,24 +35,28 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
             ScrollView(.horizontal) {
                 LazyHStack(spacing: geometry.spacing) {
                     ForEach(items) { item in
-                        content(item)
-                            .frame(width: itemWidth)
-                            .visualEffect { effect, proxy in
-                                let d = geometry.normalizedDistance(
-                                    itemMidX: proxy.frame(in: .named(coverFlowViewportSpace)).midX,
-                                    viewportMidX: outer.frame(in: .named(coverFlowViewportSpace)).midX
-                                )
-                                return effect
-                                    .rotation3DEffect(
-                                        .degrees(geometry.rotationDegrees(forDistance: d)),
-                                        axis: (x: 0, y: 1, z: 0),
-                                        anchor: geometry.anchorIsTrailing(forDistance: d)
-                                            ? .trailing : .leading,
-                                        perspective: geometry.perspective
+                        CoverFlowStripCell(
+                            geometry: geometry,
+                            viewportMidX: outer.frame(in: .named(coverFlowViewportSpace)).midX
+                        ) {
+                            content(item)
+                                .frame(width: itemWidth)
+                                .visualEffect { effect, proxy in
+                                    let d = geometry.normalizedDistance(
+                                        itemMidX: proxy.frame(in: .named(coverFlowViewportSpace)).midX,
+                                        viewportMidX: outer.frame(in: .named(coverFlowViewportSpace)).midX
                                     )
-                                    .scaleEffect(geometry.scale(forDistance: d))
-                            }
-                            .zIndex(stackingOrder(of: item))
+                                    return effect
+                                        .rotation3DEffect(
+                                            .degrees(geometry.rotationDegrees(forDistance: d)),
+                                            axis: (x: 0, y: 1, z: 0),
+                                            anchor: geometry.anchorIsTrailing(forDistance: d)
+                                                ? .trailing : .leading,
+                                            perspective: geometry.perspective
+                                        )
+                                        .scaleEffect(geometry.scale(forDistance: d))
+                                }
+                        }
                     }
                 }
                 .scrollTargetLayout()
@@ -60,13 +68,39 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
         }
         .coordinateSpace(.named(coverFlowViewportSpace))
     }
+}
 
-    /// 離散疊放：距中心愈遠愈下沉。中心未定時全部同層（首次佈局的一瞬）
-    private func stackingOrder(of item: Item) -> Double {
-        guard let centerID,
-              let centerIndex = items.firstIndex(where: { $0.id == centerID }),
-              let index = items.firstIndex(where: { $0.id == item.id })
-        else { return 0 }
-        return geometry.zIndex(forDistance: CGFloat(index - centerIndex))
+/// 單張卡的疊放：讀自己的**佈局位置**（與 `.visualEffect` 旋轉同一份幾何），離中心愈遠愈下沉。
+/// 層級按卡位量化（`CoverFlowGeometry.stackingOrder`），捲動時只在越過兩卡中點時改值。
+private struct CoverFlowStripCell<Card: View>: View {
+    let geometry: CoverFlowGeometry
+    let viewportMidX: CGFloat
+    @ViewBuilder let card: Card
+
+    /// 量到位置之前壓在最底：捲動動畫中新具現的卡會先被 SwiftUI 暫放在別張的位置上幾幀，
+    /// 預設 0（＝正中那層）會讓它蓋住正中那張
+    @State private var stackingOrder = CoverFlowGeometry.unplacedStackingOrder
+    /// 同理：新具現的卡在量到自己的位置前不顯示，免得在錯的位置上閃一下
+    @State private var isPlaced = false
+
+    var body: some View {
+        card
+            .onGeometryChange(for: Double.self) { [geometry, viewportMidX] proxy in
+                geometry.stackingOrder(forDistance: geometry.normalizedDistance(
+                    itemMidX: proxy.frame(in: .named(coverFlowViewportSpace)).midX,
+                    viewportMidX: viewportMidX
+                ))
+            } action: { order in
+                // 換層必須即時、不得帶動畫：捲動動畫期間的寫入會繼承動畫交易，
+                // SwiftUI 便以淡入淡出重排——新舊兩層並存約 0.1 秒，鄰張的那層蓋在正中那張上面
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    stackingOrder = order
+                    isPlaced = true
+                }
+            }
+            .opacity(isPlaced ? 1 : 0)
+            .zIndex(stackingOrder)
     }
 }

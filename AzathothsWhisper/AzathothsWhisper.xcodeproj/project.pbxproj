@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		070BFA6FE12F38EC022F62ED /* SettingsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8D48AED89F6F8695A6CF9E3 /* SettingsViewModelTests.swift */; };
 		08B2979FD9AEF2D7E7CAF85F /* LegacyConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4C0B0B66B19683FACBCA666 /* LegacyConfig.swift */; };
+		0A8DAD9C375EFE076842E89B /* CoverFlowStripStackingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CAA8E2815FD13EE91B7306C /* CoverFlowStripStackingTests.swift */; };
 		0C184008ADCCB6EB8711BF52 /* HTMLText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7B16B314B3DA14C6C421D5 /* HTMLText.swift */; };
 		0DDCE6BFE7270E854A88DD37 /* PythonCompatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDB995C37DF88749A2D09BFE /* PythonCompatTests.swift */; };
 		0F0C70E4D92FDE351606F6D6 /* GeniusParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECED4920B73DA65FD1E49930 /* GeniusParser.swift */; };
@@ -229,6 +230,7 @@
 		779624D54FEDE9B890CAB935 /* SerialAEQueueMusicClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialAEQueueMusicClient.swift; sourceTree = "<group>"; };
 		77A1B37D6B8DFCFB089BD24B /* CoverFlowCenterLabelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowCenterLabelTests.swift; sourceTree = "<group>"; };
 		7984B065A3700D3EAD1D526F /* CoverFlowCenterLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowCenterLabel.swift; sourceTree = "<group>"; };
+		7CAA8E2815FD13EE91B7306C /* CoverFlowStripStackingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowStripStackingTests.swift; sourceTree = "<group>"; };
 		7DBAF4CAD3EF4380B4259BA2 /* OFL-SpaceGrotesk.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-SpaceGrotesk.txt"; sourceTree = "<group>"; };
 		7E9B711BC5C1C82605BAC205 /* TrackLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackLabel.swift; sourceTree = "<group>"; };
 		85480AF256F0ABAF6E3119B5 /* CoverFlowGateLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowGateLogicTests.swift; sourceTree = "<group>"; };
@@ -651,6 +653,7 @@
 			children = (
 				C05FFC669BAA4C49A2C4EF7E /* ConfettiPhysicsTests.swift */,
 				DDC7FE27DC56B6DE64CB64DF /* CoverFlowStripRenderGeometryTests.swift */,
+				7CAA8E2815FD13EE91B7306C /* CoverFlowStripStackingTests.swift */,
 				3447D4ADE049D94DB7632E88 /* LocalizationTests.swift */,
 				FCFFF746CB6D2D71CD8EA866 /* MaterialSymbolTests.swift */,
 			);
@@ -853,6 +856,7 @@
 				100AE8C009B271A9756C7BCF /* CoverFlowPrefetchWindowTests.swift in Sources */,
 				9BC7B1722201CE194CB71E0F /* CoverFlowReportTelemetryTests.swift in Sources */,
 				3ACAFDC62889EFA144A2B517 /* CoverFlowStripRenderGeometryTests.swift in Sources */,
+				0A8DAD9C375EFE076842E89B /* CoverFlowStripStackingTests.swift in Sources */,
 				2B19F8A03FDA6AD5288A31A3 /* CoverFlowUITestFixtureTests.swift in Sources */,
 				328372DB625F7E9E650B24D8 /* CoverFlowUITestMusicTests.swift in Sources */,
 				1A24FD096089ED41B03388E0 /* CoverFlowUITestTraceTests.swift in Sources */,

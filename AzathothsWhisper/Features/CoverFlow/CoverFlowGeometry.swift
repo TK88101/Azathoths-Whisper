@@ -50,6 +50,16 @@ struct CoverFlowGeometry {
         -Double(abs(d))
     }
 
+    /// 尚未量到位置的卡：壓在所有已定位的卡之下
+    static let unplacedStackingOrder: Double = -1_000_000
+
+    /// 依**畫面位置**的疊放層級（H-02 缺陷 2）：距離先換算成「離中心第幾個卡位」再取 −|卡位|。
+    /// 用卡位而非連續距離：捲動時只在越過兩卡中點的那一刻改值，不逐幀寫狀態
+    func stackingOrder(forDistance d: CGFloat) -> Double {
+        let strideRatio = 1 + Self.overlapRatio
+        return zIndex(forDistance: (d / strideRatio).rounded())
+    }
+
     /// 旋轉錨點：左側項目繞右緣轉、右側項目繞左緣轉，才有「向中心翻開」的觀感
     func anchorIsTrailing(forDistance d: CGFloat) -> Bool {
         d < 0

@@ -80,6 +80,39 @@ struct CoverFlowGeometryTests {
         #expect(g.zIndex(forDistance: 1) == g.zIndex(forDistance: -1))
     }
 
+    // MARK: 依畫面位置疊放（H-02 缺陷 2：疊放不得跟 centerID 走）
+
+    /// 相鄰兩卡中心距（以 itemWidth 為單位）＝1 + 覆疊比例
+    private let strideRatio: CGFloat = 0.58
+
+    /// 不論捲到哪，離視口中心最近的那張（|d| < 半個卡距）都壓在左右鄰張之上
+    @Test(arguments: [-0.28, -0.15, 0, 0.15, 0.28] as [CGFloat])
+    func nearestCardStacksAboveNeighbours(offset: CGFloat) {
+        let g = CoverFlowGeometry(itemWidth: itemWidth)
+        let center = g.stackingOrder(forDistance: offset)
+        #expect(center > g.stackingOrder(forDistance: offset + strideRatio))
+        #expect(center > g.stackingOrder(forDistance: offset - strideRatio))
+    }
+
+    /// 愈遠愈下沉：鄰張壓在次鄰張之上
+    @Test func fartherSlotsStackLower() {
+        let g = CoverFlowGeometry(itemWidth: itemWidth)
+        #expect(g.stackingOrder(forDistance: strideRatio) > g.stackingOrder(forDistance: 2 * strideRatio))
+        #expect(g.stackingOrder(forDistance: -strideRatio) > g.stackingOrder(forDistance: -2 * strideRatio))
+    }
+
+    /// 同一個卡位內層級不變——捲動時只在越過兩卡中點的那一刻換層，不逐幀改值
+    @Test func stackingIsConstantWithinASlot() {
+        let g = CoverFlowGeometry(itemWidth: itemWidth)
+        #expect(g.stackingOrder(forDistance: 0.05) == g.stackingOrder(forDistance: 0.25))
+        #expect(g.stackingOrder(forDistance: 0.40) == g.stackingOrder(forDistance: 0.75))
+    }
+
+    @Test func positionalStackingIsSymmetric() {
+        let g = CoverFlowGeometry(itemWidth: itemWidth)
+        #expect(g.stackingOrder(forDistance: strideRatio) == g.stackingOrder(forDistance: -strideRatio))
+    }
+
     // MARK: 錨點（§4.8：d < 0 用 .trailing，否則 .leading）
 
     @Test func anchorFollowsSideOfCenter() {
