@@ -343,6 +343,7 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
   - 身分判定：每張卡以 `onGeometryChange` 被動回報佈局 midX（不經 AX、不增具現）。**第一版以捲動原點換算身分，系統性少一張**（兩種量法同輪對照：scroll 恆＝geometry−1），已棄用——該偏差屬量法，不屬產品。
   - 結果（geometry 身分）：換歌（窗口右移一格）direct **6/6**、兩段式 6/6、動畫 5/6（首步滑過頭）；清單重寫 direct／兩段式／動畫皆 **5/5**；空牌掛載後首次給牌 direct **5/5**、動畫 5/5、兩段式 **0/5（恆多一張）**。binding 回寫每次 1 次、無中途雜值。
   - **定案（D6）**：換牌與設 `centerID` 在同一次更新內完成（direct），不帶動畫、不做兩段式。
+- **使用者在場 #1：UITests 基線（2026-09-23 18:00–18:06，HEAD `94123ac`；app 原始碼與分支點 `ec3fd4d` 相同，僅測試／腳本／文件變動）**：Paste 已退出；暖身 `ShellUITests/testWindowGeometryAndTitle` 通過（26.4s）；正式輪 `ShellUITests`＋`BatchUITests` 16 條：**14 過／2 敗**——`ShellUITests/testQuitMenuItemTerminatesApp`（A-10，既知不穩定：`XCUIApplicationState 3≠1`）、`BatchUITests/testBatchShellInEnglish`（`C-21 col_artist`）；後者單獨重跑 2/2 通過 → 判定為與執行順序有關的偶發，非基線回歸。回歸判準：之後同集合不得出現此兩條以外的失敗；此兩條若失敗需單獨重跑 2 次再判。產物：scratchpad `ui-baseline.xcresult`／`.log`。
 - **決策**：thecure 辯論（Codex gpt-5.6-terra medium）原結論為「只顯示歷史」；Queue.dat 發現後前提改變，改依使用者裁定走佇列模式（本版 v3）。
 
 ## 14. 附錄：評審辯論記錄
