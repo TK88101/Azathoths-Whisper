@@ -568,6 +568,51 @@ screencapture -v "$G/ev/physical-K<n>/P3-1.mov"
 15. **動畫四分法**（取代三分）：裸賦值／`Transaction.disablesAnimations=true`／零時長 animation／可見 animation，四者以相同無 AX 條件、相同目標集合、presentation layer 時序判定「有無中間位置幀」；API 名稱不作證據。只有四者都測完且僅可見動畫可行時，才停在 F7 前問使用者是否擴大 H-04（範圍乙**現在不問**）。
 16. **spike 2 worktree 處置**：已封存 `round2-pbxproj.diff`、`round2-worktree-state.txt`（base HEAD `1055ff0`、spike 檔 sha256 `f2b96f66…` 兩處一致）、`xcresult-round2/`（11 份 xcresult＋run/build log，4.0M）→ 待使用者同意後刪除 worktree 與其中的 iCloud 重複 xcodeproj；spike 3 另建新 worktree。DerivedData 可重建，無保留價值。
 
+（2026-09-18／19 的三段記錄——判定器 R27 profile 與四棵樹預構建、profile CLI 與 26.6.2 彩排、Phase 3 `/simcodex`——位於文末 §14 之後。）
+
+### 2026-09-23 場 0（基準重建）：**全過，R27 已原子啟用（`version=scene0-run-1`）**
+
+**前置**：基線 `wip/h02-fix4` HEAD `4d71d7a`；判定器 Python **321** 全綠；`RUN_ENV=os_build=26A428,xcode_build=27A266a,sdk=macosx27.0`。命令逐字取自 `PREBUILD.md`，兩處依使用者開工口令：`profile` 子命令不給 `--profile-dir`（預設 `_DEFAULT_R27_PROFILE_DIR`＝`$G/r27-profile`，與 PREBUILD 的顯式值同一路徑）、`activate --version scene0-run-1`。執行器（scratchpad `scene0.sh`）每段前加 8 值 CDHash 核對、產物已存在即拒跑、Automation 逾時改名 `aborted` 且不餵 stage。**執行器在 (i) 之後、(ii) 之前改過一次**（10:41:11，只修兩行 echo：全形括號緊接未加大括號的變數被 bash 3.2 吃進變數名，(i) 的 driver 輸出因此有亂碼）；xcodebuild 呼叫未變，(i) log 內的 invocation 與 PREBUILD 逐 token 相同。**決策流程偏離**：Codex 週額度枯竭，thecure 辯論改由 TypeSafe（`jev-1.13.0`）判斷，**未經 Codex 對抗評審**；四題結論與我方一致（數字為所選選項的機率）——lsregister 殘留走既定清理（0.98）、(i) 採 PREBUILD 讀法（1.00）、(iv) 照 PREBUILD 兩次呼叫（0.83）、逐段唯讀判停止條件（0.88）；(i) 讀法與 (iv) 共 6 次 xcodebuild 由使用者當場拍板。**開跑前的 `lsregister -u` 只經 TypeSafe 與 PREBUILD 既有程序就執行，未先問使用者**（全局 §2「外部副作用需確認」，事後揭露；範圍只命中 `fix4/dd`）。
+
+**§11.1 不變式 1 的偏離與處置**：8 個 CDHash 全符；但 `lsregister -dump | grep -c bjork-h02-gate/fix4/dd`＝**3**（M0 app、ui-T0p app／runner；reg date 2026-09-22 11:05–11:08）。二進位 mtime 仍 9/18、gate 目錄 9/20 後無任何檔案變動 → **被動重註冊，非重建**。對 8 個 bundle `lsregister -u`；ui-T0p runner 隨即被 Spotlight 回註冊（`-u` 會觸發 spotlight 掃描），再 `-u` 一次後觀察 60 秒穩定為 0（整個 gate 目錄亦 0）。**場中機制（不變式 1 的理由只寫了 `build-for-testing`，不完整）**：每棵樹第一次 `test-without-building` 啟動時會註冊 app＋runner 各 1 條，段前觀察值依序 0→2→2→4→6→8；IDENTITY 全部落在期望目錄，未造成錯二進位。故「＝0」只能作開跑前條件。跑後收尾：8 條 → `-u` → 回註冊 2 條 → 再 `-u` → 穩定 0（跑後這段的計數只有本 session 終端輸出，未另存檔）。
+
+| 段 | 時間 | 結果 | 身分 | 處置 |
+|---|---|---|---|---|
+| (i) `preflight-R27-s2v5`（M0 ×1） | 10:38–10:39 | 4 條、6 個預期失敗、50.7s | IDENTITY 4/4 `instances=1`、落在 `dd/M0` | 不計證據 |
+| (ii) `cf-m0-27`（M0 ×10） | 10:41–10:49 | 40 條、60 個預期失敗、495s | 40/40 落在 `dd/M0` | v3 `run_valid=True` → `staging/m0` 凍結；evidence `94adbc1d…` |
+| (iii) `cf-M2-27`（×3） | 10:50–10:53 | 12 條、33 失敗、148s | 12/12 落在 `dd/M2` | v4 OK、`kill_ok` → `staging/m2`；`90cd4b70…` |
+| (iii) `cf-M3-27`（×3） | 10:54–10:56 | 12 條、30 失敗、148s | 12/12 落在 `dd/M3` | v4 OK、`kill_ok` → `staging/m3`；`08ecc619…` |
+| (iv) `ui-T0p-preflight` | 10:57–11:03 | 17 條：14 過／2 敗／1 skip、338s | （aad6a9b 樹無 IDENTITY 探針） | 不計證據 |
+| (iv) `ui-T0p` | 11:03–11:06 | 17 條：15 過／1 敗（A-10）／1 skip、139s | 同上 | `staging/ui_t0_prime` 凍結；`bd7bbcf9…` |
+
+Automation Mode 6/6 一次通過（6 份 log 皆無 `Timed out while enabling automation mode`、`$G` 內無 `aborted` 產物），0 次逾時中止；`attempts.jsonl` 無任何無效記錄；PROBE／UNTAGGED＝0。
+
+**第三方視窗干擾（只在兩次 preflight）**：Paste（`com.wiheads.paste-setapp`）的視窗在 (i) T3 開頭出現 1 次、在 ui preflight 的繁中 Batch 測試期間出現 2 次，XCUITest 皆報 `Did not handle the interruption`；四份證據輪與 `ui-T0p` 皆 0 次，不影響已啟用的 profile。之後各場次跑測試前應先關閉 Paste（對截圖取色閘門有污染風險）。
+
+**(i) 判讀**：Automation Mode ✓、身分 ✓；S2 功能面 ✓（9 步全部產出卡片色分類、無 uncertain／PROBE 碼，C2 的 over／side 與鄰卡幾何一致）。**未成立的一半**：背景已知點本輪無直接觀測——原 S2 spike 的 `testProbeDump` 不在四測試內；S2 在判定器是人工斷言、不入 `positive_control_ok`（`h02_gate_profile_gen.py:360`）。使用者批准的 (i) 讀法含「S2 已知點分類命中」，此半項當場未上報即續跑，**列入待使用者裁決**。
+
+**(ii) R27 基準（M0@27，×10）**：
+- ALL_PASS：T1.s1、T1.s2、T2.s1、T2.s2、T2.s3、T4.s1。
+- ALL_FAIL_CONSISTENT：**T3.s1**＝{`C1-OFFSET|label=T10|centered=T11|strides=-1`, `C2-STACK|G=T11|over=T10|side=L`}；**T4.s2**＝{`C1-OFFSET|label=T19|centered=T16|strides=+3`, `C2-STACK|G=T16|over=T17|side=R`}（**與 26.6.2 逐字相同，唯一未變的失敗步驟**；T1.s1、T2.s1 在兩個 OS 上皆 ALL_PASS，也未變）。
+- INCONSISTENT：**T1.s3**——10/10 FAIL 且碼集恆為 {C1-OFFSET, C4-REVERSAL}，但 C4 軌跡 9 次 `T13>T11>T12`、1 次 `T13>T12>T11>T12`。
+- 場 0 檢查：`positive_control_ok`（T2.s1 10/10；端點 T2.s2／T2.s3／T4.s1 ALL_PASS）✓、`defect2_reproduced`（v3 `defect2_steps=[T4.s2]`）✓、`defect3=CAUGHT` ✓。**限制**：判定器的缺陷 2 證據步驟（`DEFECT2_EVIDENCE_STEPS`）由 26.6.2 的 4 步（T1.s2／T2.s3／T4.s1／T4.s2）縮為只剩 T4.s2，而這一步同時是缺陷 3 的步驟；T3.s1 的 10/10 C2 不在該集合內，不計入。
+- 對 26.6.2 `FROZEN_REGISTRATION` 的雙欄偏離（只記錄、不停）：6 步 10/10 偏離——T1.s2／T2.s2／T2.s3／T4.s1 由 FAIL{C2} 變 PASS；T3.s1 由 PASS 變 FAIL{C1,C2}；T1.s3 由 FAIL{C2} 變 FAIL{C1,C4}。
+- **U15 的答案**：缺陷 2／3 在 27 上仍穩定存在，足以支撐判據；但 `C2-STACK` 出現的步驟由 26.6.2 的 T1.s2／T2.s2／T2.s3／T4.s1／T4.s2（另 T1.s3 4/10）變為 27 的 T3.s1／T4.s2，另多出 T1.s3 的 C4-REVERSAL（新碼；26.6.2 三份 confirm 日誌 C4 計數皆 0）。
+
+**(iii) R27 殺死簽名**：**M2 與 M3 完全相同**，5 步——T1.s1、T2.s1＝`C2-STACK|G=T11|over=T10|side=L`（與 R55 同步驟逐字相同）；T1.s2＝`C2-STACK|G=T13|over=T12|side=L`；T2.s3、T4.s1＝`C2-STACK|G=T19|over=T18|side=L`。required 集合：M2 {T1.s1, T2.s1} 在 baseline 皆 PASS；M3 {T1.s1, T2.s1, T3.s1} 中 **T3.s1 在 27 已失去 baseline PASS**，`required_baseline_pass_steps`＝{T1.s1, T2.s1}，非空 → 不觸發「跑變異前就停」。**這項檢查未機械化**：`required_baseline_pass_ok` 只由 `stage-mutant` 在變異跑完後產生；跑 M2 前是依 v3 輸出（T1.s1／T2.s1 ALL_PASS）人工判定，結論與事後機械值相同。M2／M3 全部 SIG 的多重集合只在 T1.s3（baseline 不一致格，不參與殺死）不同，且 T1.s3 的 C2 形態兩者確有差異——「不可區分」只在可殺死步驟上成立。T1.s2／T2.s3／T4.s1 的新殺死簽名與 26.6.2 M0 在同一步驟的缺陷 2 簽名逐字相同。**推測（待場 1／2 實跑）**：kill 登記只覆蓋 M0@27 全 PASS 的 5 步；變異在 T3.s1／T4.s2（M2 另有 T1.s3）也穩定帶 C2 失敗但因 baseline 非全 PASS 未登記——若候選把這些步驟修綠，M2_K／M3_K 會在這些步驟出現「active R27 未登記的殺死步驟」，按 W7 須逐條解釋，否則落「不可判定」。
+
+**(iv) ui-T0′**：證據輪 15 PASS／1 FAIL（A-10 `testQuitMenuItemTerminatesApp`，失敗訊息與 ui-T0 逐字相同）／1 SKIP（BatchLive）＝與 ui-T0（26.6.2）結果集合相同。preflight：Batch 第 1 條卡在 `does not have a process ID`（Spindump 顯示 app 停在 `KeychainStore.read`→`SecItemCopyMatching`，鑰匙串框）；第 2 條（繁中）失敗的成因**未確立**——launch 約 42s、期間有 Paste 視窗干擾、最後的 AX 快照卻是日文 UI；第 3 條起 14 條正常＝鑰匙串授權已生效。**A-10 在 preflight 通過、證據輪失敗 → 27 上不穩定**；首份規則下 active＝FAIL，W10 比對時須知此 flake。
+
+**check／activate**：每段 stage 後以 `evaluate_scene0_check` 唯讀逐條判（不寫檔），皆無「尚未 staged」以外的理由；四份齊後 `profile check`＝PASS → `profile activate --version scene0-run-1` 成功。`component_hashes`：m0 `7fd55e5e…`、m2 `d02a45e0…`、m3 `841713ef…`、ui `b7caef1e…`。四份 evidence hash 在判定器讀過 xcresult 之後重算逐一相符；跑後 8 值 CDHash 仍全符。**外部錨點**（`load_active_profile` 不讀 `frozen.jsonl`，同步改 staging＋active 兩檔即可讓 v3 用偽造內容、只有 `profile check` 察覺——口徑同第 4 輪覆核「墊高成本、非密碼學防偽」；以下完整 sha256 隨本段 commit 入 git 作錨點）：`active/profile.json`＝`ed496aaffa440bc881660df9c9da652d653e3ffdbb12911e201c6627d9e57343`；`staging/frozen.jsonl`＝`c89b88c355142d782d1cd0d181e44c96a0569ca328733d6bc4bd8f94cf556491`；`staging/scene0-check.json`＝`17932d429b9cd8ecdb29aa28ec6016838c89dce189e773c5611721893efdfcd5`。PREBUILD 的選用 `verdict`（R4-C 機械結論）未跑。
+
+**發現（待使用者裁決）——xcresult 內超出 W12 的附件**：既有 UITests 失敗時，xcresult 自動附**全螢幕**錄影（3456×2234 h264）：`ui-T0p`（證據）1 段 18.7s（A-10）；`ui-T0p-preflight` 2 段 81.4s（日文 Batch，鑰匙串那條）／71.5s（繁中 Batch）。preflight 另含一份全系統 Spindump（約 770 個行程名）與 UI Snapshot；證據輪另有 3 個 Synthesized Event bplist。**成因是 scheme 設定、不是 Xcode 27 新行為**：xctestrun 的 `SystemAttachmentLifetime` 在 ui-T0p＝`deleteOnSuccess`、M0／M2／M3＝`keepNever`（`project.yml` 的 `captureScreenshotsAutomatically: false`），兩者 `PreferredScreenCaptureFormat=screenRecording`——故 CoverFlow 四份只有裁切到視窗的 PNG（2400×1600）＋txt；**26.6.2 的歷史 `ui-T0.xcresult` 同樣帶一段 A-10 全螢幕錄影**（對抗覆核實測）。Token modal 兩條測試無任何附件 ✓。`ui-T0p` 的 evidence hash 已凍結進 active profile，刪附件即無法重算 → 原檔不動、不外流；待裁決：收官證據包（F11）如何處置新舊兩份 ui xcresult；是否為後續既有 UITests 運行改 scheme（會影響與 ui-T0′ 的可比性）。
+
+**判定器報告缺陷（登記，未修；改碼須走 TDD＋評審）**：`negative-control` 在 baseline 不合格而短路時，`active_profile_deviation` 為 None，列印落到 falsy 分支而印出「零偏離」與 `env_fingerprint: unknown`——結論本身正確，報告文字失實。
+
+**對抗覆核（2026-09-23，三路 Opus、必須實際執行、只在副本上試繞過）**：無 P0；active profile 可從 log＋xcresult 經判定器逐位元組重生、四份 hash／帳本／check 檔一致、8 個 live CDHash 相符、再啟用／第二次 stage／竄改後 check／手改 staging 後啟用皆被拒；6 次 xcodebuild 與 PREBUILD 逐 token 相同、只有兩處宣告的偏離。本段初稿被抓出的 2 條 P1（錄影歸因、Paste 干擾漏記）與十餘條 P2 錯漏已就地更正。
+
+**下一步（§13 v5 第 11 項）**：場 0 全過 → spike 3（F2c，不需使用者在場）→ F2d → sampler (8)＋報告腳本 (6) → F3a → 場 1 其餘 → F7。候選 `cf-cand-K<n>` 自此不再被「R27 未啟用」擋下。
+
 ## 14. 附錄：評審辯論記錄
 
 ### R1（2026-09-13）：Codex gpt-5.6-sol high（12 條）＋ Opus 5 四視角（TV＝test-validity 15 條、HF＝harness-fidelity 14 條、SS＝scope-simplicity 13 條、SM＝swiftui-mechanism 11 條）
