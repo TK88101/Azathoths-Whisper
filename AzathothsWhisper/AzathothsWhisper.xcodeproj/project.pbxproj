@@ -99,6 +99,7 @@
 		74D91763FE50C9CD7CD48E79 /* TrackLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E9B711BC5C1C82605BAC205 /* TrackLabel.swift */; };
 		74FD17EA4792BC863D51D061 /* AppUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AEBAE0065A4C328C97F14FE /* AppUITestCase.swift */; };
 		752004DA90E298615D2B2B85 /* LiveNetworkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54926C3154B45319A697547 /* LiveNetworkTests.swift */; };
+		759A0D9BB5FE39EE628D3DC2 /* AppInfoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5AB818A67E76590996282AD /* AppInfoTests.swift */; };
 		782C0B36DEDCA99A9FB144E4 /* DeckSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDF0A2EC7CEFB64C10E355F /* DeckSnapshotTests.swift */; };
 		788F4A3EF2FAB67E6D909296 /* ActionButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 452924C5DA3B362F5A2F4ADE /* ActionButton.swift */; };
 		794698CD4B4607F3DD2A1528 /* AppModel+CoverFlowUITest.swift in Sources */ = {isa = PBXBuildFile; fileRef = D687DBBF8D0B11DB099C88BA /* AppModel+CoverFlowUITest.swift */; };
@@ -379,6 +380,7 @@
 		D00756C67237E24ED14F80F2 /* CoverFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowUITests.swift; sourceTree = "<group>"; };
 		D3D287619A85F04254C4C202 /* Apache-2.0-MaterialSymbols.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Apache-2.0-MaterialSymbols.txt"; sourceTree = "<group>"; };
 		D4C2ED2F8AF3B71A4BD9379E /* LineEndings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineEndings.swift; sourceTree = "<group>"; };
+		D5AB818A67E76590996282AD /* AppInfoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfoTests.swift; sourceTree = "<group>"; };
 		D687DBBF8D0B11DB099C88BA /* AppModel+CoverFlowUITest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+CoverFlowUITest.swift"; sourceTree = "<group>"; };
 		D7BF51E34A53712FEF714B5E /* BatchOverlappingLoadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchOverlappingLoadTests.swift; sourceTree = "<group>"; };
 		D9E1A7DAEE49AB1565153545 /* LyricsServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsServiceTests.swift; sourceTree = "<group>"; };
@@ -671,6 +673,7 @@
 		B6233F1E1BB6FD15ABD55F29 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				D5AB818A67E76590996282AD /* AppInfoTests.swift */,
 				884465191ED1098192138961 /* AppModelTests.swift */,
 				D7BF51E34A53712FEF714B5E /* BatchOverlappingLoadTests.swift */,
 				AA23FF62ADA9D3B2A52E4117 /* BatchViewModelTests.swift */,
@@ -1004,6 +1007,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2869167F58B61DF3FBB6445C /* AEBudgetTests.swift in Sources */,
+				759A0D9BB5FE39EE628D3DC2 /* AppInfoTests.swift in Sources */,
 				F5A6D40DC86AA24322FBBDA5 /* AppModelTests.swift in Sources */,
 				C3766325CA77980130F2F5C1 /* ArtworkAEFairnessTests.swift in Sources */,
 				ABC8D9E7BABA8E253557E1A8 /* ArtworkDiskCacheTests.swift in Sources */,
@@ -1253,7 +1257,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 2.0.0;
+				CURRENT_PROJECT_VERSION = 2000001;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1420,7 +1424,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 2.0.0;
+				CURRENT_PROJECT_VERSION = 2000001;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

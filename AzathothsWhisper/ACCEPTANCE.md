@@ -103,7 +103,7 @@
 | D-07 | 驗證失敗紅字 "Invalid Token: {msg}" | py:856-858 | `invalidTokenShowsPrefixedMessageAndKeepsModalOpen` | ✅ M5 |
 | D-08 | token 驗證走 Genius account API；保存後即時生效（無需重啟） | py:2141-2152,2200-2210 | `TokenValidatorTests`（5 案，含 Bearer 標頭斷言）＋`AppModelTests.savingTokenPersistsAndRebuildsGeniusSource` | ✅ M5 |
 | D-09 | 語言三選項 en/zh_TW/ja；保存→提示 "Language saved. Restart app to apply." | py:863-871,2212-2216 | `savingLanguageStoresValueAndAsksForRestart`；下拉維持三選項（儲存值為 system 時無選項匹配＝原版同行為） | ✅ M5 |
-| D-10 | About：圖標＋Version 2.0.0＋Created By iBridge Zhao＋mailto＋GitHub 兩鏈接可點 | py:297-331 | `testHelpMenuOpensAboutModal`（四項元素斷言＋截圖）；圖標＝從 py:304 base64 抽出的原圖 | ✅ M5 |
+| D-10 | About：圖標＋Version 2.0.0 (Build <建置號>)＋Created By iBridge Zhao＋mailto＋GitHub 兩鏈接可點（2026-09-24 使用者拍板加建置號：ad-hoc 簽名每次打包都不同，同版本號須能分辨） | py:297-331 | `testHelpMenuOpensAboutModal`（四項元素斷言＋截圖；版本行比對 value／label、不寫死建置號）；`AppInfoTests`（版本行組字、建置號為整數）；圖標＝從 py:304 base64 抽出的原圖 | ✅ M5＋2026-09-24 |
 | D-11 | About 圓角例外樣式（全 app 唯一圓角區） | py:299-330 | 截圖：外框 16px、卡片 8px、Close 膠囊；其餘畫面全 0 圓角 | ✅ M5 |
 | D-12 | modal＝主窗內覆蓋層（非獨立窗/sheet）；modal 開啟時紅鈕關窗＝隱藏整窗 | Plan §4.2 | `ModalScrim` 為 ZStack 覆蓋層（截圖可見主 UI 在其後模糊）；modal 開啟時關窗的組合操作待 M8 手動 | ⬜ |
 | D-13 | modal 背景：黑 80%＋背景模糊 | py:266-267 | 截圖（`VisualEffectView(.withinWindow)`＋`Color.black.opacity(0.8)`） | ✅ M5 |

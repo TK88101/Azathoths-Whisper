@@ -13,7 +13,7 @@ packages:
 settings:
   base:
     MARKETING_VERSION: "2.0.0"
-    CURRENT_PROJECT_VERSION: "2.0.0"
+    CURRENT_PROJECT_VERSION: "2000001"   # 建置號：只增不減的整數，每次打包 +1（2026-09-24 使用者拍板）
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_IDENTITY: "-"

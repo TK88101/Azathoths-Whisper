@@ -19,7 +19,7 @@ struct AboutModalView: View {
                 .textGlow()
                 .padding(.bottom, 4)
 
-            Text(verbatim: "Version \(AppInfo.version)")
+            Text(verbatim: AppInfo.aboutVersionLine(version: AppInfo.version, build: AppInfo.build))
                 .font(Theme.Fonts.display(10))
                 .textCase(.uppercase)
                 .tracking(2)

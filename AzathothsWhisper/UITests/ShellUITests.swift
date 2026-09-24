@@ -133,7 +133,15 @@ final class ShellUITests: AppUITestCase {
         app.menuItems["About"].click()
 
         XCTAssertTrue(app.staticTexts["iBridge Zhao"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["VERSION 2.0.0"].exists)
+        // D-10：版本行＝「Version 2.0.0 (Build <建置號>)」；不寫死建置號，打包 +1 時免改測試
+        // SwiftUI 的 Text 在 macOS AX 樹上把文字放在 value、label 為空（見 BatchUITests.containsText），兩者都比
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(
+                format: "(value BEGINSWITH[c] %@ OR label BEGINSWITH[c] %@) AND (value CONTAINS[c] %@ OR label CONTAINS[c] %@)",
+                "Version 2.0.0", "Version 2.0.0", "(Build ", "(Build "
+            )).firstMatch.exists,
+            "D-10：版本行應含建置號"
+        )
         // 兩個連結是可點的 Button，文字併入其 accessibility label
         XCTAssertTrue(containsLabel("toadeater731@gmail.com"), "缺 mailto 連結")
         XCTAssertTrue(containsLabel("TK88101/Azathoths-Whisper"), "缺 GitHub 連結")

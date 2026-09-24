@@ -525,3 +525,8 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
 - 已做（TDD，先紅後綠）：`CoverFlowGeometry.centreFace(in:reflectionRatio:)`／`acceptsPlayingCardTap(isCentered:location:face:)`、`CoverFlowViewModel.playingCardTitle`、`HandleTick.appearance`（`TickAppearance` 意義代號）、`riseDelay == 影格間隔 × 步數 == 3.2s`；全量單元 614 條只剩基線紅。
 - Codex 最擔心：AC3 的實際可點＝VM 的「正中」狀態 × View 的正面命中 × 無障礙層位置，三者座標系接縫一歪，純函數與截圖都照綠、實際點擊卻壞 → 以上述新 UITest 兜住。
 - **AC11 改寫提案（待使用者批准；批准前不得視為已符合）**：「SwiftUI View 宣告檔的逐檔行覆蓋不作為合否標準。新增／改動 View 內的狀態判定、輸入許可、座標／尺寸計算、顯示內容與意義外觀的對應，一律抽成純函數或值型別並全分支單元測試；抽不出的 SwiftUI 接縫以註明對應 AC 的 XCUITest 或核准的截圖／AX 證據驗證。每個改動的 View 在證據包列出 (a) xccov 實測 (b) 抽出的邏輯與測試名 (c) UI 證據 (d) 未測分支的理由。View 以外（模型、VM、純函數、服務）照舊逐檔 ≥80%。」
+### 使用者裁定（2026-09-24）：版本號（thecure，Codex gpt-5.6-terra medium）
+- 事實：對外發布只有 1.x（GitHub Releases 至 v1.2.4）；Swift 重寫版已合進 main（`aad6a9b`）、9/9 本機打過 v2.0.0 DMG，但**從未打 tag、未發 Release**，使用者確認該 DMG 沒給過別人。
+- 結論：**本分支併回後的第一個公開版＝v2.0.0**（沿用 M8 §7 #5：merge commit＋tag `v2.0.0`＋正式版）；未公開的中間狀態不佔號。Codex 指出：若 9/9 版曾外流，拿掉 Cover Flow 分頁對持有者屬不相容改動，照 SemVer 應為 3.0.0（而非我方原提的 2.1.0）——使用者確認未外流，此分支不成立。
+- 已做：建置號（`CURRENT_PROJECT_VERSION`／`CFBundleVersion`）改只增不減的整數 `2000001`，每次打包 +1；關於畫面顯示「Version 2.0.0 (Build 2000001)」（`AppInfo.aboutVersionLine`＋`AppInfoTests` 3 條先紅後綠；D-10 UI 斷言改比對 value／label、不寫死建置號）。
+- **發版前必做（Codex 補，採納）**：① 在本分支合併後的那個 merge commit 上重打 DMG、重跑 M8 陪跑驗收與 ACCEPTANCE 剩餘 ⬜，v2.0.0 標在該 commit；② 1.x→2.0 同 bundle ID、同 Keychain service、ad-hoc 簽名每次換 CDHash——以最終 DMG 驗「有／無 1.x 設定」兩種升級：首次啟動、Music 授權拒絕→再授權、Keychain 讀寫 token、退回 1.x；③ release notes 寫明「Swift 重寫首個正式版、Cover Flow 併入 Editor、讀 Music 履歴／待播清單」。Codex 最擔心的即 ②：升級後讀不到 token 或權限被當成「更新壞了」。
