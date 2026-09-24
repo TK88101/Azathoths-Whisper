@@ -1,0 +1,34 @@
+{
+  "devices": [],
+  "testPlanConfigurations": [],
+  "testNodes": [
+    {
+      "nodeType": "Test Plan",
+      "name": "AzathothsWhisper",
+      "result": "Passed",
+      "children": [
+        {
+          "nodeType": "UI test bundle",
+          "name": "AzathothsWhisperUITests",
+          "result": "Passed",
+          "children": [
+            {
+              "nodeType": "Test Suite",
+              "name": "CoverFlowUITests",
+              "result": "Passed",
+              "children": [
+                {
+                  "nodeType": "Test Case",
+                  "name": "testReenteringTabKeepsCenteredCardCentered()",
+                  "nodeIdentifier": "CoverFlowUITests/testReenteringTabKeepsCenteredCardCentered()",
+                  "result": "Passed",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

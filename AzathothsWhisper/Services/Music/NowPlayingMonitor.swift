@@ -4,7 +4,8 @@ import Foundation
 // 差異（已批准的安全修正）：曲目身分用 persistentID，專輯鍵用 (artist, album)。
 
 enum PlaybackEvent: Equatable, Sendable {
-    case trackChanged(TrackInfo, existingLyrics: String)
+    /// `existingLyrics` 為 nil＝歌詞讀取失敗（unknown），與空字串（缺詞）不同（計劃 D9）
+    case trackChanged(TrackInfo, existingLyrics: String?)
     case albumChanged(String)          // albumKey
     case notPlaying
     case permissionDenied
@@ -44,6 +45,8 @@ actor NowPlayingMonitor {
     private var lastAlbumKey: String?
     private var lastWasNotPlaying = false
     private var busySources: Set<BusySource> = []
+    /// busy 期間收到的強制重讀：不得吞掉，全部來源空閒時補做一次
+    private var pendingForceRefresh = false
     private var pollTask: Task<Void, Never>?
 
     init(music: any MusicControlling, clock: any PollClock = SystemPollClock()) {
@@ -62,11 +65,16 @@ actor NowPlayingMonitor {
     /// Batch 載入完成送 false → Editor 仍在抓詞但輪詢已恢復。
     /// 由本型別自己記錄「誰還忙著」，而非讓組裝根替它記帳；新增來源（如 M7 Cover Flow）
     /// 只需擴 `BusySource`，不必動 `AppModel`。
-    func setBusy(_ busy: Bool, source: BusySource) {
+    func setBusy(_ busy: Bool, source: BusySource) async {
         if busy {
             busySources.insert(source)
         } else {
             busySources.remove(source)
+            // Editor 寫入成功後要求的補讀發生在它解除 busy 之前（計劃 §6 `writeSucceeded`）
+            if busySources.isEmpty, pendingForceRefresh {
+                pendingForceRefresh = false
+                await forceRefresh()
+            }
         }
     }
 
@@ -96,7 +104,8 @@ actor NowPlayingMonitor {
         guard busySources.isEmpty else { return }
 
         do {
-            guard let track = try await music.currentTrack() else {
+            // D9：曲目＋歌詞一次讀完（同一個釘住的 specifier），不再分兩次各自解析 current track
+            guard let read = try await music.nowPlaying() else {
                 if !lastWasNotPlaying {
                     lastWasNotPlaying = true
                     lastSignature = nil
@@ -105,6 +114,7 @@ actor NowPlayingMonitor {
                 return
             }
             lastWasNotPlaying = false
+            let track = read.track
 
             if track.albumKey != lastAlbumKey {
                 lastAlbumKey = track.albumKey
@@ -113,8 +123,7 @@ actor NowPlayingMonitor {
 
             guard track.signature != lastSignature else { return }
             lastSignature = track.signature
-            let lyrics = (try? await music.currentLyrics()) ?? ""
-            continuation.yield(.trackChanged(track, existingLyrics: lyrics))
+            continuation.yield(.trackChanged(track, existingLyrics: read.lyrics))
         } catch MusicError.permissionDenied {
             continuation.yield(.permissionDenied)
         } catch {
@@ -122,8 +131,13 @@ actor NowPlayingMonitor {
         }
     }
 
-    /// 使用者手動點擊「Now Editing」卡片時強制重新讀取（py:745）
+    /// 使用者手動點擊「Now Editing」卡片時強制重新讀取（py:745）；寫入成功後的補讀也走這裡。
+    /// busy 期間不讀 Music（B-02），記下來待全部來源空閒時補做
     func forceRefresh() async {
+        guard busySources.isEmpty else {
+            pendingForceRefresh = true
+            return
+        }
         lastSignature = nil
         lastWasNotPlaying = false
         await tick()

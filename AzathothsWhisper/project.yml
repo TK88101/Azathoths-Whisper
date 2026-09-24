@@ -13,7 +13,7 @@ packages:
 settings:
   base:
     MARKETING_VERSION: "2.0.0"
-    CURRENT_PROJECT_VERSION: "2.0.0"
+    CURRENT_PROJECT_VERSION: "2000001"   # 建置號：只增不減的整數，每次打包 +1（2026-09-24 使用者拍板）
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_IDENTITY: "-"
@@ -86,6 +86,19 @@ targets:
     platform: macOS
     sources:
       - path: UITests
+      # H-02 UI 測試閘門：與 app 同編的單一來源（旗標名、色板、判定純邏輯、軌跡格式、
+      # 證據命名與 manifest、marks 行格式、報告遙測行），
+      # 見 docs/plans/2026-09-11-coverflow-h02-uitest-gate.md §3.3
+      # 與 docs/plans/2026-09-13-coverflow-h02-fix4.md §5.7 (7)(9)(10)。各檔整檔包在 #if DEBUG 內
+      - path: App/UITestSupport/CoverFlowUITestFixture.swift
+      - path: App/UITestSupport/CoverFlowGateLogic.swift
+      - path: App/UITestSupport/CoverFlowTraceFormat.swift
+      - path: App/UITestSupport/CoverFlowEvidence.swift
+      - path: App/UITestSupport/CoverFlowMarksFormat.swift
+      - path: App/UITestSupport/CoverFlowReportTelemetry.swift
+      # Cover Flow × 找歌詞：場景名、旗標、假資料 ID、a11y identifier 的單一來源（計劃 Q3.5）
+      - path: App/UITestSupport/LyricsFlowUITestScenario.swift
+      - path: UI/AccessibilityID.swift
     dependencies:
       - target: AzathothsWhisper
     settings:
@@ -102,6 +115,10 @@ schemes:
         AzathothsWhisperUITests: [test]
     test:
       gatherCoverageData: true
+      # 不讓 XCTest 在失敗時自動截圖：H-02 閘門按設計會大量紅，系統截圖可能是全螢幕（使用者在場授權時的畫面），
+      # 會隨 xcresult 進證據包。需要的視覺證據由測試碼自行附「裁切到視窗」的截圖
+      # （memory no-credential-fields-in-ui-screenshots；計劃 §3.13）
+      captureScreenshotsAutomatically: false
       # 單元測試的 TEST_HOST 是完整 app，啟動即走 AppModel.live()。此旗標讓它跳過
       # 真實 Keychain 與 legacy 遷移——ad-hoc 重簽後 ACL 失配會彈授權框並阻塞啟動，
       # 使無人值守測試不可行（2026-08-23 A1 根因，見 docs/plans/2026-08-23-m6-closeout.md）。

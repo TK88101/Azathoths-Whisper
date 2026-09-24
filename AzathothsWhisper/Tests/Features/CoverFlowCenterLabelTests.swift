@@ -10,55 +10,67 @@ import Testing
 // 大寫與 mono 排版屬觀感，走 M8-14 目視。
 @Suite("CoverFlowCenterLabel")
 struct CoverFlowCenterLabelTests {
-    private func track(_ id: String, artist: String, title: String) -> AlbumTrack {
-        AlbumTrack(
-            persistentID: id, artist: artist, title: title, album: "A",
-            discNumber: 1, trackNumber: 1, lyrics: ""
-        )
+    private func card(_ id: String, _ persistentID: String) -> DeckCard {
+        DeckCard(id: id, persistentID: persistentID, side: .current)
+    }
+
+    private func details(_ persistentID: String, artist: String, title: String) -> [String: TrackDetails] {
+        [persistentID: TrackDetails(persistentID: persistentID, artist: artist, title: title, album: "A",
+                                    discNumber: 1, trackNumber: 1, lyrics: nil)]
     }
 
     @Test func composesArtistAndTitleWithDoubleSlash() {
-        let items = [track("P1", artist: "Bjork", title: "Hyperballad")]
-        #expect(CoverFlowCenterLabel.text(centerID: "P1", items: items) == "Bjork // Hyperballad")
+        let text = CoverFlowCenterLabel.text(
+            centerID: "C1", cards: [card("C1", "P1")], details: details("P1", artist: "Bjork", title: "Hyperballad")
+        )
+        #expect(text == "Bjork // Hyperballad")
     }
 
-    /// 隔離 nil 分支：items **非空**，才測得到「centerID 為 nil」這一條 guard
-    /// （原寫法同時餵 nil 與空 items，刪掉 nil guard 也不會紅）
-    @Test func returnsPlaceholderWhenCenterIDIsNilEvenWithItems() {
-        let items = [track("P1", artist: "Bjork", title: "Hyperballad")]
-        #expect(CoverFlowCenterLabel.text(centerID: nil, items: items) == CoverFlowCenterLabel.placeholder)
+    /// 隔離 nil 分支：cards **非空**，才測得到「centerID 為 nil」這一條 guard
+    @Test func returnsPlaceholderWhenCenterIDIsNilEvenWithCards() {
+        let text = CoverFlowCenterLabel.text(
+            centerID: nil, cards: [card("C1", "P1")], details: details("P1", artist: "Bjork", title: "Hyperballad")
+        )
+        #expect(text == CoverFlowCenterLabel.placeholder)
     }
 
-    @Test func returnsPlaceholderWhenListIsEmpty() {
-        #expect(CoverFlowCenterLabel.text(centerID: "P1", items: []) == CoverFlowCenterLabel.placeholder)
+    @Test func returnsPlaceholderWhenDeckIsEmpty() {
+        #expect(CoverFlowCenterLabel.text(centerID: "C1", cards: [], details: [:]) == CoverFlowCenterLabel.placeholder)
     }
 
-    @Test func returnsPlaceholderWhenCenterIDNotInItems() {
-        let items = [track("P1", artist: "Bjork", title: "Hyperballad")]
-        #expect(CoverFlowCenterLabel.text(centerID: "MISSING", items: items) == CoverFlowCenterLabel.placeholder)
+    @Test func returnsPlaceholderWhenCenterIDNotInCards() {
+        let text = CoverFlowCenterLabel.text(
+            centerID: "MISSING", cards: [card("C1", "P1")], details: details("P1", artist: "Bjork", title: "Hyperballad")
+        )
+        #expect(text == CoverFlowCenterLabel.placeholder)
     }
 
-    /// 缺 artist 是真實場景（Music 曲目可能無 artist）。此時**照常組裝**，回傳前導 " // "，
-    /// 而非退回佔位符——佔位符只保留給「沒有中心曲目」，兩種狀態不可混同：
-    /// 混同會讓「有曲目但缺 artist」在 UI 上與「還沒載入」長得一樣。
+    /// 詳情還沒讀到（批次讀取進行中）→ 佔位，不顯示殘缺字串
+    @Test func returnsPlaceholderWhenDetailsAreNotLoadedYet() {
+        #expect(CoverFlowCenterLabel.text(centerID: "C1", cards: [card("C1", "P1")], details: [:]) == CoverFlowCenterLabel.placeholder)
+    }
+
+    /// 缺 artist 是真實場景：照常組裝（" // Untitled"），佔位符只保留給「沒有中心曲目」
     @Test func emptyArtistStillComposesRatherThanFallingBackToPlaceholder() {
-        let items = [track("P1", artist: "", title: "Untitled")]
-        #expect(CoverFlowCenterLabel.text(centerID: "P1", items: items) == " // Untitled")
+        let text = CoverFlowCenterLabel.text(
+            centerID: "C1", cards: [card("C1", "P1")], details: details("P1", artist: "", title: "Untitled")
+        )
+        #expect(text == " // Untitled")
     }
 
-    /// 重複 persistentID 時取**首個**匹配（實作依賴 `first(where:)`，
-    /// 改成 last/filter 不會被其他測試擋住）
-    @Test func duplicateIDsUseFirstMatch() {
-        let items = [
-            track("P1", artist: "First", title: "A"),
-            track("P1", artist: "Second", title: "B"),
-        ]
-        #expect(CoverFlowCenterLabel.text(centerID: "P1", items: items) == "First // A")
+    /// 同曲在牌組出現多張（重播）：任一張居中都顯示同一首
+    @Test func cardsOfTheSameTrackShareTheLabel() {
+        let cards = [card("h:P1#0", "P1"), card("q:0:9", "P1")]
+        let info = details("P1", artist: "Opeth", title: "Harvest")
+        #expect(CoverFlowCenterLabel.text(centerID: "h:P1#0", cards: cards, details: info) == "Opeth // Harvest")
+        #expect(CoverFlowCenterLabel.text(centerID: "q:0:9", cards: cards, details: info) == "Opeth // Harvest")
     }
 
-    /// 分隔符是 " // "：artist 或 title 自身含 "/" 時不得被誤解析（純組裝，無切分語義）
+    /// 分隔符是 " // "：欄位自身含 "/" 不得被誤解析（純組裝，無切分語義）
     @Test func slashesInsideFieldsArePreservedVerbatim() {
-        let items = [track("P1", artist: "AC/DC", title: "T.N.T")]
-        #expect(CoverFlowCenterLabel.text(centerID: "P1", items: items) == "AC/DC // T.N.T")
+        let text = CoverFlowCenterLabel.text(
+            centerID: "C1", cards: [card("C1", "P1")], details: details("P1", artist: "AC/DC", title: "T.N.T")
+        )
+        #expect(text == "AC/DC // T.N.T")
     }
 }

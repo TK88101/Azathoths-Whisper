@@ -10,4 +10,9 @@ enum LineEndings {
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
     }
+
+    /// 換行統一後內容相同。Music 會把寫入的 LF 存成 CR：寫入後讀回比對必須用這個，逐字比對會誤判寫入失敗
+    static func equivalent(_ a: String, _ b: String) -> Bool {
+        normalized(a) == normalized(b)
+    }
 }

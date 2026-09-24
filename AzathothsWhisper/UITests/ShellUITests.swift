@@ -5,7 +5,16 @@ import XCTest
 // 結束用 app.terminate()（PID 定界），不對 Music.app 或系統偏好做任何寫入。
 // 語言以 launchArguments 的 -AppleLanguages 注入，只作用於該次啟動，不改使用者設定。
 // 啟動／收尾／等主 UI 的共用紀律見 UITests/Support/AppUITestCase.swift。
+// 一律走假 Music 的「沒在播」場景（計劃 Q3.5）：外殼測試不讀使用者的 Music——否則 Music 正在播
+// 有詞的歌時，Editor 頁會升起 Cover Flow、遮住本組要驗的 Editor 外殼。
 final class ShellUITests: AppUITestCase {
+    private typealias Scenario = LyricsFlowUITestScenario
+    private typealias ID = AccessibilityID
+
+    private func launchShell(language: String? = nil) {
+        launch(language: language, environment: Scenario.environment(.notPlaying, resetDefaults: true))
+    }
+
     /// 菜單交互前先取回前台。連跑多個用例後焦點可能落在別的 app，症狀有二：
     /// `MenuBarItem is not foreground and does not allow background interaction`，
     /// 或點擊靜默落空——後者會讓 Quit 用例誤報「app 沒退出」（實測產品退出僅 0.02s）。
@@ -22,34 +31,24 @@ final class ShellUITests: AppUITestCase {
             .exists
     }
 
-    private func attach(_ name: String) {
-        let screenshot = app.windows.firstMatch.screenshot()
-        let attachment = XCTAttachment(screenshot: screenshot)
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
-        guard let directory = ProcessInfo.processInfo.environment["AZW_UI_SHOT_DIR"] else { return }
-        let url = URL(fileURLWithPath: directory).appendingPathComponent("\(name).png")
-        try? screenshot.pngRepresentation.write(to: url)
-    }
-
     // MARK: 外殼
 
     /// A-01：啟動首屏＝splash（同一視窗，稍後換成主 UI）
     func testSplashIsShownBeforeMainUI() {
-        launch()
+        launchShell()
         let splashSubtitle = app.staticTexts["INITIALIZING CORE LOGIC"]
         XCTAssertTrue(splashSubtitle.waitForExistence(timeout: 5), "首屏應為 splash")
         attach("splash")
 
         waitForMainUI()
-        XCTAssertFalse(splashSubtitle.exists, "主 UI 出現後 splash 應消失")
+        // splash 以 0.2s 淡出；主 UI 已在 AX 樹上時它可能還在淡出途中
+        XCTAssertTrue(splashSubtitle.waitForNonExistence(timeout: 2), "主 UI 出現後 splash 應消失")
         XCTAssertEqual(app.windows.count, 1, "A-02：同窗切換，不得開新視窗")
     }
 
     /// A-03／A-04：預設 1200×800、標題固定英文
     func testWindowGeometryAndTitle() {
-        launch()
+        launchShell()
         waitForMainUI()
 
         let window = app.windows["Azathoth's Whisper"]
@@ -59,10 +58,15 @@ final class ShellUITests: AppUITestCase {
     }
 
     func testLaunchShowsEditorShellAfterSplash() {
-        launch()
+        launchShell()
         waitForMainUI()
-        XCTAssertTrue(app.buttons["BATCH"].exists)
-        XCTAssertTrue(app.buttons["COVER FLOW"].exists)
+        assertNavLabel(navButton("batch"), "BATCH")
+        // AC10：導覽區恰好兩個按鈕（Editor｜Batch，以 identifier 判定）；Cover Flow 已改為 Editor 內的一層
+        let navButtons = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", ID.navPrefix))
+        XCTAssertEqual(navButtons.count, 2, "導覽只剩 Editor 與 Batch")
+        XCTAssertTrue(app.buttons[ID.navEditor].exists)
+        XCTAssertTrue(app.buttons[ID.navBatch].exists)
+        XCTAssertFalse(app.buttons["COVER FLOW"].exists, "Cover Flow 分頁已移除")
         XCTAssertTrue(app.staticTexts["NOW EDITING"].exists)
         XCTAssertTrue(app.staticTexts["STATUS:"].exists)
         XCTAssertTrue(app.staticTexts["LINES:"].exists)
@@ -76,7 +80,7 @@ final class ShellUITests: AppUITestCase {
 
     /// A-05／D-01／D-03：菜單開 token modal，標題為英文覆寫
     func testSettingsMenuOpensTokenModal() {
-        launch()
+        launchShell()
         waitForMainUI()
         menuBar()["Settings"].click()
         app.menuItems["Token Settings..."].click()
@@ -96,7 +100,7 @@ final class ShellUITests: AppUITestCase {
     /// 它同時把「SecureField 在 macOS AX 樹上確實註冊為 secureTextField」
     /// 這個改動賴以成立的前提，從代碼註釋裡的斷言變成可證偽的測試。
     func testTokenFieldIsMasked() {
-        launch()
+        launchShell()
         waitForMainUI()
         menuBar()["Settings"].click()
         app.menuItems["Token Settings..."].click()
@@ -111,7 +115,7 @@ final class ShellUITests: AppUITestCase {
 
     /// A-05：語言設定組（兩組互斥）
     func testSettingsMenuOpensLanguageModal() {
-        launch()
+        launchShell()
         waitForMainUI()
         menuBar()["Settings"].click()
         app.menuItems["Language Settings..."].click()
@@ -123,13 +127,21 @@ final class ShellUITests: AppUITestCase {
 
     /// A-06／D-10：Help ▸ About 開 modal，含作者與兩個連結
     func testHelpMenuOpensAboutModal() {
-        launch()
+        launchShell()
         waitForMainUI()
         menuBar()["Help"].click()
         app.menuItems["About"].click()
 
         XCTAssertTrue(app.staticTexts["iBridge Zhao"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["VERSION 2.0.0"].exists)
+        // D-10：版本行＝「Version 2.0.0 (Build <建置號>)」；不寫死建置號，打包 +1 時免改測試
+        // SwiftUI 的 Text 在 macOS AX 樹上把文字放在 value、label 為空（見 BatchUITests.containsText），兩者都比
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(
+                format: "(value BEGINSWITH[c] %@ OR label BEGINSWITH[c] %@) AND (value CONTAINS[c] %@ OR label CONTAINS[c] %@)",
+                "Version 2.0.0", "Version 2.0.0", "(Build ", "(Build "
+            )).firstMatch.exists,
+            "D-10：版本行應含建置號"
+        )
         // 兩個連結是可點的 Button，文字併入其 accessibility label
         XCTAssertTrue(containsLabel("toadeater731@gmail.com"), "缺 mailto 連結")
         XCTAssertTrue(containsLabel("TK88101/Azathoths-Whisper"), "缺 GitHub 連結")
@@ -143,7 +155,7 @@ final class ShellUITests: AppUITestCase {
 
     /// A-08：紅色關閉鈕＝隱藏視窗，app 不退出
     func testRedCloseButtonHidesWindowWithoutTerminating() {
-        launch()
+        launchShell()
         waitForMainUI()
         let window = app.windows.firstMatch
         window.buttons[XCUIIdentifierCloseWindow].click()
@@ -155,7 +167,7 @@ final class ShellUITests: AppUITestCase {
 
     /// A-10：Cmd+Q 真退出（走 app 自己的菜單項，不模擬全域按鍵）
     func testQuitMenuItemTerminatesApp() {
-        launch()
+        launchShell()
         waitForMainUI()
         menuBar().element(boundBy: 1).click()      // 應用程式菜單
 
@@ -178,11 +190,11 @@ final class ShellUITests: AppUITestCase {
 
     /// E-04／E-07／A-07：日文冷啟動——UI 走 ja，菜單維持英文
     func testColdStartInJapaneseLocalizesUIButNotMenus() {
-        launch(language: "ja")
+        launchShell(language: "ja")
         waitForMainUI("エディタ")
 
-        XCTAssertTrue(app.buttons["一括処理"].exists)
-        XCTAssertTrue(app.buttons["カバーフロー"].exists, "E-10 新鍵")
+        assertNavLabel(navButton("batch"), "一括処理")
+        XCTAssertTrue(containsLabel("カバーフロー"), "E-10：nav_coverflow 保留作把手標題（D12）")
         XCTAssertTrue(app.staticTexts["ステータス:"].exists)
         XCTAssertTrue(menuBar()["Settings"].exists, "A-07 菜單硬編碼英文")
         XCTAssertTrue(menuBar()["Help"].exists)
@@ -191,11 +203,11 @@ final class ShellUITests: AppUITestCase {
 
     /// E-04／E-07：繁中冷啟動
     func testColdStartInTraditionalChinese() {
-        launch(language: "zh-Hant")
+        launchShell(language: "zh-Hant")
         waitForMainUI("編輯器")
 
-        XCTAssertTrue(app.buttons["批量處理"].exists)
-        XCTAssertTrue(app.buttons["封面瀏覽"].exists)
+        assertNavLabel(navButton("batch"), "批量處理")
+        XCTAssertTrue(containsLabel("封面瀏覽"), "E-10：nav_coverflow 保留作把手標題（D12）")
         XCTAssertTrue(app.staticTexts["狀態:"].exists)
         XCTAssertTrue(menuBar()["Settings"].exists)
         attach("editor-zh-Hant")

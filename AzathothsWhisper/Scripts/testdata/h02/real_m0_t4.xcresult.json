@@ -1,0 +1,84 @@
+{
+ "devices": [],
+ "testPlanConfigurations": [],
+ "testNodes": [
+  {
+   "name": "AzathothsWhisper",
+   "nodeType": "Test Plan",
+   "result": "Failed",
+   "children": [
+    {
+     "name": "AzathothsWhisperUITests",
+     "nodeIdentifierURL": "test://com.apple.xcode/AzathothsWhisper/AzathothsWhisperUITests",
+     "nodeType": "UI test bundle",
+     "result": "Failed",
+     "children": [
+      {
+       "name": "CoverFlowUITests",
+       "nodeIdentifierURL": "test://com.apple.xcode/AzathothsWhisper/AzathothsWhisperUITests/CoverFlowUITests",
+       "nodeType": "Test Suite",
+       "result": "Failed",
+       "children": [
+        {
+         "children": [
+          {
+           "children": [
+            {
+             "name": "CoverFlowUITests.swift:63: failed - SIG{T4.s1|C2-STACK|G=T19|over=T18|side=L}",
+             "nodeType": "Failure Message"
+            },
+            {
+             "name": "CoverFlowUITests.swift:74: failed - SIG{T4.s2|C1-OFFSET|label=T19|centered=T16|strides=+3}",
+             "nodeType": "Failure Message"
+            },
+            {
+             "name": "CoverFlowUITests.swift:74: failed - SIG{T4.s2|C2-STACK|G=T16|over=T17|side=R}",
+             "nodeType": "Failure Message"
+            }
+           ],
+           "duration": "12秒",
+           "durationInSeconds": 12.611711978912354,
+           "name": "Repetition 1",
+           "nodeIdentifier": "1",
+           "nodeType": "Repetition",
+           "result": "Failed"
+          },
+          {
+           "children": [
+            {
+             "name": "CoverFlowUITests.swift:63: failed - SIG{T4.s1|C2-STACK|G=T19|over=T18|side=L}",
+             "nodeType": "Failure Message"
+            },
+            {
+             "name": "CoverFlowUITests.swift:74: failed - SIG{T4.s2|C1-OFFSET|label=T19|centered=T16|strides=+3}",
+             "nodeType": "Failure Message"
+            },
+            {
+             "name": "CoverFlowUITests.swift:74: failed - SIG{T4.s2|C2-STACK|G=T16|over=T17|side=R}",
+             "nodeType": "Failure Message"
+            }
+           ],
+           "duration": "12秒",
+           "durationInSeconds": 12.236302971839905,
+           "name": "Repetition 2",
+           "nodeIdentifier": "2",
+           "nodeType": "Repetition",
+           "result": "Failed"
+          }
+         ],
+         "duration": "12秒",
+         "durationInSeconds": 12.486859798431396,
+         "name": "testReenteringTabKeepsCenteredCardCentered()",
+         "nodeIdentifier": "CoverFlowUITests/testReenteringTabKeepsCenteredCardCentered()",
+         "nodeIdentifierURL": "test://com.apple.xcode/AzathothsWhisper/AzathothsWhisperUITests/CoverFlowUITests/testReenteringTabKeepsCenteredCardCentered",
+         "nodeType": "Test Case",
+         "result": "Failed"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

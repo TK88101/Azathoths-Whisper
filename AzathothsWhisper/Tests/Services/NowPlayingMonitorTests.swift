@@ -60,6 +60,50 @@ struct NowPlayingMonitorTests {
         #expect(trackEvents.count == 2)
     }
 
+    /// 歌詞必須屬於同一輪送出的那首（計劃 §3 事實 11 的錯位鎖定：舊替身把 B 的歌詞配給 A）
+    @Test func lyricsBelongToTheTrackServedInTheSameTick() async {
+        let first = TrackInfo.fixture(id: "PID1")
+        let second = TrackInfo.fixture(id: "PID2")
+        let music = MockMusicClient(
+            script: [.track(first, lyrics: "first lyrics"), .track(second, lyrics: "")],
+            repeatLast: false
+        )
+        let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
+
+        async let collected = collect(monitor, expecting: 2)
+        await monitor.tick()
+        let events = await collected
+
+        #expect(events.last == .trackChanged(first, existingLyrics: "first lyrics"))
+    }
+
+    /// 計劃 D9／AC12：曲目欄位與歌詞只來自同一次讀取（不再先讀曲目、再另讀歌詞）
+    @Test func trackAndLyricsComeFromASingleRead() async {
+        let track = TrackInfo.fixture()
+        let music = MockMusicClient(script: [.track(track, lyrics: "verse")])
+        let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
+
+        async let collected = collect(monitor, expecting: 2)
+        await monitor.tick()
+        let events = await collected
+
+        #expect(events.last == .trackChanged(track, existingLyrics: "verse"))
+        #expect(await music.nowPlayingCalls == 1, "一輪只讀一次（曲目與歌詞同一次讀取）")
+    }
+
+    /// 歌詞讀取失敗＝nil（unknown），不得折疊成空字串（那會被當成缺詞而降下 Editor）
+    @Test func unreadableLyricsArriveAsNil() async {
+        let track = TrackInfo.fixture()
+        let music = MockMusicClient(script: [.track(track, lyrics: nil)])
+        let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
+
+        async let collected = collect(monitor, expecting: 2)
+        await monitor.tick()
+        let events = await collected
+
+        #expect(events.last == .trackChanged(track, existingLyrics: nil))
+    }
+
     @Test func emitsAlbumChangedOnlyWhenArtistAlbumPairChanges() async {
         let first = TrackInfo.fixture(id: "PID1", title: "One", album: "Damage Done")
         let sameAlbum = TrackInfo.fixture(id: "PID2", title: "Two", album: "Damage Done")
@@ -135,6 +179,42 @@ struct NowPlayingMonitorTests {
         let events = await collected
 
         #expect(events.last == .trackChanged(track, existingLyrics: "l"))
+    }
+
+    /// 寫入成功的回報發生在 Editor 仍 busy 的區間內（先回報、後解除 busy），
+    /// 此時要求的補讀不得被 busy 靜默吞掉——記下來，全部來源空閒時補做（計劃 §6 `writeSucceeded`）
+    @Test func forceRefreshWhileBusyRunsOnceIdle() async {
+        let track = TrackInfo.fixture()
+        let music = MockMusicClient(script: [.track(track, lyrics: "l")])
+        let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
+
+        async let collected = collect(monitor, expecting: 3)
+        await monitor.tick()
+        await monitor.setBusy(true, source: .editor)
+        await monitor.forceRefresh()
+        #expect(await music.currentTrackCalls == 1, "busy 期間不得查詢 Music")
+
+        await monitor.setBusy(false, source: .editor)
+        let events = await collected
+
+        #expect(events.last == .trackChanged(track, existingLyrics: "l"))
+        #expect(await music.currentTrackCalls == 2)
+    }
+
+    @Test func pendingForceRefreshWaitsForEveryBusySource() async {
+        let music = MockMusicClient(script: [.track(.fixture(), lyrics: "l")])
+        let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
+
+        await monitor.setBusy(true, source: .editor)
+        await monitor.setBusy(true, source: .batch)
+        await monitor.forceRefresh()
+        await monitor.setBusy(false, source: .editor)
+        #expect(await music.currentTrackCalls == 0, "Batch 仍 busy")
+
+        await monitor.setBusy(false, source: .batch)
+        #expect(await music.currentTrackCalls == 1, "最後一個來源空閒時補做一次")
+        await monitor.setBusy(false, source: .batch)
+        #expect(await music.currentTrackCalls == 1, "只補一次")
     }
 
     // ACCEPTANCE H-11：Cover Flow 穩定排序（disc → track → AE 返回序）

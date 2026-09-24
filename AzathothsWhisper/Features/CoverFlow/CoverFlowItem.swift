@@ -8,8 +8,10 @@ struct CoverFlowItem: View {
     let artwork: NSImage?
     let size: CGFloat
 
-    /// 倒影高度佔封面的比例（§4.8：LinearGradient 0.45 → 0）
-    private let reflectionRatio: CGFloat = 0.45
+    /// 倒影高度佔封面的比例（§4.8：LinearGradient 0.45 → 0）。條帶外的點擊區以此推算封面正面的位置
+    static let reflectionRatio: CGFloat = 0.45
+
+    private var reflectionRatio: CGFloat { Self.reflectionRatio }
 
     var body: some View {
         VStack(spacing: 0) {

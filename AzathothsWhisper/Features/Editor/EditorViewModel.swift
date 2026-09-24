@@ -29,6 +29,13 @@ final class EditorViewModel {
     var onBusyChange: ((Bool) async -> Void)?
     /// 卡片點擊＝強制重讀（B-06）
     var onRequestHydrate: (() -> Void)?
+    /// D8①：該曲是否已標記「沒有歌詞」（唯讀判斷式；Editor 不持有標記 store）
+    var isMarkedNoLyrics: (String) -> Bool = { _ in false }
+    /// 寫入成功：（寫入目標, 寫入的文字）——兩者都在 busy 的 actor hop 之前擷取（D8③）
+    var onSaved: ((String, String) -> Void)?
+    var onSaveFailed: ((String) -> Void)?
+    /// 使用者在歌詞框打字（取消待升回，計劃 §6 `editorTextEdited`）
+    var onUserEditedLyrics: (() -> Void)?
 
     var lyricsService: LyricsService
     private let music: any MusicControlling
@@ -39,6 +46,14 @@ final class EditorViewModel {
     private var fetchSeq = 0        // 抓詞序號：決定誰擁有 isBusy
     /// 100ms 延後的自動抓詞；測試以 `await autoFetchTask?.value` 等待其收斂
     @ObservationIgnored private(set) var autoFetchTask: Task<Void, Never>?
+    /// 自動抓詞是為哪一首排的（`cancelAutoFetch(for:)` 只取消那一首的）
+    @ObservationIgnored private var autoFetchTrackID: String?
+    #if DEBUG
+    /// 本次啟動的抓詞次數：UITests 以 a11y value 判定「未自動抓詞」（計劃 §9.4）
+    private(set) var fetchCount = 0
+    /// 本次啟動的強制重讀請求次數（AC3：點非播放卡不得觸發）
+    private(set) var hydrateRequestCount = 0
+    #endif
 
     init(lyricsService: LyricsService, music: any MusicControlling, clock: any PollClock = SystemPollClock()) {
         self.lyricsService = lyricsService
@@ -66,7 +81,7 @@ final class EditorViewModel {
         }
     }
 
-    private func apply(track: TrackInfo, existingLyrics: String) {
+    private func apply(track: TrackInfo, existingLyrics: String?) {
         isAccessDenied = false
         let lines = TrackLabel.lines(artist: track.artist, title: track.title)
         artistLine = lines.artist
@@ -79,9 +94,22 @@ final class EditorViewModel {
         generation += 1
         autoFetchTask?.cancel()
 
-        if existingLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        // D8：讀不到歌詞 ≠ 沒有歌詞。不自動抓詞、不宣稱缺詞——否則使用者一按 Write 就覆蓋掉原本的詞
+        guard let existingLyrics else {
             lyricsText = ""
+            statusText = StatusText.lyricsUnreadable
+            return
+        }
+
+        if LyricsText.isBlank(existingLyrics) {
+            lyricsText = ""
+            // D8①：使用者已標記「沒有歌詞」的曲不再自動抓詞
+            if isMarkedNoLyrics(track.persistentID) {
+                statusText = StatusText.markedNoLyrics
+                return
+            }
             guard isEditorTabActive else { return }   // py:481 batch view 可見時不自動抓
+            autoFetchTrackID = track.persistentID
             autoFetchTask = Task { [weak self] in
                 guard let self else { return }
                 try? await self.clock.sleep(for: .milliseconds(100))   // py:483
@@ -109,7 +137,26 @@ final class EditorViewModel {
     }
 
     func requestHydrate() {
+        #if DEBUG
+        hydrateRequestCount += 1
+        #endif
         onRequestHydrate?()
+    }
+
+    /// D8②：標記「沒有歌詞」時取消該曲的自動抓詞——含已在飛的那一輪（遞增世代，結果不套用），
+    /// 否則抓詞完成後會把文字寫進已升起、看不見的 Editor
+    func cancelAutoFetch(for persistentID: String) {
+        guard autoFetchTrackID == persistentID, !persistentID.isEmpty else { return }
+        autoFetchTask?.cancel()
+        autoFetchTask = nil
+        autoFetchTrackID = nil
+        generation += 1
+    }
+
+    /// 歌詞框的使用者輸入（View 的 binding setter；程式寫入不走這裡）
+    func userEditedLyrics(_ text: String) {
+        lyricsText = text
+        onUserEditedLyrics?()
     }
 
     /// C-23：Batch 載入專輯的三態文案設在 **Editor** 的狀態欄（py:623/633/637 走同一個 setStatus）
@@ -122,6 +169,9 @@ final class EditorViewModel {
     // MARK: - 動作
 
     func fetch() async {
+        #if DEBUG
+        fetchCount += 1
+        #endif
         fetchSeq += 1
         let mySeq = fetchSeq
         let myGeneration = generation
@@ -181,21 +231,31 @@ final class EditorViewModel {
     }
 
     func save() async {
+        // D8③：寫入目標與文字在 busy 的 actor hop **之前**擷取。hop 期間事件迴圈可能處理掉
+        // 一個換歌事件、把 Editor 改綁到下一首——之後才讀就會把 A 的詞寫給 B、還回報成 B
+        let target = boundTrackID
+        let text = lyricsText
         await withBusy {
             statusText = StatusText.savingToMusic
 
             // B-13：寫入畫面綁定的曲目，而非當前播放曲
-            guard let persistentID = boundTrackID, !persistentID.isEmpty else {
+            guard let persistentID = target, !persistentID.isEmpty else {
                 statusText = StatusText.noTrackPlaying     // py:2101
                 return
             }
 
             do {
-                let didWrite = try await music.setLyrics(persistentID: persistentID, lyrics: lyricsText)
+                let didWrite = try await music.setLyrics(persistentID: persistentID, lyrics: text)
                 statusText = didWrite ? StatusText.saved : StatusText.failedToSave
-                if didWrite { confettiTrigger += 1 }
+                if didWrite {
+                    confettiTrigger += 1
+                    onSaved?(persistentID, text)
+                } else {
+                    onSaveFailed?(persistentID)
+                }
             } catch {
                 statusText = StatusText.writeFailed        // py:548
+                onSaveFailed?(persistentID)
             }
         }
     }

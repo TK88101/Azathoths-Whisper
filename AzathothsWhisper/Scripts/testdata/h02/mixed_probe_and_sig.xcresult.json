@@ -1,0 +1,43 @@
+{
+  "devices": [],
+  "testPlanConfigurations": [],
+  "testNodes": [
+    {
+      "nodeType": "Test Plan",
+      "name": "AzathothsWhisper",
+      "result": "Failed",
+      "children": [
+        {
+          "nodeType": "UI test bundle",
+          "name": "AzathothsWhisperUITests",
+          "result": "Failed",
+          "children": [
+            {
+              "nodeType": "Test Suite",
+              "name": "CoverFlowUITests",
+              "result": "Failed",
+              "children": [
+                {
+                  "nodeType": "Test Case",
+                  "name": "testKeyboardCommandsCanCenterBothEndpoints()",
+                  "nodeIdentifier": "CoverFlowUITests/testKeyboardCommandsCanCenterBothEndpoints()",
+                  "result": "Failed",
+                  "children": [
+                    {
+                      "nodeType": "Failure Message",
+                      "name": "CoverFlowUITests.swift:80: SIG{T2.s1|C3-TARGET-MISS|want=T01|got=T19}"
+                    },
+                    {
+                      "nodeType": "Failure Message",
+                      "name": "CoverFlowUITests.swift:81: [PROBE-OFFCARD] 交疊參考點落在別張卡的顏色上"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

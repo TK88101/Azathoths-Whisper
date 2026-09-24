@@ -1,0 +1,5 @@
+Test Case '-[AzathothsWhisperUITests.CoverFlowUITests testKeyboardCommandsCanCenterBothEndpoints]' started.
+GATE{T2.s1|FAIL|C3-TARGET-MISS,PROBE-OFFCARD}
+GATE{T2.s2|PASS}
+GATE{T2.s3|PASS}
+Test Case '-[AzathothsWhisperUITests.CoverFlowUITests testKeyboardCommandsCanCenterBothEndpoints]' failed (1.234 seconds).

@@ -7,13 +7,14 @@ import Foundation
 // 只作用於渲染，不改回傳值。對 accessibilityLabel 斷言「大寫」會假失敗（M8 三角評審 #B5）。
 // 這裡只負責組裝，大小寫與 mono 排版留在 View。
 enum CoverFlowCenterLabel {
-    /// 無中心曲目（列表空、或 centerID 不在列表裡）時的佔位
+    /// 無中心曲目（牌組空、centerID 不在牌組裡、或該曲詳情尚未讀到）時的佔位
     static let placeholder = "--"
 
-    static func text(centerID: String?, items: [AlbumTrack]) -> String {
+    static func text(centerID: String?, cards: [DeckCard], details: [String: TrackDetails]) -> String {
         guard let centerID,
-              let track = items.first(where: { $0.persistentID == centerID })
+              let card = cards.first(where: { $0.id == centerID }),
+              let info = details[card.persistentID]
         else { return placeholder }
-        return "\(track.artist) // \(track.title)"
+        return "\(info.artist) // \(info.title)"
     }
 }

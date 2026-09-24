@@ -54,8 +54,12 @@ actor SerialAEQueueMusicClient: MusicControlling {
         await enqueue("currentTrack") { TrackInfo.fixture() }
     }
 
-    func currentLyrics() async throws -> String {
-        await enqueue("currentLyrics") { "" }
+    func nowPlaying() async throws -> NowPlayingRead? {
+        await enqueue("nowPlaying") { NowPlayingRead(track: TrackInfo.fixture(), lyrics: "") }
+    }
+
+    func trackDetails(persistentIDs: [String]) async throws -> [TrackDetails] {
+        await enqueue("trackDetails") { [] }
     }
 
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] {

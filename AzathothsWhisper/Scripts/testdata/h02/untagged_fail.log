@@ -1,0 +1,4 @@
+Test Case '-[AzathothsWhisperUITests.CoverFlowUITests testReenteringTabKeepsCenteredCardCentered]' started.
+GATE{T4.s1|PASS}
+GATE{T4.s2|PASS}
+Test Case '-[AzathothsWhisperUITests.CoverFlowUITests testReenteringTabKeepsCenteredCardCentered]' failed (1.234 seconds).

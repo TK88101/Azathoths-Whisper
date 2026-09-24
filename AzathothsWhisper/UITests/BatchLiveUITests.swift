@@ -33,7 +33,7 @@ final class BatchLiveUITests: AppUITestCase {
         // （實測：第二次跑等 45s 也等不到主 UI）
         launch()
         waitForMainUI()
-        app.buttons["BATCH"].click()
+        navButton("batch").click()
 
         // 依賴真實 Music 資料：需有當前專輯且含缺詞曲目
         XCTAssertTrue(

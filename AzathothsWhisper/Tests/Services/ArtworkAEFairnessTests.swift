@@ -64,9 +64,9 @@ struct ArtworkAEFairnessTests {
 
         _ = try? await music.currentTrack()
         _ = try? await music.artworkData(persistentID: "A")
-        _ = try? await music.currentLyrics()
+        _ = try? await music.nowPlaying()
 
         let order = await music.executionOrder
-        #expect(order == ["currentTrack", "artwork:A", "currentLyrics"])
+        #expect(order == ["currentTrack", "artwork:A", "nowPlaying"])
     }
 }

@@ -50,6 +50,34 @@ struct CoverFlowGeometry {
         -Double(abs(d))
     }
 
+    /// 依**畫面位置**的疊放層級（H-02 缺陷 2）：距離先換算成「離中心第幾個卡位」再取 −|卡位|。
+    /// 用卡位而非連續距離：捲動時只在越過兩卡中點的那一刻改值，不逐幀寫狀態
+    func stackingOrder(forDistance d: CGFloat) -> Double {
+        let strideRatio = 1 + Self.overlapRatio
+        return zIndex(forDistance: (d / strideRatio).rounded())
+    }
+
+    /// 可點判定的容差（計劃 D6、N2）：|d| ≤ 0.2 個卡寬才算「在正中」。
+    /// 相鄰兩卡相距 0.58 個卡寬，捲動跨中點途中沒有任何卡落在容差內——不會點到正在滑過的卡
+    static let centeredTolerance: CGFloat = 0.2
+
+    func isCentered(forDistance d: CGFloat) -> Bool {
+        abs(d) <= Self.centeredTolerance
+    }
+
+    /// 正中那張的封面正面（不含倒影）：卡片在條帶內垂直置中，高＝邊長 ×（1＋倒影比）。
+    /// 點擊、懸停、無障礙按鈕都以它為準（D6、AC3）
+    func centreFace(in stripSize: CGSize, reflectionRatio: CGFloat) -> CGRect {
+        let cardHeight = itemWidth * (1 + reflectionRatio)
+        return CGRect(x: (stripSize.width - itemWidth) / 2, y: (stripSize.height - cardHeight) / 2,
+                      width: itemWidth, height: itemWidth)
+    }
+
+    /// AC3 的最終許可：播放卡位於幾何正中（條帶回報給 VM）∧ 點在它的封面正面內
+    static func acceptsPlayingCardTap(isCentered: Bool, location: CGPoint, face: CGRect) -> Bool {
+        isCentered && face.contains(location)
+    }
+
     /// 旋轉錨點：左側項目繞右緣轉、右側項目繞左緣轉，才有「向中心翻開」的觀感
     func anchorIsTrailing(forDistance d: CGFloat) -> Bool {
         d < 0

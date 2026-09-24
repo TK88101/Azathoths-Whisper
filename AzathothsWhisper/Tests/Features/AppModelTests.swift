@@ -19,6 +19,8 @@ struct AppModelTests {
         /// 暴露給需要驅動輪詢／斷言 AE 調用次數的用例
         let music: MockMusicClient
         let monitor: NowPlayingMonitor
+        /// 升回計時（寫入成功後等彩帶撒完）
+        let clock: GatedPollClock
 
         func tearDown() {
             defaults.removePersistentDomain(forName: suiteName)
@@ -33,7 +35,22 @@ struct AppModelTests {
         let defaults = UserDefaults(suiteName: suiteName)!
         let store = ConfigStore(secrets: EphemeralSecretStore(), defaults: defaults)
         let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
-        let model = AppModel(
+        let clock = GatedPollClock()
+        let model = makeModel(store: store, music: music, monitor: monitor, clock: clock, token: token)
+        return Fixture(
+            model: model, store: store, defaults: defaults,
+            suiteName: suiteName, music: music, monitor: monitor, clock: clock
+        )
+    }
+
+    private func makeModel(
+        store: ConfigStore,
+        music: MockMusicClient,
+        monitor: NowPlayingMonitor,
+        clock: GatedPollClock = GatedPollClock(),
+        token: String = ""
+    ) -> AppModel {
+        AppModel(
             configStore: store,
             httpClient: MockHTTPClient(),
             music: music,
@@ -41,11 +58,9 @@ struct AppModelTests {
             validator: AlwaysValidValidator(),
             initialToken: token,
             initialLanguage: .system,
-            splashDuration: .milliseconds(1)
-        )
-        return Fixture(
-            model: model, store: store, defaults: defaults,
-            suiteName: suiteName, music: music, monitor: monitor
+            splashDuration: .milliseconds(1),
+            lyricsFlowClock: clock,
+            isMusicRunning: { true }
         )
     }
 
@@ -85,7 +100,7 @@ struct AppModelTests {
         fixture.model.select(.batch)
         #expect(fixture.model.editor.isEditorTabActive == false)
 
-        fixture.model.select(.coverFlow)
+        fixture.model.select(.batch)
         #expect(fixture.model.editor.isEditorTabActive == false)
 
         fixture.model.select(.editor)
@@ -137,6 +152,192 @@ struct AppModelTests {
     /// 可達性：Editor 的 busy 區間橫跨 `await resolveAndFetch()`，而原版 `toggleBusy`
     /// 禁用的 5 個元素**不含 tab 導航**（py:407，上游 §8.2 已核實），故使用者可在抓詞中
     /// 切到 Batch → 觸發載入 → 載入完成送 false → Editor 仍在抓詞但輪詢已恢復，違反 B-02。
+    /// 整合測試入口（計劃 Q0）：只接事件、不啟動輪詢，由測試逐次驅動 `monitor.tick()`
+    @Test func eventLoopAppliesManuallyTickedTrackWithoutStartingPolling() async {
+        let track = TrackInfo.fixture(title: "Punish My Heaven")
+        let music = MockMusicClient(script: [.track(track, lyrics: "lyric")])
+        let fixture = makeFixture(music: music)
+        defer { fixture.tearDown() }
+
+        fixture.model.startEventLoop()
+        await fixture.monitor.tick()
+        await waitUntil { fixture.model.editor.lyricsText == "lyric" }
+
+        #expect(fixture.model.editor.lyricsText == "lyric")
+        #expect(await music.currentTrackCalls == 1, "未啟動輪詢：只有手動那一次 tick")
+    }
+
+    /// AC1（整合）：輪詢到有詞的歌 → Cover Flow 升起、可見、置中於它
+    @Test func tickedTrackWithLyricsRaisesCoverFlow() async {
+        let music = MockMusicClient(script: [.track(.fixture(id: "PID1"), lyrics: "words")])
+        let fixture = makeFixture(music: music)
+        defer { fixture.tearDown() }
+        fixture.model.startEventLoop()
+
+        await fixture.monitor.tick()
+        await waitUntil { fixture.model.lyricsFlow.surface == .coverFlow }
+
+        #expect(fixture.model.lyricsFlow.surface == .coverFlow)
+        #expect(fixture.model.coverFlow.isVisible)
+        #expect(fixture.model.coverFlow.centerID != nil)
+    }
+
+    /// AC2（整合）：缺詞 → Editor；Cover Flow 不可見
+    @Test func tickedMissingTrackShowsTheEditor() async {
+        let music = MockMusicClient(script: [.track(.fixture(id: "PID1"), lyrics: "")])
+        let fixture = makeFixture(music: music)
+        defer { fixture.tearDown() }
+        fixture.model.startEventLoop()
+
+        await fixture.monitor.tick()
+        await waitUntil { fixture.model.lyricsFlow.status == .missing }
+
+        #expect(fixture.model.lyricsFlow.surface == .editor)
+        #expect(!fixture.model.coverFlow.isVisible)
+    }
+
+    /// Cover Flow 可見＝Editor 分頁在前 ∧ 畫面＝Cover Flow
+    @Test func coverFlowIsHiddenOnTheBatchTab() async {
+        let music = MockMusicClient(script: [.track(.fixture(id: "PID1"), lyrics: "words")])
+        let fixture = makeFixture(music: music)
+        defer { fixture.tearDown() }
+        fixture.model.startEventLoop()
+        await fixture.monitor.tick()
+        await waitUntil { fixture.model.coverFlow.isVisible }
+
+        fixture.model.select(.batch)
+        #expect(!fixture.model.coverFlow.isVisible)
+        fixture.model.select(.editor)
+        #expect(fixture.model.coverFlow.isVisible)
+    }
+
+    /// AC4（整合）：Editor 寫入成功 → 補讀確認有詞 → 彩帶撒完後升回
+    @Test func savingLyricsRaisesCoverFlowAfterTheConfetti() async {
+        let music = MockMusicClient(script: [
+            .track(.fixture(id: "PID1"), lyrics: ""),
+            .track(.fixture(id: "PID1"), lyrics: "new words"),     // 寫入後的補讀
+        ])
+        let fixture = makeFixture(music: music)
+        defer { fixture.tearDown() }
+        let model = fixture.model
+        model.editor.isEditorTabActive = false     // 不讓自動抓詞與本測試搶 busy
+        model.startEventLoop()
+        await fixture.monitor.tick()
+        await waitUntil { model.lyricsFlow.status == .missing }
+        #expect(model.lyricsFlow.surface == .editor)
+
+        model.editor.lyricsText = "new words"
+        await model.editor.save()
+        await fixture.clock.waitUntilPending(1)
+        await waitFor { await music.currentTrackCalls == 2 }
+        await waitUntil { model.coverFlow.details["PID1"]?.lyrics == "new words" }
+        #expect(model.lyricsFlow.surface == .editor, "彩帶撒完才升回")
+        #expect(model.lyricsFlow.status == .present, "補讀確認寫入生效")
+
+        await fixture.clock.releaseAll()
+        await waitUntil { model.lyricsFlow.surface == .coverFlow }
+        #expect(model.lyricsFlow.surface == .coverFlow)
+        #expect(model.coverFlow.isVisible)
+    }
+
+    /// AC5（整合）：標記「沒有歌詞」→ 升回、取消自動抓詞；標記存在設定裡，重啟後同曲不跳 Editor、不自動抓詞
+    @Test func markingNoLyricsRaisesAndSurvivesRelaunch() async {
+        let music = MockMusicClient(script: [.track(.fixture(id: "PID1"), lyrics: "")])
+        let fixture = makeFixture(music: music)
+        defer { fixture.tearDown() }
+        let model = fixture.model
+        model.startEventLoop()
+        await fixture.monitor.tick()
+        await waitUntil { model.lyricsFlow.status == .missing }
+        #expect(model.editor.autoFetchTask != nil, "缺詞曲在 Editor 分頁自動抓詞")
+
+        model.lyricsFlow.markNoLyrics(persistentID: "PID1")
+        #expect(model.lyricsFlow.surface == .coverFlow)
+        #expect(model.editor.autoFetchTask == nil, "標記取消了自動抓詞")
+
+        let relaunchedMusic = MockMusicClient(script: [.track(.fixture(id: "PID1"), lyrics: "")])
+        let relaunchedMonitor = NowPlayingMonitor(music: relaunchedMusic, clock: ImmediateClock())
+        let relaunched = makeModel(store: fixture.store, music: relaunchedMusic, monitor: relaunchedMonitor)
+        relaunched.startEventLoop()
+        await relaunchedMonitor.tick()
+        await waitUntil { relaunched.lyricsFlow.status == .markedNone }
+
+        #expect(relaunched.lyricsFlow.surface == .coverFlow)
+        #expect(relaunched.editor.autoFetchTask == nil, "標記過的曲不自動抓詞")
+    }
+
+    /// AC6（整合）：點中心卡進 Editor 後，同曲重發（forceRefresh）只更新狀態，不把使用者踢回 Cover Flow
+    @Test func sameTrackRefreshKeepsTheEditorTheUserOpened() async {
+        let music = MockMusicClient(script: [
+            .track(.fixture(id: "PID1"), lyrics: "words"),
+            .track(.fixture(id: "PID1"), lyrics: "words v2"),
+        ])
+        let fixture = makeFixture(music: music)
+        defer { fixture.tearDown() }
+        let model = fixture.model
+        model.startEventLoop()
+        await fixture.monitor.tick()
+        await waitUntil { model.lyricsFlow.surface == .coverFlow }
+
+        model.lyricsFlow.tapPlayingCard(isCentered: true)
+        #expect(model.lyricsFlow.surface == .editor)
+        #expect(!model.coverFlow.isVisible)
+
+        await fixture.monitor.forceRefresh()
+        await waitUntil { model.coverFlow.details["PID1"]?.lyrics == "words v2" }
+        #expect(model.coverFlow.details["PID1"]?.lyrics == "words v2", "同曲重發已處理")
+        #expect(model.lyricsFlow.surface == .editor)
+    }
+
+    /// H-05 × 畫面翻轉：使用者在 Cover Flow 滑走後換到缺詞曲（畫面降下）→ 接管解除，中心回到新的當前曲
+    @Test func realChangeWhileTheSurfaceFlipsResetsTheUserOverride() async {
+        let music = MockMusicClient(script: [
+            .track(.fixture(id: "PID1"), lyrics: "words"),
+            .track(.fixture(id: "PID2"), lyrics: "words"),
+            .track(.fixture(id: "PID3"), lyrics: ""),
+        ])
+        let fixture = makeFixture(music: music)
+        defer { fixture.tearDown() }
+        let model = fixture.model
+        model.editor.isEditorTabActive = false
+        model.startEventLoop()
+        await fixture.monitor.tick()
+        await fixture.monitor.tick()
+        await waitUntil { model.coverFlow.cards.count == 2 }
+        let first = model.coverFlow.cards[0].id
+        model.coverFlow.userDidScroll(to: first)
+        #expect(model.coverFlow.centerID == first)
+
+        await fixture.monitor.tick()
+        await waitUntil { model.lyricsFlow.status == .missing }
+
+        #expect(model.lyricsFlow.surface == .editor)
+        #expect(model.coverFlow.centerID == model.coverFlow.deck.currentCardID, "真實換歌解除接管")
+        #expect(model.coverFlow.deck.cards.last?.persistentID == "PID3")
+    }
+
+    /// D10：分頁只剩 Editor 與 Batch（Cover Flow 改為 Editor 內的一層）
+    @Test func tabsAreEditorAndBatchOnly() {
+        #expect(AppTab.allCases == [.editor, .batch])
+    }
+
+    /// D11：單元測試 host 不得輪詢使用者的 Music（以不回應的替身取代）
+    @Test func unitTestHostUsesInertMusicClient() {
+        #expect(AppModel.makeLiveMusic(isUnitTestHost: true) is InertMusicClient)
+        #expect(AppModel.makeLiveMusic(isUnitTestHost: false) is MusicAppleEventsClient)
+    }
+
+    @Test func inertMusicClientReportsNothingPlayingAndNeverWrites() async throws {
+        let music = InertMusicClient()
+        #expect(try await music.currentTrack() == nil)
+        #expect(try await music.playerState() == .stopped)
+        #expect(try await music.nowPlaying() == nil)
+        #expect(try await music.trackDetails(persistentIDs: ["PID1"]).isEmpty)
+        #expect(try await music.albumTracks(artist: "a", album: "b").isEmpty)
+        #expect(try await music.setLyrics(persistentID: "PID1", lyrics: "x") == false)
+        #expect(try await music.artworkData(persistentID: "PID1") == nil)
+    }
+
     @Test func batchLoadCompletionMustNotClearEditorBusy() async {
         let music = MockMusicClient(script: [.track(.fixture(), lyrics: "")])
         await music.setAlbumTracks([.fixture(id: "T1", title: "Alpha", lyrics: "")])

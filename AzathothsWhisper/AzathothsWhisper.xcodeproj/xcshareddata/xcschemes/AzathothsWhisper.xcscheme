@@ -57,7 +57,8 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "NO"
       codeCoverageEnabled = "YES"
-      onlyGenerateCoverageForSpecifiedTargets = "NO">
+      onlyGenerateCoverageForSpecifiedTargets = "NO"
+      systemAttachmentLifetime = "keepNever">
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
