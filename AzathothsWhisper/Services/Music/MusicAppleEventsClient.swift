@@ -127,7 +127,7 @@ struct MusicAppleEventsClient: MusicControlling {
         try await run { app in
             guard let track = Self.findTrack(persistentID: persistentID, in: app) else { return false }
             track.setLyrics?(lyrics)
-            return (track.lyrics ?? "") == lyrics
+            return LineEndings.equivalent(track.lyrics ?? "", lyrics)   // Music 存成 CR 換行（2026-09-24 實測）
         }
     }
 
