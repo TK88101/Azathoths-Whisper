@@ -80,6 +80,9 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
                         }
                     }
                 }
+                // 撐滿捲動區高度、卡片垂直置中（LazyHStack 原本如此；HStack 只取內容高度、貼在頂端——
+                // 卡片上緣被把手切掉、點擊判定區也對不上，2026-09-24 UITest 截圖）
+                .frame(maxHeight: .infinity)
                 .scrollTargetLayout()
             }
             .scrollTargetBehavior(.viewAligned)
