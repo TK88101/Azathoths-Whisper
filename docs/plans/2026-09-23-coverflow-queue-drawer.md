@@ -1,4 +1,4 @@
-# Cover Flow × 找歌詞 —— 實施計劃（v3.6，2026-09-23；v3.4 定稿後依 Q3b 使用者拍板①②與 Codex R6 裁決修訂 AC5／AC6／AC8／§6，見 §14 R6；v3.6 依 U#3 前預檢修 D6 可點的實作方式，見 §13、§14 R7）
+# Cover Flow × 找歌詞 —— 實施計劃（v3.7，2026-09-24：AC11 改寫經使用者批准、U6／U10 定案，見 §13 收官；v3.6，2026-09-23；v3.4 定稿後依 Q3b 使用者拍板①②與 Codex R6 裁決修訂 AC5／AC6／AC8／§6，見 §14 R6；v3.6 依 U#3 前預檢修 D6 可點的實作方式，見 §13、§14 R7）
 
 - 分支：`wip/coverflow-lyrics`（自 `wip/h02-fix4`@`ec3fd4d` 分出；只做本地 wip checkpoint，不 commit 到 `feat/*`／`main`、不 push）
 - 設計稿（互動原型）：https://claude.ai/artifact/GZSFdZEvyoshP48owh7c5G
@@ -98,7 +98,7 @@
 | AC8d | 卡片詳情（曲名、歌手、專輯、歌詞狀態）以 persistentID 批次讀取（去重後 ≤ 21 首一批）：單一背景 actor、最新者勝（帶快照版本 token，舊任務不得覆蓋新版）、總 deadline、快取（寫入／標記時更新該卡）；部分失敗 → 該卡狀態 `unknown`、只顯示封面；不阻塞事件分發、不餓死輪詢（R3-8） | 單元（`SerialAEQueueMusicClient` 公平性、版本 token）；時間界＝真機 |
 | AC9 | **無播控（三層）**：① `MusicControlling` 不含播控方法（類型層）；② 執行期測試以 `protocol_copyMethodDescriptionList` 列出 Music `@objc` 協議的全部選擇器，必須 ⊆ 允許清單、`set*:` 只許 `setLyrics:`、required 方法＝0；`SBObject`／`SBApplication` 上帶 `AZW` 前綴的協議只能是允許的那幾個；負對照協議（`playpause`／`playOnce:`／`{get set}` 的 `shuffleEnabled`／`@objc(nextTrack)` 改名）必須回報 4 個違規；③ `Scripts/no_playback_gate.sh`（grep，stdin 可餵負對照）：`import ScriptingBridge` 只許出現在 `Services/Music/MusicAppleEventsClient.swift` 與 spike 檔；全部 target 目錄（`App Features Services Infra UI`）＋spike 禁 `NSAppleScript|NSUserAppleScriptTask|OSAScript|osascript|AESend|NSAppleEventDescriptor\(eventClass|sendEvent\(options:|MediaRemote|NX_KEYTYPE|import (OSAKit|Carbon)`；SB 檔內禁 `perform\(|NSSelectorFromString|Selector\(\(|setValue\(|makeObjectsPerform|byApplying:[^)]*with:|\.(add|insert|remove|replace)(Object)?\(`，`value(forKey: "…")` 的 key ⊆ {`rawData`} | 執行期測試隨全量單元跑；腳本退出碼；每條禁止模式各一負對照 |
 | AC10 | 導覽區恰好兩個按鈕（Editor｜Batch，以 identifier 判定）；新字串三語齊（新鍵加入 `LocalizationTests` 清單） | `LocalizationTests`＋`ShellUITests` |
-| AC11 | 每個 Q 結束：全量單元綠（skip 已知 flaky 一條）；Services＋Infra 由 `coverage_gate.sh` 判定 ≥ 80%（只算 app 本體；豁免清單僅 AE client 一檔，理由、批准日、行數上限 400 寫在腳本內，R8）；新檔與改動過的 Features 檔每檔行覆蓋 ≥ 80% 走 §9.3 的 xccov 手順，記錄基準 commit、檔案清單、各檔數字、xcresult 位置；`LiveMusicTests` 在閘門外、為手動 smoke——讀取類隨時可跑，寫入類（`writesLyricsByPersistentIDVerbatim`）只在使用者明示許可時執行，平時加 `"-skip-testing:AzathothsWhisperTests/LiveMusicTests/writesLyricsByPersistentIDVerbatim()"`；UITests 回歸集合（`ShellUITests`＋`BatchUITests`）對分支點基線不新增紅燈（A-10 已知 flaky 除外）；`test_h02_gate_*.py` 綠 | `xcodebuild test`＋`xccov`＋`coverage_gate.sh <xcresult>`＋pytest |
+| AC11 | 每個 Q 結束：全量單元綠（skip 已知 flaky 一條）；Services＋Infra 由 `coverage_gate.sh` 判定 ≥ 80%（只算 app 本體；豁免清單僅 AE client 一檔，理由、批准日、行數上限 400 寫在腳本內，R8）；新檔與改動過的 Features 檔（模型、VM、純函數等非 View 檔）每檔行覆蓋 ≥ 80% 走 §9.3 的 xccov 手順，記錄基準 commit、檔案清單、各檔數字、xcresult 位置；**SwiftUI View 宣告檔不以逐檔行覆蓋判定**（2026-09-24 使用者批准，R10）——其中的狀態判定、輸入許可、座標／尺寸計算、顯示內容與意義外觀的對應一律抽成純函數或值型別並全分支單元測試，抽不出的接縫以註明 AC 的 XCUITest 或截圖／AX 證據驗證，證據包逐檔列 (a) xccov (b) 抽出的邏輯與測試名 (c) UI 證據 (d) 未測分支理由；`LiveMusicTests` 在閘門外、為手動 smoke——讀取類隨時可跑，寫入類（`writesLyricsByPersistentIDVerbatim`）只在使用者明示許可時執行，平時加 `"-skip-testing:AzathothsWhisperTests/LiveMusicTests/writesLyricsByPersistentIDVerbatim()"`；UITests 回歸集合（`ShellUITests`＋`BatchUITests`）對分支點基線不新增紅燈（A-10 已知 flaky 除外）；`test_h02_gate_*.py` 綠 | `xcodebuild test`＋`xccov`＋`coverage_gate.sh <xcresult>`＋pytest |
 | AC12 | 當前曲的曲目欄位與歌詞只來自同一個 `NowPlayingRead`（單一來源，由同一次 `run` 對釘住的 track 物件讀出）；`NowPlayingRead` 是事件身分的唯一來源；替身回傳不完整讀取（歌詞讀取失敗）→ `unreadable` → 狀態 `unknown` | monitor／Editor 單元（替身逐欄注入失敗）＋S1 實測（釘住物件連讀 20 次屬性一致）＋opt-in `LiveMusicTests` |
 | AC13 | Music 未執行時任何路徑都不啟動它；執行中途 Music 退出 → AE 以錯誤返回（不重啟 Music） | 代碼審查＋`SBApplication(processIdentifier:)` 用法測試；中途退出情境＝使用者在場時手動驗 |
 | AC14 | 升起時方向鍵步進 Cover Flow、打字不進被遮住的 Editor；降下時 Cover Flow 不持有焦點 | XCUITest `keyboardFocusFollowsSurface` |
@@ -313,11 +313,11 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
 | U3 | `findTrack` 能否以釘住物件的 persistentID 找到同一首 | 已知的未知 | S1 | 寫入／封面路徑 |
 | U4 | 右側是否顯示接下來的歌 | **已裁決（2026-09-23）**：要；播放中置中。來源＝Queue.dat（事實 20–21） | — | §2.1、AC8 |
 | U5 | 歷史追加後居中的可靠做法 | 已知的未知 | S5 | D6 |
-| U6 | `riseDelay` ≈ 3.2s 的手感 | 未知 | Q6 試用 | 常數 |
+| U6 | `riseDelay` ≈ 3.2s 的手感 | **已消解（2026-09-24 使用者實機：剛好）** | — | 常數維持 |
 | U8 | Queue.dat 在清單播到尾、關閉 Music 再開、從專輯頁直接點播、插入同一首時的行為 | **已消解（S8）**：專輯點播、同曲插入、曲庫隨機、重開重洗皆可；清單播到尾／自動續播未測（依 AC8b 退回） | — | AC8／AC8b |
 | U9 | app 本身的檔案讀取權限 | **已消解（S7）**：獨立 ad-hoc app 可讀、無提示 | — | R9 |
 | U7 | 本分支上 H-02 閘門 `CoverFlowUITests` 的處置 | **已裁決（2026-09-23）：本分支退役＋替代證據**。內容：本分支正式退役（資料模型已由整張專輯變為歷史，20 首 fixture 與探針前提不成立），ACCEPTANCE H-02 改附替代證據：`CoverFlowStripStackingTests`（缺陷 2，CALayer 無 AX）、S5 轉成的追加居中測試、D2 結構消除缺陷 3 的觸發條件、`LyricsFlowUITests` 升降；檔案保留（Python 閘門測試讀它）但移出回歸集合；fix4 在 `wip/h02-fix4` 另行延續與否由使用者定 | 使用者在場 #1 | Q5 回歸集合、H-02 條目 |
-| U10 | 順序模式（非隨機）的 Queue.dat 是否寫 `shuffleMode` 鍵 | 已知的未知（目前唯一實檔樣本為整庫隨機；S8 當時未記此鍵） | 使用者在場 #2 時以唯讀方式看一次循序播放時的檔案鍵 | P1① 的「兩處都沒寫」分支（沒寫且只有 `list` → 順序；若實檔一律有寫，該分支只是防禦） |
+| U10 | 順序模式（非隨機）的 Queue.dat 是否寫 `shuffleMode` 鍵 | **已消解（2026-09-24 唯讀實查：頂層與 items 兩處皆寫 `off`、只有 `list`、無 `shuffledList`；「兩處都沒寫」分支僅為防禦）**；原狀態：已知的未知（目前唯一實檔樣本為整庫隨機；S8 當時未記此鍵） | 使用者在場 #2 時以唯讀方式看一次循序播放時的檔案鍵 | P1① 的「兩處都沒寫」分支（沒寫且只有 `list` → 順序；若實檔一律有寫，該分支只是防禦） |
 
 **Premortem**：① 歷史追加居中停錯卡（→ S5／R1）；② 掛載結構改動打壞外殼（→ R3、回歸集合）；③ 讀取競態讓 Editor 在有詞曲上出現並被使用者覆寫（→ D9／AC12）；④ 同曲重發把使用者踢出 Editor（→ AC6）。
 
@@ -393,6 +393,25 @@ xcodebuild test ... -only-testing:AzathothsWhisperUITests/LyricsFlowUITests \
   - **P2（延後）**：串行任務鏈兩處重複（`LyricsFlowModel.enqueue` 與分支前既有的 `CoverFlowViewModel.dispatchPrefetch`）；`CoverFlowItem.reflectionRatio` 的 private 包裝；把手兩個配色函式同名易混；`spike_gate.sh` 與 `no_playback_gate.sh` 正則重複；Python 測試的 `run` 形狀重複。
 
 - **收官前補強（2026-09-24，`adb119e` 之後）**：① R10：View 內判斷抽成純函數（見 §14 R10）；② AC8d「最新者勝」原本只有整合測試間接覆蓋——補 `LyricsFlowModelTests.anOlderDetailsBatchArrivingLateIsDropped`（套用層世代號；首版測試有洞，`settleForTesting` 只等最新一批，變異拿掉世代比對仍綠 → 補等舊批次真的回來，變異即紅）；讀碼另發現 `CardDetailsReader` 快取會被較早發出、較晚回來的批次覆蓋（actor 在 await 可重入）→ 以每首序號只收較新者（先紅 2 條後綠）；Codex 補審這段差異 0／0／1：尚未進快取就寫入時舊批次仍會被收 → 寫入一律推進序號（先紅後綠）。③ ACCEPTANCE 補 H-12–H-25（引用的測試名逐一核實），總計 146 條。全量單元 618 條只剩基線紅；各閘門通過。
+
+- **收官（2026-09-24，使用者在場）**：
+  - **UITests**：歌詞流程 **9/9**（含 R10 新增的 `testOnlyTheFrontFaceOfThePlayingCardIsClickable`：按鈕四邊＝封面正面、點倒影不開、點正面角落開）；回歸集合 Shell＋Batch **15/16**，唯一紅＝A-10（XCUITest 狀態卡住，見 §13 在場 #3）。一次性偶發：`BatchUITests.testImportAllShowsConfirmationWithExactWording` 在一輪中紅一次（點 Batch 分頁那一下卡 5.6 秒、之後 AX 樹查無元素；其他 4 次 0.55 秒），單獨重跑 2/2 綠、下一輪也綠——原因 TBD，記錄待觀察。「寫入後升回」兩度因使用者輸入法被切回拼音而紅（鍵入核對斷言正確指出），切 ABC 後綠。
+  - **實機試用**：U6 升回 3.2 秒手感「剛好」；AC13 使用者 ⌘Q 關 Music 後 app 未把它叫回（每 0.5 秒進程監看 90 秒），app 保持上一首、佇列 session 失效；U10 見 §11；牌組左右各 10 張（至多 21 張）使用者確認維持。
+  - **實機發現並修正 ①（寫入誤報，M5 以來）**：寫入後讀回逐字比對，Music 把寫入的 LF 存成 CR（唯讀實查 63 個 CR）→ 實際已寫入卻報「FAILED TO SAVE」、不撒彩帶、不升回。`LineEndings.equivalent`（先紅後綠）＋`setLyrics` 讀回改用它；修後實機撒彩帶並升回。
+  - **實機發現並修正 ②（條帶停歪、正中被右鄰蓋住，使用者截圖回報）**：當場 AX 讀到條帶停在兩張之間（播放卡偏左約 120pt）。重現（S5 量測條帶，新增「正中不變、兩側變動」8 種）：牌組換了而 centerID 不變時 scrollPosition 不捲、SwiftUI 保住數值位移（增加與換身分偏 119–146pt）；`LazyHStack` 在前面有項目被移除時用估算位置，連明確 `scrollTo` 也停在兩張之間（層樹證實無任何卡對齊）。修正：條帶改 `HStack`（至多 21 張）＋內容一變就 `ScrollViewReader.scrollTo(centerID, .center)`、不帶動畫 → 兩側變動 8/8、換歌／重建／首次給牌（direct／兩段式／動畫）全中。正式測試 `CoverFlowDeckSideChangeTests`（5 種；修前 5/5 紅、修後綠）。**連帶後果被新 UITest 抓到**：`HStack` 只取內容高度、貼在捲動區頂端（卡片上緣被把手切掉、點擊判定區對不上）→ `.frame(maxHeight: .infinity)`；AX 比對播放卡本體與按鈕上緣同為 263。使用者實機換歌、自然播完後確認「都正常」。
+  - 單元基線變化：`CoverFlowStripRenderGeometryTests` 仍 2 條紅，斷言 8→7——該測試走「建立時就帶中心值」的初始值路徑（缺陷 3），改 `HStack` 後停在 #0（原為請求位置 −3），失敗點由「左右對稱」變為「兩側都應有卡」；正式 app 不走此路徑（D2）。
+  - 全量單元 618 條只剩上述基線紅；`coverage_gate.sh` 豁免前 78.4%、豁免後 95.5%（豁免檔 378／400）；無播控閘門、兩支 Python 閘門測試、H-02 閘門 321 條皆過。
+  - **AC11 View 檔證據表（改寫後條文要求）**：
+
+    | View 檔 | (a) xccov | (b) 抽出的邏輯與測試 | (c) UI 證據 | (d) 未測分支理由 |
+    |---|---|---|---|---|
+    | `CoverFlowView` | 37.2% | 點擊判定區與許可 `CoverFlowGeometryTests.centreFaceIsTheSquareFrontOfTheCentredCard`／`.playingCardTapNeedsCentreAndFace`；無障礙曲名 `CoverFlowViewModelDeckTests.playingCardTitleComesOnlyFromThePlayingCardsDetails`；徽章角落 `LyricsFlowPresentationTests.badgeSitsOnTheExposedCornerRelativeToTheCentre` 等 | `LyricsFlowUITests` 9 條（點擊、方向鍵閘、非 current 不可點、四邊對齊）＋三態截圖 | 版面組合、懸停／點擊閉包本體、覆蓋層；單元宿主不渲染牌組 |
+    | `CoverFlowStrip` | 100% | 疊放與可點容差 `CoverFlowStripStackingTests`；兩側變動 `CoverFlowDeckSideChangeTests` | 同上 | — |
+    | `CoverFlowItem` | 73.3% | 倒影比例契約由 `centreFace` 測試以實際 `reflectionRatio` 釘住 | 截圖 | 無封面佔位分支（M7 既有，本分支只動常數） |
+    | `LyricsFlowHandleView` | 78.2% | 刻度外觀 `LyricsFlowPresentationTests.tickAppearance`（12 組）；刻度序列 `.handleTicksFollowTheDeck` | 把手點擊／升降（`testKeyboardFocusFollowsSurface`、`waitForLoweredAndUsable`） | 懸停色、徽章 `Tone.color`（設計色常數，`Tone` 本身已測） |
+    | `LyricsStatusLabel` | 0% | 無邏輯；符號／i18n 鍵／色調皆在 `LyricsBadge`（100%） | 三態截圖的狀態字 | 純組合 |
+    | `LyricsFlowPageView`／`RootView`／`EditorView` | 92.5%／93.2%／95.8%（宿主啟動時順帶渲染） | 狀態機 `LyricsFlowReducerTests`、模型 `LyricsFlowModelTests`、Editor `EditorViewModelTests` | `LyricsFlowUITests`、`ShellUITests` | 分支皆為版面 |
+    | `UI/ConfettiView`（非 Features） | 43.6% | 影格間隔與升回延遲同源 `LyricsFlowPresentationTests.riseDelayIsTheConfettiLifetime` | 使用者實機撒彩帶 | 粒子繪製（M5 既有） |
 
 ## 14. 附錄：評審辯論記錄
 
