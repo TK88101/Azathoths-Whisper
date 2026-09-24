@@ -147,7 +147,7 @@ struct CoverFlowDeckTransitionSpikeTests {
         ((id - window)...(id + window)).map(SpikeCard.init)
     }
 
-    private static func apply(_ session: SpikeSession, cards: [SpikeCard], center: Int, method: S5Method) async {
+    fileprivate static func apply(_ session: SpikeSession, cards: [SpikeCard], center: Int, method: S5Method) async {
         switch method {
         case .direct:
             session.deck.cards = cards
@@ -166,7 +166,7 @@ struct CoverFlowDeckTransitionSpikeTests {
     }
 
     /// 起點：以 [0…20] 建牌、第 0 張置中量原點，再移到正中（id 10）
-    private static func prepared() async throws -> SpikeSession {
+    fileprivate static func prepared() async throws -> SpikeSession {
         var session = SpikeSession.open()
         session.deck.cards = (0...20).map(SpikeCard.init)
         session.deck.center = 0
@@ -239,5 +239,31 @@ struct CoverFlowDeckTransitionSpikeTests {
             results.append("\(round):shown=\(shownID.map(String.init) ?? "nil")(scroll=\(byScroll.map(String.init) ?? "nil"))/want=\(target)")
         }
         print("S5 first[\(method.rawValue)] hits=\(hits)/5 " + results.joined(separator: " "))
+    }
+}
+
+/// D6 補（2026-09-24 使用者實機：條帶停在兩張之間，正中那張被右鄰蓋住）：正中那張不變、兩側的卡增減或換身分
+/// （履歴晚一步讀到、播完的歌由佇列卡換成履歴卡、窗口滑動）→ 條帶仍停在它。正式測試，不受 `AZW_SPIKE_S5` 控制。
+/// 修前（LazyHStack、無明確捲回）：增加與換身分停在左偏 119–146pt，左邊有卡被移除時偏 119pt 且無任何卡對齊
+@Suite("Cover Flow 牌組兩側變動（正中不變）", .serialized)
+@MainActor
+struct CoverFlowDeckSideChangeTests {
+    private nonisolated static let cases: [(String, [Int])] = [
+        ("leftGrows", Array(-5...20)),
+        ("leftShrinks", Array(5...20)),
+        ("windowSlides", Array(1...21)),
+        ("leftIDsSwapped", Array(100...109) + Array(10...20)),
+        ("rightGrows", Array(0...25)),
+    ]
+
+    @Test("正中那張不變時，兩側增減不得讓條帶停歪", arguments: cases)
+    func theCentreStaysWhenTheSidesChange(name: String, ids: [Int]) async throws {
+        let session = try await CoverFlowDeckTransitionSpikeTests.prepared()
+        defer { session.close() }
+        await CoverFlowDeckTransitionSpikeTests.apply(session, cards: ids.map(SpikeCard.init), center: 10, method: .direct)
+        let frame = try #require(await session.settled(), "未穩定")
+        #expect(session.deck.centeredID(viewportMidX: frame.viewportMidX) == 10, "\(name)：畫面正中不是 10")
+        let nearest = frame.cards.map { $0.midX - frame.viewportMidX }.min { abs($0) < abs($1) }
+        #expect(abs(nearest ?? .infinity) < 1, "\(name)：沒有任何卡對齊正中（停在兩張之間）")
     }
 }

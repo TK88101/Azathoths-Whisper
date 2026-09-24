@@ -50,8 +50,11 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
 
     var body: some View {
         GeometryReader { outer in
+          ScrollViewReader { reader in
             ScrollView(.horizontal) {
-                LazyHStack(spacing: geometry.spacing) {
+                // 不用 LazyHStack：前面有項目被移除時它用估算位置，明確捲回也會停在兩張之間（實測偏 119pt）。
+                // 牌組至多 21 張，全數具現的成本可接受
+                HStack(spacing: geometry.spacing) {
                     ForEach(items) { item in
                         CoverFlowStripCell(
                             geometry: geometry,
@@ -83,6 +86,14 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
             .safeAreaPadding(.horizontal, geometry.edgePadding(viewWidth: outer.size.width))
             .scrollPosition(id: $centerID, anchor: .center)
             .scrollIndicators(.hidden)
+            // 牌組換了而正中的卡沒變（履歴晚到、播完的歌由佇列卡換成履歴卡、窗口滑動）：scrollPosition 的值沒變就不會捲，
+            // SwiftUI 保住的是數值位移而非 center 錨點——條帶停歪、正中那張被鄰張蓋住（2026-09-24 使用者實機）。
+            // 內容一變就明確捲回正中那張，不帶動畫（`CoverFlowDeckSideChangeTests`）
+            .onChange(of: items.map(\.id)) {
+                guard let centerID else { return }
+                reader.scrollTo(centerID, anchor: .center)
+            }
+          }
         }
         .coordinateSpace(.named(coverFlowViewportSpace))
     }
