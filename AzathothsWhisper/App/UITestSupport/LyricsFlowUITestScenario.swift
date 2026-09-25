@@ -15,6 +15,9 @@ enum LyricsFlowUITestScenario: String, CaseIterable, Sendable {
     case marked
     /// 沒在播 → Editor 顯示 NO ARTIST／NO TRACK（外殼測試用：不碰使用者的 Music）
     case notPlaying
+    /// 播放中有詞 → Cover Flow；Batch 載入整張專輯、Fetch Missing 從替身專輯頁補上缺詞的 1、4
+    /// （2026-09-25 回報：Batch 匯入後徽章不刷新）
+    case batchImport
 
     // MARK: 環境變數（UITest 以 launchEnvironment 注入）
 
@@ -69,6 +72,23 @@ enum LyricsFlowUITestScenario: String, CaseIterable, Sendable {
     /// 非播放中各卡的檔內歌詞：0、3 有詞，1、4 缺詞（徽章 ✓／✗ 都看得到）；播放中那首由場景決定
     static func fixtureLyrics(at index: Int) -> String {
         [0, 3].contains(index) ? "fixture lyrics \(index)" : ""
+    }
+
+    /// 各首的初始檔內歌詞：播放中那首有詞與否由場景決定，其餘見 `fixtureLyrics(at:)`
+    func initialLyrics(at index: Int) -> String {
+        guard index == Self.playingIndex else { return Self.fixtureLyrics(at: index) }
+        switch self {
+        case .present, .batchImport: return "fixture lyrics"
+        case .missing, .marked, .notPlaying: return ""
+        }
+    }
+
+    // MARK: batchImport：替身專輯頁上找得到的歌（＝初始缺詞的 1、4）
+
+    static let batchFoundIndices = [1, 4]
+
+    static func batchLyrics(at index: Int) -> String {
+        "batch lyrics \(index) line one\nbatch lyrics \(index) line two"
     }
 }
 #endif

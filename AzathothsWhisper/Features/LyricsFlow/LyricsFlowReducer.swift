@@ -42,6 +42,14 @@ struct LyricsFlowState: Equatable, Sendable {
     var hasUserChosenSurface = false
 }
 
+extension LyricsFlowState {
+    /// 是否為當前曲——寫入、標記、Batch 回報一律以此比對（同一語義只留一處定義）。
+    /// 空 ID 永不相符：不同的歌會共用同一個空鍵
+    func isCurrent(_ persistentID: String) -> Bool {
+        !persistentID.isEmpty && persistentID == nowPlayingPersistentID
+    }
+}
+
 enum LyricsFlowEvent: Equatable, Sendable {
     case nowPlaying(NowPlayingIdentity, persistentID: String, status: LyricsStatus)
     case notPlaying
@@ -100,7 +108,7 @@ enum LyricsFlowReducer {
         case .writeFailed:
             return (state, [.forceRefresh])
         case .markedNone(let persistentID):
-            guard isCurrent(persistentID, in: state) else { return (state, [.cancelAutoFetch(persistentID: persistentID)]) }
+            guard state.isCurrent(persistentID) else { return (state, [.cancelAutoFetch(persistentID: persistentID)]) }
             // 只有已知缺詞的當前曲可標記：有詞時標記無意義，讀不到時「沒讀到」不能當成「沒有」
             guard state.status == .missing else { return (state, []) }
             var next = clearingRise(state)
@@ -158,7 +166,7 @@ enum LyricsFlowReducer {
     private static func writeSucceeded(
         _ state: LyricsFlowState, persistentID: String, resultingStatus: LyricsStatus
     ) -> (LyricsFlowState, [LyricsFlowEffect]) {
-        guard isCurrent(persistentID, in: state) else { return (state, [.forceRefresh]) }
+        guard state.isCurrent(persistentID) else { return (state, [.forceRefresh]) }
         var next = state
         next.status = resultingStatus
         // 寫入空字串：先前寫入排下的升回一併取消（對抗覆核 P1②），缺詞曲不得升回
@@ -171,10 +179,6 @@ enum LyricsFlowReducer {
         let token = RiseToken(occurrence: state.occurrence, serial: next.riseSerial)
         next.pendingRise = token
         return (next, [.scheduleRise(token), .forceRefresh])
-    }
-
-    private static func isCurrent(_ persistentID: String, in state: LyricsFlowState) -> Bool {
-        !persistentID.isEmpty && persistentID == state.nowPlayingPersistentID
     }
 
     /// 清掉待升回；原本有待升回才附 `cancelRise`

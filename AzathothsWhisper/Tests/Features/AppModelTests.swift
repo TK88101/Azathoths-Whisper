@@ -369,4 +369,97 @@ struct AppModelTests {
         await gate.open()
         await editorTask.value
     }
+
+    // MARK: Batch 匯入 → Cover Flow（2026-09-25 回報；計劃 2026-09-25-batch-import-coverflow-refresh）
+    // 全程經 `model.batch` 的公開操作驅動，不直接呼叫 `lyricsFlow.batchSaved`（Codex R1-9）
+
+    private func batchFixture(_ music: MockMusicClient) -> Fixture {
+        let fixture = makeFixture(music: music)
+        fixture.model.editor.isEditorTabActive = false     // 不讓 Editor 自動抓詞攪進來
+        fixture.model.startEventLoop()
+        return fixture
+    }
+
+    private func importAll(_ model: AppModel) async {
+        model.select(.batch)
+        await model.batch.loadTask?.value
+        model.batch.requestImportAll()
+        await model.batch.confirmImportAll()
+    }
+
+    /// AC1／AC6：播過的缺詞曲 A 被 Import All 寫入 → 左側那張立即 ✓；非當前曲不補讀（不多問 Music）
+    @Test func importAllRefreshesThePlayedCardWithoutReadingMusicAgain() async throws {
+        let music = MockMusicClient(script: [
+            .track(.fixture(id: "PID1", title: "A"), lyrics: ""),
+            .track(.fixture(id: "PID2", title: "B"), lyrics: "words"),
+        ])
+        await music.setAlbumTracks([.fixture(id: "PID1", title: "A", lyrics: "batch words")])
+        let fixture = batchFixture(music)
+        defer { fixture.tearDown() }
+        let coverFlow = fixture.model.coverFlow
+        await fixture.monitor.tick()
+        await fixture.monitor.tick()
+        await waitUntil { coverFlow.cards.count == 2 }
+        let played = try #require(coverFlow.cards.first { $0.persistentID == "PID1" })
+        #expect(coverFlow.status(for: played) == .missing)
+
+        let readsBefore = await music.nowPlayingCalls
+        await importAll(fixture.model)
+        await fixture.model.lyricsFlow.settleForTesting()
+        await settle(300)
+
+        #expect(coverFlow.status(for: played) == .present)
+        #expect(await music.nowPlayingCalls == readsBefore, "非當前曲不補讀")
+        #expect(fixture.model.lyricsFlow.surface == .coverFlow)
+    }
+
+    /// AC4：Batch 寫到當前缺詞曲 → 補讀確認 → 彩帶撒完升回（回 Editor 分頁即是 Cover Flow）
+    @Test func importAllOfTheMissingCurrentTrackRaisesCoverFlow() async throws {
+        let music = MockMusicClient(script: [
+            .track(.fixture(id: "PID1", title: "A"), lyrics: ""),
+            .track(.fixture(id: "PID1", title: "A"), lyrics: "batch words"),     // Batch 載入與寫入後的補讀
+        ])
+        await music.setAlbumTracks([.fixture(id: "PID1", title: "A", lyrics: "batch words")])
+        let fixture = batchFixture(music)
+        defer { fixture.tearDown() }
+        let model = fixture.model
+        await fixture.monitor.tick()
+        await waitUntil { model.lyricsFlow.status == .missing }
+        #expect(model.lyricsFlow.surface == .editor)
+
+        await importAll(model)
+        await fixture.clock.waitUntilPending(1)
+        #expect(model.lyricsFlow.surface == .editor, "彩帶撒完才升回")
+        await fixture.clock.releaseAll()
+        await waitUntil { model.lyricsFlow.surface == .coverFlow }
+
+        #expect(model.lyricsFlow.surface == .coverFlow)
+        #expect(model.lyricsFlow.status == .present)
+        model.select(.editor)
+        #expect(model.coverFlow.isVisible)
+    }
+
+    /// AC9（評審 F2 的回歸）：當前曲已有詞、使用者親手降下 Editor → Import All 重寫它 → 仍是 Editor、無升回；恰讀回一次
+    @Test func importAllKeepsTheEditorTheUserLoweredOverAPresentCurrentTrack() async throws {
+        let music = MockMusicClient(script: [.track(.fixture(id: "PID1", title: "A"), lyrics: "words")])
+        await music.setAlbumTracks([.fixture(id: "PID1", title: "A", lyrics: "words")])
+        let fixture = batchFixture(music)
+        defer { fixture.tearDown() }
+        let model = fixture.model
+        await fixture.monitor.tick()
+        await waitUntil { model.lyricsFlow.surface == .coverFlow }
+        model.lyricsFlow.toggleHandle()
+        #expect(model.lyricsFlow.surface == .editor)
+
+        let readsBefore = await music.nowPlayingCalls
+        await importAll(model)
+        await waitFor { await music.nowPlayingCalls == readsBefore + 1 }
+        await model.lyricsFlow.settleForTesting()
+        await settle(300)
+
+        #expect(await music.writes["PID1"] == "words")
+        #expect(model.lyricsFlow.surface == .editor, "Batch 不得覆寫使用者親手選的畫面")
+        #expect(await fixture.clock.pendingCount == 0, "不排升回")
+        #expect(await music.nowPlayingCalls == readsBefore + 1, "恰讀回一次")
+    }
 }

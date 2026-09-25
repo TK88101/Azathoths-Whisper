@@ -19,6 +19,11 @@ enum AccessibilityID {
 
     static let playingCard = "coverflow-playing-card"
     static let cardPrefix = "coverflow-item-"
+    /// DEBUG 限定：卡片的 a11y value＝徽章狀態。卡片是 `.combine` 合成的元素，label 不保證含徽章文字（2026-09-25 計劃 T5b）
+    static let badgePresent = "present"
+    static let badgeMissing = "missing"
+    static let badgeMarked = "marked"
+    static let badgeUnknown = "unknown"
     static let centerLabel = "coverflow-center-label"
     static let upNextUnavailable = "coverflow-upnext-unavailable"
 

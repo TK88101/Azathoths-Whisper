@@ -27,6 +27,18 @@ enum LyricsBadge {
         }
     }
 
+    #if DEBUG
+    /// DEBUG 徽章探針的值（UITests 以卡片 a11y value 判定徽章）
+    static func probeValue(for status: LyricsStatus) -> String {
+        switch status {
+        case .present: return AccessibilityID.badgePresent
+        case .missing: return AccessibilityID.badgeMissing
+        case .markedNone: return AccessibilityID.badgeMarked
+        case .unknown: return AccessibilityID.badgeUnknown
+        }
+    }
+    #endif
+
     /// 中心卡附兩位數軌號（`✓ 07`）；沒有軌號（0）或非中心卡只顯示符號
     static func text(for status: LyricsStatus, trackNumber: Int?, isCurrent: Bool) -> String {
         let symbol = symbol(for: status)

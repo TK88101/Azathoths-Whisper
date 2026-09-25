@@ -126,6 +126,10 @@ final class AppModel {
         batch.onEditorStatus = { [weak self] text in
             self?.editor.setExternalStatus(text)
         }
+        // Batch 寫入成功 → Cover Flow 徽章（2026-09-25 回報：匯入後卡片仍顯示缺詞）
+        batch.onLyricsWritten = { [weak self] persistentID, text in
+            self?.lyricsFlow.batchSaved(persistentID: persistentID, text: text)
+        }
     }
 
     /// 封面磁碟快取的位置。放 Caches 是刻意的：內容可再生，系統空間吃緊時清掉不損失資料

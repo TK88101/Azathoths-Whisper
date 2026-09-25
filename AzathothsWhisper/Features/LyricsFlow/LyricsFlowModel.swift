@@ -50,6 +50,9 @@ final class LyricsFlowModel {
     @ObservationIgnored private var workTask: Task<Void, Never>?
     @ObservationIgnored private var detailsTask: Task<Void, Never>?
     @ObservationIgnored private var detailsGeneration = 0
+    /// 每首歌最後一筆本 app 寫入的序號：reader 快取確認收到時只認最後一筆（計劃 §9.1）
+    @ObservationIgnored private var latestWrites: [String: Int] = [:]
+    @ObservationIgnored private var writeSerial = 0
     @ObservationIgnored private var pollTask: Task<Void, Never>?
 
     init(
@@ -133,15 +136,27 @@ final class LyricsFlowModel {
 
     /// Editor 寫入成功（目標與文字在寫入前擷取，D8③）
     func saved(persistentID: String, text: String) {
-        reloadMarks()
-        let status = LyricsStatus.resolve(lyrics: text, isMarked: marks.contains(persistentID))
-        // AC5：日後寫入成功（非空）清除標記
-        if status == .present, marks.contains(persistentID) {
-            configStore.clearNoLyricsMark(persistentID)
-            reloadMarks()
-        }
-        updateCardLyrics(text, for: persistentID)
+        let status = applyWrittenLyrics(text, for: persistentID)
         dispatch(.writeSucceeded(persistentID: persistentID, resultingStatus: status))
+    }
+
+    /// Batch 寫入成功（Import Selected／Import All 每首，2026-09-25 回報）。
+    /// - 非當前曲：只更新卡片，**不經狀態機**——reducer 對非當前曲只會要求補讀，那是為「Editor 寫入期間
+    ///   monitor busy」而設，Batch 匯入期間輪詢照跑（C-18）
+    /// - 當前曲、有詞→有詞：畫面是使用者的選擇，**不經狀態機**（不升回）；仍讀回一次，讓當前曲收斂到 Music 的真值。
+    ///   「寫入前」取此刻的狀態：`setLyrics` await 期間若有事件改了狀態，那正是 Music 的最新值（計劃 §9.2）
+    /// - 其餘當前曲寫入：與 Editor 寫入同一條路（升回、補讀確認）
+    func batchSaved(persistentID: String, text: String) {
+        guard state.isCurrent(persistentID) else {
+            _ = applyWrittenLyrics(text, for: persistentID)
+            return
+        }
+        if state.status == .present, !LyricsText.isBlank(text) {
+            _ = applyWrittenLyrics(text, for: persistentID)
+            forceRefresh()
+        } else {
+            saved(persistentID: persistentID, text: text)
+        }
     }
 
     func saveFailed(persistentID: String) {
@@ -151,8 +166,7 @@ final class LyricsFlowModel {
     /// AC5：「No lyrics for this song」。只接受已知缺詞的當前曲：有詞時標記無意義；
     /// 讀不到時「沒讀到」不能當成「沒有」；空 ID 拒絕（不同的歌會共用同一個空鍵）
     func markNoLyrics(persistentID: String) {
-        guard !persistentID.isEmpty, persistentID == state.nowPlayingPersistentID, state.status == .missing,
-              configStore.markNoLyrics(persistentID)
+        guard state.isCurrent(persistentID), state.status == .missing, configStore.markNoLyrics(persistentID)
         else { return }
         reloadMarks()
         dispatch(.markedNone(persistentID: persistentID))
@@ -325,14 +339,45 @@ final class LyricsFlowModel {
         coverFlow.updateMarks(stored)
     }
 
+    /// 寫入事實的資料面：標記與卡片。**不碰 `state`**（畫面由呼叫端決定要不要經狀態機）
+    private func applyWrittenLyrics(_ text: String, for persistentID: String) -> LyricsStatus {
+        reloadMarks()
+        let status = LyricsStatus.resolve(lyrics: text, isMarked: marks.contains(persistentID))
+        // AC5：日後寫入成功（非空）清除標記
+        if status == .present, marks.contains(persistentID) {
+            configStore.clearNoLyricsMark(persistentID)
+            reloadMarks()
+        }
+        updateCardLyrics(text, for: persistentID)
+        return status
+    }
+
     /// 寫入成功後就地更新該卡的歌詞（徽章隨之改變），不重讀 Music
     private func updateCardLyrics(_ lyrics: String, for persistentID: String) {
         guard !persistentID.isEmpty else { return }
         if let existing = coverFlow.details[persistentID] {
             coverFlow.updateDetails([persistentID: existing.replacingLyrics(lyrics)])
         }
+        writeSerial += 1
+        let serial = writeSerial
+        latestWrites[persistentID] = serial
         let reader = detailsReader
-        enqueue { _ in await reader.updateLyrics(lyrics, for: persistentID) }
+        enqueue { model in
+            await reader.updateLyrics(lyrics, for: persistentID)
+            model.writeAcknowledged(lyrics, for: persistentID, serial: serial)
+        }
+    }
+
+    /// reader 快取已收到寫入（計劃 §9.1，評審 F1）。reader 的更新排在工作鏈上，在它之前發出的詳情讀取
+    /// 可能命中舊快取，故在此收口：作廢所有在飛的讀取（ack 後才回來的被世代丟棄，該卡下次 publish 重讀），
+    /// 並把寫入再套一次到卡片（ack 前已套上的舊值由此蓋正）。只認該首最後一筆寫入；**不得含 await**
+    private func writeAcknowledged(_ lyrics: String, for persistentID: String, serial: Int) {
+        guard latestWrites[persistentID] == serial else { return }
+        latestWrites[persistentID] = nil
+        detailsGeneration += 1
+        if let existing = coverFlow.details[persistentID], existing.lyrics != lyrics {
+            coverFlow.updateDetails([persistentID: existing.replacingLyrics(lyrics)])
+        }
     }
 
     private static func details(of track: TrackInfo, lyrics: String?) -> TrackDetails {
