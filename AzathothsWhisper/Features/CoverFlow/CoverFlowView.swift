@@ -198,6 +198,10 @@ private struct CoverFlowItemContainer: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(AccessibilityID.cardPrefix + card.id)
+        #if DEBUG
+        // UITests 的徽章探針（計劃 T5b）。只在 DEBUG：Release 不讓 VoiceOver 多讀一個英文狀態字
+        .accessibilityValue(LyricsBadge.probeValue(for: model.status(for: card)))
+        #endif
         // key 帶版本號：取圖失敗時先顯示佔位，退避到期重取成功後 service 會通知 VM
         // 遞增**該 ID** 的版本，只讓這一項重讀（命中記憶體，不驚動其他可見項）
         .task(id: ItemTaskKey(

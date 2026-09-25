@@ -61,6 +61,9 @@ final class BatchViewModel {
     var onBusyChange: ((Bool) async -> Void)?
     /// 載入三態文案設在 **Editor** 狀態欄，非 Batch 自己的（C-23，py:623/633/637）
     var onEditorStatus: ((String) -> Void)?
+    /// 每筆寫入成功（`setLyrics` 回 true）：（寫入目標, 寫入的文字）→ Cover Flow 徽章（2026-09-25 回報）。
+    /// 這是「檔案已寫入」的事實事件，**不受 sessionID 約束**：寫入後專輯切走，檔案裡的詞照樣變了
+    var onLyricsWritten: ((String, String) -> Void)?
 
     private let music: any MusicControlling
     /// D-08：Token 保存後即時生效——AppModel 會重建此服務
@@ -279,6 +282,9 @@ final class BatchViewModel {
 
         do {
             let didWrite = try await music.setLyrics(persistentID: selectedID, lyrics: content)
+            if didWrite {
+                onLyricsWritten?(selectedID, content)      // 先於 stale 守衛（見 onLyricsWritten）
+            }
             guard !isStale(session) else { return }
             if didWrite {
                 apply(lyrics: content, to: selectedID)
@@ -326,9 +332,13 @@ final class BatchViewModel {
                 index + 1, of: toSave.count, title: track.title
             )
             do {
-                _ = try await music.setLyrics(
+                let didWrite = try await music.setLyrics(
                     persistentID: track.persistentID, lyrics: track.lyrics
                 )
+                // 先於下一輪的 stale 守衛（見 onLyricsWritten）；false 照原版不中斷、不改文案（計劃 N4）
+                if didWrite {
+                    onLyricsWritten?(track.persistentID, track.lyrics)
+                }
             } catch {
                 // py:729-734：單曲失敗只記錄，不中斷整批
                 Self.log.error("import all: \(track.persistentID, privacy: .public) failed")

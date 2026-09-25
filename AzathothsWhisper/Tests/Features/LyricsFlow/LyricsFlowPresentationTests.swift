@@ -33,6 +33,21 @@ struct LyricsFlowPresentationTests {
         #expect(LyricsBadge.text(for: status, trackNumber: nil, isCurrent: false) == symbol)
     }
 
+    /// DEBUG 徽章探針（2026-09-25 計劃 T5b）：UITests 以卡片的 a11y value 判定徽章，不靠 `.combine` 合成的 label
+    @Test("徽章探針值", arguments: [
+        (LyricsStatus.present, AccessibilityID.badgePresent), (.missing, AccessibilityID.badgeMissing),
+        (.markedNone, AccessibilityID.badgeMarked), (.unknown, AccessibilityID.badgeUnknown),
+    ])
+    func badgeProbeValue(status: LyricsStatus, value: String) {
+        #expect(LyricsBadge.probeValue(for: status) == value)
+    }
+
+    @Test func badgeProbeValuesAreDistinct() {
+        let values = [AccessibilityID.badgePresent, AccessibilityID.badgeMissing,
+                      AccessibilityID.badgeMarked, AccessibilityID.badgeUnknown]
+        #expect(Set(values).count == values.count)
+    }
+
     @Test func currentCardBadgeCarriesTheTrackNumber() {
         #expect(LyricsBadge.text(for: .present, trackNumber: 7, isCurrent: true) == "✓ 07")
         #expect(LyricsBadge.text(for: .missing, trackNumber: 12, isCurrent: true) == "✗ 12")

@@ -7,7 +7,7 @@ extension AppModel {
     ///
     /// 真實 RootView／AppModel／monitor／LyricsFlowModel／CoverFlowViewModel，只換掉：
     /// - Music：`LyricsFlowUITestMusic`（不送 AE、`setLyrics` 只寫記憶體）
-    /// - HTTP：恆 404（自動抓詞不上網）
+    /// - HTTP：恆 404（自動抓詞不上網）；batchImport 例外：DarkLyrics 直連專輯頁回替身頁（見 `LyricsFlowUITestLyricsPage`）
     /// - 設定：測試專屬 suite（**從不碰使用者的 `.standard`**，D4）；secret 走 `EphemeralSecretStore`，不碰 Keychain
     /// - Queue.dat／History.dat：app 暫存目錄裡的假檔；Music 一律視為執行中
     static func makeLyricsFlowUITestModelIfRequested(environment: [String: String]) -> AppModel? {
@@ -28,7 +28,7 @@ extension AppModel {
         seeds.forEach { store.markNoLyrics($0) }
 
         let music = LyricsFlowUITestMusic(scenario: scenario)
-        let client = UITestStubHTTPClient()
+        let client = UITestStubHTTPClient(pages: scenario == .batchImport ? LyricsFlowUITestLyricsPage.pages : [:])
         return AppModel(
             configStore: store,
             httpClient: client,

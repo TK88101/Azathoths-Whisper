@@ -21,17 +21,6 @@ final class BatchUITests: AppUITestCase {
         batchTab.click()
     }
 
-    /// SwiftUI 的 Text 在 macOS AX 樹裡把文字放在 **value**，label 為空（2026-08-14 實測），
-    /// 故兩者都比對；大小寫不敏感（`.textCase(.uppercase)` 未必反映到 AX 屬性）
-    /// 限定在 staticTexts：用 descendants(.any) 掃全樹在載入 12 首曲目後會讓 UI query 超時
-    /// （實測 111s 仍未回應，2026-08-14）
-    private func containsText(_ text: String) -> Bool {
-        app.staticTexts
-            .matching(NSPredicate(format: "value CONTAINS[c] %@ OR label CONTAINS[c] %@", text, text))
-            .firstMatch
-            .exists
-    }
-
     // MARK: - C-21／C-25
 
     /// C-21：表頭走 i18n；C-25：Batch 狀態欄為硬編碼 "Ready"

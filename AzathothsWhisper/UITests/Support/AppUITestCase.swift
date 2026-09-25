@@ -133,6 +133,37 @@ class AppUITestCase: XCTestCase {
         try? screenshot.pngRepresentation.write(to: url)
     }
 
+    /// 以 identifier 定位任意型別的 AX 元素（identifier 不隨語言變，是唯一可靠的定位鍵）
+    func element(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)[identifier]
+    }
+
+    /// 等元素的 a11y value 等於 `value`（DEBUG 探針：升降、徽章等）；逾時以 `message` 失敗並附實際值
+    @discardableResult
+    func waitForValue(
+        _ element: XCUIElement, _ value: String, timeout: TimeInterval, _ message: String,
+        file: StaticString = #filePath, line: UInt = #line
+    ) -> Bool {
+        let predicate = NSPredicate(format: "value == %@", value)
+        let result = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)], timeout: timeout)
+        XCTAssertEqual(result, .completed, "\(message)（實際 value：\(String(describing: element.value))）", file: file, line: line)
+        return result == .completed
+    }
+
+    /// 含 `text` 的靜態文字。SwiftUI 的 Text 在 macOS AX 樹裡把文字放在 **value**，label 為空（2026-08-14 實測），
+    /// 故兩者都比對；大小寫不敏感（`.textCase(.uppercase)` 未必反映到 AX 屬性）。
+    /// 限定在 staticTexts：用 descendants(.any) 掃全樹在載入 12 首曲目後會讓 UI query 超時
+    /// （實測 111s 仍未回應，2026-08-14）
+    func staticText(containing text: String) -> XCUIElement {
+        app.staticTexts
+            .matching(NSPredicate(format: "value CONTAINS[c] %@ OR label CONTAINS[c] %@", text, text))
+            .firstMatch
+    }
+
+    func containsText(_ text: String) -> Bool {
+        staticText(containing: text).exists
+    }
+
     /// 導航按鈕以 identifier 定位：按鈕帶 identifier 後，XCUITest 的 label 不再帶 `.textCase(.uppercase)`
     /// （2026-09-23 U#3：XCUI 讀到 "Editor"；同一版 app 的 AXDescription 仍是 "EDITOR"），以字樣定位會找不到
     func navButton(_ tab: String) -> XCUIElement {

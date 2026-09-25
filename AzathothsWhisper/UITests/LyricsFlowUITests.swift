@@ -17,19 +17,12 @@ final class LyricsFlowUITests: AppUITestCase {
         waitForMainUI()
     }
 
-    private func element(_ identifier: String) -> XCUIElement {
-        app.descendants(matching: .any)[identifier]
-    }
-
     /// Cover Flow 層常駐（降下時只露把手）：以 value 判定升降，不能只看「存在」
     @discardableResult
     private func waitForSurface(raised: Bool, timeout: TimeInterval = surfaceTimeout,
                                 file: StaticString = #filePath, line: UInt = #line) -> Bool {
-        let layer = element(ID.surfaceProbe)
-        let predicate = NSPredicate(format: "value == %@", raised ? ID.raised : ID.lowered)
-        let result = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: layer)], timeout: timeout)
-        XCTAssertEqual(result, .completed, raised ? "Cover Flow 應升起" : "Cover Flow 應降下", file: file, line: line)
-        return result == .completed
+        waitForValue(element(ID.surfaceProbe), raised ? ID.raised : ID.lowered, timeout: timeout,
+                     raised ? "Cover Flow 應升起" : "Cover Flow 應降下", file: file, line: line)
     }
 
     private func fetchCount() -> String? {

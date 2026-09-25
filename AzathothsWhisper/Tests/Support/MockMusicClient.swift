@@ -44,9 +44,15 @@ actor MockMusicClient: MusicControlling {
     /// 覆寫整體結果（優先於 artwork 字典）：用來製造 AE 失敗
     private var artworkOutcome: Result<Data?, MusicError>?
     private var setLyricsOutcome: Result<Bool, MusicError> = .success(true)
+    /// 逐首覆寫（優先於 `setLyricsOutcome`）：Import All 部分失敗用
+    private var setLyricsOutcomes: [String: Result<Bool, MusicError>] = [:]
 
     func setSetLyricsOutcome(_ outcome: Result<Bool, MusicError>) {
         setLyricsOutcome = outcome
+    }
+
+    func setSetLyricsOutcome(_ outcome: Result<Bool, MusicError>, for persistentID: String) {
+        setLyricsOutcomes[persistentID] = outcome
     }
 
     init(script: [Response] = [], repeatLast: Bool = true) {
@@ -183,7 +189,7 @@ actor MockMusicClient: MusicControlling {
         if let writeGate {
             await writeGate.wait()
         }
-        switch setLyricsOutcome {
+        switch setLyricsOutcomes[persistentID] ?? setLyricsOutcome {
         case .success(let didWrite):
             if didWrite { writes[persistentID] = lyrics }
             return didWrite

@@ -151,7 +151,7 @@ Requirements: **macOS 14.0+**, **Xcode 16+** (Swift 6), [XcodeGen](https://githu
     chflags hidden "$STAGING/dmg_background.png"
 
     hdiutil create -volname "Azathoth's Whisper" -srcfolder "$STAGING" \
-      -format UDZO -ov "$WORK/Azathoths-Whisper-v2.0.0.dmg"
+      -format UDZO -ov "$WORK/Azathoths-Whisper-v2.0.1.dmg"
     ```
 
     The volume name and the item names must stay exactly as above — the `.DS_Store` resolves the

@@ -14,10 +14,8 @@ actor LyricsFlowUITestMusic: MusicControlling {
 
     init(scenario: LyricsFlowUITestScenario) {
         self.scenario = scenario
-        let playing = Fixture.playingIndex
         self.lyrics = Dictionary(uniqueKeysWithValues: (0..<Fixture.trackCount).map { index in
-            let text = index == playing ? (scenario == .present ? "fixture lyrics" : "") : Fixture.fixtureLyrics(at: index)
-            return (Fixture.persistentID(at: index), text)
+            (Fixture.persistentID(at: index), scenario.initialLyrics(at: index))
         })
     }
 
@@ -45,7 +43,17 @@ actor LyricsFlowUITestMusic: MusicControlling {
         }
     }
 
-    func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] { [] }
+    /// 只有 batchImport 有專輯可載；其他場景維持空列表，不擾動既有的 Batch／外殼 UITests
+    func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] {
+        guard scenario == .batchImport else { return [] }
+        return (0..<Fixture.trackCount).map { index in
+            let track = Self.track(at: index)
+            return AlbumTrack(
+                persistentID: track.persistentID, artist: track.artist, title: track.title, album: track.album,
+                discNumber: track.discNumber, trackNumber: track.trackNumber, lyrics: lyrics[track.persistentID] ?? ""
+            )
+        }
+    }
 
     func setLyrics(persistentID: String, lyrics newLyrics: String) async throws -> Bool {
         guard lyrics[persistentID] != nil else { return false }
@@ -65,14 +73,37 @@ actor LyricsFlowUITestMusic: MusicControlling {
     }
 }
 
-/// 恆回 404 的 HTTP：UI 測試的自動抓詞不上網，結果固定為「找不到」
+/// UI 測試的 HTTP：不上網。`pages` 以外的 GET、以及一切 POST 都回 404（預設空＝恆 404，自動抓詞結果固定為「找不到」）
 struct UITestStubHTTPClient: HTTPClient {
+    var pages: [URL: String] = [:]
+
     func get(_ url: URL, headers: [String: String], timeout: TimeInterval) async throws -> HTTPResponse {
-        HTTPResponse(statusCode: 404, body: "")
+        guard let body = pages[url] else { return HTTPResponse(statusCode: 404, body: "") }
+        return HTTPResponse(statusCode: 200, body: body)
     }
 
     func post(_ url: URL, form: [String: String], headers: [String: String], timeout: TimeInterval) async throws -> HTTPResponse {
         HTTPResponse(statusCode: 404, body: "")
+    }
+}
+
+/// batchImport 的替身 DarkLyrics 專輯頁：掛在真實的直連 URL 上，形狀照真站（`div.lyrics` 內 `h3` 標題＋`br` 分行），
+/// 由真的 `DarkLyricsParser` 解析。Genius 不會被問到：測試組裝的 token 為空，`GeniusSource` 直接回錯、不發請求
+enum LyricsFlowUITestLyricsPage {
+    private typealias Fixture = LyricsFlowUITestScenario
+
+    static var pages: [URL: String] {
+        guard let url = DarkLyricsSource.directURL(artist: Fixture.artist, album: Fixture.album) else { return [:] }
+        return [url: html]
+    }
+
+    static var html: String {
+        let songs = Fixture.batchFoundIndices.map { index in
+            let lines = Fixture.batchLyrics(at: index).components(separatedBy: "\n").map { "\($0)<br />" }
+            return "<h3><a name=\"\(index + 1)\">\(index + 1). \(Fixture.title(at: index))</a></h3><br />\n"
+                + lines.joined(separator: "\n")
+        }
+        return "<html><body><div class=\"lyrics\">\n\(songs.joined(separator: "\n<br />\n"))\n</div></body></html>"
     }
 }
 

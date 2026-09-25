@@ -146,7 +146,7 @@
     chflags hidden "$STAGING/dmg_background.png"
 
     hdiutil create -volname "Azathoth's Whisper" -srcfolder "$STAGING" \
-      -format UDZO -ov "$WORK/Azathoths-Whisper-v2.0.0.dmg"
+      -format UDZO -ov "$WORK/Azathoths-Whisper-v2.0.1.dmg"
     ```
 
     ボリューム名とアイテム名は上記のままにしてください — `.DS_Store` がバックグラウンドイメージとアイコン位置を名前で解決します。

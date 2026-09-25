@@ -133,12 +133,12 @@ final class ShellUITests: AppUITestCase {
         app.menuItems["About"].click()
 
         XCTAssertTrue(app.staticTexts["iBridge Zhao"].waitForExistence(timeout: 5))
-        // D-10：版本行＝「Version 2.0.0 (Build <建置號>)」；不寫死建置號，打包 +1 時免改測試
-        // SwiftUI 的 Text 在 macOS AX 樹上把文字放在 value、label 為空（見 BatchUITests.containsText），兩者都比
+        // D-10：版本行＝「Version 2.0.1 (Build <建置號>)」；不寫死建置號，打包 +1 時免改測試
+        // SwiftUI 的 Text 在 macOS AX 樹上把文字放在 value、label 為空（見 AppUITestCase.staticText(containing:)），兩者都比
         XCTAssertTrue(
             app.staticTexts.matching(NSPredicate(
                 format: "(value BEGINSWITH[c] %@ OR label BEGINSWITH[c] %@) AND (value CONTAINS[c] %@ OR label CONTAINS[c] %@)",
-                "Version 2.0.0", "Version 2.0.0", "(Build ", "(Build "
+                "Version 2.0.1", "Version 2.0.1", "(Build ", "(Build "
             )).firstMatch.exists,
             "D-10：版本行應含建置號"
         )

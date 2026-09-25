@@ -3,7 +3,7 @@ import Testing
 
 @testable import AzathothsWhisper
 
-// 計劃 Q3.5：UI 測試組裝（場景 env、假 Music、恆 404 的 HTTP、測試專屬設定 suite、假的 Queue.dat／History.dat）。
+// 計劃 Q3.5：UI 測試組裝（場景 env、假 Music、恆 404 的 HTTP——batchImport 例外見替身專輯頁、測試專屬設定 suite、假的 Queue.dat／History.dat）。
 // 組裝是 E2E 的地基：場景錯了，UITests 的紅綠就沒有意義——故每個場景都在單元層先釘住。
 @MainActor
 @Suite("LyricsFlowUITestAssembly", .serialized)
@@ -123,5 +123,77 @@ struct LyricsFlowUITestAssemblyTests {
         #expect(queue.entries.map(\.persistentID) == (0..<Scenario.trackCount).map(Scenario.persistentID(at:)))
         #expect(queue.entries.map(\.itemID) == (0..<Scenario.trackCount).map { Scenario.itemID(at: $0) })
         #expect(history.recent.map(\.persistentID) == (0..<Scenario.playingIndex).map(Scenario.persistentID(at:)))
+    }
+
+    // MARK: 2026-09-25 batchImport 場景（計劃 T5a／T5c）
+
+    /// 播放中那首有詞 → Cover Flow；1、4 缺詞、0、3 有詞；Batch 載入得到完整 5 首（順序＝軌序）
+    @Test func batchImportScenarioShowsCoverFlowAndLoadsTheWholeAlbum() async throws {
+        defer { cleanUp() }
+        let model = try make(.batchImport)
+        await pollOnce(model)
+        await waitUntil({ model.lyricsFlow.surface == .coverFlow }, iterations: 20_000)
+        await model.lyricsFlow.settleForTesting()
+
+        let statuses = model.coverFlow.cards.map { model.coverFlow.status(for: $0) }
+        #expect(statuses == [.present, .missing, .present, .present, .missing])
+
+        await model.batch.loadAlbum()
+        #expect(model.batch.tracks.map(\.persistentID) == (0..<Scenario.trackCount).map(Scenario.persistentID(at:)))
+        #expect(model.batch.tracks.map(\.lyrics) == (0..<Scenario.trackCount).map(Scenario.batchImport.initialLyrics(at:)))
+    }
+
+    /// 經真實 LyricsService → DarkLyricsSource → 替身專輯頁：Fetch Missing 補上 1、4；Import All 後兩卡 ✓（E2E 的單元版）
+    @Test func batchImportScenarioFetchesAndImportsTheMissingTracks() async throws {
+        defer { cleanUp() }
+        let model = try make(.batchImport)
+        await pollOnce(model)
+        await waitUntil({ model.lyricsFlow.surface == .coverFlow }, iterations: 20_000)
+        await model.lyricsFlow.settleForTesting()
+        await model.batch.loadAlbum()
+
+        await model.batch.fetchMissing()
+        #expect(model.batch.statusText == StatusText.fetchComplete)
+        #expect(model.batch.missingTracks.isEmpty)
+        for index in Scenario.batchFoundIndices {
+            let track = try #require(model.batch.tracks.first { $0.persistentID == Scenario.persistentID(at: index) })
+            #expect(track.lyrics == Scenario.batchLyrics(at: index))
+        }
+
+        model.batch.requestImportAll()
+        await model.batch.confirmImportAll()
+        await model.lyricsFlow.settleForTesting()
+        let statuses = model.coverFlow.cards.map { model.coverFlow.status(for: $0) }
+        #expect(statuses == Array(repeating: .present, count: Scenario.trackCount))
+    }
+
+    /// 替身專輯頁必須被真的解析器讀懂：找得到的歌給出預期歌詞，其餘是「頁上沒有這首」
+    @Test func batchImportLyricsPageParsesWithTheRealParser() {
+        for index in 0..<Scenario.trackCount {
+            let outcome = DarkLyricsParser.parse(html: LyricsFlowUITestLyricsPage.html, targetTitle: Scenario.title(at: index))
+            if Scenario.batchFoundIndices.contains(index) {
+                #expect(outcome == .lyrics(Scenario.batchLyrics(at: index)), "index \(index)")
+            } else {
+                #expect(outcome == .titleNotFound, "index \(index)")
+            }
+        }
+    }
+
+    /// 替身只回應 DarkLyrics 直連頁；其他場景沿用恆 404（既有場景的自動抓詞結果不變）
+    @Test func batchImportStubAnswersOnlyTheDirectAlbumPage() async throws {
+        let client = UITestStubHTTPClient(pages: LyricsFlowUITestLyricsPage.pages)
+        let direct = try #require(DarkLyricsSource.directURL(artist: Scenario.artist, album: Scenario.album))
+        #expect(try await client.get(direct, headers: [:], timeout: 1).statusCode == 200)
+        let other = try #require(URL(string: "http://www.darklyrics.com/lyrics/other/album.html"))
+        #expect(try await client.get(other, headers: [:], timeout: 1).statusCode == 404)
+        #expect(try await client.post(direct, form: [:], headers: [:], timeout: 1).statusCode == 404)
+    }
+
+    /// 其他場景的 Batch 列表維持空（不擾動既有 BatchUITests／ShellUITests）
+    @Test func otherScenariosKeepAnEmptyAlbum() async throws {
+        for scenario in [Scenario.present, .missing, .marked] {
+            let music = LyricsFlowUITestMusic(scenario: scenario)
+            #expect(try await music.albumTracks(artist: Scenario.artist, album: Scenario.album).isEmpty)
+        }
     }
 }

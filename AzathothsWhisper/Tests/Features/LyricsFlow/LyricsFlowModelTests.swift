@@ -359,4 +359,223 @@ struct LyricsFlowModelTests {
         #expect(h.coverFlow.status(for: h.coverFlow.cards[1]) == .missing)
         #expect(h.coverFlow.details[QueueFixtures.pid(1)]?.lyrics == "words", "當前曲的詳情直接取自事件")
     }
+
+    // MARK: Batch 寫入（2026-09-25 回報：匯入成功後徽章不刷新）
+
+    private func details(_ n: Int64, lyrics: String) -> TrackDetails {
+        TrackDetails(persistentID: QueueFixtures.pid(n), artist: "B", title: "Song \(n)", album: "L",
+                     discNumber: 1, trackNumber: Int(n), lyrics: lyrics)
+    }
+
+    /// 正在播 1（有詞），右側是缺詞的 2
+    private func playingOneWithMissingTwo(_ h: Harness) async throws -> DeckCard {
+        await h.music.setTrackDetails([details(2, lyrics: "")])
+        try h.writeQueue([Item(1, itemID: 10), Item(2, itemID: 11)])
+        await play(h, 1, lyrics: "words")
+        let card = try #require(h.coverFlow.cards.first { $0.persistentID == QueueFixtures.pid(2) })
+        return card
+    }
+
+    /// AC1／AC6：非當前曲——卡片立即 ✓；不補讀、不動畫面、不排升回、不重讀詳情
+    @Test func batchWriteOfAnotherTrackRefreshesItsCardOnly() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        let card = try await playingOneWithMissingTwo(h)
+        #expect(h.coverFlow.status(for: card) == .missing)
+        let surfaceReports = h.recorder.surfaces.count
+        let detailRequests = await h.music.trackDetailsRequests.count
+
+        h.model.batchSaved(persistentID: QueueFixtures.pid(2), text: "batch words")
+        await h.model.settleForTesting()
+
+        #expect(h.coverFlow.status(for: card) == .present)
+        #expect(h.recorder.forceRefreshes == 0, "Batch 期間 monitor 不 busy，非當前曲不補讀")
+        #expect(h.recorder.surfaces.count == surfaceReports, "非當前曲不經狀態機")
+        #expect(h.model.surface == .coverFlow)
+        #expect(h.model.status == .present, "當前曲狀態不受影響")
+        #expect(await h.clock.pendingCount == 0)
+        #expect(await h.music.trackDetailsRequests.count == detailRequests, "就地更新，不重讀 Music")
+    }
+
+    /// AC4：寫到當前缺詞曲——與 Editor 寫入同一條路：彩帶撒完升回、補讀一次
+    @Test func batchWriteOfTheMissingCurrentTrackRisesLikeAnEditorWrite() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        await play(h, 1, lyrics: "")
+        #expect(h.model.surface == .editor)
+
+        h.model.batchSaved(persistentID: QueueFixtures.pid(1), text: "batch words")
+        await h.clock.waitUntilPending(1)
+        #expect(h.model.surface == .editor, "彩帶撒完才升回")
+        #expect(h.model.status == .present)
+        #expect(h.recorder.forceRefreshes == 1, "當前曲補讀確認寫入生效")
+
+        await h.clock.releaseAll()
+        await waitUntil { h.model.surface == .coverFlow }
+        #expect(h.model.surface == .coverFlow)
+    }
+
+    /// AC5：已標記「沒有歌詞」的非當前曲被寫入非空歌詞 → 標記清除、徽章 ✓
+    @Test func batchWriteClearsTheNoLyricsMarkOfAnotherTrack() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        h.store.markNoLyrics(QueueFixtures.pid(2))
+        let card = try await playingOneWithMissingTwo(h)
+        #expect(h.coverFlow.status(for: card) == .markedNone)
+
+        h.model.batchSaved(persistentID: QueueFixtures.pid(2), text: "found them after all")
+
+        #expect(h.store.noLyricsMarks.isEmpty)
+        #expect(!h.coverFlow.marks.contains(QueueFixtures.pid(2)))
+        #expect(h.coverFlow.status(for: card) == .present)
+    }
+
+    /// Import Selected 可能寫入空的預覽框：卡片照實顯示缺詞
+    @Test func batchWriteOfEmptyTextShowsTheCardAsMissing() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        await h.music.setTrackDetails([details(2, lyrics: "old words")])
+        try h.writeQueue([Item(1, itemID: 10), Item(2, itemID: 11)])
+        await play(h, 1, lyrics: "words")
+        let card = try #require(h.coverFlow.cards.first { $0.persistentID == QueueFixtures.pid(2) })
+
+        h.model.batchSaved(persistentID: QueueFixtures.pid(2), text: "   ")
+
+        #expect(h.coverFlow.status(for: card) == .missing)
+        #expect(h.recorder.forceRefreshes == 0)
+    }
+
+    /// 計劃 §9.3 AC11（F4）：空文字寫入不清「沒有歌詞」標記——AC5 只在非空寫入時清
+    @Test func batchWriteOfEmptyTextKeepsTheNoLyricsMark() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        h.store.markNoLyrics(QueueFixtures.pid(2))
+        let card = try await playingOneWithMissingTwo(h)
+
+        h.model.batchSaved(persistentID: QueueFixtures.pid(2), text: "   ")
+
+        #expect(h.store.noLyricsMarks == [QueueFixtures.pid(2)])
+        #expect(h.coverFlow.marks.contains(QueueFixtures.pid(2)))
+        #expect(h.coverFlow.status(for: card) == .markedNone)
+    }
+
+    /// 計劃 T3b（回歸防線）：詳情讀取在飛時 Batch 寫入 → 放行後該卡不得顯示寫入前的舊歌詞。
+    /// 不用 `play`（它的 settle 會等被閘門擋住的批次）
+    @Test func detailsInFlightDuringABatchWriteNeverShowTheOldLyrics() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        let gate = LyricsGate()
+        await h.music.setTrackDetailsGateQueue([gate])
+        await h.music.setTrackDetails([details(2, lyrics: "")])
+        try h.writeQueue([Item(1, itemID: 10), Item(2, itemID: 11)])
+        h.model.handle(.trackChanged(track(1), existingLyrics: "words"))
+        await waitFor { await h.music.trackDetailsRequests.count == 1 }
+
+        h.model.batchSaved(persistentID: QueueFixtures.pid(2), text: "batch words")
+        await settle(300)       // 讓排進工作鏈的快取更新先落地
+        await h.music.setTrackDetails([details(2, lyrics: "batch words")])     // 之後的 Music 讀取讀得到寫入
+        await gate.open()
+        await waitFor { await h.music.trackDetailsCompleted == 1 }
+        await settle(300)
+
+        let card = try #require(h.coverFlow.cards.first { $0.persistentID == QueueFixtures.pid(2) })
+        #expect(h.coverFlow.status(for: card) != .missing, "在飛的舊讀取不得蓋掉寫入")
+
+        await h.model.refreshSources()
+        await h.model.settleForTesting()
+        #expect(h.coverFlow.status(for: card) == .present, "下一輪輪詢補上")
+    }
+
+    // MARK: 計劃 §9.1（F1）：寫入確認（ack）收口
+
+    /// 種下 reader 快取（2＝缺詞）後把 2 移出牌組：`coverFlow.details` 濾掉 2，reader 快取仍留著舊值
+    private func cachedMissingTwoOutOfTheDeck(_ h: Harness) async throws {
+        await h.music.setTrackDetails([details(2, lyrics: ""), details(3, lyrics: "three")])
+        try h.writeQueue([Item(1, itemID: 10), Item(2, itemID: 11)])
+        await play(h, 1, lyrics: "words")
+        try h.writeQueue([Item(1, itemID: 10), Item(3, itemID: 12)])
+        await h.model.refreshSources()
+        await h.model.settleForTesting()
+        #expect(h.coverFlow.details[QueueFixtures.pid(2)] == nil)
+    }
+
+    /// AC10 原時序（評審 F1 重現）：工作鏈上 readSources 未跑完時寫入 2，readSources 把 2 帶回牌組 →
+    /// 詳情讀取命中 reader 的舊快取。回牌組後不得是舊值，下一輪輪詢後必 ✓
+    @Test func aCardReturningToTheDeckRightAfterABatchWriteIsNotStale() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        try await cachedMissingTwoOutOfTheDeck(h)
+
+        try h.writeQueue([Item(1, itemID: 10), Item(2, itemID: 11), Item(3, itemID: 12)])
+        h.model.handle(.trackChanged(track(1), existingLyrics: "words"))    // 讀檔排上工作鏈、尚未執行
+        h.model.batchSaved(persistentID: QueueFixtures.pid(2), text: "batch words")
+        await h.model.settleForTesting()
+
+        let card = try #require(h.coverFlow.cards.first { $0.persistentID == QueueFixtures.pid(2) })
+        #expect(h.coverFlow.status(for: card) != .missing, "回牌組後不得是寫入前的舊值")
+        await h.model.refreshSources()
+        await h.model.settleForTesting()
+        #expect(h.coverFlow.status(for: card) == .present)
+    }
+
+    /// §9.1 三分法之一：ack 前已套上的舊詳情，ack 時被重套為寫入的歌詞
+    @Test func staleDetailsAppliedBeforeTheAckAreCorrectedByIt() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        let card = try await playingOneWithMissingTwo(h)
+
+        h.model.batchSaved(persistentID: QueueFixtures.pid(2), text: "batch words")
+        h.coverFlow.updateDetails([QueueFixtures.pid(2): details(2, lyrics: "")])    // 模擬 ack 前落地的舊讀取
+        await h.model.settleForTesting()
+
+        #expect(h.coverFlow.status(for: card) == .present)
+        #expect(h.coverFlow.details[QueueFixtures.pid(2)]?.lyrics == "batch words")
+    }
+
+    /// 同首連寫兩次：只認最後一筆
+    @Test func theLastOfTwoWritesToTheSameTrackWins() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        _ = try await playingOneWithMissingTwo(h)
+
+        h.model.batchSaved(persistentID: QueueFixtures.pid(2), text: "first")
+        h.model.batchSaved(persistentID: QueueFixtures.pid(2), text: "second")
+        await h.model.settleForTesting()
+
+        #expect(h.coverFlow.details[QueueFixtures.pid(2)]?.lyrics == "second")
+    }
+
+    // MARK: 計劃 §9.2（F2）：當前曲有詞→有詞不經狀態機
+
+    /// AC9：當前曲已有詞、使用者手動降下 Editor → Batch 寫入（同文或不同文字）後畫面不動、無升回；恰讀回一次
+    @Test("有詞→有詞不升回", arguments: ["words", "different words"])
+    func batchRewriteOfThePresentCurrentTrackKeepsTheUsersSurface(text: String) async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        await play(h, 1, lyrics: "words")
+        h.model.toggleHandle()
+        #expect(h.model.surface == .editor)
+        let surfaceReports = h.recorder.surfaces.count
+
+        h.model.batchSaved(persistentID: QueueFixtures.pid(1), text: text)
+        await h.model.settleForTesting()
+
+        #expect(h.model.surface == .editor, "畫面是使用者的選擇")
+        #expect(await h.clock.pendingCount == 0, "不排升回")
+        #expect(h.recorder.surfaces.count == surfaceReports, "不經狀態機")
+        #expect(h.recorder.forceRefreshes == 1, "讀回一次，讓當前曲收斂到 Music 的真值")
+        #expect(h.coverFlow.details[QueueFixtures.pid(1)]?.lyrics == text)
+    }
+
+    /// 有詞→空文字仍走 `saved()`：狀態跟著變成缺詞，與卡片一致
+    @Test func batchWriteOfEmptyTextToThePresentCurrentTrackGoesThroughTheStateMachine() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        await play(h, 1, lyrics: "words")
+
+        h.model.batchSaved(persistentID: QueueFixtures.pid(1), text: "  ")
+
+        #expect(h.model.status == .missing)
+        #expect(h.recorder.forceRefreshes == 1)
+    }
 }
