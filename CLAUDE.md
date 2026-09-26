@@ -10,7 +10,7 @@
 介面分三塊：**Editor**（單首編輯與寫入）、**Batch**（整張專輯補詞與匯入）、**Cover Flow × 找歌詞**（Editor 頁內的升降層，依 `Queue.dat`／`History.dat` 顯示播放佇列與缺詞徽章）。
 
 - 只支援 macOS 14+，Swift 6（`SWIFT_VERSION: 6.0`，strict concurrency），不用第三方 UI 框架。唯一的套件依賴是 SwiftSoup（SPM）。
-- 使用者本機的實測環境是 macOS 26.6、Xcode 26.6、Swift 6.3。
+- 使用者本機的實測環境是 macOS 27.0、Xcode 27.0（27A266a）、Swift 6.4（2026-09-26 實測；改動前用 `sw_vers`／`xcodebuild -version`／`swift --version` 重核）。
 
 ## 目錄結構（`AzathothsWhisper/`）
 
@@ -20,7 +20,7 @@
 | `App/` | `AzathothsWhisperApp`（Scene、選單）、`AppDelegate`（退出矩陣）、**`AppModel`（組裝根：服務建立、legacy 遷移、事件分發、各 ViewModel 之間的回呼接線）** |
 | `App/UITestSupport/` | 只在 DEBUG 下存在的 UI 測試組裝與替身（`*UITestMusic`、`InertMusicClient`、H-02 閘門判定邏輯）。**整檔包在 `#if DEBUG` 內，不得進入 Release** |
 | `Features/` | `Editor`、`Batch`、`CoverFlow`、`LyricsFlow`、`Settings`、`About`、`Splash`、`Shell`：每個 feature 都是 `@MainActor @Observable` 的 ViewModel 加 View |
-| `Services/Music/` | `MusicControlling`（protocol）、`MusicAppleEventsClient`（ScriptingBridge，**唯一**可以 `import ScriptingBridge` 的檔案）、`NowPlayingMonitor`（3 秒輪詢，busy 時跳過）、`Queue`／`History` 的唯讀解析 |
+| `Services/Music/` | `MusicControlling`（protocol）、`MusicAppleEventsClient`（ScriptingBridge；**app target 內唯一**可以 `import ScriptingBridge` 的檔案。例外只有 `Tests/Services/MusicSelectorAllowListTests.swift` 的選擇器白名單檢查與 `Scripts/spike/`）、`NowPlayingMonitor`（3 秒輪詢，busy 時跳過）、`Queue`／`History` 的唯讀解析 |
 | `Services/Lyrics/` | `LyricsService`（Editor 只走 Genius；Batch 會 fallback DarkLyrics）、各來源與解析器 |
 | `Services/Config/` | `ConfigStore`（token 存 **Keychain**，其餘存 **UserDefaults**）、一次性 legacy 遷移（`.env`、`~/.azathoths_whisper_config`） |
 | `Services/Artwork/` | 封面記憶體快取、磁碟快取（`~/Library/Caches/com.ibridgezhao.azathothswhisper/Artwork`）、失敗退避 |
@@ -87,13 +87,20 @@ Release 建置與 DMG 的完整流程見 README「Build from Source」第 5、6 
 
 ## 工作流程（使用者的慣例）
 
+- **邊界（與使用者全域 CLAUDE.md §1 一致；雲端看不到全域檔，故在此鏡像）**：
+  - 可自主：讀檔、搜尋、唯讀命令、寫草稿、單檔小改、跑測試。
+  - 需確認：多檔改動、刪除、重構、改依賴／設定、外部副作用、破壞性操作（先列影響面）——先說計劃，等使用者確認再動。
+  - 禁止（未經使用者明說）：commit／push、裝依賴、動憑證與正式環境。例外：多步改碼可在本機 `wip/` 分支做 checkpoint commit，禁 push、禁併回 `main`。
+  - 不擅自擴大、縮小或改造範圍；常規判斷自己做並標明假設，只在不同解讀會導致實質不同產出時問一個關鍵問題。
+  - 派子 agent 只限廣度、隔離、獨立視角三種理由；派發前先輸出任務形狀判定（串行／並行／混合＋依據），串行不派；不派子 agent 複核自己的產出。
+  - 技術主張標級：已核事實直陳（帶出處）；推斷標「推測」並給推理鏈；未知標 TBD，不寫成結論。程式碼不用 emoji（`ACCEPTANCE.md` 的狀態符號是文件慣例，不在此限）。
 - **先寫計劃，再開工**：每個功能或 bug 都在 `docs/plans/YYYY-MM-DD-<slug>.md` 寫計劃。慣用章節：複述／目標與非目標／根因（已核事實與推理分開寫）／設計／測試／驗證項／待拍板。
   **計劃經使用者審閱、拍板之後才實作。** 使用者只要計劃時，寫完計劃就停手。
 - **TDD**：先寫測試並跑出紅燈，再實作。紅燈摘要記進計劃。commit 訊息習慣附上測試狀態，例如「618 條僅基線 8 斷言紅」（已知的基線紅不算新增的紅）。
 - **使用者在場**：XCUITest 需要使用者授權 Automation Mode 和輔助使用，真機驗證也要使用者操作 Music。這些步驟列成「使用者在場 #N」，**不要**假設可以無人值守跑完。
 - **熔斷紀律**：同一個問題連續幾輪沒有進展，就停手，把事實和已被排除的假設記進計劃，改換方向或交給使用者決定，不要一直重試。已經熔斷的項目（例如 A-10 的 XCUITest 時序問題）不要重新開始調查。
 - **偶發失敗不能當根因**：失敗的測試不能靠「重跑幾次會過」結案。任何測試都不准為了變綠而跳過、停用或放寬斷言。
-- **評審**：重要的計劃與實作要經過 Codex（`/simcodex`）或多視角評審，逐條記錄處置（採納／駁回與理由）。
+- **評審**：重要的計劃與實作要經過 Codex 對抗評審（計劃：`codex exec` 讀計劃檔；實作：`codex review --uncommitted`，本機由 `/fatboyslim`／`/simcodex` 封裝）或多視角評審，逐條記錄處置（採納／駁回與理由）。
 - **Git**：commit 訊息用中文，格式是 `type: 摘要——補充`（type 是 feat／fix／docs／test／refactor／chore／wip）。功能完成後用 `Merge: <功能> —— Azathoth's Whisper vX.Y.Z` 合進 `main`。不要改寫別人分支的歷史。
 
 ## 雲端（claude.ai/code）工作須知
