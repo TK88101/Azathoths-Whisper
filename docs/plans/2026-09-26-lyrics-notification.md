@@ -4,6 +4,7 @@
 - 基線：`origin/main` `98af41f`（v2.0.1）
 - 分支：`feat/lyrics-notification`
 - 狀態：**待使用者審閱**。已拍板：①Batch 全部失敗要彈失敗通知；②通知開關本次一併做，放在 App 內 Settings，預設開；③分支名。
+- 本次迭代同時包含（使用者 2026-09-26 指定）：**Cover Flow 隨 Music 切曲自動滑動（帶動畫）**，需求與計劃見 `2026-09-26-coverflow-follow-playback-slide.md`；兩者同分支、同一次發版。
 
 ## 0. 複述
 
