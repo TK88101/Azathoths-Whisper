@@ -435,7 +435,32 @@ production `CoverFlowView`＋`CoverFlowViewModel`（StubArtworkProvider 佔位�
 |---|---|
 | V2 自然播完 → 向左滑一張 | 會滑、方向正確（另有 F1 的延遲） |
 | V3 連按下一首（一路按到 The Used） | 每一次都正常滑動，沒有直接跳、沒有閃一下 |
-| V3 上一首、V4–V8 | 尚未回報 |
+| V3 上一首（Music 暫停中按） | 向右滑，正常 |
+| V3 連按兩次、V4 同封面、V5 滑走／滑回、V6 減少動態效果、V7 沒歌詞的歌、V8 逐幀 | 使用者未測。使用者 2026-09-27 表示測試應由我負責 → 改以程式驗證（見下） |
+
+**待補的程式驗證（尚未動工）**
+| 項目 | 做法 | 現況 |
+|---|---|---|
+| 連按兩次、同封面 | 已有：`CoverFlowSlideGeometryTests.aSecondChangeMidSlideLandsDirectly`；幾何測試用的封面全是同一張佔位圖，等同「同封面」 | 已涵蓋 |
+| 滑走後換歌直接拉回；同曲更新不拉回 | production `CoverFlowView`＋VM 開視窗，視窗內送合成的觸控板捲動事件（`window.sendEvent`，不動全域輸入；先例 `CoverFlowStripStackingTests` 的 `StackGesture`） | 待寫 |
+| 滑走又回到播放卡後換歌照常平移 | 同上；回程用 `stepCenter`（H-09） | 待寫 |
+| 換到沒歌詞的歌：降下時平移、寫入後升回、正中是當前曲 | 以測試用 `AppModel`（`MockMusicClient`、臨時目錄的 Queue／History 夾具、`GatedPollClock`）掛 `LyricsFlowPageView` | 待寫 |
+| 減少動態效果 | 已有：`reducedMotionSwitchesWithoutMoving`（參數層）。系統設定→環境值那一段是一行傳遞，不改使用者的系統設定去測 | 已涵蓋（參數層） |
+
+**不由我做的事**：操控使用者正在用的 Music 播放、改系統設定。
+
+### 8.6 三項發現的處置方向（2026-09-27，Codex 辯論 R1；尚未實作）
+
+| # | 我方提案 | Codex R1 | 裁決 |
+|---|---|---|---|
+| F1 | 監聽 `com.apple.Music.playerInfo`，收到就 `tick()`；3 秒輪詢保留 | 修改後採：①用 `tick()` 不用 `forceRefresh()`（成立）②busy 期間收到的通知要補：另設 `pendingNotificationTick`，最後一個 busy 來源解除時補一次 `tick()` ③輪詢與通知收進同一個單飛讀取：至多一個讀取進行中，期間再來的訊號只記成「完成後再讀一次」④介面只給 `start(onChange:)`／`stop()`，live 實作丟棄 userInfo ⑤不違反只讀與 `no_playback_gate.sh` | **採 Codex 的修改版**（我方無反證） |
+| F2 | 暫留卡留到履歴追上、上限約 7 秒（要重簽 AC8 例外） | 不採：會多出第二個顯示層狀態；暫留期間又換歌時「照常平移／保留兩張暫留／≤21 張」無法同時成立。替代：換歌後對 `History.dat` 做有界的短重讀（立即、100ms、300ms、700ms），尾端出現剛播完的那首就停；仍沒追上就接受正式牌組 | **採 Codex 的替代方案**，AC8 例外不動。**前提未核**：Music 寫 `History.dat` 的時點相對於通知有多晚——下一個 session 先量，再定重讀的時點 |
+| F3 | 剝掉履歴尾端「其實排在當前曲之後」的那一段（以 persistentID 比對） | 不採、另立迭代。反例：清單 `A→C→A→C` 正常播到第二個 A 時，履歴尾 `[A, C]` 會被誤剝；剝掉後左側張數改變，平移的位次條件更常不成立。這不是局部修正，是「左側代表什麼」的產品定義 | **未收斂於修法；雙方同意要先由使用者定義**（見下） |
+
+**F3 要使用者定義的事**：Cover Flow 左邊代表什麼？
+- 甲「播過的歌」（現行）：左邊＝Music 的播放記錄。往回跳時記錄不倒退，所以會看到同一首出現兩張、左鄰不變。
+- 乙「清單裡排在前面的歌」：左邊＝播放清單中排在當前曲之前的那幾首。往回跳時左邊跟著變。代價：從清單中段起播時，左邊會出現其實沒播過的歌；要改驗收 H-19a 與牌組模型，另立計劃。
+
 
 ## 9. 任務清單（v5；串行，主執行緒 TDD，不派 agent）
 
@@ -608,3 +633,10 @@ R4–R7 勝負：Codex 勝——條帶重建、落定冪等、初值的「出現
 - 既有測試檔 `CoverFlowStripStackingTests`／`CoverFlowDeckTransitionSpikeTests`／`CoverFlowStripRenderGeometryTests` 各自的開視窗與落定輔助尚未收斂到 `CoverFlowTestWindow`；三份「落定」的規則不同。
 - `CoverFlowDeckTransitionSpikeTests`（S8）仍寫死動畫常數，未改用 `Theme.Motion.layerShift`。
 - 牌組張數上限的單一來源（`DeckSnapshot` 層）。
+
+### A.9 2026-09-27 實機發現 F1–F3 的修法辯論 R1
+
+提案與 Codex 的逐項意見、裁決見 §8.6。原始輸出：`codex-f123-r1.txt`（不入庫）。Codex 最擔心的一點：F3 的提案把不可逆的播放履歴用 persistentID 猜成可逆的清單位置，會在重播、重複曲、隨機播放下靜默刪掉真實歷史。
+
+勝負：F1 Codex 補了三處我方沒想到的（busy 期間補讀、單飛合併、介面不暴露 userInfo）；F2 Codex 的替代方案較簡且不動已簽字的例外，我方認輸；F3 Codex 的反例成立，我方提案作廢。
+
