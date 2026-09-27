@@ -1,9 +1,9 @@
-# Cover Flow 隨 Music 切曲自動滑動（帶動畫）—— 需求記錄與實施計劃（v1，待 Codex 評審）
+# Cover Flow 隨 Music 切曲自動滑動（帶動畫）—— 需求記錄與實施計劃（v4，評審收斂；待使用者拍板 §7 與 S8）
 
 - 日期：2026-09-26
 - 基線：`origin/main` `98af41f`（v2.0.1）
 - 分支：`feat/lyrics-notification`——使用者 2026-09-26 指定與「歌詞寫入成功的系統通知」（`2026-09-26-lyrics-notification.md`）**同一次迭代**
-- 狀態：v1（2026-09-27）：S7 spike 完成（§8.1），§3.1／§3.2 依實測收斂；**待 Codex 評審與使用者拍板 §7**；未實作。
+- 狀態：v3（2026-09-27）：S7 完成（§8.1）；R1→VM 短暫過渡顯示層；R2→精確身分判向、settle 回報契約、邏輯當前曲（§3.7）；R3→三處收緊（A.3）；**Codex 評審收斂；待使用者拍板 §7，之後 S8 定第二段觸發，再 TDD**；未實作。
 - 任務形狀：串行（先 spike 定居中方式，再改 VM／條帶，再驗證），不派多 agent。
 
 ## 0. 複述（使用者 2026-09-26 原話要點）
@@ -44,27 +44,61 @@
 - 手動拖曳與方向鍵的手感、升降動畫：不改。
 - 1.x Python 版：不動。
 
-## 3. 設計草案（待 Codex 評審與使用者拍板）
+## 3. 設計（v2，2026-09-27：依 Codex R1 改為 VM 短暫過渡顯示層）
 
-- **3.1 舊中心留在牌組（對應事實 7；v1：S7 證實為前提，§8.1 結論 2）**：真實換歌當下，若左側來源是 History.dat 且其最新一筆不是剛播完那首，則把剛播完的那首以觀察歷史卡（`o:<pid>#<場次>`，`listening` 已在事件當下記錄）補在左側末端；History.dat 讀到後由 `h:A#0` 取代（同位置換身分＝「正中不變、兩側變動」路徑，不帶動畫，`CoverFlowDeckSideChangeTests` 已覆蓋）。改在 `DeckSnapshot.build`（純函式），去重規則沿用（兩側與中心同 ID 剔兩側；左側與中心不以 persistentID 互相去重）。
-  備案：讓 `q:A` 以 `side: .played` 留在左側直到 History 追上——ID 完全不變、動畫最乾淨，但要修 AC8「`q:` 只供中心與右側」的規格。
-- **3.2 動畫觸發點（v1：依 S7 定為 splitUpdate）**：只在 `apply(_:isRealChange: true)` 且舊中心與新中心都在新牌組內時走動畫路徑；其餘維持 direct（D6 其餘部分不動）。
-  - 做法：同一次更新只換牌（`items`，`centerID` 保持舊中心——條帶 `onChange(of: items)` 無動畫捲回舊中心，舊中心在牌組內故定位正確）；**下一次更新**再 `withAnimation(slide) { centerID = target }`。S7：keepOld／previous 平移 10/10、落定 10/10。
-  - 不採 sameUpdate：同一次更新內條帶的無動畫 `scrollTo` 會蓋掉動畫（S7 平移 0/10；S5「animated」被放棄的真因）。
-  - 「下一次更新」的排法：VM 以 `Task { @MainActor in … }` 讓出一輪（S7 以 16ms sleep 量測；實作改為讓出 runloop，須以單元測試釘住「兩次更新」的順序而非時長）。兩次更新之間若又有真實換歌或使用者拖曳，後到者取消前者（以「動畫目標」狀態判定，見 3.3）。
-  - 方向 B（View 內 `reader.scrollTo` 動畫）不再評估：splitUpdate 已達標，且維持「VM 決定、View 呈現」的既有分工。
-- **3.3 K5 守衛重做**：`isCenteringProgrammatically` 改為「程式化目標」狀態 `pendingProgrammaticTarget: String?`：binding 回寫 ≠ 目標 → 忽略（不算使用者接管）；＝ 目標 → 清除。落定判定不能用 macOS 15 API（事實 10），候選：目標回寫到達即清除＋逾時保險（動畫時長 × 2）自動清除；使用者在動畫途中真的拖曳的情況列為已知限制或以逾時後的回寫判定。
-- **3.4 動畫參數**：曲線沿用升降的 `timingCurve(0.16, 1, 0.3, 1)`；時長初值 0.45s（升降為 0.62s）；實機看手感後拍板。
-- **3.5 上一首的兩段過程（事實 8）**：第一段（退回模式）新舊中心是否都在牌組取決於 3.1；第二段「同一首換身分」不帶動畫。要不要在第一段就滑、還是等解析後一次滑，待拍板（§7）。
-- **3.6 減少動態效果**：`accessibilityReduceMotion` 由 View 讀取（`LyricsFlowPageView` 已有），傳給 VM 或在 View 層決定是否包 `withAnimation`。
+### 3.0 總則
+- **canonical 牌組不動**：`DeckSnapshot.build`、AC8 卡 ID 規則、History／觀察歷史語義全部不改（R1-P0-1／P0-2／P2-12）。
+- `CoverFlowViewModel` 新增**顯示層**：`displayCards`（條帶實際吃的卡）＝平時等於 `deck.cards`；只在「過渡」期間多一張**暫留卡**。
+- 過渡＝真實換歌的一次平移，狀態機：`idle → staged → animating → idle`，帶單調 `transitionGeneration`。
+
+### 3.1 何時進入過渡（全部成立才進，否則維持現行 direct）
+1. `apply(_:isRealChange: true)`；未處於 H-05 接管；未開「減少動態效果」（3.6）。
+2. 舊中心卡 `old`（`centerID` 在**舊顯示牌組**中的卡）存在，新中心 `target = newDeck.currentCardID` 存在且 ≠ `old.id`。
+3. 方向可**證明**（v3，R2-P0-3：不以 persistentID 距離猜）。依序：
+   - (i) `target.id` 在舊顯示牌組中 → 比位置（佇列模式下一首：`q:B` 本在 `q:A` 右側）；
+   - (ii) `old.id` 在新 canonical 牌組中 → 比位置（觀察模式下一首：`o:A#k` 播完移到左側 ID 不變）；
+   - (iii) 由 `LyricsFlowModel`（持有 `QueueSession`）以 `apply` 的顯式參數 `slideHint` 提供，**在 `nowPlaying` 呼叫 `resolvingCurrent` 之前取證**，且同時成立（v4，R3-2）：舊顯示中心卡 ID ＝ `queue.cardID(at: i)`；`snapshot.entries[i].persistentID ＝ old.persistentID`；新曲 persistentID 在同一快照**恰出現一次**且索引＝i−1（上一首）或 i+1（下一首）。任一不符 → 無 hint；
+   - 以上皆不成立（非相鄰跳播、重複曲、清單重寫）→ direct。
+   下一首＝`old` 暫留新中心**左側**；上一首＝暫留**右側**（R1-P0-3）。
+
+### 3.2 三個階段
+- **staged**（同一次 `apply`；v3 另見 §3.7 的單一狀態與顯示牌組純函式）：`deck = newDeck`；`displayCards = newDeck.cards`，若 `old.id` 不在其中，把 `old` 以原 ID 插到 `target` 的正確一側緊鄰處，並從同側最遠端剔一張，保持 ≤ 21 張（R1-P1 上限）；`centerID` **保持 `old.id`**——條帶 `onChange(items)` 的無動畫 `scrollTo` 會把畫面定在 `old`（S7 keepOld／previous 的第一段）。
+- **animating**：由第二次更新觸發 `withAnimation(slide) { centerID = target }`。觸發機制不靠 `Task.yield` 猜 runloop（R1-P1）：候選 (a) 條帶在 `onChange(items)` 完成 `scrollTo` 後回呼 VM；(b) `DispatchQueue.main.async`；(c) 固定 16ms——**S8 以 production 路徑量測後擇一**（§4）。
+- **settle → idle**：binding 回寫 `target`（v3：經 §3.7 的 raw 回報契約，不被 `id != centerID` 守衛吞掉），或逾時保險（動畫時長 ×2，帶 generation）到期 → `displayCards = deck.cards`（去掉暫留卡；正中不變、只有一側少一張＝既有「兩側變動」路徑，無動畫，`CoverFlowDeckSideChangeTests` 覆蓋）。
+
+### 3.3 過渡期間的其他事件（R1-P0-4／P0-5／P1）
+- **非真實 publish**（`readSources` 讀完 History／Queue、同曲重發）：只更新 `deck` 與 `displayCards`（重新套 3.2 的暫留與 ≤21 規則），**不動 `centerID`**。若 canonical `currentCardID` 在過渡中換身分（上一首的 `o:B` 被解析成 `q:B`）→ 結束過渡、以 direct 居中新身分（同一首換身分本來就不帶動畫）。
+- **又一次真實換歌**（A→B→C）：遞增 generation、放棄前一次（逾時與回呼以 generation 自行作廢），以**當下的 `centerID`**當作新的 `old`，重新判定 3.1。
+- **binding 回寫 ≠ `target`（staged 之後）**＝使用者接管：立即結束過渡、`displayCards = deck.cards`、照 H-05 設 override（使用者停的那張若已不在 canonical，回當前卡）。前提：S8 證實 production 路徑在程式化動畫途中**不**回寫中間值；若 S8 否證，則改為「動畫期間回寫一律視為動畫、使用者真拖曳列為已知限制」並回報使用者拍板，不默默吞掉。
+- `isCenteringProgrammatically` 同步守衛保留給 direct 路徑；動畫路徑以「過渡狀態＋target」判定。
+
+### 3.7 v3 補（Codex R2）
+
+- **單一過渡狀態**（R2-P0-4）：`SlideTransition { generation, old: DeckCard, target: String, side: .left/.right, phase: .staged/.animating }`；`displayCards` 一律由純函式 `SlideDisplay.cards(canonical:transition:limit:)` 派生（每次 publish 重算），規則：以 card ID 去重（canonical 已含 `old.id` 則不插）；插入後超過 21 張才剔同側最遠一張；同側無可剔（只剩 target／暫留卡）→ 放棄過渡、direct（R2-P1-8／R2-7）。「History 在過渡內追上」「清單重寫」「≤21 邊界」進純函式測試。
+- **raw 回報契約**（R2-P0-1／P0-5）：View 的 binding setter 改呼叫 `scrollPositionDidReport(_ raw: String?)`：過渡中 raw＝target → settle；raw≠target 且 phase＝animating → 使用者接管（結束過渡、照 H-05）；staged 階段**只忽略 raw＝`old.id`**（條帶把畫面定在 old 的回寫；`nil` 亦忽略），其他任何有效卡 ID 一律立即接管、取消過渡（v4，R3-1；S8 加「staged 真拖曳至非 old」子案）；idle → 走既有 `scrollPositionDidChange` 邏輯（不變）。
+- **邏輯當前曲**（R2-P0-2；v4 R3-3 定時序）：每次 `apply` **開頭**先存 `previousLogicalCurrentID`、隨即 `logicalCurrentID = newDeck.currentCardID`，再走過渡／direct／H-05 分支；使用者接管只改 `centerID`、**不改** logical 值；新的真實換歌以 `logicalCurrentID` 為 `old`（在 staged 中又換歌時即舊 target B，不是畫面上的 A），先作廢前一 generation。
+- **第二段觸發**（R2-P1-4）：`ScrollViewReader.scrollTo` 無完成回呼，(a)(b)(c) 都是時序假設。S8 選定後加「未提交偵測」：第二段開動畫前確認 `old` 已位於正中（條帶回報的置中卡＝`old`）；否則放棄過渡、direct。
+- **cards 消費端**（R2-P1-5／P2-6）：`cards` 改回傳 `displayCards`，另設 `canonicalCards`；逐一審：中心標籤、徽章角落、鍵盤步進（顯示層）、把手刻度（顯示層）、`artworkRevisions`／`details` 清理與 `artworkDidStore` 存活判定改以 `displayCards` 為準、settle 後再清；`isPlayingCardCentered`／`currentCardID` 用 canonical。
+- **減少動態效果**（R2-P2-10／P1-8）：VM 預設 `prefersReducedMotion = true`（安全側，未同步前不開動畫）；View `onAppear`／`onChange` 寫入實值；過渡中變為 true → 作廢 generation、移除暫留卡、direct。
+
+### 3.4 動畫參數
+曲線沿用升降的 `timingCurve(0.16, 1, 0.3, 1)`；時長初值 0.45s（S7 量得約 0.35s 視覺到位）；實機看手感後拍板（§7-1）。
+
+### 3.5 上一首的兩段過程
+佇列往回跳當下 `currentIndex = nil`，canonical 為 `[左…, o:B]`；3.1-3 以 persistentID 找到舊顯示牌組左側的 `h:B`／`o:B` → 判為上一首，`old = q:A` 暫留 `o:B` 右側 → 立即向右滑一張。≤3s 後輪詢解析為 `q:B`＝3.3 的換身分 → direct（畫面位置不變）。是否要「第一段就滑」仍待 §7-2。
+
+### 3.6 減少動態效果
+View 讀 `accessibilityReduceMotion`，在 `onAppear`／`onChange` 寫入 VM 的 `prefersReducedMotion`（不在 body 內改狀態，R1-P2）；為 true 時 3.1 不成立＝一次 direct 更新，不走兩段。
 
 ## 4. 測試策略（TDD；紅燈摘要回填本節）
 
-- **S7 spike**（沿用 `Tests/UI/CoverFlowDeckTransitionSpikeTests.swift` 的 `SpikeSession`／`StackReader`，`AZW_SPIKE_S7=1` 才跑）：以真實牌組形狀（舊中心離開／留下兩種）做 animated 換歌 ×10，量：落定命中率、途中 binding 回寫序列、逐幀 `scrollX` 是否單調且至少 N 幀介於起訖之間（證明是平移不是跳）。結果寫進本檔 §8，定出 3.1／3.2 的做法後轉正式測試 `CoverFlowDeckSlideTests`。
-- **單元（純函式）**：`DeckSnapshotTests` 新增「換歌當下舊中心留在左側末端」「History 追上後以 `h:` 取代、位置不變」「History 最新一筆已是該曲時不重複補」。
-- **單元（VM）**：`CoverFlowViewModelDeckTests` 新增：真實換歌產生動畫居中意圖、同曲重發／清單重寫／首次給牌不產生；動畫途中的中間回寫不設 override；目標回寫清除 pending；逾時清除；`reduceMotion` 下無動畫意圖。
-- **整合**：`LyricsFlowModelTests.advancingWithinTheSameQueueMovesTheCentre` 加斷言：落定後 override 仍為 false。
-- **E2E（使用者在場）**：`LyricsFlowUITests` 現有 `waitForRaisedAndSettled`（播放卡按鈕出現＝落定）沿用，不斷言動畫時長。
+- **S8 spike（開工前提，production 路徑）**：真實 `CoverFlowView`＋`CoverFlowViewModel` 掛進視窗（沿用 S5／S7 的 `SpikeSession`／`StackReader`），量：①程式化動畫途中 binding 回寫序列（有無非 target 中間值）②第二段觸發 (a)/(b)/(c) 各 ×10 的平移率與落定率 ③過渡中插入一次非真實 publish 是否仍平移。結果回填 §8.2，定 3.2 觸發機制與 3.3 接管判定。
+- **單元（VM，`CoverFlowViewModelSlideTests`）**：下一首／上一首的暫留側與位置；≤21 剔最遠；方向判定不了→direct；H-05 接管中→direct；reduce motion→direct；非真實 publish 不動中心、暫留卡保留；換身分→結束過渡；A→B→C（第二次在 staged、animating、idle 三時點）最終中心＝C、無舊 generation 回寫；回寫≠target→接管；回寫＝target→settle；逾時→settle；settle 後 `displayCards == deck.cards`。
+- **正式幾何整合測試**（v3，R2 反駁 P2-11 採納）：`CoverFlowSlideGeometryTests`——比照 `CoverFlowDeckSideChangeTests`（正式、進全量、開視窗量幾何），以 production `CoverFlowView`＋VM 驗「下一首／上一首各 3 次：有 ≥3 幀介於起訖、單調、落定對齊、方向正確」；時長上限控制在數秒。
+- **S8 矩陣擴充**（R2-P1-9）：觸發 (a)(b)(c) ×20；各含「換歌後立即非真實 publish」「staged 時 A→B→C」「動畫中注入一次非 target 回寫（模擬拖曳）」子案。
+- **既有防線**：`CoverFlowDeckSideChangeTests` 5/5、`CoverFlowStripStackingTests`、`DeckSnapshotTests` 不改動即綠（canonical 不變的證據）。
+- **整合**：`LyricsFlowModelTests.advancingWithinTheSameQueueMovesTheCentre` 加斷言：落定後 override 仍為 false；新增「換歌後 readSources 在 settle 前 publish」仍落定於新中心。
+- **E2E（使用者在場）**：`LyricsFlowUITests` 現有 `waitForRaisedAndSettled` 沿用；V2–V7 實機。
 
 ## 5. 驗證項（V）
 
@@ -86,12 +120,12 @@
 - R3 3.1 補卡與 History 去重打架，出現同曲兩張（`DeckSnapshotTests` 釘住）。
 - ACCEPTANCE：H-04 驗證欄補「平滑」證據；H-05「交互整合未驗」可能隨 V5 轉 ✅；AC8 卡 ID 規則若採 3.1 備案需修訂並簽字。
 
-## 7. 待拍板（v1：第 3 項 S7 已證實「舊中心必須留在牌組」，兩案都滿足，剩取捨）
+## 7. 待拍板（v2）
 
-1. 動畫時長與曲線（§3.4）。
-2. 上一首第一段（退回模式）就滑，還是等解析後一次滑（§3.5）。
-3. 3.1 主案（補 `o:` 卡）還是備案（`q:` 卡留左側、修 AC8 規格）。
-4. 與通知功能同一分支合併發版（使用者已指定同一迭代；分支名維持 `feat/lyrics-notification`）——版本號 2.0.2 或 2.1.0 待定。
+1. 動畫時長與曲線（§3.4；初值 0.45s、升降同曲線）。
+2. 上一首：第一段（退回模式）就立即向右滑，還是等 ≤3s 解析後才滑（§3.5；v2 技術上可第一段就滑）。
+3. **AC8 暫時例外**：過渡期間（≤ 動畫時長×2）舊中心的 `q:` 卡以原 ID 暫留在新中心左側（下一首）或右側（上一首），過渡結束即回到 canonical。需修訂 AC8 並簽字；canonical 規則本身不變。
+4. 與通知同分支合併發版——版本號 2.0.2 或 2.1.0。
 
 ## 8. 實測記錄（實施中回填）
 
@@ -126,3 +160,41 @@
 - P1：`Task.yield` 不保證 SwiftUI 已提交第一段；A→B→C 連續換歌取消規則；補卡突破 21 張上限；S7 未走 production 的 binding adapter／`scrollPositionDidChange`。
 - P2：reduce motion 的責任邊界；驗收只驗落定；**更簡方案**：canonical deck 不動，由 VM 持有短暫的 transition display layer（舊卡以原 ID 暫留在正確一側，動畫完即採 canonical）。
 原始輸出：session scratchpad `codex-plan2-r1.txt`（不入庫）。
+
+#### A.1 裁決（v2）
+
+| R1 | 裁決 | 理由／落點 |
+|---|---|---|
+| P0-1 build 拿不到 listening | 採納 | 改為 VM 過渡顯示層，canonical 不動（§3.0） |
+| P0-2 History 無場次、去重不可證 | **部分駁回**：問題成立，但不採「以 History 尾端追加證明後才退休」 | 暫留卡在**動畫落定／逾時**即退休，不依 History；與 History 何時追上無關，去重問題不再出現（§3.2 settle） |
+| P0-3 上一首暫留右側 | 採納 | §3.1-3、§3.5 |
+| P0-4 兩段之間 publish 吞動畫 | 採納 | 過渡期間非真實 publish 不動中心（§3.3） |
+| P0-5 忽略非 target 回寫違反 H-05 | 採納（附條件） | 非 target 回寫＝接管；以 S8 證實前提，否證則回報使用者（§3.3） |
+| P1-6 Task.yield 不保證提交 | 採納 | 觸發機制由 S8 以 production 路徑擇一（§3.2、§4） |
+| P1-7 A→B→C | 採納 | generation＋以當下 centerID 為新 old（§3.3）；三時點測試（§4） |
+| P1-8 ≤21 | 採納 | 同側剔最遠（§3.2） |
+| P1-9 S7 未走 production | 採納 | S8（§4） |
+| P2-10 reduce motion 邊界 | 採納 | View 在 onAppear／onChange 寫入 VM（§3.6） |
+| P2-11 只驗落定 | **部分採納**：方向、暫留側、接管、A→B→C 進 VM 單元測試（阻擋性）；逐幀平移只在 S8 spike 量（環境變數開啟，不進每次全量）——逐幀取樣需開視窗、耗時，放進全量會拖慢並引入時序抖動 | §4 |
+| P2-12 更簡方案 | 採納 | 即 v2 主架構 |
+
+### A.2 2026-09-27 Codex R2（v2）與裁決（v3）
+
+R2 接受 P0-1／P0-3／P1-8／P1-9／P2-12；對 P0-2、P1-7、P2-11 的反駁成立，另提 R2-1…R2-9。v3 處置：
+| 項 | 裁決 | 落點 |
+|---|---|---|
+| P0-2 反駁（PID 最近＝猜） | 採納 | §3.1-3：只接受可證明關係；上一首以佇列唯一相鄰證明（iii），否則 direct |
+| P1-7 反駁／R2-2（A→B→C 取錯 old） | 採納 | §3.7 `logicalCurrentID` |
+| P2-11 反駁（需正式幾何測試） | 採納 | §4 `CoverFlowSlideGeometryTests`（先例：`CoverFlowDeckSideChangeTests`） |
+| P0-4 未閉合／R2-7 | 採納 | §3.7 單一狀態＋`SlideDisplay.cards` 純函式 |
+| R2-1（target 回寫被守衛吞） | 採納 | §3.7 raw 回報契約 |
+| P1-6／R2-4（無完成回呼） | 採納 | §3.7 未提交偵測，失敗即 direct |
+| R2-5／R2-6（cards 消費端、details 清理） | 採納 | §3.7 |
+| P2-10／R2-8（reduce motion 中途、首次） | 採納 | §3.7 預設安全側 |
+| R2-9（S8 矩陣） | 採納 | §4 |
+未全數無條件採納的說明：R2-3 建議「沒有精確 ID 即 direct」會使上一首永遠不滑（往回跳當下佇列刻意不解析，解析時只換身分），與需求「上一首向右滑」衝突；故以 (iii) 佇列唯一相鄰證明補足，重複曲仍 direct——**待 R3 覆核**。
+
+### A.3 2026-09-27 Codex R3（v3）與裁決（v4）
+
+R3 無新設計層問題，(iii) 思路成立；三處收緊全採納：R3-1（P0）staged 只忽略 raw＝old.id → §3.7；R3-2（P1）(iii) 三重一致且在 resolvingCurrent 前取證 → §3.1-3；R3-3（P1）logicalCurrentID 於 apply 開頭更新、接管不改 → §3.7。測試補「staged 真拖曳至非 old」「direct 後再換歌」「animating 接管後再換歌」。評審至此收斂（R1→R3），剩 §7 使用者價值判斷。
+
