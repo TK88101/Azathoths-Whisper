@@ -1,4 +1,4 @@
-# Cover Flow 隨 Music 切曲自動滑動（帶動畫）—— 需求記錄與實施計劃（v5.3 定稿：直接換牌＋條帶內容位移動畫；實作完成，待使用者在場的實機驗證 V2–V8）
+# Cover Flow 隨 Music 切曲自動滑動（帶動畫）—— 需求記錄與實施計劃（v5.3 定稿：直接換牌＋條帶內容位移動畫；實作完成；實機驗證中，發現三項待處置，見 §8.5）
 
 - 日期：2026-09-26
 - 基線：`origin/main` `98af41f`（v2.0.1）
@@ -417,6 +417,25 @@ production `CoverFlowView`＋`CoverFlowViewModel`（StubArtworkProvider 佔位�
 - `CoverFlowView` 多一個必填參數 `prefersReducedMotion`，由 `LyricsFlowPageView` 讀環境值後傳入。計劃 §3.5 寫的是 View 自己讀環境值；環境值唯讀，測試無法覆寫，改由上層傳入才測得到。
 - `pruneCaches`／`artworkDidStore` 以「顯示牌組 ∪ 正式牌組」為準，比計劃 §3.3-5 寫的「以 `displayCards` 為準」寬：顯示上讓位的那張仍在正式牌組裡，它的資料不該被清掉。
 - 條帶的判斷抽成純函式 `CoverFlowStripReaction`（計劃 §3.4 未列，simcodex 第 1 輪依專案慣例補上）。
+
+### 8.5 實機驗證發現（2026-09-27，使用者在場；處置待定）
+
+建置：`wip/coverflow-slide-s9` `be7002a` 的 Debug 版，20:55 啟動。授權框、Cover Flow 升起、正中＝播放中皆正常。V2 會滑、方向正確。以下三項由使用者回報，**尚未處置**。
+
+| # | 使用者看到的 | 已核事實 | 是否本次改動造成 |
+|---|---|---|---|
+| F1 | 下一首已經播了約一秒，上一首的封面還停在正中，之後才滑過去 | App 每 3 秒問一次 Music（`NowPlayingMonitor.swift:36`，沿用 py:769），換歌要等下一次詢問才發現；App 沒有監聽 Music 的換歌通知（grep `DistributedNotificationCenter`／`playerInfo` 無結果）；動畫本身不含等待 | 否（H-04 原文即「≤3s」）。有了平移之後變得顯眼 |
+| F2 | 滑完之後，剛播完的封面從左鄰消失約 3 秒才回來，其他封面跟著挪一格 | 截圖 21:00:15：正中 My Chemical Romance、左鄰 Dark Funeral；21:00:18：左鄰變回 Slipknot。`History.dat` 的修改時間＝21:00:15。暫留卡在動畫落定時收掉（§3.3），而播放記錄要到下一次詢問才讀到 | 部分：缺口本來就在（換歌後左鄰先是更早的歌）；平移讓「滑到左邊的那張又被換掉」變得顯眼 |
+| F3 | 按上一首回到 Slipknot 後，Slipknot 出現兩張（正中與左鄰）；再往回跳幾首，左鄰一直是 Slipknot | 截圖 21:04:49、21:06:07。左側＝Music 的播放記錄（`History.dat`），往回跳時記錄不會倒退；同一首歌可同時在左側與正中是先前的既定設計（R4-7，`DeckSnapshotTests.theSameTrackMayAppearOnTheLeftAndInTheCentre`）。使用者的期望：左側＝清單裡排在當前曲之前的歌（Music 的清單是 Dark Funeral → Slipknot → My Chemical Romance） | 否（2026-09-23 的牌組設計） |
+
+**F1 的可行性量測**：只讀監聽 `com.apple.Music.playerInfo`（`DistributedNotificationCenter`，不記曲名）。使用者切歌三次，三次都收到（21:05:56.985、21:06:00.718、21:07:24.352），通知帶 `PersistentID` 欄位。三次的播放狀態欄都是 `Paused`，與實情相符（使用者確認：按上一首的那幾次 Music 都在暫停中）。暫停中切歌也會廣播。
+
+**已通過的項目**
+| 項目 | 結果（使用者目視） |
+|---|---|
+| V2 自然播完 → 向左滑一張 | 會滑、方向正確（另有 F1 的延遲） |
+| V3 連按下一首（一路按到 The Used） | 每一次都正常滑動，沒有直接跳、沒有閃一下 |
+| V3 上一首、V4–V8 | 尚未回報 |
 
 ## 9. 任務清單（v5；串行，主執行緒 TDD，不派 agent）
 
