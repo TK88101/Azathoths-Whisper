@@ -299,3 +299,18 @@ A.2 #1（合併窗）的辯論結果：
 - 實作：`MusicPlayerInfoSignal.isStopped(_:)`＋observer 閘門。TDD：`PlayerChangeSignalTests.aStoppedNotificationDoesNotTriggerARead` 紅→綠；`everyOtherNotificationTriggersARead` 6 個參數案例（Paused／Playing／小寫 stopped／缺欄位／非字串／無 userInfo）為守衛。
 - 實機再驗（重編命令列工具）：清單中點歌 3 次，皆約 120ms 直接 `trackChanged`，**零次 `notPlaying`**。
 - 已知行為（接受）：真的停止由 3 秒輪詢發現（＝加通知前的行為）；若 Music 只送 `Stopped` 而不再送任何通知就換了歌，也退回輪詢（≤3 秒）。
+
+## 11. GUI 實機驗證（2026-09-28 00:1x，使用者授權我操控；Debug 版 App 本體）
+
+做法：Debug 版以臨時家目錄啟動（`HOME`／`CFFIXED_USER_HOME` 指向 scratchpad，`Music` 以符號連結指回真曲庫）——找不到 Keychain token 就不跳授權框；Music 的自動化權限沿用終端機。觀測：輔助使用 API 每 50ms 讀 Cover Flow 正中卡 ID 與左鄰卡 ID（persistentID 雜湊輸出）。佇列：暫時建一個含 89 首的播放清單播放，測完刪除。
+
+| 情境 | Cover Flow 觀測 |
+|---|---|
+| 播放中下一首 ×2、暫停中下一首（F1） | 指令後 0.25–0.26s 正中換新歌（含 osascript 與 50ms 輪詢開銷；改前最慢 3s） |
+| 平移 | 換歌當下左鄰＝暫留的剛播完那張；約 0.64s 後落定，左鄰暫為更早那首 |
+| F2 | 換歌後約 5.7s，剛播完的那首回到左鄰（5.2s 重讀點）；另一次在 6s 重讀點 |
+| 播整個清單／清單中點歌（U3，Music 先送 Stopped） | 188–219ms 正中換新歌，左側不變，未出現空白 |
+| 播放超過 3 秒按上一首 | 回曲首、不換歌，Cover Flow 不動（正確） |
+| 真的停止 | 正中維持最後一首（既有行為，`.notPlaying` 在 LyricsFlow 為 no-op） |
+
+限制：平移的「觀感」（是否閃一下）只能目視；本輪只驗到卡 ID 與時序。
