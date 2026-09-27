@@ -251,7 +251,11 @@ var onImportFinished: ((BatchImportResult) -> Void)?
 | V6 | ✅ en／ja／zh-Hant；subtitle 長專輯名被系統截成單行（預期內） |
 | V7 | ✅ 情況 A：從 Cover Flow 開始→切回 Cover Flow；情況 B：從歌詞畫面開始→切回歌詞畫面（⑨ 維持現狀） |
 
-UITests（XCUITest 全量）尚未在使用者在場下跑；臨時診斷 UITest 已刪除、未提交。
+UITests（2026-09-27 使用者在場，ABC 輸入法）：31 條＝25 綠、1 skip、5 紅。
+- 紅 1：A-10 `testQuitMenuItemTerminatesApp`（已知 XCUITest 狀態問題，已熔斷，不重查）。
+- 紅 4：`CoverFlowUITests` 四條 H-02 閘門（補 `TEST_RUNNER_AZW_EXPECTED_APP_DIR` 後仍紅）——點不到「COVER FLOW」分頁按鈕。v2.0.0 起 Cover Flow 併入 Editor 分頁，此檔最後修改 2026-09-13 早於 v2.0.0，本分支未動。**範圍外、另立項**：按新結構重寫。
+- 本次新增斷言（A-07 選單第三項英文）通過；「寫入後升回」「Batch 匯入後徽章刷新」等既有 UITests 通過。
+- 臨時診斷 UITest（真實 Music 重走 Batch 流程）已刪除、未提交；兩份含失敗全螢幕錄影的 xcresult 經使用者同意已刪除。
 
 ## 7. 非目標
 

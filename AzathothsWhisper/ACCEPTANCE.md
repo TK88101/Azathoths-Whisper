@@ -16,7 +16,7 @@
 | A-04 | 窗口標題 "Azathoth's Whisper" | py:1864 | 同上（`windows["Azathoth's Whisper"]`） | ✅ M5 |
 | A-05 | 菜單 Settings → Token Settings... / Language Settings... 開對應 modal | py:1909-1918 | `testSettingsMenuOpensTokenModal`／`testSettingsMenuOpensLanguageModal` | ✅ M5 |
 | A-06 | 菜單 Help → About 開 About modal | py:1919-1922 | `testHelpMenuOpensAboutModal` | ✅ M5 |
-| A-07 | 菜單文案硬編碼英文，不隨語言變 | py:1909-1923 | `testColdStartInJapaneseLocalizesUIButNotMenus`（ja 冷啟動下 Settings／Help 仍為英文；2.1 起另斷言 Settings 第三項 "Notification Settings..." 為英文，待使用者在場跑 UITests）。實作差異：SwiftUI 的系統 Help 菜單標題由 AppKit 在地化，故清空系統組＋自建英文 Help 菜單，並在 `AppDelegate` 移除空的頂層菜單 | ✅ M5 |
+| A-07 | 菜單文案硬編碼英文，不隨語言變 | py:1909-1923 | `testColdStartInJapaneseLocalizesUIButNotMenus`（ja 冷啟動下 Settings／Help 仍為英文；2.1 起另斷言 Settings 第三項 "Notification Settings..." 為英文，2026-09-27 使用者在場實跑通過）。實作差異：SwiftUI 的系統 Help 菜單標題由 AppKit 在地化，故清空系統組＋自建英文 Help 菜單，並在 `AppDelegate` 移除空的頂層菜單 | ✅ M5 |
 | A-08 | 紅色關閉鈕＝隱藏窗口，app 不退出 | py:2052-2060 | `testRedCloseButtonHidesWindowWithoutTerminating`（視窗消失＋`app.state != .notRunning`） | ✅ M5 |
 | A-09 | Dock 圖標點擊→重新顯示已隱藏窗口 | py:1877-1893 | `applicationShouldHandleReopen` 已實作；Dock 點擊無法在 XCUITest 內定界模擬，M8 真人操作 | ⬜ |
 | A-10 | Cmd+Q 真退出 | py:753-761,1969-1995 | `testQuitMenuItemTerminatesApp`（走 app 自身 Quit 菜單項，與 Cmd+Q 同一 `terminate:` 路徑；不模擬全域按鍵）。**2026-08-23 註**：單獨跑通過（7.2s），連跑時穩定失敗。**2026-09-05 更新——狀況變差且已排除本次改動**：現在**單獨跑也失敗**（18.4s，`app.state` 停在 4 而非 1）。已用獨立 git worktree 在乾淨的 HEAD `cc88a53`（不含任何 M8 改動）複驗，**同樣失敗**（72.6s）→ 非 M8 引入；且 M8 的改動經 `git diff --stat` 確認**未觸及 `App/`（含 AppDelegate 與退出邏輯）與 `UI/`**。依熔斷紀律不重啟調查（M7 計劃附錄已記 6 輪未進展、4 假設被砍）。**產品行為本身未被證偽**：`AppDelegate` 無 `applicationShouldTerminate`，退出路徑是 M5 驗收過的；失敗的是 XCUITest 觀測 `app.state` 的時序，非 Quit 功能。真人操作驗證列入 M8-14 | ✅ M5（連跑 flaky） |
