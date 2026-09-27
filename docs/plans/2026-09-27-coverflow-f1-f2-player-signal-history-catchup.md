@@ -314,3 +314,21 @@ A.2 #1（合併窗）的辯論結果：
 | 真的停止 | 正中維持最後一首（既有行為，`.notPlaying` 在 LyricsFlow 為 no-op） |
 
 限制：平移的「觀感」（是否閃一下）只能目視；本輪只驗到卡 ID 與時序。
+
+## 12. F2 的另一半：剛播完的封面仍會消失約 5 秒（使用者 2026-09-28 07:49 實機回報，要求修掉）
+
+**使用者回報**（截圖 07:49:21／28／46）：前一首 Cradle of Filth、當前 HIM、下一首 My Chemical Romance，三首都有詞。HIM 自然播完 → 向左滑 → HIM 從左鄰消失、左鄰變成 Cradle of Filth → 幾秒後 HIM 又出現。**必現**。
+**根因（已核）**：§8.1——Music 在換歌後約 5 秒才把 HIM 寫進 `History.dat`；在那之前，左側只能照履歴顯示（左鄰＝更早的 Cradle of Filth）。§9 乙只把「消失」從 5–8 秒縮到約 5.2 秒，本來就消不掉（§9 已寫明）。使用者現在要求不得消失 → 改採 §9.1 的丁案。
+
+### 12.1 設計（丁：待入履歴的暫定左鄰卡）
+- `LyricsFlowModel` 在**順向相鄰**的真實換歌（換歌前 `queue.currentIndex = i`、換歌後解析為 `i+1`）時，若履歴尾端不是剛離開的那首，記一筆 `pendingPlayed = (persistentID, cardID)`，`cardID`＝換歌前那張當前卡的 ID（`queue.cardID(at: i)`，即平移中的暫留卡 ID）。
+- `DeckSnapshot.build` 新增參數 `pendingPlayed`：履歴模式下若存在且履歴尾端 ≠ 它，左側＝履歴最近 `window−1` 筆＋這張暫定卡（左側張數不變，平移的位次條件不變）。它的 ID 與暫留卡相同 → 平移落定時畫面不動（②計劃 §3.2 規則 2：`old.id` 已在 canonical）。
+- 清除：①履歴尾端出現同一首（`applyHistoryRead` 讀到）→ 清掉，左鄰由 `h:` 卡原位接手（同一首、同位置；卡 ID 換了，封面快取以 persistentID 為鍵，畫面不變）；②短重讀跑滿 7 秒仍沒追上（只播幾秒就跳過，Music 不記）→ 清掉並 publish（左側與 Music 面板一致）；③下一次真實換歌 → 以新的取代；④`stopPolling`／履歴變成 `.missing`／佇列失效 → 清掉。
+- 往回跳、跳播、佇列未解析、觀察歷史模式（`History.dat` 不可讀）一律不記（往回跳時舊當前卡在右側，記了會重複 ID）。
+- 已知代價：只播幾秒就跳過的歌，會在左鄰停留到 7 秒才消失（那段時間 Music 面板沒有它）；兩次換歌間隔 <5 秒時，前一筆暫定卡被取代，之後履歴寫入時可能插回一張（挪一格）。
+
+### 12.2 測試（TDD）
+- `DeckSnapshotTests`：暫定卡在左鄰、左側張數仍為 window、履歴已追上時不加、觀察模式不加、ID 與中心／右側不衝突。
+- `LyricsFlowModelTests`／`LyricsFlowHistoryRecheckTests`：順向換歌後左鄰＝暫定卡（ID＝舊當前卡）；平移落定後仍在；履歴寫入後換成同一首的 `h:` 卡且位置不變；7 秒放棄後移除；往回跳不記；下一次換歌取代。
+- 既有 `advancingWithinTheSameQueueSlidesToTheNextCard`、`historyCatchingUpBeforeTheSlideSettlesKeepsItGoing` 等照跑。
+- 實機：GUI 觀測左鄰在換歌後不再變成更早那首。

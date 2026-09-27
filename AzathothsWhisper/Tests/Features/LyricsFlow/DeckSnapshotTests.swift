@@ -100,6 +100,48 @@ struct DeckSnapshotTests {
         #expect(Set(deck.cards.map(\.id)).count == 2)
     }
 
+    // MARK: 待入履歴的暫定左鄰卡（F2 另一半，計劃 2026-09-27-coverflow-f1-f2 §12）
+
+    private var fullHistory: [Int64] { Array(101...110) }
+    private let queueItems = [Item(1, itemID: 10), Item(2, itemID: 11), Item(3, itemID: 12)]
+
+    @Test func aPendingPlayedCardSitsNextToTheCentreAndKeepsTheWindow() {
+        let deck = DeckSnapshot.build(
+            nowPlaying: DeckSnapshot.NowPlaying(persistentID: pid(2), occurrence: 1),
+            played: history(fullHistory),
+            pendingPlayed: DeckSnapshot.PendingPlayed(persistentID: pid(1), cardID: "q:0:10"),
+            queue: session(queueItems, current: 2),
+            window: 10
+        )
+        let left = deck.cards.filter { $0.side == .played }
+        #expect(left.count == 10, "左側張數不變：履歴讓出最舊的一張")
+        #expect(left.last == DeckCard(id: "q:0:10", persistentID: pid(1), side: .played), "暫定卡沿用剛離開的那張卡的 ID")
+        #expect(left.first?.persistentID == pid(102))
+    }
+
+    @Test func aPendingPlayedCardIsIgnoredInObservedMode() {
+        let deck = DeckSnapshot.build(
+            nowPlaying: DeckSnapshot.NowPlaying(persistentID: pid(2), occurrence: 1),
+            played: .observed(ListeningHistory().recording(.init(persistentID: pid(1), occurrence: 0))),
+            pendingPlayed: DeckSnapshot.PendingPlayed(persistentID: pid(1), cardID: "q:0:10"),
+            queue: session(queueItems, current: 2),
+            window: 10
+        )
+        #expect(!deck.cards.contains { $0.id == "q:0:10" }, "觀察模式本來就立即記下前一首")
+    }
+
+    @Test func aPendingPlayedCardThatCollidesIsDropped() {
+        let deck = DeckSnapshot.build(
+            nowPlaying: DeckSnapshot.NowPlaying(persistentID: pid(2), occurrence: 1),
+            played: history(fullHistory),
+            pendingPlayed: DeckSnapshot.PendingPlayed(persistentID: pid(3), cardID: "q:0:12"),
+            queue: session(queueItems, current: 2),
+            window: 10
+        )
+        #expect(deck.cards.filter { $0.side == .played }.map(\.persistentID) == fullHistory.map(pid), "ID 衝突就不放，不靜默吃掉右側的卡")
+        #expect(deck.cards.filter { $0.id == "q:0:12" }.map(\.side) == [.upcoming])
+    }
+
     @Test func historyCardIDsCountOccurrencesFromTheNewest() {
         let deck = DeckSnapshot.build(
             nowPlaying: nil, played: history([5, 6, 5]), queue: QueueSession(), window: 10

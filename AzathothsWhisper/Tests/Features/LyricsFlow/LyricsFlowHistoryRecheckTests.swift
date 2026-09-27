@@ -29,6 +29,8 @@ struct LyricsFlowHistoryRecheckTests {
         /// 左側（播過）的 persistentID，由舊到新
         var played: [String] { coverFlow.deck.cards.filter { $0.side == .played }.map(\.persistentID) }
 
+        var leftNeighbour: DeckCard? { coverFlow.deck.cards.last { $0.side == .played } }
+
         func tearDown() {
             model.stopPolling()
             UserDefaults().removePersistentDomain(forName: suiteName)
@@ -86,12 +88,13 @@ struct LyricsFlowHistoryRecheckTests {
         defer { h.tearDown() }
         await play(h, 1)
         await play(h, 2)
-        #expect(h.played.last == pid(110), "換歌當下 Music 還沒寫履歴")
+        #expect(h.leftNeighbour?.id == "q:0:10", "Music 還沒寫履歴：左鄰是暫定卡（剛離開的那張）")
 
         try h.writeHistory(Array(Self.fullHistory.dropFirst()) + [1])
         await releaseNextRecheck(h)
 
-        #expect(h.played.last == pid(1), "剛播完的那首在短重讀時出現在左鄰")
+        #expect(h.leftNeighbour?.id == "h:\(pid(1))#0", "履歴追上：同一首的履歴卡原位接手")
+        #expect(h.played.count == 10, "左側張數不變")
     }
 
     @Test func recheckStopsOnceTheFinishedTrackAppears() async throws {
@@ -118,7 +121,8 @@ struct LyricsFlowHistoryRecheckTests {
         let requested = await gated(h).requested
         #expect(requested == [.milliseconds(5200), .milliseconds(800), .seconds(1)], "sleep 的是相鄰時點的差")
         #expect(await gated(h).pendingCount == 0, "跑滿時點表就放棄")
-        #expect(h.played.last == pid(110), "沒播完的歌 Music 不記，左鄰維持履歴的真相")
+        #expect(h.played.last == pid(110), "7 秒仍沒寫（只播幾秒就跳過）：暫定卡移除，左側回到履歴的真相")
+        #expect(h.played.count == 10)
     }
 
     /// 使用者 2026-09-27 拍板（計劃 §9 乙）：實測 Music 在換歌後 4.86–5.05 秒才寫履歴，
@@ -184,11 +188,12 @@ struct LyricsFlowHistoryRecheckTests {
         await clock.waitUntilPending(2)
 
         try h.writeHistory(Array(Self.fullHistory.dropFirst()) + [1])
+        let before = h.coverFlow.deck
         await clock.releaseFirst()           // 舊世代的追趕：取消了卻照樣醒來
         await settle(200)
         await h.model.settleForTesting()
 
-        #expect(h.played.last == pid(110), "舊世代醒來也不得讀檔、不得 publish")
+        #expect(h.coverFlow.deck == before, "舊世代醒來也不得讀檔、不得 publish")
     }
 
     @Test func anUnchangedOrIdenticalRecheckDoesNotFetchDetails() async throws {
@@ -203,9 +208,10 @@ struct LyricsFlowHistoryRecheckTests {
         await releaseNextRecheck(h)                                  // .unchanged
         try h.writeHistory(Self.fullHistory)                         // 內容相同、屬性變
         await releaseNextRecheck(h)
-        await releaseNextRecheck(h)
-
         #expect(await h.music.trackDetailsRequests.count == before, "履歴沒變就不 publish，不多問 Music")
+
+        await releaseNextRecheck(h)                                  // 7 秒放棄：暫定卡移除、牌組真的變了
+        #expect(await h.music.trackDetailsRequests.count == before + 1, "只為放棄時換進來的那張卡問一次")
     }
 
     @Test func recheckFollowsTheSameHistoryTransitions() async throws {
@@ -216,11 +222,56 @@ struct LyricsFlowHistoryRecheckTests {
 
         try Data("not a plist".utf8).write(to: h.historyURL)
         await releaseNextRecheck(h)
-        #expect(h.played.last == pid(110), ".failed 保留最後一份有效的履歴")
+        #expect(h.played.suffix(2) == [pid(110), pid(1)], ".failed 保留最後一份有效的履歴（＋暫定卡）")
 
         try FileManager.default.removeItem(at: h.historyURL)
         await releaseNextRecheck(h)
         #expect(h.played == [pid(1)], ".missing 退回本 app 觀察到的歷史（與 readSources 同）")
+    }
+
+    // MARK: 待入履歴的暫定左鄰卡（§12）
+
+    @Test func theFinishedCardStaysOnTheLeftThroughTheSlide() async throws {
+        let h = try makeHarness(slides: true)
+        defer { h.tearDown() }
+        await play(h, 1)
+        let current = try #require(h.coverFlow.deck.currentCardID)
+        h.coverFlow.playingCardCentering(cardID: current, isCentered: true)
+
+        await play(h, 2)
+        #expect(h.coverFlow.slide == CoverFlowSlideRequest(generation: 1, slots: 1), "仍然平移")
+        h.coverFlow.slideDidSettle(generation: 1)
+
+        #expect(h.coverFlow.cards == h.coverFlow.deck.cards)
+        #expect(h.leftNeighbour?.id == "q:0:10", "落定後剛播完的那張留在左鄰，不讓位給更早的歌")
+    }
+
+    @Test func skippingBackDoesNotKeepAPendingCard() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        await play(h, 1)
+        await play(h, 2)
+        #expect(h.leftNeighbour?.id == "q:0:10")
+
+        await play(h, 1)
+
+        #expect(h.played == Self.fullHistory.map(pid), "往回跳：舊暫定卡清掉、不記新的（舊當前卡在右側）")
+    }
+
+    @Test func aRepeatedSongStillWaitsForItsOwnWrite() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        try h.writeHistory(Array(Self.fullHistory.dropFirst()) + [1])   // 先前已播完過一次 1
+        await play(h, 1)
+        await play(h, 2)
+
+        #expect(h.leftNeighbour?.id == "q:0:10", "尾端碰巧是同一首的舊記錄，不算追上")
+        #expect(await gated(h).pendingCount == 1, "照樣等這一次的寫入")
+
+        try h.writeHistory(Array(Self.fullHistory.dropFirst(2)) + [1, 1])
+        await releaseNextRecheck(h)
+        #expect(h.leftNeighbour?.id == "h:\(pid(1))#0")
+        #expect(h.played.suffix(2) == [pid(1), pid(1)])
     }
 
     @Test func noRecheckAfterStopPolling() async throws {
