@@ -57,9 +57,7 @@ struct LyricsFlowModelTests {
         let music = MockMusicClient()
         let clock = GatedPollClock()
         let recorder = Recorder()
-        let coverFlow = slides
-            ? CoverFlowViewModel(artwork: StubArtworkProvider(), clock: GatedPollClock())
-            : CoverFlowViewModel(artwork: StubArtworkProvider())
+        let coverFlow = CoverFlowViewModel(artwork: StubArtworkProvider(), clock: GatedPollClock())
         coverFlow.setPrefersReducedMotion(!slides)
         let model = LyricsFlowModel(
             configStore: store,

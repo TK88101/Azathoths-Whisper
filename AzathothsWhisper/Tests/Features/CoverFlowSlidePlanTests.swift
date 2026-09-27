@@ -5,9 +5,11 @@ import Testing
 
 // 換歌平移的判定與過渡顯示牌組（計劃 docs/plans/2026-09-26-coverflow-follow-playback-slide.md §3.1、§3.2）。
 // 卡 ID 沿用 AC8 的前綴：`h:` 履歴、`q:` 佇列、`o:` 觀察到的播放。
+/// `@MainActor`：上限取自 `CoverFlowViewModel.cardLimit`（VM 隔離在 MainActor）；被測的函式本身是純函式
+@MainActor
 @Suite("CoverFlowSlidePlan")
 struct CoverFlowSlidePlanTests {
-    private static let limit = 21
+    private static let limit = CoverFlowViewModel.cardLimit
 
     private func history(_ n: Int) -> DeckCard { DeckCard(id: "h:H\(n)#0", persistentID: "H\(n)", side: .played) }
     private func queue(_ name: String, _ side: DeckCard.Side) -> DeckCard { DeckCard(id: "q:0:\(name)", persistentID: name, side: side) }

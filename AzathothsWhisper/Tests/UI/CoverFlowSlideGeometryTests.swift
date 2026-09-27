@@ -100,11 +100,6 @@ private struct StripHarness: View {
     }
 }
 
-enum SlideDirection: String, CaseIterable, Sendable {
-    case next
-    case previous
-}
-
 @Suite("Cover Flow 換歌平移（幾何）", .serialized)
 @MainActor
 struct CoverFlowSlideGeometryTests {
@@ -169,8 +164,8 @@ struct CoverFlowSlideGeometryTests {
         #expect(await SlideProbe.waitUntil { model.isPlayingCardCentered }, "第 \(step) 步落定後目標卡應在正中")
     }
 
-    @Test("下一首／上一首各三次：每一步都平移一個卡距、捲動位置不動", arguments: SlideDirection.allCases)
-    func slidesOneCardPerChange(direction: SlideDirection) async throws {
+    @Test("下一首／上一首各三次：每一步都平移一個卡距、捲動位置不動", arguments: SlideHint.Direction.allCases)
+    func slidesOneCardPerChange(direction: SlideHint.Direction) async throws {
         var playing = 100
         let stage = try await Self.stage(playing: playing)
         defer { stage.window.orderOut(nil) }

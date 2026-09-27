@@ -3,7 +3,7 @@ import Foundation
 /// 換歌方向的佐證，由 `QueueSession.slideHint(to:)` 在解析新位置之前取得
 /// （計劃 `docs/plans/2026-09-26-coverflow-follow-playback-slide.md` §3.1-4 (iii)）
 struct SlideHint: Equatable, Sendable {
-    enum Direction: Equatable, Sendable {
+    enum Direction: Equatable, Sendable, CaseIterable {
         case next
         case previous
     }

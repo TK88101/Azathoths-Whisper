@@ -19,7 +19,7 @@ enum CoverFlowStripReaction: Equatable {
 
     static func resolve<ID: Hashable>(from old: CoverFlowStripInput<ID>, to new: CoverFlowStripInput<ID>,
                                       releasedGeneration: Int) -> CoverFlowStripReaction {
-        if let request = new.slide, request.generation != releasedGeneration {
+        if let request = unreleased(new.slide, releasedGeneration: releasedGeneration) {
             // `onChange(initial: true)` 的初值呼叫新舊相同。已釋放的指令不會走到這裡：
             // 條帶只是重新出現時 `@State` 還在，動畫照常由自己落定
             return old == new ? .settleAtOnce(generation: request.generation) : .slide(generation: request.generation)
@@ -29,7 +29,12 @@ enum CoverFlowStripReaction: Equatable {
 
     /// 內容此刻要往回推幾個卡距：指令還沒釋放才推
     static func pendingSlots(_ slide: CoverFlowSlideRequest?, releasedGeneration: Int) -> Int {
-        guard let slide, slide.generation != releasedGeneration else { return 0 }
-        return slide.slots
+        unreleased(slide, releasedGeneration: releasedGeneration)?.slots ?? 0
+    }
+
+    /// 還沒開始歸零的指令。「釋放了沒」只在這裡判定
+    private static func unreleased(_ slide: CoverFlowSlideRequest?, releasedGeneration: Int) -> CoverFlowSlideRequest? {
+        guard let slide, slide.generation != releasedGeneration else { return nil }
+        return slide
     }
 }
