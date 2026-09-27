@@ -85,6 +85,7 @@ struct LyricsFlowPageView: View {
                 isInteractive: isRaised && isActive,
                 focus: $coverFlowFocused,
                 upcoming: lyricsFlow.upcoming,
+                prefersReducedMotion: reduceMotion,
                 // 傳實際判定值給狀態機（Codex R7-③）：可點資格以條帶最新回報的幾何為準
                 onTapPlayingCard: { lyricsFlow.tapPlayingCard(isCentered: coverFlow.isPlayingCardCentered) }
             )

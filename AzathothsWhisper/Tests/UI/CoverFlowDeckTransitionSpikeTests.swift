@@ -390,7 +390,8 @@ private struct S8Harness: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        CoverFlowView(model: model, isInteractive: false, focus: $focused, upcoming: .available, onTapPlayingCard: {})
+        CoverFlowView(model: model, isInteractive: false, focus: $focused, upcoming: .available,
+                      prefersReducedMotion: true, onTapPlayingCard: {})
             .frame(width: spikeViewSize.width, height: spikeViewSize.height)
     }
 }

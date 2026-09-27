@@ -112,9 +112,11 @@ final class LyricsFlowModel {
                 enqueue { _ in await reader.updateLyrics(lyrics, for: track.persistentID) }
             }
         }
+        // 換歌平移的方向佐證要在推進位置**之前**取：往回跳時 `resolvingCurrent` 會把位置清成 nil
+        let slideHint = isRealChange ? queue.slideHint(to: track.persistentID) : nil
         // AC8：換歌（同一份清單）只移中心——以手上的快照推進位置；真實換歌才解除使用者接管（H-05）
         queue = queue.resolvingCurrent(persistentID: track.persistentID, isRealChange: isRealChange)
-        publish(isRealChange: isRealChange)
+        publish(isRealChange: isRealChange, slideHint: slideHint)
         // D16：每次換歌立即檢查兩個檔的屬性
         enqueue { model in await model.readSources(isPollTick: false) }
     }
@@ -294,12 +296,12 @@ final class LyricsFlowModel {
         publish(isRealChange: false)
     }
 
-    private func publish(isRealChange: Bool) {
+    private func publish(isRealChange: Bool, slideHint: SlideHint? = nil) {
         let played: DeckSnapshot.PlayedSource = history.map { .musicHistory($0) } ?? .observed(listening)
         let deck = DeckSnapshot.build(nowPlaying: current, played: played, queue: queue, window: Self.window)
         upcoming = deck.upcoming
         if deck != coverFlow.deck || isRealChange {
-            coverFlow.apply(deck, isRealChange: isRealChange)
+            coverFlow.apply(deck, isRealChange: isRealChange, slideHint: slideHint)
         }
         fetchDetails(for: deck)
     }

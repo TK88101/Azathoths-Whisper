@@ -48,7 +48,8 @@ struct LyricsFlowModelTests {
         }
     }
 
-    private func makeHarness() throws -> Harness {
+    /// - Parameter slides: 開啟換歌平移（關掉「減少動態效果」；逾時保險接到可控時鐘，不放行就不到期）
+    private func makeHarness(slides: Bool = false) throws -> Harness {
         let suiteName = "LyricsFlowModelTests-\(UUID().uuidString)"
         let store = ConfigStore(secrets: EphemeralSecretStore(), defaults: UserDefaults(suiteName: suiteName)!)
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("LyricsFlowModelTests-\(UUID().uuidString)")
@@ -56,7 +57,10 @@ struct LyricsFlowModelTests {
         let music = MockMusicClient()
         let clock = GatedPollClock()
         let recorder = Recorder()
-        let coverFlow = CoverFlowViewModel(artwork: StubArtworkProvider())
+        let coverFlow = slides
+            ? CoverFlowViewModel(artwork: StubArtworkProvider(), clock: GatedPollClock())
+            : CoverFlowViewModel(artwork: StubArtworkProvider())
+        coverFlow.setPrefersReducedMotion(!slides)
         let model = LyricsFlowModel(
             configStore: store,
             detailsReader: CardDetailsReader(music: music),
@@ -277,6 +281,89 @@ struct LyricsFlowModelTests {
         await play(h, 1, lyrics: "words")
         await play(h, 2, lyrics: "words")
         #expect(h.coverFlow.centerID == "q:0:11")
+    }
+
+    // MARK: 換歌平移（docs/plans/2026-09-26-coverflow-follow-playback-slide.md §3.5）
+
+    /// 左側已滿的履歴（十筆，與清單裡的歌不重複）：換歌時正中卡的位次才不會變
+    private static let fullHistory: [Int64] = Array(101...110)
+
+    /// 清單 [1, 2, 3]、履歴已滿、正在播第 `n` 首且條帶回報它在正中
+    private func playingInAFullDeck(_ n: Int64, queue: [Item] = [Item(1, itemID: 10), Item(2, itemID: 11), Item(3, itemID: 12)])
+        async throws -> Harness {
+        let h = try makeHarness(slides: true)
+        try h.writeQueue(queue)
+        try h.writeHistory(Self.fullHistory)
+        await play(h, n, lyrics: "words")
+        let current = try #require(h.coverFlow.deck.currentCardID)
+        h.coverFlow.playingCardCentering(cardID: current, isCentered: true)
+        return h
+    }
+
+    /// 同一份清單的下一首：中心立即是新曲，條帶收到向左滑一張的指令；落定後抑制仍未設
+    @Test func advancingWithinTheSameQueueSlidesToTheNextCard() async throws {
+        let h = try await playingInAFullDeck(1)
+        defer { h.tearDown() }
+
+        await play(h, 2, lyrics: "words")
+
+        #expect(h.coverFlow.centerID == "q:0:11")
+        #expect(h.coverFlow.slide == CoverFlowSlideRequest(generation: 1, slots: 1))
+        let cards = h.coverFlow.cards.map(\.id)
+        #expect(cards.firstIndex(of: "q:0:10") == cards.firstIndex(of: "q:0:11").map { $0 - 1 }, "剛播完的那張暫留在左鄰")
+
+        h.coverFlow.slideDidSettle(generation: 1)
+        await h.model.refreshSources()
+        #expect(h.coverFlow.centerID == "q:0:11", "同曲更新照常居中：抑制沒有被平移設起來")
+        #expect(h.coverFlow.cards == h.coverFlow.deck.cards)
+    }
+
+    /// 往回跳到清單的前一項：當下位置不解析、中心是觀察卡，方向靠事前取得的佐證
+    @Test func skippingBackToTheAdjacentEntrySlidesTheOtherWay() async throws {
+        let h = try await playingInAFullDeck(2)
+        defer { h.tearDown() }
+
+        await play(h, 1, lyrics: "words")
+
+        #expect(h.coverFlow.slide == CoverFlowSlideRequest(generation: 1, slots: -1))
+        #expect(h.coverFlow.centerID?.hasPrefix("o:") == true)
+        #expect(h.coverFlow.cards.last?.id == "q:0:11", "舊當前卡暫留在右鄰")
+
+        // 下一次輪詢把位置解析成佇列卡：同一首歌換了卡 ID → 過渡結束、直接定位
+        await h.model.refreshSources()
+        #expect(h.coverFlow.slide == nil)
+        #expect(h.coverFlow.centerID == "q:0:10")
+        #expect(h.coverFlow.cards == h.coverFlow.deck.cards)
+    }
+
+    /// 往回跳到清單中出現兩次的歌：沒有佐證就不滑
+    @Test func skippingBackOntoADuplicateDoesNotSlide() async throws {
+        let h = try await playingInAFullDeck(2, queue: [Item(1, itemID: 10), Item(2, itemID: 11), Item(3, itemID: 12), Item(1, itemID: 13)])
+        defer { h.tearDown() }
+
+        await play(h, 1, lyrics: "words")
+
+        #expect(h.coverFlow.slide == nil)
+        #expect(h.coverFlow.centerID == h.coverFlow.deck.currentCardID)
+    }
+
+    /// 履歴在落定前追上：暫留卡原位留著、指令不重發；落定後換成履歴卡，中心不動
+    @Test func historyCatchingUpBeforeTheSlideSettlesKeepsItGoing() async throws {
+        let h = try await playingInAFullDeck(1)
+        defer { h.tearDown() }
+        await play(h, 2, lyrics: "words")
+
+        try h.writeHistory(Array(Self.fullHistory.dropFirst()) + [1])
+        await h.model.refreshSources()
+
+        #expect(h.coverFlow.slide == CoverFlowSlideRequest(generation: 1, slots: 1))
+        #expect(h.coverFlow.cards.contains { $0.id == "q:0:10" })
+        #expect(!h.coverFlow.cards.contains { $0.id.hasPrefix("h:\(QueueFixtures.pid(1))") })
+
+        h.coverFlow.slideDidSettle(generation: 1)
+        #expect(h.coverFlow.centerID == "q:0:11")
+        #expect(h.coverFlow.cards == h.coverFlow.deck.cards)
+        #expect(h.coverFlow.cards.contains { $0.id.hasPrefix("h:\(QueueFixtures.pid(1))") })
     }
 
     /// D15：Music 未執行 → 佇列 session 失效
