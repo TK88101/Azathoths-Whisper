@@ -267,3 +267,97 @@ struct CoverFlowDeckSideChangeTests {
         #expect(abs(nearest ?? .infinity) < 1, "\(name)：沒有任何卡對齊正中（停在兩張之間）")
     }
 }
+
+// MARK: - S7（docs/plans/2026-09-26-coverflow-follow-playback-slide.md §4）：真實換歌以動畫平移
+//
+// 量測碼，預設關閉：只在 `TEST_RUNNER_AZW_SPIKE_S7=1` 時執行，結果印成 `S7 …` 行寫進該計劃 §8。
+// 量三件事：落定是否在目標且對齊正中、途中 binding 回寫是否有非目標值（K5）、
+// 目標卡離正中的距離是否逐幀單調縮小且有 ≥3 幀落在起訖之間（證明是平移不是跳）。
+
+/// 牌組形狀：換歌後舊中心在不在新牌組
+enum S7Shape: String, CaseIterable, Sendable {
+    /// 下一首，舊中心留在左側（窗口右移一格）
+    case keepOld
+    /// 下一首，舊中心離開牌組（佇列模式下 History.dat 尚未追上，計劃 §1 事實 7）
+    case dropOld
+    /// 上一首，舊中心留在右側（窗口左移一格）
+    case previous
+}
+
+/// 觸發方式（計劃 §3.2 方向 A 的兩種排法）
+enum S7Method: String, CaseIterable, Sendable {
+    /// 同一次更新內換牌，中心用 withAnimation 設（條帶 onChange(items)→scrollTo 同時觸發）
+    case sameUpdate
+    /// 先換牌（中心不變，條帶無動畫捲回舊中心），下一幀再 withAnimation 設中心
+    case splitUpdate
+}
+
+@Suite("S7 換歌平移（spike）", .serialized,
+       .enabled(if: ProcessInfo.processInfo.environment["AZW_SPIKE_S7"] == "1"))
+@MainActor
+struct CoverFlowSlideSpikeS7Tests {
+    /// 計劃 §3.4 初值：曲線沿用升降，時長 0.45s
+    private static let slide = Animation.timingCurve(0.16, 1, 0.3, 1, duration: 0.45)
+    private static let steps = 10
+
+    private static func deck(centeredOn id: Int) -> [SpikeCard] {
+        ((id - 10)...(id + 10)).map(SpikeCard.init)
+    }
+
+    private static func next(from center: Int, shape: S7Shape) -> (cards: [SpikeCard], target: Int) {
+        switch shape {
+        case .keepOld: return (deck(centeredOn: center + 1), center + 1)
+        case .dropOld: return (deck(centeredOn: center + 1).filter { $0.id != center }, center + 1)
+        case .previous: return (deck(centeredOn: center - 1), center - 1)
+        }
+    }
+
+    @Test("換歌動畫：落定、回寫、平移", arguments: S7Shape.allCases, S7Method.allCases)
+    func slide(shape: S7Shape, method: S7Method) async throws {
+        let session = try await CoverFlowDeckTransitionSpikeTests.prepared()
+        defer { session.close() }
+        let start = try #require(await session.settled(), "起點未穩定")
+        let viewportMidX = start.viewportMidX
+        var center = 10
+        var hits = 0, slid = 0, strayRuns = 0
+        var results: [String] = []
+
+        for step in 1...Self.steps {
+            let (cards, target) = Self.next(from: center, shape: shape)
+            session.deck.bindingWrites = []
+            session.deck.cards = cards
+            if method == .splitUpdate {
+                try? await Task.sleep(for: .milliseconds(16))
+            }
+            withAnimation(Self.slide) { session.deck.center = target }
+
+            // 逐幀取樣目標卡離正中的距離（0.8s，涵蓋 0.45s 動畫與收尾）
+            var samples: [CGFloat] = []
+            for _ in 0..<50 {
+                try? await Task.sleep(for: .milliseconds(16))
+                if let x = session.deck.midX[target] { samples.append(x - viewportMidX) }
+            }
+            let frame = await session.settled()
+            let shown = frame.flatMap { session.deck.centeredID(viewportMidX: $0.viewportMidX) }
+            let offset = frame.flatMap { f in f.cards.map { $0.midX - f.viewportMidX }.min { abs($0) < abs($1) } }
+            let landed = shown == target && abs(offset ?? .infinity) < 1
+            if landed { hits += 1 }
+
+            let inBetween = samples.filter { abs($0) > 4 && abs($0) < spikeStride - 4 }.count
+            let monotonic = zip(samples, samples.dropFirst()).allSatisfy { abs($1) <= abs($0) + 0.5 }
+            if inBetween >= 3, monotonic { slid += 1 }
+            let stray = session.deck.bindingWrites.compactMap { $0 }.filter { $0 != target }
+            if !stray.isEmpty { strayRuns += 1 }
+
+            var line = "\(step):landed=\(landed)(shown=\(shown.map(String.init) ?? "nil")/\(target),off=\(offset.map { String(format: "%.1f", $0) } ?? "nil")) "
+                + "mid=\(inBetween) mono=\(monotonic) writes=\(session.deck.bindingWrites.count) stray=\(stray)"
+            if step == 1 {
+                line += " samples=" + samples.prefix(24).map { String(format: "%.0f", $0) }.joined(separator: ",")
+            }
+            results.append(line)
+            center = target
+        }
+        print("S7 \(shape.rawValue)[\(method.rawValue)] landed=\(hits)/\(Self.steps) slid=\(slid)/\(Self.steps) "
+              + "strayRuns=\(strayRuns)/\(Self.steps) | " + results.joined(separator: " | "))
+    }
+}
