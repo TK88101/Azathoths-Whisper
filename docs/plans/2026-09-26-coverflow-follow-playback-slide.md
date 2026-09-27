@@ -1,9 +1,9 @@
-# Cover Flow 隨 Music 切曲自動滑動（帶動畫）—— 需求記錄與實施計劃（v5.3 定稿：直接換牌＋條帶內容位移動畫；實作中）
+# Cover Flow 隨 Music 切曲自動滑動（帶動畫）—— 需求記錄與實施計劃（v5.3 定稿：直接換牌＋條帶內容位移動畫；實作完成，待使用者在場的實機驗證 V2–V8）
 
 - 日期：2026-09-26
 - 基線：`origin/main` `98af41f`（v2.0.1）
 - 分支：`feat/lyrics-notification`——使用者 2026-09-26 指定與「歌詞寫入成功的系統通知」（`2026-09-26-lyrics-notification.md`）**同一次迭代**
-- 狀態：v3（2026-09-27）：S7 完成（§8.1）；R1→VM 短暫過渡顯示層；R2→精確身分判向、settle 回報契約、邏輯當前曲（§3.7）；R3→三處收緊（A.3）；§7 已拍板（不重議）；S8 否證 VM 兩段觸發（§8.2）；S9 否證條帶內兩段，量得「不動捲動位置＋條帶內容位移動畫」120/120（§8.3）；**v5（2026-09-27）依 S9 重寫 §3／§4／§6、新增 §9 任務清單；v5.1–v5.3 依 Codex R4–R6 修訂（附錄 A.4–A.6），R7 確認三項條件皆已滿足、無新 P0／P1（A.7）；§9 末第 8 點已簽字（§7-5），**v5.3 定稿（2026-09-27）**；實作中。v4 全文見 git `b5f8f23`。
+- 狀態：v3（2026-09-27）：S7 完成（§8.1）；R1→VM 短暫過渡顯示層；R2→精確身分判向、settle 回報契約、邏輯當前曲（§3.7）；R3→三處收緊（A.3）；§7 已拍板（不重議）；S8 否證 VM 兩段觸發（§8.2）；S9 否證條帶內兩段，量得「不動捲動位置＋條帶內容位移動畫」120/120（§8.3）；**v5（2026-09-27）依 S9 重寫 §3／§4／§6、新增 §9 任務清單；v5.1–v5.3 依 Codex R4–R6 修訂（附錄 A.4–A.6），R7 確認三項條件皆已滿足、無新 P0／P1（A.7）；§9 末第 8 點已簽字（§7-5），**v5.3 定稿（2026-09-27）**；T1–T11 完成（§8.4），待實機 V2–V8（§5）。v4 全文見 git `b5f8f23`。
 - 任務形狀：串行（先 spike 定居中方式，再改 VM／條帶，再驗證），不派多 agent。
 
 ## 0. 複述（使用者 2026-09-26 原話要點）
@@ -217,6 +217,22 @@ S9 量測碼（`CoverFlowSlideSpikeS9*.swift`）預設關閉，不是正式測�
 | V7 | 換到缺詞曲 → 降下露出 Editor 的同時條帶照常平移，不觸發接管；升回後中心正確 | 實機 |
 | V8 | 起滑瞬間與落定瞬間沒有「閃一下」（慢動作錄影逐幀看：正中那張不得先跳到別張再回來）；徽章角落換位可接受 | 實機 |
 
+### 5.1 實機驗證步驟（使用者在場；T12）
+
+前置：系統設定的「減少動態效果」為關；Music 的播放記錄已有十首以上；用一個十首以上的播放清單循序播放；Azathoth's Whisper 在 Editor 分頁、Cover Flow 升起、正中是正在播的那張。建置後第一次啟動可能重新詢問自動化權限與鑰匙圈（ad-hoc 簽名，屬預期）。
+
+| # | 操作 | 應該看到 |
+|---|---|---|
+| V2 | 讓一首歌自然播完（或拖到最後幾秒） | 3 秒內整排封面向左滑一張，約 0.6 秒到位；剛播完的那張留在左鄰；下方的「歌手 // 歌名」與軌號徽章換成新曲 |
+| V3 | 在 Music 按「下一首」；到位後再按「上一首」 | 下一首＝向左滑一張；上一首＝向右滑一張。上一首最多晚 3 秒。接著在 0.6 秒內連按兩次「下一首」：第一次滑、第二次直接定位 |
+| V4 | 播同一張專輯的連續兩首（封面相同） | 仍然看得到平移 |
+| V5 | 用觸控板把封面滑到別張停住，等換歌 | 直接跳回新的當前曲（不滑）；之後不會再被拉走。另試：滑走後自己滑回正在播的那張，等換歌 → 照常平移 |
+| V6 | 系統設定開「減少動態效果」，等換歌 | 瞬間切換，沒有動畫。關掉之後恢復平移 |
+| V7 | 換到一首沒有歌詞的歌 | Cover Flow 降下、露出 Editor，同時條帶照常平移；寫入歌詞升回後，正中是這首歌 |
+| V8 | 以 QuickTime 錄下視窗（只錄 App 視窗），換歌數次後逐幀看起滑與落定的瞬間 | 正中那張不會先跳到別張再回來；沒有「閃一下」。徽章在起滑瞬間換到另一角屬預期 |
+
+不在本次驗證內：手指正在拖的瞬間換歌（§7-5 已簽字的限制）。
+
 ## 6. 影響面、風險與回退
 
 **影響檔**
@@ -369,6 +385,39 @@ production `CoverFlowView`＋`CoverFlowViewModel`（StubArtworkProvider 佔位�
 - production 現有的兩側變動修正與事實 3 同一條路徑：履歴晚到且正中卡位次改變時，同樣有機率閃一幀。
 - `CoverFlowView` 若在掛載當下就帶著牌組，畫面會停在第一張。production 是先空牌掛載再給牌，未受影響。
 
+### 8.4 實作記錄（2026-09-27）
+
+**紅燈→綠燈**
+| 任務 | 紅燈（空殼實作） | 綠燈 |
+|---|---|---|
+| T1–T4 | 64 條中 20 個斷言失敗：`slideOffset` 3 組、`CoverFlowSlidePlanTests` 6 條、`slideHint` 2 條 | 64/64 |
+| T5 | VM 相關 62 條中 12 條新測試失敗（20 個斷言） | 80/80 |
+| T6–T8 | 幾何 6 條中 5 條失敗（11 個斷言）：沒有位移、減少動態效果未同步、條帶不回報落定 | 6/6（13 秒） |
+| T9 | `LyricsFlowModelTests` 36 條中 1 條失敗：往回跳沒有佐證就不滑 | 36/36 |
+| simcodex 第 1 輪的修正 | 41 條中 9 條失敗：條帶反應純函式 7 條、落定後不重排預取、讓位卡的封面通知被丟掉 | 相關 11 個 suite 185/185 |
+
+**變異檢查**（把條帶實作改壞，`CoverFlowSlideGeometryTests` 必須變紅）
+| 變異 | 變紅的測試 |
+|---|---|
+| 位移不餵疊放與正中判定 | `slidesOneCardPerChange`、`historyCatchingUpMidSlideDoesNotInterruptIt`（起滑時目標卡已算在正中） |
+| 初值不看是否已釋放 | `reappearingMidSlideDoesNotSettleEarly`（落定回報兩次）——證實條帶重新出現時初值分支確實會再跑 |
+| 拿掉重建補救 | `aStripMountedWithAPendingRequestSettlesAtOnce` |
+
+**閘門（最後一次全量，HEAD `502b19d`）**
+| 閘門 | 結果 |
+|---|---|
+| 全量單元（帶 skip＋超時） | 782 條／82 suites；僅基線 7 個斷言紅（`CoverFlowStripRenderGeometry` 2 條測試）。在 `b5f8f23` 的匯出副本上實跑同一 suite，失敗集合逐條相同 |
+| `coverage_gate.sh <單元 xcresult>` | Services＋Infra 95.3%（門檻 80%；豁免 1 檔 378 行） |
+| 本次改動的檔案逐檔覆蓋率 | 89.6%–100%（最低＝`CoverFlowView.swift` 89.6%） |
+| `no_playback_gate.sh` | 通過 |
+| `Scripts` 的 Python 測試 | 333 條 OK |
+| XCUITest | **未跑**：需使用者在場授權 |
+
+**與計劃的出入**
+- `CoverFlowView` 多一個必填參數 `prefersReducedMotion`，由 `LyricsFlowPageView` 讀環境值後傳入。計劃 §3.5 寫的是 View 自己讀環境值；環境值唯讀，測試無法覆寫，改由上層傳入才測得到。
+- `pruneCaches`／`artworkDidStore` 以「顯示牌組 ∪ 正式牌組」為準，比計劃 §3.3-5 寫的「以 `displayCards` 為準」寬：顯示上讓位的那張仍在正式牌組裡，它的資料不該被清掉。
+- 條帶的判斷抽成純函式 `CoverFlowStripReaction`（計劃 §3.4 未列，simcodex 第 1 輪依專案慣例補上）。
+
 ## 9. 任務清單（v5；串行，主執行緒 TDD，不派 agent）
 
 | # | 任務 | DoD |
@@ -509,3 +558,34 @@ R6 三項條件逐項確認：A1 已滿足；A2 設計裁決已滿足（不實�
 
 R4–R7 勝負：Codex 勝——條帶重建、落定冪等、初值的「出現」語義、`isPlayingCardCentered` 容差、殘留回報、hint 缺 target 身分、「macOS 14 無從判定」的理由錯誤、消費端缺測試。我方勝——駁回「違反 H-05」、過渡中又換歌一律 direct、釋放留在條帶、不實作 live-scroll bridge。
 
+
+
+### A.8 2026-09-27 實作後評審（/simcodex）
+
+評審範圍＝`b5f8f23..HEAD` 的產品碼與測試（S9 量測碼除外）。工作樹已 checkpoint 在本機 wip 分支，故 Codex 以 `codex review --base feat/lyrics-notification` 審，不用 `--uncommitted`。安全評審未派：本次改動不涉及認證、個資、加密、檔案操作、外部 API、資料庫。
+
+| 輪 | 四視角（重用／簡化／效率／層次） | Codex | 驗證 |
+|---|---|---|---|
+| 1 | P1×3、P2 若干 | 0 條 | 相關 11 個 suite 185/185；全量 782 條僅基線紅 |
+| 2 | 0 條 P0／P1；P2×7 | 0 條 | 全量 782 條僅基線紅 → 符合提前結束 |
+| 收尾（含第 2 輪的 P2 修正） | — | 0 條 | 全量 782 條僅基線紅；覆蓋率、無播控、腳本測試皆過（§8.4） |
+
+**第 1 輪裁決**
+| 意見 | 裁決 |
+|---|---|
+| P1 平移的四個欄位在五處各抄一份 | 採納：`SlidePlacement` |
+| P1 「停著的卡不在牌組就回當前卡」寫了兩份且已不一致；落定後沒重排預取 | 採納：`reconcileCenter`；補測試 `settlingReschedulesThePrefetch` |
+| P1 測試的「落定」判定第三次各寫一份 | 採納：`Tests/Support` 的 `CoverFlowTestWindow`。既有三個測試檔各自的版本不動（範圍外，另立項） |
+| P2 條帶 `onChange` 的判斷寫在 View 裡 | 採納：`CoverFlowStripReaction`＋11 條單元測試 |
+| P2 `slideAnimation` 參數無人使用；卡距兩處定義；`slideHint` 自己掃清單；「牌組內的歌」兩個定義；`keeping` 以原樣回傳表示失敗；`SlideHint` 放在 CoverFlow | 全數採納 |
+| P2 `cards`／`displayCards` 兩個名字 | 駁回：兩個名字都寫在計劃與 ACCEPTANCE 裡 |
+| P2 方向用 enum 而非 ±1 | 駁回：呼叫端可讀性 |
+| P2 `cardLimit` 引用 `LyricsFlowModel.window` | 延後：要動 `DeckSnapshot.swift`（§6 列為不動） |
+| P2 過渡期間顯示牌組重算約 26 次、徽章逐卡重算 | 延後：微秒級，不隨動畫逐幀放大；快取會違反「不另存」 |
+
+**第 2 輪裁決**：P2×7 採納 6 條（「指令還沒釋放」單一定義、共用測試輔助拿掉三個無人使用的參數、`centerOffset` 由 `centerPosition` 推出、測試改用 `SlideHint.Direction` 與 `CoverFlowViewModel.cardLimit`、測試裝置單一建構路徑）；駁回 1 條（`slidePlan` 在無過渡時讀 `displayCards`——保留「換歌前條帶吃的牌」的字面語義）。
+
+**遺留（另立項）**
+- 既有測試檔 `CoverFlowStripStackingTests`／`CoverFlowDeckTransitionSpikeTests`／`CoverFlowStripRenderGeometryTests` 各自的開視窗與落定輔助尚未收斂到 `CoverFlowTestWindow`；三份「落定」的規則不同。
+- `CoverFlowDeckTransitionSpikeTests`（S8）仍寫死動畫常數，未改用 `Theme.Motion.layerShift`。
+- 牌組張數上限的單一來源（`DeckSnapshot` 層）。
