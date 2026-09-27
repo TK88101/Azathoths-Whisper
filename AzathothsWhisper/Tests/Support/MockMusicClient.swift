@@ -44,6 +44,11 @@ actor MockMusicClient: MusicControlling {
     /// 覆寫整體結果（優先於 artwork 字典）：用來製造 AE 失敗
     private var artworkOutcome: Result<Data?, MusicError>?
     private var setLyricsOutcome: Result<Bool, MusicError> = .success(true)
+    /// 逐次閘門：第 n 次 `nowPlaying()` 等第 n 個（回應在呼叫當下取定）——單飛讀取的在飛窗口
+    private var nowPlayingGateQueue: [LyricsGate] = []
+    /// `nowPlaying()` 在飛數與峰值——驗「至多一個讀取進行中」
+    private(set) var nowPlayingInFlight = 0
+    private(set) var maxNowPlayingInFlight = 0
     /// 逐首覆寫（優先於 `setLyricsOutcome`）：Import All 部分失敗用
     private var setLyricsOutcomes: [String: Result<Bool, MusicError>] = [:]
 
@@ -58,6 +63,10 @@ actor MockMusicClient: MusicControlling {
     init(script: [Response] = [], repeatLast: Bool = true) {
         self.script = script
         self.repeatLast = repeatLast
+    }
+
+    func setNowPlayingGateQueue(_ gates: [LyricsGate]) {
+        nowPlayingGateQueue = gates
     }
 
     func setTrackDetails(_ details: [TrackDetails]) {
@@ -150,9 +159,19 @@ actor MockMusicClient: MusicControlling {
 
     /// 一次回應同時帶曲目與歌詞（取自同一個腳本項，D9）
     func nowPlaying() async throws -> NowPlayingRead? {
+        let call = nowPlayingCalls
         nowPlayingCalls += 1
         currentTrackCalls += 1
-        switch next() {
+        let response = next()
+        if call < nowPlayingGateQueue.count {
+            nowPlayingInFlight += 1
+            maxNowPlayingInFlight = max(maxNowPlayingInFlight, nowPlayingInFlight)
+            await nowPlayingGateQueue[call].wait()
+            nowPlayingInFlight -= 1
+        } else {
+            maxNowPlayingInFlight = max(maxNowPlayingInFlight, nowPlayingInFlight + 1)
+        }
+        switch response {
         case .track(let info, let lyrics): return NowPlayingRead(track: info, lyrics: lyrics)
         case .notPlaying: return nil
         case .failure(let error): throw error

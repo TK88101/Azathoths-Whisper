@@ -64,6 +64,7 @@ struct LyricsFlowModelTests {
             detailsReader: CardDetailsReader(music: music),
             queueSource: QueueFileSource(directory: directory),
             clock: clock,
+            historyRecheckClock: GatedPollClock(),
             coverFlow: coverFlow,
             isMusicRunning: { recorder.musicRunning },
             forceRefresh: { recorder.forceRefreshes += 1 },

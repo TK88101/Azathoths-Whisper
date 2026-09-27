@@ -31,6 +31,8 @@ final class AppModel {
     private let splashDuration: Duration
     /// 歌詞寫入通知（計劃 2026-09-26-lyrics-notification §4.5）。**不給預設值**：漏注入＝編譯錯誤
     private let notifier: any LyricsNotifying
+    /// Music 的換歌通知（F1，計劃 2026-09-27-coverflow-f1-f2 §3.1）。**不給預設值**：漏注入＝編譯錯誤
+    private let playerSignal: any PlayerChangeSignaling
     /// Batch 成功後自動切回 Editor 分頁的計時（§4.6）。只與 LyricsFlow 升回共用時長常數，不共用排程（R1-6）
     private let batchSwitchClock: any PollClock
     @ObservationIgnored private var pendingReturnToEditor: Task<Void, Never>?
@@ -44,6 +46,7 @@ final class AppModel {
         monitor: NowPlayingMonitor,
         validator: any TokenValidating,
         notifier: any LyricsNotifying,
+        playerSignal: any PlayerChangeSignaling,
         initialToken: String,
         initialLanguage: AppLanguage,
         splashDuration: Duration = .milliseconds(3500),    // py:1896
@@ -55,6 +58,8 @@ final class AppModel {
         queueDirectory: URL? = nil,
         /// 升回計時（寫入成功後等彩帶撒完）
         lyricsFlowClock: any PollClock = SystemPollClock(),
+        /// 換歌後履歴短重讀的時鐘（F2）。不與升回共用：可控時鐘依請求序放行，混用會放錯等待者
+        historyRecheckClock: any PollClock = SystemPollClock(),
         batchSwitchClock: any PollClock = SystemPollClock(),
         isMusicRunning: @escaping () -> Bool = MusicProcess.isRunning
     ) {
@@ -65,6 +70,7 @@ final class AppModel {
         self.language = initialLanguage
         self.splashDuration = splashDuration
         self.notifier = notifier
+        self.playerSignal = playerSignal
         self.batchSwitchClock = batchSwitchClock
         self.editor = EditorViewModel(
             lyricsService: Self.makeLyricsService(client: httpClient, token: initialToken),
@@ -90,6 +96,7 @@ final class AppModel {
             detailsReader: CardDetailsReader(music: music),
             queueSource: QueueFileSource(directory: queueDirectory),
             clock: lyricsFlowClock,
+            historyRecheckClock: historyRecheckClock,
             coverFlow: coverFlow,
             isMusicRunning: isMusicRunning,
             // 寫入期間 monitor 為 busy、換歌會漏掉：寫入後唯讀補讀一次（Codex R1-4）
@@ -203,11 +210,15 @@ final class AppModel {
         CoverFlowUITestTrace.installIfRequested(environment: environment)
         let isTestHost = environment[unitTestHostFlag] == "1"
         // 自動化測試＝單元測試 host（"1"）或 UI 測試（AppUITestCase 顯式設 "0"，仍走真 Keychain 驗 A-05）。
+        // 換歌通知同理：自動化測試不監聽使用者機上的 Music（F1）。
         // 兩者一律不碰真的通知中心，否則 start() 的授權請求會在 UI 測試期間彈系統權限提示（計劃 §4.5 R0-5）
         let isAutomatedTest = environment[unitTestHostFlag] != nil
         let notifier: any LyricsNotifying = isAutomatedTest
             ? NoopLyricsNotifier()
             : SystemLyricsNotifier(center: SystemNotificationCenter())
+        let playerSignal: any PlayerChangeSignaling = isAutomatedTest
+            ? NoopPlayerChangeSignal()
+            : MusicPlayerInfoSignal()
         let store = isTestHost
             ? ConfigStore(secrets: EphemeralSecretStore())
             : ConfigStore(secrets: KeychainStore())
@@ -216,6 +227,7 @@ final class AppModel {
         let store = ConfigStore(secrets: KeychainStore())
         let shouldMigrate = true
         let notifier: any LyricsNotifying = SystemLyricsNotifier(center: SystemNotificationCenter())
+        let playerSignal: any PlayerChangeSignaling = MusicPlayerInfoSignal()
         #endif
 
         if shouldMigrate {
@@ -245,6 +257,7 @@ final class AppModel {
             monitor: NowPlayingMonitor(music: music),
             validator: GeniusTokenValidator(client: client),
             notifier: notifier,
+            playerSignal: playerSignal,
             initialToken: store.token,
             initialLanguage: store.language,
             artworkDiskDirectory: artworkCacheDirectory,
@@ -279,6 +292,9 @@ final class AppModel {
 
         startEventLoop()
         await monitor.start()
+        // 換歌當下就讀，不等下一次 3 秒輪詢（F1）；輪詢保留作通知漏送時的保底
+        let monitor = monitor
+        playerSignal.start { Task { await monitor.playerDidChange() } }
         lyricsFlow.startPolling()
 
         try? await Task.sleep(for: splashDuration)
@@ -304,6 +320,7 @@ final class AppModel {
         eventTask?.cancel()
         eventTask = nil
         lyricsFlow.stopPolling()
+        playerSignal.stop()
         Task { await monitor.stop() }
     }
 

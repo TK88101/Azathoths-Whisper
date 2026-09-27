@@ -56,6 +56,7 @@ struct AppModelNotificationTests {
             monitor: monitor,
             validator: AlwaysValidValidator(),
             notifier: notifier,
+            playerSignal: SpyPlayerChangeSignal(),
             initialToken: "",
             initialLanguage: .system,
             splashDuration: .milliseconds(1),

@@ -57,6 +57,7 @@ struct AppModelTests {
             monitor: monitor,
             validator: AlwaysValidValidator(),
             notifier: SpyLyricsNotifier(),
+            playerSignal: SpyPlayerChangeSignal(),
             initialToken: token,
             initialLanguage: .system,
             splashDuration: .milliseconds(1),

@@ -186,6 +186,26 @@ private var deferred: Set<ReadReason> = []    // busy 期間記下的理由（�
 
 ## 7. 紅燈摘要（實作時回填）
 
+**F1（2026-09-27 21:42）**：最小樁（型別存在、行為空）下跑 `NowPlayingMonitorSingleFlightTests`／`PlayerChangeSignalTests`／`AppModelPlayerSignalTests`／`NowPlayingMonitorTests`：AppModel 接線 3 條紅（startCount／stopCount／讀取次數）；單飛與通知補讀 7 條紅；`aPlayerChangeReadsAtOnce`、`aChangeArrivingMidRead…` 因空樁掛到 120s 逾時（紅）。`forceRefreshDuringAnInFlightReadStillReemits`／`pendingForceRefreshAndPlayerChangeReadOnlyOnce`／`pollTicksWhileBusyAreStillDropped` 在舊碼即綠——舊碼沒有單飛，並發的第二個讀取恰好重發；它們是新碼的回歸守衛。
+**F1 綠（21:50）**：上述 4 檔＋`AppModelTests`／`AppModelNotificationTests` 共 70 條全綠；新檔與改動檔零警告（Swift 6 strict）。
+
+**F2 機制（22:00）**：`LyricsFlowHistoryRecheckTests` 12 條，樁下 7 條紅（追上、停止、sleep 相鄰差、輪詢先追上、換歌重來、`.missing` 轉移、平移中追上）；另 5 條（已追上不重讀、舊世代醒來不 publish、沒變不問詳情、stop 後不重讀、時點表形狀）是「不該發生」的守衛，樁下本來就綠。
+**F2 機制綠（22:01）**：12＋既有 `LyricsFlowModelTests` 36 條全綠。
+**實作偏離 §3.3（筆誤級，留痕）**：世代只在「醒來後／入鏈前／讀之前」比對，**讀完後不比對**——讀到的是檔案最新內容，丟掉會讓屬性戳已更新的那份內容永遠讀不到（lost update）；鏈上讀取串行，後讀的不可能比先讀的舊，所以讀完一律套用是安全的。
+
+## 8. 量測記錄
+
+### 8.1 U1：History.dat 寫入 vs 換歌通知（量測器 `recorder2`，唯讀）
+| # | 換歌方式 | 通知 | History.dat mtime | 差 |
+|---|---|---|---|---|
+| 1 | 自然播完 | 22:02:07.777 `Playing` | 22:02:12.824 | **+5.05s** |
+
+**第 1 筆即超過使用者設的 1 秒線**（任務說明：「量測若顯示寫檔常晚於 1 秒：停手，帶數據找我」）。收集中。
+
+### 8.2 U3（新）：播放中切歌的通知序列
+播放中手動切歌，Music 先廣播 `Stopped`、約 40–50ms 後再廣播 `Playing`（21:57:07–11，4 次皆然）；暫停中切歌只有 `Paused`（②計劃 §8.5）；自然播完只有 `Playing`（8.1 #1）。
+**風險（推測）**：收到 `Stopped` 就讀，若讀到 stopped，`MusicAppleEventsClient.nowPlaying` 回 nil（`:60`）→ monitor 送 `.notPlaying` → LyricsFlow 走「沒在播」→ 平移被打斷或畫面閃一下。量測器已加「收到通知即唯讀 `player state`」，待播放中切歌的樣本。
+
 ## 附錄 A　評審記錄
 
 ### A.1 Codex R1（v1，gpt-5.6-terra，read-only，對照程式碼）與裁決（v2）
