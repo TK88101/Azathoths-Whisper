@@ -3,7 +3,7 @@
 - 日期：2026-09-26
 - 基線：`origin/main` `98af41f`（v2.0.1）
 - 分支：`feat/lyrics-notification`——使用者 2026-09-26 指定與「歌詞寫入成功的系統通知」（`2026-09-26-lyrics-notification.md`）**同一次迭代**
-- 狀態：v3（2026-09-27）：S7 完成（§8.1）；R1→VM 短暫過渡顯示層；R2→精確身分判向、settle 回報契約、邏輯當前曲（§3.7）；R3→三處收緊（A.3）；**Codex 評審收斂；§7 已拍板（2026-09-27）；下一步 S8 定第二段觸發，再 TDD**；未實作。
+- 狀態：v3（2026-09-27）：S7 完成（§8.1）；R1→VM 短暫過渡顯示層；R2→精確身分判向、settle 回報契約、邏輯當前曲（§3.7）；R3→三處收緊（A.3）；**Codex 評審收斂；§7 已拍板；S8 否證 VM 兩段觸發（§8.2），下一步 S9：條帶內兩段**；未實作。
 - 任務形狀：串行（先 spike 定居中方式，再改 VM／條帶，再驗證），不派多 agent。
 
 ## 0. 複述（使用者 2026-09-26 原話要點）
@@ -146,6 +146,21 @@ View 讀 `accessibilityReduceMotion`，在 `onAppear`／`onChange` 寫入 VM 的
 1. **sameUpdate 不可用**：條帶 `onChange(of: items)` 的無動畫 `scrollTo` 在同一次更新內蓋掉動畫——這是 S5「animated」被放棄的真因（當時只量落定，未量平移）。§3.2 採 **splitUpdate**（換牌與動畫居中分兩次更新）。
 2. **舊中心必須留在牌組**：dropOld 兩種觸發都只有 1/10 看得到平移（中心卡被移除時鄰卡直接補位）。§3.1 不是可選優化而是前提；主案（補 `o:` 卡）與備案（`q:` 卡留左側）皆滿足，取捨仍待 §7-3 拍板。
 3. 推測（未核）：dropOld 第 1 次的 1/10 是牌組形狀剛由校準狀態轉入時的偶然，不代表可用路徑。
+
+### 8.2 S8 spike（2026-09-27，`CoverFlowSlideSpikeS8Tests`，`TEST_RUNNER_AZW_SPIKE_S8=1`）
+
+production `CoverFlowView`＋`CoverFlowViewModel`（StubArtworkProvider 佔位封面），動畫 0.62s；staged＝apply 一副窗口已移到 target、中心仍為 old 的牌組，再以三種觸發 `withAnimation { centerID = target }`；每組 20 次，逐幀（16ms×60）取樣捲動原點與 VM `centerID`。兩次完整重跑（取樣數每步皆 60，量測有效）：
+
+| 觸發 | next 平移 | previous 平移 | 落定 | 非目標回寫 |
+|---|---|---|---|---|
+| mainAsync | 14／15 | 17／12 | 19/20（第 1 步為起點未穩） | 0 |
+| sleep16 | 15／17 | 12／11 | 19/20 | 0 |
+| yield | 14／18 | 11／13 | 19/20 | 0 |
+
+已核事實：
+1. **非目標回寫 0/240**：production 路徑下程式化動畫途中 SwiftUI 不回寫中間值 → §3.7「非 target 回寫＝使用者接管」的前提成立。
+2. **VM 兩段（splitUpdate）在 production 不可靠**：失敗步的 60 幀全停在終點（staged 的「條帶無動畫退回 old」沒有發生，新卡換入時已在正中＝瞬移），三種觸發皆隨機失敗 10–45%，無一可用。R2-4 的風險屬實；S7 的 10/10 是精簡 harness 的結果，不能外推。
+3. 推論（未核）：staged 依賴 `onChange(of: items)` 內的 `reader.scrollTo(old)` 在第二段前生效；VM 端無法觀測它是否已生效。可行方向是把「退回 old → 動畫到 target」兩步都放進**條帶自己**（持有 `ScrollViewReader`，順序由它保證）——待 S9 量測。
 
 ## 附錄 A　評審記錄
 
