@@ -69,7 +69,7 @@
 | 情況 | body（zh-Hant） |
 |---|---|
 | 全成功，且寫入數＝專輯曲目數 | ✓ 整張專輯 8 首歌詞寫入成功 |
-| 全成功，只寫了部分 | ✓ 5 首歌詞寫入成功：The Leper Affinity、Bleak、Harvest 等 5 首 |
+| 全成功，只寫了部分 | ✓ 5 首歌詞寫入成功：The Leper Affinity、Bleak、Harvest 及另外 2 首（R0-6） |
 | 部分失敗 | 6 / 8 首寫入成功，2 首失敗：Dirge for November、The Funeral Portrait |
 | 全部失敗（已拍板要彈） | ✕ 8 首歌詞全部寫入失敗 |
 
@@ -217,7 +217,7 @@ var onImportFinished: ((BatchImportResult) -> Void)?
 | T5 | `EditorViewModel.onSavedTrack` | 成功送原曲 `TrackInfo`、失敗／throw 不送；save 期間換歌仍回報原曲 |
 | T6 | Settings `.notifications` 群組、Toggle、標題、選單第三項 | `SettingsViewModelTests`：open 帶入值、切換即回呼、標題英文 |
 | T7 | AppModel 組裝＋四處注入＋授權＋`postIfEnabled`＋§4.6 切頁 | `AppModelTests`（Spy notifier＋GatedPollClock 分開注入）：開關開／關的 post；start 授權只在開時；關→開觸發授權；allSucceeded 到期切 Editor；someFailed／allFailed／stale／single stale 不排程；到期前手動 `select`（含同分頁）取消；Batch→Editor→Batch 不被切；新工作（generation 變）取消；彈框（modal／確認框／alert）開著不切；連續成功重排；整合：Import All 首曲較早寫入、LyricsFlow 已升回後，切頁計時到期才切 |
-| T8 | ACCEPTANCE：C-31、C-32 ⚠️、D-14、A-07 驗證方式更新；UI 測試斷言選單第三項 | 條目齊、簽字日 2026-09-26／27 |
+| T8 | ACCEPTANCE：C-31、C-32 ⚠️、D-14、D-15（通知本身）、A-07 驗證方式更新；UI 測試斷言選單第三項 | 條目齊、簽字日 2026-09-26／27 |
 | T9 | 全量單元測試、`coverage_gate.sh`、`no_playback_gate.sh`、Scripts 測試 | 全綠（已知基線紅另列）；Services/ 覆蓋率 ≥ 80% |
 
 影響面：`Services/Notifications/`（新）、`Features/Batch`、`Features/Editor`、`Features/Settings`、`App/AppModel.swift`、`App/AzathothsWhisperApp.swift`、
@@ -265,6 +265,8 @@ var onImportFinished: ((BatchImportResult) -> Void)?
 | R0-1 | §4.5 權限請求 | `AppDelegate` 由 `@NSApplicationDelegateAdaptor` 建立，無 `AppModel` 參照（`App/AzathothsWhisperApp.swift:8-9`、`App/AppDelegate.swift`） | 改到 `AppModel.start()` |
 | R0-2 | §4.5 Noop 注入 | UITest 有兩個組裝入口＋單元測試 host 分支（`App/AppModel.swift` `live()`、`App/UITestSupport/AppModel+LyricsFlowUITest.swift`） | 三處列全，`notifier` 參數不給預設值。**v1.2 更正（R1-9）：漏列 `AppModelTests.makeModel`，實為四處** |
 | R0-3 | §4.4 選單 | 新選單項落在 A-07 覆蓋範圍（`ACCEPTANCE.md` A-07） | 同步更新 A-07 驗證方式＋新增開關驗收條目 |
+| R0-5 | §4.5 注入條件（實作時 2026-09-27 發現） | 不走 fixture 的 UITests（Shell、A-07…）走 `live()` 的真實路徑；所有 UITests 皆由 `AppUITestCase` 顯式設 `AZW_UNIT_TEST_HOST="0"`（`UITests/Support/AppUITestCase.swift:55`），真實啟動不帶此變數 | DEBUG 下改以「變數存在」判定自動化測試 → Noop；否則 start() 的授權請求會在 UI 測試期間彈系統提示 |
+| R0-6 | §3.3 字串（實作時 2026-09-27 核對樣式參考頁） | 使用者選定的樣式 A 中 subtitle 依語言加書名號（zh《》、ja『』、en 無），歌名分隔 zh／ja「、」、en「, 」；§3.3 表缺這兩鍵。另 §3.2「等 5 首」為總數，與 en「and N more」、ja「ほか N 曲」（剩餘數）不一致 | 新增 `notify_subtitle`、`notify_list_separator`（共 10 鍵）；「更多」統一傳剩餘數，zh 改「及另外 %lld 首」（已向使用者聲明預設） |
 | R0-4 | §4.2 Editor | `save()` 目前只在 hop 前擷取 `boundTrackID`／`lyricsText`（`Features/Editor/EditorViewModel.swift` `save()`），`boundTrack` 未擷取 | 維持 §4.2 原設計：同處加擷取 `boundTrack` |
 
 ### A.3 2026-09-27 Codex 對抗評審 R1／R2（gpt-5.6-terra，reasoning medium，read-only，對照程式碼）
@@ -291,3 +293,15 @@ var onImportFinished: ((BatchImportResult) -> Void)?
 
 原始輸出：session scratchpad `codex-r1.txt`／`codex-r2.txt`（不入庫）。
 
+
+### A.4 2026-09-27 實作後評審（/simcodex，2 輪 early-exit）
+
+| 輪 | 來源 | 發現 | 處置 |
+|---|---|---|---|
+| R1 | codex review --uncommitted | 無正確性問題 | — |
+| R1 | simplify／efficiency | clean | — |
+| R1 | simplify／altitude | ①同一環境旗標兩套判準 ②`operationGeneration += 1` 散落五處 ③AppModel 直接讀 Batch 彈框欄位 | 全採納：`isAutomatedTest` 命名、`beginOperation()` 單一入口、`BatchViewModel.isShowingDialog` |
+| R1 | simplify／simplification | ①`wasInvalidated` 可由 `isStale(session)` 推導（sessionID 只增不減） ②延時任務樣板與 `LyricsFlowModel.scheduleRise` 同構 | ①採納；②**遺留 P2**（reuse 評審亦獨立指出）：抽共用須改 diff 外的 `LyricsFlowModel`，另立項 |
+| R2 | codex review／主 session 複查 R1 修正 | 無 | early-exit |
+
+security-reviewer 未派：無認證／支付／加密／網路／檔案操作；日誌只記錯誤 domain／code。

@@ -64,6 +64,14 @@ final class BatchViewModel {
     /// 每筆寫入成功（`setLyrics` 回 true）：（寫入目標, 寫入的文字）→ Cover Flow 徽章（2026-09-25 回報）。
     /// 這是「檔案已寫入」的事實事件，**不受 sessionID 約束**：寫入後專輯切走，檔案裡的詞照樣變了
     var onLyricsWritten: ((String, String) -> Void)?
+    /// 一次匯入的結果（通知＋自動切回 Editor 分頁，計劃 2026-09-26-lyrics-notification §4.3）。
+    /// outcome 在這裡判定，AppModel 與通知文案不重算；在狀態欄與彩紙**之後**送出。
+    /// 與 `onLyricsWritten` 同為事實事件：stale 的寫入照樣回報（`.stale`／`isStale: true`）
+    var onImportFinished: ((BatchImportResult) -> Void)?
+    /// 「開始了新工作」的單調計數（§4.6 ⑧）：Fetch Missing、Import Selected、確認後的 Import All、
+    /// 載入／切換專輯各遞增一次；早退（只彈提示框）、點選曲目、打開確認框**不**遞增。
+    /// AppModel 排自動切頁時擷取、到期時比對，不相等即放棄
+    @ObservationIgnored private(set) var operationGeneration = 0
 
     private let music: any MusicControlling
     /// D-08：Token 保存後即時生效——AppModel 會重建此服務
@@ -97,6 +105,16 @@ final class BatchViewModel {
 
     private func isStale(_ session: Int) -> Bool { session != sessionID }
 
+    /// 「開始了新工作」的唯一入口（見 `operationGeneration`）。新增的操作若算新工作，呼叫這裡
+    private func beginOperation() {
+        operationGeneration += 1
+    }
+
+    /// 此刻有任何 Batch 自己的彈框（Import All 確認框、提示框）開著——AppModel 的自動切頁到期時據此放棄（§4.6 ⑦）
+    var isShowingDialog: Bool {
+        isConfirmingImportAll || alertMessage != nil
+    }
+
     // MARK: - 導航與事件
 
     /// C-01：切入 Batch 時，**資料為空**才載入（py:396 判的是 batchData.length，不是「首次」）
@@ -117,6 +135,7 @@ final class BatchViewModel {
         // 故切專輯後預覽框仍留著上一張專輯的內容。照搬。
         tracks = []
         sessionID += 1
+        beginOperation()
         albumName = StatusText.albumLoadingPlaceholder
         listState = .idle
         guard isTabActive else { return }
@@ -132,6 +151,7 @@ final class BatchViewModel {
     // MARK: - 載入專輯（py:620-641）
 
     func loadAlbum() async {
+        beginOperation()
         await withLoadingAlbum {
             onEditorStatus?(StatusText.processingAlbumBatch)
             listState = .loading
@@ -226,6 +246,7 @@ final class BatchViewModel {
         }
 
         let session = sessionID
+        beginOperation()
         isFetchingMissing = true
         defer { isFetchingMissing = false }
 
@@ -277,6 +298,7 @@ final class BatchViewModel {
         guard let track = tracks.first(where: { $0.persistentID == selectedID }) else { return }
 
         let session = sessionID
+        beginOperation()
         statusText = StatusText.savingTrack(track.title)
         let content = previewText      // py:695：寫入的是預覽框當前文本
 
@@ -285,11 +307,15 @@ final class BatchViewModel {
             if didWrite {
                 onLyricsWritten?(selectedID, content)      // 先於 stale 守衛（見 onLyricsWritten）
             }
-            guard !isStale(session) else { return }
+            guard !isStale(session) else {
+                if didWrite { reportSingle(track, isStale: true) }
+                return
+            }
             if didWrite {
                 apply(lyrics: content, to: selectedID)
                 statusText = StatusText.batchSaved       // C-28：帶句點，與 Editor 不同
                 confettiTrigger += 1
+                reportSingle(track, isStale: false)      // 彩紙之後（切頁計時的起點）
             } else {
                 statusText = StatusText.batchSaveFailed
             }
@@ -321,13 +347,20 @@ final class BatchViewModel {
         }
 
         let session = sessionID
+        beginOperation()
+        // 匯總的專輯資訊在 await 之前快照：切專輯會立即清空 tracks、把 albumName 改成 Loading（R1-5）
+        let artist = toSave[0].artist
+        let album = toSave[0].album
+        let albumTrackCount = tracks.count
         isImportingAll = true
         defer { isImportingAll = false }
 
         statusText = StatusText.savingTracks(toSave.count)   // py:724，同樣即被覆蓋
 
+        var succeeded: [String] = []
+        var failed: [String] = []
         for (index, track) in toSave.enumerated() {
-            guard !isStale(session) else { return }
+            guard !isStale(session) else { break }      // sessionID 只增不減：離開後 isStale 仍為真
             statusText = StatusText.savingProgress(
                 index + 1, of: toSave.count, title: track.title
             )
@@ -335,18 +368,54 @@ final class BatchViewModel {
                 let didWrite = try await music.setLyrics(
                     persistentID: track.persistentID, lyrics: track.lyrics
                 )
-                // 先於下一輪的 stale 守衛（見 onLyricsWritten）；false 照原版不中斷、不改文案（計劃 N4）
+                // 先於下一輪的 stale 守衛（見 onLyricsWritten）；false 照原版不中斷整批（計劃 N4）
                 if didWrite {
                     onLyricsWritten?(track.persistentID, track.lyrics)
+                    succeeded.append(track.title)
+                } else {
+                    failed.append(track.title)
                 }
             } catch {
                 // py:729-734：單曲失敗只記錄，不中斷整批
                 Self.log.error("import all: \(track.persistentID, privacy: .public) failed")
+                failed.append(track.title)
             }
         }
 
-        guard !isStale(session) else { return }
-        statusText = StatusText.allSaved
-        confettiTrigger += 1
+        let outcome = Self.importAllOutcome(
+            isStale: isStale(session), succeeded: succeeded.count, failed: failed.count
+        )
+        showImportAllResult(outcome, saved: succeeded.count, failed: failed.count)
+        let summary = BatchWriteSummary(
+            artist: artist, album: album, albumTrackCount: albumTrackCount,
+            succeeded: succeeded, failed: failed
+        )
+        onImportFinished?(.batch(summary, outcome))
+    }
+
+    static func importAllOutcome(isStale: Bool, succeeded: Int, failed: Int) -> BatchImportOutcome {
+        if isStale { return .stale }
+        if failed == 0 { return .allSucceeded }
+        return succeeded == 0 ? .allFailed : .someFailed
+    }
+
+    /// 結束文案與彩紙（C-31 ⚠️，使用者 2026-09-26 拍板）：原版 py:736 不論成敗一律 "All saved."＋彩紙。
+    /// 部分失敗寫出數字、全部失敗沿用 Import Selected 的 "Save failed."，兩者都不放彩紙
+    private func showImportAllResult(_ outcome: BatchImportOutcome, saved: Int, failed: Int) {
+        switch outcome {
+        case .allSucceeded:
+            statusText = StatusText.allSaved
+            confettiTrigger += 1
+        case .someFailed:
+            statusText = StatusText.savedSomeFailed(saved: saved, of: saved + failed, failed: failed)
+        case .allFailed:
+            statusText = StatusText.batchSaveFailed
+        case .stale:
+            break       // 原版：已作廢的一輪不寫狀態欄、不放彩紙
+        }
+    }
+
+    private func reportSingle(_ track: AlbumTrack, isStale: Bool) {
+        onImportFinished?(.single(artist: track.artist, title: track.title, album: track.album, isStale: isStale))
     }
 }

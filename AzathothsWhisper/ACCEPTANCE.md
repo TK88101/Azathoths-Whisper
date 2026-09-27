@@ -16,7 +16,7 @@
 | A-04 | 窗口標題 "Azathoth's Whisper" | py:1864 | 同上（`windows["Azathoth's Whisper"]`） | ✅ M5 |
 | A-05 | 菜單 Settings → Token Settings... / Language Settings... 開對應 modal | py:1909-1918 | `testSettingsMenuOpensTokenModal`／`testSettingsMenuOpensLanguageModal` | ✅ M5 |
 | A-06 | 菜單 Help → About 開 About modal | py:1919-1922 | `testHelpMenuOpensAboutModal` | ✅ M5 |
-| A-07 | 菜單文案硬編碼英文，不隨語言變 | py:1909-1923 | `testColdStartInJapaneseLocalizesUIButNotMenus`（ja 冷啟動下 Settings／Help 仍為英文）。實作差異：SwiftUI 的系統 Help 菜單標題由 AppKit 在地化，故清空系統組＋自建英文 Help 菜單，並在 `AppDelegate` 移除空的頂層菜單 | ✅ M5 |
+| A-07 | 菜單文案硬編碼英文，不隨語言變 | py:1909-1923 | `testColdStartInJapaneseLocalizesUIButNotMenus`（ja 冷啟動下 Settings／Help 仍為英文；2.1 起另斷言 Settings 第三項 "Notification Settings..." 為英文，待使用者在場跑 UITests）。實作差異：SwiftUI 的系統 Help 菜單標題由 AppKit 在地化，故清空系統組＋自建英文 Help 菜單，並在 `AppDelegate` 移除空的頂層菜單 | ✅ M5 |
 | A-08 | 紅色關閉鈕＝隱藏窗口，app 不退出 | py:2052-2060 | `testRedCloseButtonHidesWindowWithoutTerminating`（視窗消失＋`app.state != .notRunning`） | ✅ M5 |
 | A-09 | Dock 圖標點擊→重新顯示已隱藏窗口 | py:1877-1893 | `applicationShouldHandleReopen` 已實作；Dock 點擊無法在 XCUITest 內定界模擬，M8 真人操作 | ⬜ |
 | A-10 | Cmd+Q 真退出 | py:753-761,1969-1995 | `testQuitMenuItemTerminatesApp`（走 app 自身 Quit 菜單項，與 Cmd+Q 同一 `terminate:` 路徑；不模擬全域按鍵）。**2026-08-23 註**：單獨跑通過（7.2s），連跑時穩定失敗。**2026-09-05 更新——狀況變差且已排除本次改動**：現在**單獨跑也失敗**（18.4s，`app.state` 停在 4 而非 1）。已用獨立 git worktree 在乾淨的 HEAD `cc88a53`（不含任何 M8 改動）複驗，**同樣失敗**（72.6s）→ 非 M8 引入；且 M8 的改動經 `git diff --stat` 確認**未觸及 `App/`（含 AppDelegate 與退出邏輯）與 `UI/`**。依熔斷紀律不重啟調查（M7 計劃附錄已記 6 輪未進展、4 假設被砍）。**產品行為本身未被證偽**：`AppDelegate` 無 `applicationShouldTerminate`，退出路徑是 M5 驗收過的；失敗的是 XCUITest 觀測 `app.state` 的時序，非 Quit 功能。真人操作驗證列入 M8-14 | ✅ M5（連跑 flaky） |
@@ -53,7 +53,7 @@
 | B-22 | 狀態欄初始文案 status_ready（en="Ready"——修正⚠️數據錯，原值為日文） | py:196,962 | `LocalizationTests.englishDataDefectsAreFixed`＋footer 綁定（statusText 為 nil 時取本地化 status_ready） | ✅ M5 |
 | B-23 | Footer "Status:"/"Lines:" 標籤走 i18n | py:192-199 | `testLaunchShowsEditorShellAfterSplash`（en）＋ja／zh-Hant 冷啟動斷言 | ✅ M5 |
 
-## C Batch（30 條）
+## C Batch（32 條）
 
 | ID | 行為描述 | 依據 | 驗證方式 | 狀態 |
 |---|---|---|---|---|
@@ -88,8 +88,10 @@
 | C-28 | Import Selected 結果文案**帶句點**："Saved."／"Save failed."／"Error saving."——與 Editor Save 的 "Saved"（無句點）不同，照搬此差異 | py:700/703/707 vs py:543 | `importSelectedWritesPreviewTextAndTriggersConfetti`／`…ReportsSaveFailedWhenWriteReturnsFalse`／`…ReportsErrorSavingWhenMusicThrows` | ✅ M6（邏輯層） |
 | C-29 | **缺詞判定採 trim 語義**（⚠️ 已拍板修正 2026-08-14）：純空白歌詞（如 "   "）視為缺詞。原版三處篩選（狀態點/Fetch Missing/Import All）用未 strip 的 `length > 0`，而後端算好的 `has_lyrics`（strip 判空）從未被使用——屬原版內部不一致。可見變化：純空白曲目改顯暗紅點、會被 Fetch Missing 抓、不再被 Import All 把空白寫回音樂庫 | py:587/651/717（實際用）vs py:2253-2254（算了沒用） | `whitespaceOnlyLyricsCountAsMissing`／`importAllWritesEveryTrackThatHasLyrics`（純空白 fixture 三處斷言） | ⚠️ 已拍板修正 |
 | C-30 | **Batch 不把 Genius 錯誤訊息當歌詞**（⚠️ 與 B-11a 同源，按其先例修正）：原版 py:2232 只判 `startswith("Error")`，而 Genius 異常路徑回 "Genius Error: …" 不以 Error 開頭 → 直接當歌詞回傳；前端過濾只擋 "No track"／"Lyrics not found" 兩前綴亦放行 → 錯誤訊息入列表顯白點 → **Import All 會將其寫進音樂檔 lyrics 欄位**。新版 `LyricsResult` 為列舉，`.error` 不會被當 `.found` | py:2232、1283-1284、665 | `sourceErrorIsNeverStoredAsLyrics`＋`LyricsServiceTests`（已綠） | ⚠️ 按 B-11a 先例修正 |
+| C-31 | **Import All 結束文案與彩紙依結果區分**（⚠️ 已批准偏差）：原版不論成敗一律 "All saved."＋彩紙，部分失敗或全部失敗也宣稱全部成功，誤導使用者。新版：全成功＝"All saved."＋彩紙；部分失敗＝"Saved N of M. K failed."、不放彩紙；全部失敗＝"Save failed."、不放彩紙；中途切專輯（stale）照原版不寫、不放。「失敗」＝`setLyrics` 回 false 或 throw | py:736-737 | `BatchImportFinishedTests`（allSucceeded／someFailed／allFailed／stale 四條＋`savedSomeFailedText`）；實機 V3 | ⚠️ 已批准偏差（使用者 2026-09-26 簽字；計劃 2026-09-26-lyrics-notification §4.3a） |
+| C-32 | **Batch 寫入成功後自動切回 Editor 分頁**（⚠️ 已批准偏差，2.1 新增）：Import All 全部成功、Import Selected 成功 → 等彩紙撒完（`riseDelay`）切回 Editor 分頁，畫面照 Cover Flow 規則（有詞＝Cover Flow、缺詞＝Editor）。部分失敗／全部失敗／stale 不切；等待期間使用者自己切分頁（含點同一分頁）、開始新工作（Fetch Missing／Import／載入或切換專輯）、或到期時有任何彈框開著 → 本次不切 | 原版匯入後停在 Batch（py:701／737 只放彩紙） | `AppModelNotificationTests`（觸發 2 條、不排程 2 條、取消 4 組、連續成功重排、與 LyricsFlow 升回共存）；實機 V7 | ⚠️ 已批准偏差（使用者 2026-09-26 需求、2026-09-27 拍板彈框⑦與取消範圍⑧；計劃 §4.6） |
 
-## D Settings / About（13 條）
+## D Settings / About（15 條）
 
 | ID | 行為描述 | 依據 | 驗證方式 | 狀態 |
 |---|---|---|---|---|
@@ -107,6 +109,8 @@
 | D-11 | About 圓角例外樣式（全 app 唯一圓角區） | py:299-330 | 截圖：外框 16px、卡片 8px、Close 膠囊；其餘畫面全 0 圓角 | ✅ M5 |
 | D-12 | modal＝主窗內覆蓋層（非獨立窗/sheet）；modal 開啟時紅鈕關窗＝隱藏整窗 | Plan §4.2 | `ModalScrim` 為 ZStack 覆蓋層（截圖可見主 UI 在其後模糊）；modal 開啟時關窗的組合操作待 M8 手動 | ⬜ |
 | D-13 | modal 背景：黑 80%＋背景模糊 | py:266-267 | 截圖（`VisualEffectView(.withinWindow)`＋`Color.black.opacity(0.8)`） | ✅ M5 |
+| D-14 | **歌詞寫入通知開關**（2.1 新增）：選單 Settings → "Notification Settings..." 開 modal（標題英文覆寫，D-03 慣例），一個開關、**切換即存**、預設開、重啟後保持；關→開時請求系統權限，關閉不撤銷系統權限 | 計劃 2026-09-26-lyrics-notification §4.4 | `ConfigStoreNotificationsTests`、`SettingsViewModelTests`（通知三條）、`AppModelNotificationTests.settingsToggleIsPersistedAndTurningOnRequestsAuthorization`；實機 V4 | ⬜（邏輯層通過，待 V4） |
+| D-15 | **歌詞寫入成功的系統通知**（2.1 新增）：Editor 寫入與 Import Selected 一首一則；Import All 整批一則匯總（全成功／只寫部分／部分失敗列失敗曲／全部失敗），stale 批次照樣匯總實際寫入的部分；版式＝App 名稱／藝人 · 專輯／結果（樣式 A），三語跟隨 App 語言；App 在前景也顯示橫幅；通知失敗不影響寫入 | 計劃 2026-09-26-lyrics-notification §3、§4.1 | `LyricsNotificationContentTests`、`LyricsNotifierTests`、`AppModelNotificationTests`（通知三條）；實機 V2／V3／V5／V6 | ⬜（邏輯層通過，待 V2／V3／V5／V6） |
 
 ## E i18n（10 條）
 

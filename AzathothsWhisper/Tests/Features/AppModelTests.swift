@@ -56,6 +56,7 @@ struct AppModelTests {
             music: music,
             monitor: monitor,
             validator: AlwaysValidValidator(),
+            notifier: SpyLyricsNotifier(),
             initialToken: token,
             initialLanguage: .system,
             splashDuration: .milliseconds(1),

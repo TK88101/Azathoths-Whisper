@@ -35,6 +35,7 @@ extension AppModel {
             music: music,
             monitor: NowPlayingMonitor(music: music),
             validator: GeniusTokenValidator(client: client),
+            notifier: NoopLyricsNotifier(),
             initialToken: "",
             initialLanguage: store.language,
             artworkDiskDirectory: nil,

@@ -199,6 +199,11 @@ final class ShellUITests: AppUITestCase {
         XCTAssertTrue(menuBar()["Settings"].exists, "A-07 菜單硬編碼英文")
         XCTAssertTrue(menuBar()["Help"].exists)
         attach("editor-ja")
+
+        // A-07（2.1 補）：Settings 選單新增的第三項同樣硬編碼英文。以點擊開關選單，不用按鍵模擬
+        menuBar()["Settings"].click()
+        XCTAssertTrue(app.menuItems["Notification Settings..."].waitForExistence(timeout: 2))
+        menuBar()["Settings"].click()
     }
 
     /// E-04／E-07：繁中冷啟動
