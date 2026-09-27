@@ -116,9 +116,7 @@ struct LyricsFlowHistoryRecheckTests {
         for _ in LyricsFlowModel.historyRecheckOffsets { await releaseNextRecheck(h) }
 
         let requested = await gated(h).requested
-        let offsets = LyricsFlowModel.historyRecheckOffsets
-        let gaps = zip(offsets, [.zero] + offsets.dropLast()).map { $0 - $1 }
-        #expect(requested == gaps, "sleep 的是相鄰時點的差")
+        #expect(requested == [.milliseconds(5200), .milliseconds(800), .seconds(1)], "sleep 的是相鄰時點的差")
         #expect(await gated(h).pendingCount == 0, "跑滿時點表就放棄")
         #expect(h.played.last == pid(110), "沒播完的歌 Music 不記，左鄰維持履歴的真相")
     }

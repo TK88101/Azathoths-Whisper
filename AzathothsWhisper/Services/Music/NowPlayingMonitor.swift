@@ -117,6 +117,8 @@ actor NowPlayingMonitor {
 
     func stop() {
         isStopped = true
+        followUp = []
+        deferred = []
         pollTask?.cancel()
         pollTask = nil
         continuation.finish()
@@ -153,7 +155,8 @@ actor NowPlayingMonitor {
 
     /// 讀取的唯一入口：讀完若期間又來了理由就再讀一次；變 busy 就停，未完成的理由（輪詢除外）延到空閒時
     private func beginRead(reasons initial: Set<ReadReason>) async {
-        guard !isStopped, !isReading else {
+        guard !isStopped else { return }
+        guard !isReading else {
             followUp.formUnion(initial)
             return
         }

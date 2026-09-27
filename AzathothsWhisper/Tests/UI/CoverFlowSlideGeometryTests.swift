@@ -194,6 +194,62 @@ struct CoverFlowSlideGeometryTests {
         }
     }
 
+    // MARK: 使用者滑走（②計劃 §8.5「待補的程式驗證」；H-05 抑制與 §3.1-3 起滑條件）
+
+    /// 用合成的觸控板手勢把條帶滑離播放卡（in-process，不動使用者的游標）
+    private static func swipeAway(_ stage: Stage) async throws {
+        await StackGesture.swipe(stage.window, fingerDeltaX: -24, fingerEvents: 25, momentumEvents: 45)
+        _ = await CoverFlowTestWindow.settled(stage.window)
+        try #require(await SlideProbe.waitUntil { stage.model.centerID != stage.model.deck.currentCardID }, "沒有滑離播放卡")
+    }
+
+    @Test func aChangeAfterScrollingAwayLandsOnThePlayingCard() async throws {
+        let stage = try await Self.stage(playing: 100)
+        defer { stage.window.orderOut(nil) }
+        try await Self.swipeAway(stage)
+
+        stage.model.apply(Self.queueDeck(playing: 101), isRealChange: true)
+
+        #expect(stage.model.slide == nil, "畫面不在播放卡上：不平移，直接定位")
+        _ = await CoverFlowTestWindow.settled(stage.window)
+        #expect(stage.model.centerID == "q:0:101", "真實換歌解除接管，拉回新的播放卡")
+        #expect(await SlideProbe.waitUntil { stage.model.isPlayingCardCentered })
+    }
+
+    @Test func aSameTrackUpdateAfterScrollingAwayStaysPut() async throws {
+        let stage = try await Self.stage(playing: 100)
+        defer { stage.window.orderOut(nil) }
+        try await Self.swipeAway(stage)
+        let away = stage.model.centerID
+
+        stage.model.apply(Self.queueDeck(playing: 100), isRealChange: false)
+        _ = await CoverFlowTestWindow.settled(stage.window)
+
+        #expect(stage.model.centerID == away, "同曲更新不拉回使用者停著的那張")
+        #expect(stage.model.slide == nil)
+    }
+
+    @Test func scrollingBackToThePlayingCardSlidesAgain() async throws {
+        let stage = try await Self.stage(playing: 100)
+        defer { stage.window.orderOut(nil) }
+        try await Self.swipeAway(stage)
+
+        let model = stage.model
+        let ids = model.cards.map(\.id)
+        let playing = try #require(ids.firstIndex(of: "q:0:100"))
+        let away = try #require(model.centerID.flatMap { ids.firstIndex(of: $0) })
+        model.stepCenter(by: playing - away)       // H-09 鍵盤步進回到播放卡
+        #expect(model.centerID == "q:0:100")
+        _ = try #require(await CoverFlowTestWindow.settled(stage.window))
+        try #require(await SlideProbe.waitUntil { model.isPlayingCardCentered }, "回到播放卡後應回報在正中")
+        let before = try #require(StackReader.read(stage.window)?.scrollX)
+
+        model.apply(Self.queueDeck(playing: 101), isRealChange: true)
+
+        try #require(model.slide != nil, "自己滑回播放卡之後，換歌照常平移（不看接管旗標）")
+        await Self.expectSlide(stage, sign: -1, before: before, step: 1)
+    }
+
     @Test func reducedMotionSwitchesWithoutMoving() async throws {
         let stage = try await Self.stage(playing: 100, prefersReducedMotion: true)
         defer { stage.window.orderOut(nil) }

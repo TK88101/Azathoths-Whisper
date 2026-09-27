@@ -293,8 +293,7 @@ final class AppModel {
         startEventLoop()
         await monitor.start()
         // 換歌當下就讀，不等下一次 3 秒輪詢（F1）；輪詢保留作通知漏送時的保底
-        let monitor = monitor
-        playerSignal.start { Task { await monitor.playerDidChange() } }
+        playerSignal.start { [monitor] in Task { await monitor.playerDidChange() } }
         lyricsFlow.startPolling()
 
         try? await Task.sleep(for: splashDuration)

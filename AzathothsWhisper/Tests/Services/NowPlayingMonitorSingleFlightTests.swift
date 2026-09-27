@@ -200,6 +200,22 @@ struct NowPlayingMonitorSingleFlightTests {
         #expect(await music.nowPlayingCalls == 1, "輪詢的補讀遇到 busy 就丟棄（B-02）")
     }
 
+    @Test func stoppingMidReadDropsTheFollowUp() async {
+        let music = MockMusicClient(script: [.track(.fixture(), lyrics: "l")])
+        let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())
+        let first = LyricsGate()
+        let read = await startBlockedRead(monitor, music, gates: [first])
+
+        await monitor.playerDidChange()
+        await monitor.stop()
+        await first.open()
+        await read.value
+        await monitor.setBusy(true, source: .editor)
+        await monitor.setBusy(false, source: .editor)
+
+        #expect(await music.nowPlayingCalls == 1, "stop 之後不得再補讀，也不得留下待補的理由")
+    }
+
     @Test func noReadAfterStop() async {
         let music = MockMusicClient(script: [.track(.fixture(), lyrics: "l")])
         let monitor = NowPlayingMonitor(music: music, clock: ImmediateClock())

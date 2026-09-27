@@ -317,6 +317,29 @@ struct LyricsFlowModelTests {
         #expect(h.coverFlow.cards == h.coverFlow.deck.cards)
     }
 
+    /// ②計劃 §8.5「待補的程式驗證」：換到沒歌詞的歌——Cover Flow 降下（Editor 在前）時照樣發出平移、
+    /// 正中是當前曲；寫入成功、彩帶撒完後升回，正中仍是當前曲
+    @Test func aMissingLyricsTrackSlidesWhileLoweredAndRisesCentredOnIt() async throws {
+        let h = try await playingInAFullDeck(1)
+        defer { h.tearDown() }
+
+        await play(h, 2, lyrics: "")
+
+        #expect(h.model.surface == .editor, "缺詞 → 降下")
+        #expect(h.coverFlow.slide == CoverFlowSlideRequest(generation: 1, slots: 1), "降下的同時照常平移")
+        #expect(h.coverFlow.centerID == "q:0:11")
+        h.coverFlow.slideDidSettle(generation: 1)
+
+        h.model.saved(persistentID: QueueFixtures.pid(2), text: "new words")
+        await h.clock.waitUntilPending(1)
+        await h.clock.releaseAll()
+        await waitUntil { h.model.surface == .coverFlow }
+
+        #expect(h.model.surface == .coverFlow, "寫入後升回")
+        #expect(h.coverFlow.centerID == "q:0:11", "升回時正中是當前曲")
+        #expect(h.coverFlow.deck.currentCardID == "q:0:11")
+    }
+
     /// 往回跳到清單的前一項：當下位置不解析、中心是觀察卡，方向靠事前取得的佐證
     @Test func skippingBackToTheAdjacentEntrySlidesTheOtherWay() async throws {
         let h = try await playingInAFullDeck(2)

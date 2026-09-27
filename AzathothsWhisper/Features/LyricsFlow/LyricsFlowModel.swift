@@ -24,9 +24,8 @@ final class LyricsFlowModel {
     static let historyRecheckOffsets: [Duration] = [.milliseconds(5200), .seconds(6), .seconds(7)]
 
     /// 實際 sleep 的是相鄰時點的差（R1-5）
-    static var historyRecheckGaps: [Duration] {
+    static let historyRecheckGaps: [Duration] =
         zip(historyRecheckOffsets, [.zero] + historyRecheckOffsets.dropLast()).map { $0 - $1 }
-    }
 
     private(set) var state = LyricsFlowState()
     /// 右側可用性（AC8b）：`unavailable` 時畫面標明「接下來的歌暫時讀不到」
@@ -111,7 +110,7 @@ final class LyricsFlowModel {
     private func nowPlaying(_ track: TrackInfo, lyrics: String?) {
         let identity = NowPlayingIdentity(track: track)
         let isRealChange = identity != state.nowPlaying
-        let finishedID = isRealChange ? current?.persistentID : nil
+        let finishedID = current?.persistentID     // 在 `current` 換成新歌之前取
         // AC8b：真實換歌時把「前一首」記進聆聽歷史（History.dat 不可讀時的左側來源）
         if isRealChange, let previous = current {
             listening = listening.recording(.init(persistentID: previous.persistentID, occurrence: previous.occurrence))
