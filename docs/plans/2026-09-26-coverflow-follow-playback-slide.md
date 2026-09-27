@@ -1,9 +1,9 @@
-# Cover Flow 隨 Music 切曲自動滑動（帶動畫）—— 需求記錄與實施計劃（v0，待審閱）
+# Cover Flow 隨 Music 切曲自動滑動（帶動畫）—— 需求記錄與實施計劃（v1，待 Codex 評審）
 
 - 日期：2026-09-26
 - 基線：`origin/main` `98af41f`（v2.0.1）
 - 分支：`feat/lyrics-notification`——使用者 2026-09-26 指定與「歌詞寫入成功的系統通知」（`2026-09-26-lyrics-notification.md`）**同一次迭代**
-- 狀態：**需求已記錄，設計為草案；未經 Codex 評審；未實作。** 使用者指示本 session 只記錄、不動手。
+- 狀態：v1（2026-09-27）：S7 spike 完成（§8.1），§3.1／§3.2 依實測收斂；**待 Codex 評審與使用者拍板 §7**；未實作。
 - 任務形狀：串行（先 spike 定居中方式，再改 VM／條帶，再驗證），不派多 agent。
 
 ## 0. 複述（使用者 2026-09-26 原話要點）
@@ -46,12 +46,13 @@
 
 ## 3. 設計草案（待 Codex 評審與使用者拍板）
 
-- **3.1 舊中心留在牌組（對應事實 7）**：真實換歌當下，若左側來源是 History.dat 且其最新一筆不是剛播完那首，則把剛播完的那首以觀察歷史卡（`o:<pid>#<場次>`，`listening` 已在事件當下記錄）補在左側末端；History.dat 讀到後由 `h:A#0` 取代（同位置換身分＝「正中不變、兩側變動」路徑，不帶動畫，`CoverFlowDeckSideChangeTests` 已覆蓋）。改在 `DeckSnapshot.build`（純函式），去重規則沿用（兩側與中心同 ID 剔兩側；左側與中心不以 persistentID 互相去重）。
+- **3.1 舊中心留在牌組（對應事實 7；v1：S7 證實為前提，§8.1 結論 2）**：真實換歌當下，若左側來源是 History.dat 且其最新一筆不是剛播完那首，則把剛播完的那首以觀察歷史卡（`o:<pid>#<場次>`，`listening` 已在事件當下記錄）補在左側末端；History.dat 讀到後由 `h:A#0` 取代（同位置換身分＝「正中不變、兩側變動」路徑，不帶動畫，`CoverFlowDeckSideChangeTests` 已覆蓋）。改在 `DeckSnapshot.build`（純函式），去重規則沿用（兩側與中心同 ID 剔兩側；左側與中心不以 persistentID 互相去重）。
   備案：讓 `q:A` 以 `side: .played` 留在左側直到 History 追上——ID 完全不變、動畫最乾淨，但要修 AC8「`q:` 只供中心與右側」的規格。
-- **3.2 動畫觸發點**：只在 `apply(_:isRealChange: true)` 且舊中心與新中心都在新牌組內時走動畫路徑；其餘維持 direct。兩個實作方向待 spike（§4 S7）：
-  - A：VM 內 `withAnimation(slide) { centerID = target }`，並讓 `CoverFlowStrip` 的 `onChange(of: items)` → `scrollTo` 在動畫路徑下不打斷動畫（同一 transaction 或跳過）。
-  - B：VM 只發「滑到 X」意圖，View 在 `ScrollViewReader` 內 `withAnimation { reader.scrollTo(target, anchor: .center) }`，binding 落定後同步 `centerID`。
-  - S5 動畫版 5/6 的那一次失敗要先弄清是動畫與 `scrollTo` 打架，還是換內容時的量測問題。
+- **3.2 動畫觸發點（v1：依 S7 定為 splitUpdate）**：只在 `apply(_:isRealChange: true)` 且舊中心與新中心都在新牌組內時走動畫路徑；其餘維持 direct（D6 其餘部分不動）。
+  - 做法：同一次更新只換牌（`items`，`centerID` 保持舊中心——條帶 `onChange(of: items)` 無動畫捲回舊中心，舊中心在牌組內故定位正確）；**下一次更新**再 `withAnimation(slide) { centerID = target }`。S7：keepOld／previous 平移 10/10、落定 10/10。
+  - 不採 sameUpdate：同一次更新內條帶的無動畫 `scrollTo` 會蓋掉動畫（S7 平移 0/10；S5「animated」被放棄的真因）。
+  - 「下一次更新」的排法：VM 以 `Task { @MainActor in … }` 讓出一輪（S7 以 16ms sleep 量測；實作改為讓出 runloop，須以單元測試釘住「兩次更新」的順序而非時長）。兩次更新之間若又有真實換歌或使用者拖曳，後到者取消前者（以「動畫目標」狀態判定，見 3.3）。
+  - 方向 B（View 內 `reader.scrollTo` 動畫）不再評估：splitUpdate 已達標，且維持「VM 決定、View 呈現」的既有分工。
 - **3.3 K5 守衛重做**：`isCenteringProgrammatically` 改為「程式化目標」狀態 `pendingProgrammaticTarget: String?`：binding 回寫 ≠ 目標 → 忽略（不算使用者接管）；＝ 目標 → 清除。落定判定不能用 macOS 15 API（事實 10），候選：目標回寫到達即清除＋逾時保險（動畫時長 × 2）自動清除；使用者在動畫途中真的拖曳的情況列為已知限制或以逾時後的回寫判定。
 - **3.4 動畫參數**：曲線沿用升降的 `timingCurve(0.16, 1, 0.3, 1)`；時長初值 0.45s（升降為 0.62s）；實機看手感後拍板。
 - **3.5 上一首的兩段過程（事實 8）**：第一段（退回模式）新舊中心是否都在牌組取決於 3.1；第二段「同一首換身分」不帶動畫。要不要在第一段就滑、還是等解析後一次滑，待拍板（§7）。
@@ -85,7 +86,7 @@
 - R3 3.1 補卡與 History 去重打架，出現同曲兩張（`DeckSnapshotTests` 釘住）。
 - ACCEPTANCE：H-04 驗證欄補「平滑」證據；H-05「交互整合未驗」可能隨 V5 轉 ✅；AC8 卡 ID 規則若採 3.1 備案需修訂並簽字。
 
-## 7. 待拍板
+## 7. 待拍板（v1：第 3 項 S7 已證實「舊中心必須留在牌組」，兩案都滿足，剩取捨）
 
 1. 動畫時長與曲線（§3.4）。
 2. 上一首第一段（退回模式）就滑，還是等解析後一次滑（§3.5）。
@@ -111,3 +112,17 @@
 1. **sameUpdate 不可用**：條帶 `onChange(of: items)` 的無動畫 `scrollTo` 在同一次更新內蓋掉動畫——這是 S5「animated」被放棄的真因（當時只量落定，未量平移）。§3.2 採 **splitUpdate**（換牌與動畫居中分兩次更新）。
 2. **舊中心必須留在牌組**：dropOld 兩種觸發都只有 1/10 看得到平移（中心卡被移除時鄰卡直接補位）。§3.1 不是可選優化而是前提；主案（補 `o:` 卡）與備案（`q:` 卡留左側）皆滿足，取捨仍待 §7-3 拍板。
 3. 推測（未核）：dropOld 第 1 次的 1/10 是牌組形狀剛由校準狀態轉入時的偶然，不代表可用路徑。
+
+## 附錄 A　評審記錄
+
+### A.1 2026-09-27 Codex 評審 R1（v1 全文，gpt-5.6-terra，read-only，對照程式碼）
+
+結論：方向正確，P0×5／P1×4／P2×3，不宜直接實作。要點（裁決待 v2 逐條記錄）：
+- P0-1 `DeckSnapshot.build` 拿不到 `listening`（History 可讀時只傳 `.musicHistory`），無法在純函式內補 `o:` 卡（`LyricsFlowModel.swift:98-101,297-302`）。
+- P0-2 History 無場次資訊，`h:A#n` 由新往舊動態編號，「同位置換身分」不成立；重播 A→B→A 會誤判。
+- P0-3 上一首：舊中心應暫留在新中心**右側**，且佇列往回跳當下 `currentIndex=nil`，牌組無 A。
+- P0-4 splitUpdate 兩次更新之間，`readSources` 的 `publish(isRealChange:false)` 可直接居中到目標，吞掉動畫。
+- P0-5 3.3「回寫≠目標一律忽略」違反 H-05（使用者動畫途中拖曳）。
+- P1：`Task.yield` 不保證 SwiftUI 已提交第一段；A→B→C 連續換歌取消規則；補卡突破 21 張上限；S7 未走 production 的 binding adapter／`scrollPositionDidChange`。
+- P2：reduce motion 的責任邊界；驗收只驗落定；**更簡方案**：canonical deck 不動，由 VM 持有短暫的 transition display layer（舊卡以原 ID 暫留在正確一側，動畫完即採 canonical）。
+原始輸出：session scratchpad `codex-plan2-r1.txt`（不入庫）。
