@@ -59,6 +59,29 @@ struct QueueSession: Equatable, Sendable {
         return next
     }
 
+    /// 換歌平移的方向佐證：新曲在清單中**恰出現一次**，且就在當前位置的前一項或後一項。
+    /// 必須在 `resolvingCurrent` **之前**呼叫——往回跳時它會把位置清成 nil，之後就無從取證
+    func slideHint(to persistentID: String) -> SlideHint? {
+        guard !persistentID.isEmpty, let snapshot, let currentIndex, snapshot.entries.indices.contains(currentIndex)
+        else { return nil }
+        let matches = snapshot.entries.indices.filter { snapshot.entries[$0].persistentID == persistentID }
+        guard matches.count == 1, let direction = Self.direction(from: currentIndex, to: matches[0]) else { return nil }
+        return SlideHint(
+            oldCardID: cardID(at: currentIndex),
+            oldPersistentID: snapshot.entries[currentIndex].persistentID,
+            targetPersistentID: persistentID,
+            direction: direction
+        )
+    }
+
+    private static func direction(from current: Int, to target: Int) -> SlideHint.Direction? {
+        switch target - current {
+        case 1: return .next
+        case -1: return .previous
+        default: return nil
+        }
+    }
+
     /// D15：Music 未執行 → 整個 session 失效，下一次取得有效讀取時重建
     func invalidated() -> QueueSession { QueueSession() }
 

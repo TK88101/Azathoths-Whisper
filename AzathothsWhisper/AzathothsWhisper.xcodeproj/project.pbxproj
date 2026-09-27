@@ -21,6 +21,7 @@
 		156D29F451CD333678FA3430 /* ArtworkDiskCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05EFB5F1B46342FF23FBAAB7 /* ArtworkDiskCache.swift */; };
 		16FBD7EDEABE6E49B37816EB /* SpaceGrotesk-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2D73EEC1E7143A8AD5C82C3D /* SpaceGrotesk-Variable.ttf */; };
 		193B259FC4EBFB36BEC757FB /* DeckFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA67BEAF9D31D2A090F57BF1 /* DeckFixtures.swift */; };
+		19781A7D083B10BF6421185B /* CoverFlowViewModelSlideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09930CC7EB1CC3C06927852E /* CoverFlowViewModelSlideTests.swift */; };
 		19D490A3DD871AFCD493D7B0 /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = B46629C50C54617D6DD25525 /* SwiftSoup */; };
 		1A24FD096089ED41B03388E0 /* CoverFlowUITestTraceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3A97A6F7C8C8A1218E12513 /* CoverFlowUITestTraceTests.swift */; };
 		1A4E1A843227FC0ED95F8751 /* CoverFlowGateLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE742760CB69460EDBC0EEB /* CoverFlowGateLogic.swift */; };
@@ -122,6 +123,7 @@
 		872CEFC9EA05015B0E85AC61 /* PlainTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F24739D9A5DEEA26D5E423C /* PlainTextEditor.swift */; };
 		89DEA9A1C808FA79E1FC01D5 /* LyricsFlowPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3B3D94E420D64D0F859655 /* LyricsFlowPresentation.swift */; };
 		8BE4CFAC52B93CBC4820E133 /* CoverFlowEvidenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E18ACE5B34E5264819AF0C2 /* CoverFlowEvidenceTests.swift */; };
+		8C15F6B8E698244B775E3A09 /* CoverFlowSlidePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90A5DFCD794FAE0271D0628 /* CoverFlowSlidePlan.swift */; };
 		90064F8C58350CBF225582F2 /* CoverFlowPrefetchWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 520D65C700949B2DDBC44E88 /* CoverFlowPrefetchWindow.swift */; };
 		90B1C6FF2F5FBD2A32FC4B58 /* CoverFlowUITestFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A725C8E898735606E8032F29 /* CoverFlowUITestFixture.swift */; };
 		9111CE050E7244BEA698758C /* CoverFlowCenterLabelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77A1B37D6B8DFCFB089BD24B /* CoverFlowCenterLabelTests.swift */; };
@@ -168,9 +170,11 @@
 		BB949953F47CEB08313B9B7B /* AccessibilityID.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACE94C7D4E17C34B130F77C8 /* AccessibilityID.swift */; };
 		BCB591555BC827D60B77B75C /* LyricsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E1A7DAEE49AB1565153545 /* LyricsServiceTests.swift */; };
 		BDB5721EBA5DF9149D2DD047 /* AboutLogo.png in Resources */ = {isa = PBXBuildFile; fileRef = 869CACD3F359C692710F276F /* AboutLogo.png */; };
+		BFD7D7F75E9D29EC97E731AE /* CoverFlowSlidePlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF6A29B59968A7FAAA9AB990 /* CoverFlowSlidePlanTests.swift */; };
 		C002CD79C0F951217AF5D928 /* CoverFlowMarksFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8575F16A3A5A87F67499C2FF /* CoverFlowMarksFormat.swift */; };
 		C094C29487585BEFEFBD7BC7 /* CoverFlowCenterLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7984B065A3700D3EAD1D526F /* CoverFlowCenterLabel.swift */; };
 		C3766325CA77980130F2F5C1 /* ArtworkAEFairnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB50ECDAB5786183829FB8C5 /* ArtworkAEFairnessTests.swift */; };
+		C4D5B37D6118823344D013C2 /* ThemeMotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00EE1BA3EC41C32F76D6B638 /* ThemeMotionTests.swift */; };
 		C69576D0DB2A12AF00509568 /* DeckSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6A54F1E1CC997DEE6C48766 /* DeckSnapshot.swift */; };
 		C763E2EFEB523EC7FB2C636A /* BatchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA1F99A3200554365F178A49 /* BatchUITests.swift */; };
 		C900CBC274F34AAFDF35C9E5 /* BundleAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CF1077108A3D6897BF3A40D /* BundleAssets.swift */; };
@@ -234,6 +238,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		00EE1BA3EC41C32F76D6B638 /* ThemeMotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeMotionTests.swift; sourceTree = "<group>"; };
 		01835B19D00459C3AA7AC195 /* LyricsFlowModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFlowModelTests.swift; sourceTree = "<group>"; };
 		02CD4AD754524742BBC47364 /* CoverFlowLayerReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowLayerReader.swift; sourceTree = "<group>"; };
 		05EFB5F1B46342FF23FBAAB7 /* ArtworkDiskCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkDiskCache.swift; sourceTree = "<group>"; };
@@ -242,6 +247,7 @@
 		08135CEA1179595F7FB63713 /* LyricsText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsText.swift; sourceTree = "<group>"; };
 		088DE4D5E615ED6616D23545 /* BatchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchViewModel.swift; sourceTree = "<group>"; };
 		08B38C59EC0043F3B2F28534 /* ArtworkServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkServiceTests.swift; sourceTree = "<group>"; };
+		09930CC7EB1CC3C06927852E /* CoverFlowViewModelSlideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowViewModelSlideTests.swift; sourceTree = "<group>"; };
 		0D038DACAB810D1E3A9A643E /* noise.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = noise.png; sourceTree = "<group>"; };
 		0F24739D9A5DEEA26D5E423C /* PlainTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlainTextEditor.swift; sourceTree = "<group>"; };
 		11A1AAB04870CA0FC8B13260 /* LyricsNotificationContentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsNotificationContentTests.swift; sourceTree = "<group>"; };
@@ -429,9 +435,11 @@
 		EE1BF2F922C9386770DBD80C /* AzathothsWhisperApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzathothsWhisperApp.swift; sourceTree = "<group>"; };
 		EE218CB453AF679FBA2EACD1 /* AEBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AEBudgetTests.swift; sourceTree = "<group>"; };
 		EE953C0F880DC66BD3F0B668 /* VisualEffectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectView.swift; sourceTree = "<group>"; };
+		EF6A29B59968A7FAAA9AB990 /* CoverFlowSlidePlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowSlidePlanTests.swift; sourceTree = "<group>"; };
 		F3A97A6F7C8C8A1218E12513 /* CoverFlowUITestTraceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowUITestTraceTests.swift; sourceTree = "<group>"; };
 		F517C76FBFFEDC9A2CE58C7C /* LyricsNotifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsNotifierTests.swift; sourceTree = "<group>"; };
 		F88E1A081770623476A3A22E /* HistorySnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistorySnapshotTests.swift; sourceTree = "<group>"; };
+		F90A5DFCD794FAE0271D0628 /* CoverFlowSlidePlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowSlidePlan.swift; sourceTree = "<group>"; };
 		FAA4B29822CA9BCCFEA5A207 /* EditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorViewModel.swift; sourceTree = "<group>"; };
 		FCFFF746CB6D2D71CD8EA866 /* MaterialSymbolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialSymbolTests.swift; sourceTree = "<group>"; };
 		FD35F164D8DBC688441330AD /* DarkLyricsSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkLyricsSource.swift; sourceTree = "<group>"; };
@@ -728,11 +736,13 @@
 				C2042248839B92C8571BF152 /* CoverFlowMarksFormatTests.swift */,
 				274E9B45A05861B55549838A /* CoverFlowPrefetchWindowTests.swift */,
 				9A9879C61C594EBFBC199A9F /* CoverFlowReportTelemetryTests.swift */,
+				EF6A29B59968A7FAAA9AB990 /* CoverFlowSlidePlanTests.swift */,
 				48B5785DBC8AE50D1A015696 /* CoverFlowUITestFixtureTests.swift */,
 				298C6019808B478E0D0EF144 /* CoverFlowUITestMusicTests.swift */,
 				F3A97A6F7C8C8A1218E12513 /* CoverFlowUITestTraceTests.swift */,
 				436CC389AA48CA8CEA132DF6 /* CoverFlowViewModelDeckTests.swift */,
 				889C88F35A72CC626E65D35D /* CoverFlowViewModelPrefetchTests.swift */,
+				09930CC7EB1CC3C06927852E /* CoverFlowViewModelSlideTests.swift */,
 				86E6252CFCC71AD3006C388D /* EditorViewModelTests.swift */,
 				9CBA8D561D582B0F4B004CEF /* LyricsFlowUITestAssemblyTests.swift */,
 				A8D48AED89F6F8695A6CF9E3 /* SettingsViewModelTests.swift */,
@@ -861,6 +871,7 @@
 				7CAA8E2815FD13EE91B7306C /* CoverFlowStripStackingTests.swift */,
 				3447D4ADE049D94DB7632E88 /* LocalizationTests.swift */,
 				FCFFF746CB6D2D71CD8EA866 /* MaterialSymbolTests.swift */,
+				00EE1BA3EC41C32F76D6B638 /* ThemeMotionTests.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -907,6 +918,7 @@
 				2E34A7ABCF8572F080A284F5 /* CoverFlowGeometry.swift */,
 				99BCAD66C666943E40ACDE33 /* CoverFlowItem.swift */,
 				520D65C700949B2DDBC44E88 /* CoverFlowPrefetchWindow.swift */,
+				F90A5DFCD794FAE0271D0628 /* CoverFlowSlidePlan.swift */,
 				92141CE1E1632E95C5ADD861 /* CoverFlowStrip.swift */,
 				88BBB0D3A2E6233A8FED3B35 /* CoverFlowView.swift */,
 				CEFCB2D70197F055F01640D5 /* CoverFlowViewModel.swift */,
@@ -1082,6 +1094,7 @@
 				ED158419DE8DA2D7142DE134 /* CoverFlowMarksFormatTests.swift in Sources */,
 				100AE8C009B271A9756C7BCF /* CoverFlowPrefetchWindowTests.swift in Sources */,
 				9BC7B1722201CE194CB71E0F /* CoverFlowReportTelemetryTests.swift in Sources */,
+				BFD7D7F75E9D29EC97E731AE /* CoverFlowSlidePlanTests.swift in Sources */,
 				851D1D1E511F03E5C40245E1 /* CoverFlowSlideSpikeS9Support.swift in Sources */,
 				2DAAE161D065379561EDAFFE /* CoverFlowSlideSpikeS9Tests.swift in Sources */,
 				3ACAFDC62889EFA144A2B517 /* CoverFlowStripRenderGeometryTests.swift in Sources */,
@@ -1091,6 +1104,7 @@
 				1A24FD096089ED41B03388E0 /* CoverFlowUITestTraceTests.swift in Sources */,
 				B41A98A578327ECA58E8B39E /* CoverFlowViewModelDeckTests.swift in Sources */,
 				A98D4D5D47E5CAA78F5A458D /* CoverFlowViewModelPrefetchTests.swift in Sources */,
+				19781A7D083B10BF6421185B /* CoverFlowViewModelSlideTests.swift in Sources */,
 				7A5F2F6E6EE853724E52D5FC /* DarkLyricsParserTests.swift in Sources */,
 				193B259FC4EBFB36BEC757FB /* DeckFixtures.swift in Sources */,
 				782C0B36DEDCA99A9FB144E4 /* DeckSnapshotTests.swift in Sources */,
@@ -1137,6 +1151,7 @@
 				25068C45C1CE38223F5F441C /* SkeletonTests.swift in Sources */,
 				019D6EAB6B08C533AF05145E /* SpyLyricsNotifier.swift in Sources */,
 				2E7B58956B0648C793807039 /* StubLyricsSource.swift in Sources */,
+				C4D5B37D6118823344D013C2 /* ThemeMotionTests.swift in Sources */,
 				465014A4EC7A454040B0FB65 /* TitleSanitizerTests.swift in Sources */,
 				6E0F72E6CF9588F5F7ED94AF /* TokenValidatorTests.swift in Sources */,
 				7D7234F68BFF710C010BE8CB /* TrackLabelTests.swift in Sources */,
@@ -1180,6 +1195,7 @@
 				EF9EFCB123EDF59A0DF3813F /* CoverFlowMarksFormat.swift in Sources */,
 				90064F8C58350CBF225582F2 /* CoverFlowPrefetchWindow.swift in Sources */,
 				AE08800C3FCF0F53126FADE7 /* CoverFlowReportTelemetry.swift in Sources */,
+				8C15F6B8E698244B775E3A09 /* CoverFlowSlidePlan.swift in Sources */,
 				FB26F20B6D6CBA3D8BDC32C3 /* CoverFlowStrip.swift in Sources */,
 				F832A340C58C89BB205E49F2 /* CoverFlowTraceFormat.swift in Sources */,
 				136F27EB5EA7F622814137DA /* CoverFlowUITestFixture.swift in Sources */,

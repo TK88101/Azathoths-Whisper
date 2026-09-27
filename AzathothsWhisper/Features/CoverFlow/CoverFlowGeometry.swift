@@ -23,6 +23,12 @@ struct CoverFlowGeometry {
     /// `LazyHStack` 的間距：負值造成覆疊
     var spacing: CGFloat { Self.overlapRatio * itemWidth }
 
+    /// 換歌平移的起點位移：條帶內容往回推 `slots` 個卡距（卡距＝卡寬＋間距）。
+    /// +1＝下一首（內容先往右推一格，再滑回原位）；−1＝上一首
+    func slideOffset(slots: Int) -> CGFloat {
+        CGFloat(slots) * (itemWidth + spacing)
+    }
+
     // MARK: 距離
 
     /// 以 itemWidth 為單位的帶號距離：中心為 0，右側為正、左側為負。

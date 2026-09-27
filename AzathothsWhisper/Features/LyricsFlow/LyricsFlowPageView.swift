@@ -17,7 +17,7 @@ struct LyricsFlowPageView: View {
     @FocusState private var coverFlowFocused: Bool
 
     /// 設計稿：cubic-bezier(.16, 1, .3, 1) 620ms
-    private static let riseAnimation = Animation.timingCurve(0.16, 1, 0.3, 1, duration: 0.62)
+    private static let riseAnimation = Theme.Motion.layerShift
 
     private var isRaised: Bool { lyricsFlow.surface == .coverFlow }
 
