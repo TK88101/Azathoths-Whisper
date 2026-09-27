@@ -18,10 +18,10 @@ final class LyricsFlowModel {
     static let riseDelay: Duration = ConfettiTiming.lifetime
     /// D1：左右各幾張（S6：左右合計 ≤ 20 首一批讀詳情）
     static let window = 10
-    /// 換歌後 History.dat 短重讀的時點（相對換歌事件的**絕對時點**；0ms＝換歌當下既有的讀檔）。
-    /// 自然播完時 Music 寫履歴可能晚於換歌通知，平移中追上就不會有「剛播完的那張消失」（F2，
-    /// 計劃 2026-09-27-coverflow-f1-f2 §3.3）。末項不得超過平移的逾時保險
-    static let historyRecheckOffsets: [Duration] = [.milliseconds(100), .milliseconds(300), .milliseconds(700)]
+    /// 換歌後 History.dat 重讀的時點（相對換歌事件的**絕對時點**；0ms＝換歌當下既有的讀檔）。
+    /// 實測 Music 在換歌後 4.86–5.05 秒才寫履歴（4 次自然播完）；第一點晚於最大值，後兩點防負載尾端，
+    /// 7 秒仍沒追上就放棄、交給 3 秒輪詢（F2，使用者 2026-09-27 拍板，計劃 2026-09-27-coverflow-f1-f2 §8.1、§9 乙）
+    static let historyRecheckOffsets: [Duration] = [.milliseconds(5200), .seconds(6), .seconds(7)]
 
     /// 實際 sleep 的是相鄰時點的差（R1-5）
     static var historyRecheckGaps: [Duration] {

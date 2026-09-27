@@ -268,3 +268,6 @@ A.2 #1（合併窗）的辯論結果：
 - 丙：P1——`slidePlan` 要求 `transition == nil` 才起滑，暫留 7 秒會讓這段期間的下一次換歌全部 direct；位次條件在 7 秒內更易失效；須重簽 AC8。不推薦。
 - 第四案丁（Codex 提出）：另設「待入履歴」的暫定左鄰卡（不動平移的 `transition`），履歴寫入時原位換成 `h:` 卡。畫面不再消失；代價是只播幾秒就跳過（Music 不記）時，會顯示一張 Music 面板沒有的卡，直到上限到時才消失——與 F3「和面板一致」衝突。
 - 需使用者拍板：連續觀感（丁）與忠於 Music（乙）的取捨。
+
+### 9.2 使用者拍板（2026-09-27 23:29）
+**採乙**：時點改為 5.2／6／7 秒（`LyricsFlowModel.historyRecheckOffsets`）。契約測試改為 `recheckOffsetsCoverTheMeasuredWriteDelay`（紅：舊值 100／300／700ms → 綠）；`LyricsFlowHistoryRecheckTests` 13 條＋`LyricsFlowModelTests` 36 條全綠。§3.3「末項 ≤ slideTimeout」的約束隨之作廢（實測下平移中不可能追上）。

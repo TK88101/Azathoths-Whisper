@@ -123,12 +123,13 @@ struct LyricsFlowHistoryRecheckTests {
         #expect(h.played.last == pid(110), "沒播完的歌 Music 不記，左鄰維持履歴的真相")
     }
 
-    @Test func recheckOffsetsFitInsideTheSlide() {
+    /// 使用者 2026-09-27 拍板（計劃 §9 乙）：實測 Music 在換歌後 4.86–5.05 秒才寫履歴，
+    /// 第一點要晚於實測最大值，末點是放棄的上限
+    @Test func recheckOffsetsCoverTheMeasuredWriteDelay() {
         let offsets = LyricsFlowModel.historyRecheckOffsets
-        #expect(!offsets.isEmpty)
-        #expect(offsets.first! > .zero)
+        #expect(offsets == [.milliseconds(5200), .seconds(6), .seconds(7)])
+        #expect(offsets.first! > .milliseconds(5050), "第一點晚於實測最大延遲")
         #expect(zip(offsets, offsets.dropFirst()).allSatisfy { $0 < $1 }, "遞增")
-        #expect(offsets.last! <= CoverFlowViewModel.slideTimeout, "末項超過過渡時長就不再是平移中追上")
     }
 
     @Test func alreadyCaughtUpAtTheChangeDoesNotRecheck() async throws {
@@ -234,6 +235,23 @@ struct LyricsFlowHistoryRecheckTests {
         await settle(200)
 
         #expect(await gated(h).requested.isEmpty)
+    }
+
+    /// F3（使用者 2026-09-27 裁定甲）：往回跳不改 History.dat，左側照履歴逐列顯示——
+    /// 往回跳到剛播完的那首時，它在左鄰（先前播完的那次）與正中（正在播）各一張，
+    /// 與 Music「次に再生」面板的履歴＋迷你播放器一致（計劃 2026-09-27-coverflow-f3 E1–E8）
+    @Test func skippingBackKeepsTheHistoryRowOfTheSameSong() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        await play(h, 1)
+        try h.writeHistory(Array(Self.fullHistory.dropFirst()) + [1])
+        await play(h, 2)
+
+        await play(h, 1)
+
+        #expect(h.played.last == pid(1), "履歴最後一列是先前播完的那次，不藏")
+        let current = try #require(h.coverFlow.deck.cards.first { $0.side == .current })
+        #expect(current.persistentID == pid(1))
     }
 
     @Test func historyCatchingUpDuringTheSlideKeepsItGoing() async throws {

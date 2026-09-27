@@ -34,7 +34,7 @@ Cover Flow 的排列要與 Music 播放清單面板**完全一致**：左＝履�
 對平移的影響（Codex R1 駁倒我方原先「不會變常不滑」的推測）：乙、丙改變的正是往回跳／重播時的左側排列；平移要求目標卡位次＝舊中心位次，這些情況 direct 的比例**會增加**（未量）。一般順向播放不受影響。
 
 ## 4. 狀態
-待使用者取捨；取捨前不動程式、不改 H-19／H-19a 與 `theSameTrackMayAppearOnTheLeftAndInTheCentre`。
+**使用者 2026-09-27 23:29 拍板：甲（維持現狀）。** 程式不改；`theSameTrackMayAppearOnTheLeftAndInTheCentre` 保留（語義正確）；新增回歸測試 `LyricsFlowHistoryRecheckTests.skippingBackKeepsTheHistoryRowOfTheSameSong`（往回跳到剛播完的那首：左鄰＝先前播完的那次、正中＝正在播）；ACCEPTANCE H-19／H-19a 補述 E1–E8 與「窗口內等於面板履歴＋迷你播放器＋接下來」的精確定義。
 
 ## 附錄 A　Codex R1（2026-09-27，原始輸出 scratchpad `codex-f23-r1.txt`）
 - 我方主張「現況已等於面板清單＋迷你播放器、兩條定義在往回跳／單曲循環時衝突」：**成立**，加兩個限定——只在左右各 10 張的窗口內、且檔案已讀到時成立。
