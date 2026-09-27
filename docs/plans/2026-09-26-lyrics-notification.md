@@ -9,6 +9,8 @@
   ⑥（2026-09-26 新增需求）Batch 寫入成功後**自動切回 Editor 分頁**（§4.6）；
   ⑦（2026-09-27）切頁到期時有任何彈框（Settings／About modal、Import All 確認框、Batch 提示框）開著 → **本次不切**；
   ⑧（2026-09-27）等待期間只有「真正開始新工作」才取消切頁（Fetch Missing、Import Selected、確認後的 Import All、載入／切換專輯）；點選曲目看預覽不取消。
+  ⑨（2026-09-27，實機情況 B 後）自動切回時**維持現狀**：切回後的畫面照 v2.0.1 規則，當前曲本已有詞且使用者先前親手降下歌詞畫面時仍是歌詞畫面，不強制 Cover Flow。
+  依據：實機 A（從 Cover Flow 開始→切回 Cover Flow）與 B（從歌詞畫面開始→切回歌詞畫面）皆符合此規則；Codex 兩輪辯論後傾向「自動切回時一律 Cover Flow」，使用者裁定維持現狀。
   ④⑤ 的選擇依據：樣式參考頁 https://claude.ai/artifact/CFCdb8pZpp7MCoTLbqA9Nm（使用者在頁上點選）。
 - 本次迭代同時包含（使用者 2026-09-26 指定）：**Cover Flow 隨 Music 切曲自動滑動（帶動畫）**，需求與計劃見 `2026-09-26-coverflow-follow-playback-slide.md`；兩者同分支、同一次發版。
 
@@ -237,6 +239,20 @@ var onImportFinished: ((BatchImportResult) -> Void)?
 | V6 | 三語切換重啟後，通知文案（含 title）跟著變 | 實機 |
 | V7 | Batch 分頁：Import All 全成功、Import Selected 成功 → 彩紙撒完後自動切回 Editor 分頁（當前曲有詞＝Cover Flow）；延遲期間手動切分頁、開 Settings、開始新工作則不切 | 實機 |
 
+### 6.1 實機驗證結果（2026-09-27，使用者在場，Debug 建置＋真實 Music）
+
+| # | 結果 |
+|---|---|
+| V1 | 全量單元 701 條：687 綠、2 條基線紅（RenderGeometry）、12 skip |
+| V2 | ✅ 前景橫幅；三行正確；App 名稱不重複（§3.1 推測成立） |
+| V3 | 全成功 ✅（36 首「all 36 tracks」；11 首缺 1 首「10 tracks: … and 7 more」）；部分失敗⏭ 實機造不出（鎖定檔案 Music 仍回報成功），使用者決定不改曲庫，以單元測試為準 |
+| V4 | ✅ 關閉不彈、重啟後保持、再開恢復；選單第三項英文 |
+| V5 | ✅ 系統層關閉：靜默、寫入照常、不報錯；ad-hoc 重簽（CDHash 變更）後只重問鑰匙串與 Music，**不再詢問通知權限**，通知照常 |
+| V6 | ✅ en／ja／zh-Hant；subtitle 長專輯名被系統截成單行（預期內） |
+| V7 | ✅ 情況 A：從 Cover Flow 開始→切回 Cover Flow；情況 B：從歌詞畫面開始→切回歌詞畫面（⑨ 維持現狀） |
+
+UITests（XCUITest 全量）尚未在使用者在場下跑；臨時診斷 UITest 已刪除、未提交。
+
 ## 7. 非目標
 
 - 寫入失敗時的**單首**通知（Editor 已有狀態欄與 `Failed to save`，不重複打擾）。
@@ -301,7 +317,7 @@ var onImportFinished: ((BatchImportResult) -> Void)?
 | R1 | codex review --uncommitted | 無正確性問題 | — |
 | R1 | simplify／efficiency | clean | — |
 | R1 | simplify／altitude | ①同一環境旗標兩套判準 ②`operationGeneration += 1` 散落五處 ③AppModel 直接讀 Batch 彈框欄位 | 全採納：`isAutomatedTest` 命名、`beginOperation()` 單一入口、`BatchViewModel.isShowingDialog` |
-| R1 | simplify／simplification | ①`wasInvalidated` 可由 `isStale(session)` 推導（sessionID 只增不減） ②延時任務樣板與 `LyricsFlowModel.scheduleRise` 同構 | ①採納；②**遺留 P2**（reuse 評審亦獨立指出）：抽共用須改 diff 外的 `LyricsFlowModel`，另立項 |
+| R1 | simplify／simplification | ①`wasInvalidated` 可由 `isStale(session)` 推導（sessionID 只增不減） ②延時任務樣板與 `LyricsFlowModel.scheduleRise` 同構 | ①採納；②**遺留 P2**（reuse 評審亦獨立指出）：抽共用須改 diff 外的 `LyricsFlowModel`。**使用者 2026-09-27 裁定：必須合併為一份，於 V2–V7 實機驗證通過後處理** |
 | R2 | codex review／主 session 複查 R1 修正 | 無 | early-exit |
 
 security-reviewer 未派：無認證／支付／加密／網路／檔案操作；日誌只記錯誤 domain／code。
