@@ -143,3 +143,20 @@ actor NowPlayingMonitor {
         await tick()
     }
 }
+
+extension PollClock {
+    /// 「等一段時間、沒被取消才執行」的唯一實作：LyricsFlow 的升回與 Batch 成功後切回 Editor 分頁共用。
+    /// 呼叫端持有回傳的 task，以 `cancel()` 放棄；sleep 被取消而丟錯、或醒來時已取消，都不執行 `action`
+    @MainActor
+    func schedule(after delay: Duration, _ action: @escaping @MainActor () -> Void) -> Task<Void, Never> {
+        Task { @MainActor in
+            do {
+                try await sleep(for: delay)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            action()
+        }
+    }
+}

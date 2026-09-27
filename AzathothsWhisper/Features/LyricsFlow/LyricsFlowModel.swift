@@ -241,14 +241,7 @@ final class LyricsFlowModel {
 
     private func scheduleRise(_ token: RiseToken) {
         riseTask?.cancel()
-        let clock = self.clock
-        riseTask = Task { [weak self] in
-            do {
-                try await clock.sleep(for: Self.riseDelay)
-            } catch {
-                return
-            }
-            guard !Task.isCancelled else { return }
+        riseTask = clock.schedule(after: Self.riseDelay) { [weak self] in
             self?.dispatch(.riseDue(token))
         }
     }

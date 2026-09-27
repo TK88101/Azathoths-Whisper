@@ -395,15 +395,7 @@ final class AppModel {
     private func scheduleReturnToEditor() {
         cancelPendingReturnToEditor()
         let generation = batch.operationGeneration
-        let clock = batchSwitchClock
-        let delay = LyricsFlowModel.riseDelay
-        pendingReturnToEditor = Task { [weak self] in
-            do {
-                try await clock.sleep(for: delay)
-            } catch {
-                return
-            }
-            guard !Task.isCancelled else { return }
+        pendingReturnToEditor = batchSwitchClock.schedule(after: LyricsFlowModel.riseDelay) { [weak self] in
             self?.returnToEditorIfUndisturbed(since: generation)
         }
     }

@@ -317,7 +317,7 @@ UITests（XCUITest 全量）尚未在使用者在場下跑；臨時診斷 UITest
 | R1 | codex review --uncommitted | 無正確性問題 | — |
 | R1 | simplify／efficiency | clean | — |
 | R1 | simplify／altitude | ①同一環境旗標兩套判準 ②`operationGeneration += 1` 散落五處 ③AppModel 直接讀 Batch 彈框欄位 | 全採納：`isAutomatedTest` 命名、`beginOperation()` 單一入口、`BatchViewModel.isShowingDialog` |
-| R1 | simplify／simplification | ①`wasInvalidated` 可由 `isStale(session)` 推導（sessionID 只增不減） ②延時任務樣板與 `LyricsFlowModel.scheduleRise` 同構 | ①採納；②**遺留 P2**（reuse 評審亦獨立指出）：抽共用須改 diff 外的 `LyricsFlowModel`。**使用者 2026-09-27 裁定：必須合併為一份，於 V2–V7 實機驗證通過後處理** |
+| R1 | simplify／simplification | ①`wasInvalidated` 可由 `isStale(session)` 推導（sessionID 只增不減） ②延時任務樣板與 `LyricsFlowModel.scheduleRise` 同構 | ①採納；②**遺留 P2**（reuse 評審亦獨立指出）：抽共用須改 diff 外的 `LyricsFlowModel`。**使用者 2026-09-27 裁定：必須合併為一份，於 V2–V7 實機驗證通過後處理** → 已處理（2026-09-27）：`PollClock.schedule(after:_:)` 為唯一實作，LyricsFlow 升回與 AppModel 切頁共用；新增 `PollClockScheduleTests`（先紅後綠），全量 703 條僅基線紅，codex review 無問題 |
 | R2 | codex review／主 session 複查 R1 修正 | 無 | early-exit |
 
 security-reviewer 未派：無認證／支付／加密／網路／檔案操作；日誌只記錯誤 domain／code。

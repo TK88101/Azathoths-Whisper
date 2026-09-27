@@ -96,6 +96,7 @@
 		63C8297837078C7EFF8859D5 /* ShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1207833B927999FE4629D7C4 /* ShellUITests.swift */; };
 		69E9C58C82DA0D567F4B4061 /* ArtworkFailureBackoffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDF3DD13262175B062024A47 /* ArtworkFailureBackoffTests.swift */; };
 		6E0F72E6CF9588F5F7ED94AF /* TokenValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBD798CD14BE3D073D1D95B /* TokenValidatorTests.swift */; };
+		6EFA2DC6ABCF8A365A26E03A /* PollClockScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E3EFFBB36D6C0965350C53 /* PollClockScheduleTests.swift */; };
 		6F5400E5F4CFE1F7E395E357 /* QueueFileSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 469085BCC5001E8EB78677AF /* QueueFileSourceTests.swift */; };
 		71FD6CF89E6E5E3DD71F8023 /* SecretStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC04C43614AE140D937C8D47 /* SecretStore.swift */; };
 		72A427582BB6C4D5BBB02138 /* LyricsStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECDE70E69B691F835254409 /* LyricsStatus.swift */; };
@@ -315,6 +316,7 @@
 		6C61FC001523CA630A644E18 /* LyricsFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFlowUITests.swift; sourceTree = "<group>"; };
 		70100D311C4A8C4190052A3D /* LyricsFlowUITestScenario.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFlowUITestScenario.swift; sourceTree = "<group>"; };
 		71D5D3EB1307A6301785FE06 /* AppModel+LyricsFlowUITest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+LyricsFlowUITest.swift"; sourceTree = "<group>"; };
+		71E3EFFBB36D6C0965350C53 /* PollClockScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollClockScheduleTests.swift; sourceTree = "<group>"; };
 		7293458563F6C6A8657480BC /* CoverFlowUITestTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowUITestTrace.swift; sourceTree = "<group>"; };
 		748E387ADDA437C553314752 /* MaterialSymbol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialSymbol.swift; sourceTree = "<group>"; };
 		74CC7F7BFE181C5DFA37DF89 /* CoverFlowTraceFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowTraceFormat.swift; sourceTree = "<group>"; };
@@ -884,6 +886,7 @@
 				B0F9592625EF979488828038 /* MusicSelectorAllowListTests.swift */,
 				E2F7884E2BD6084D58D02973 /* NoLyricsMarksTests.swift */,
 				21CCBA00B1D1C642B5BB0EAA /* NowPlayingMonitorTests.swift */,
+				71E3EFFBB36D6C0965350C53 /* PollClockScheduleTests.swift */,
 				469085BCC5001E8EB78677AF /* QueueFileSourceTests.swift */,
 				E4243624BD7A1223595A604E /* QueueSnapshotTests.swift */,
 				ABBD798CD14BE3D073D1D95B /* TokenValidatorTests.swift */,
@@ -1114,6 +1117,7 @@
 				26E18EED221AA164EAA7C457 /* MusicSelectorAllowListTests.swift in Sources */,
 				D55E3B26036A2FAC9C6C02F6 /* NoLyricsMarksTests.swift in Sources */,
 				27D8CDEF942513320FAD76A4 /* NowPlayingMonitorTests.swift in Sources */,
+				6EFA2DC6ABCF8A365A26E03A /* PollClockScheduleTests.swift in Sources */,
 				0DDCE6BFE7270E854A88DD37 /* PythonCompatTests.swift in Sources */,
 				6F5400E5F4CFE1F7E395E357 /* QueueFileSourceTests.swift in Sources */,
 				FD08FDB49C9A0488EA051F31 /* QueueFixtures.swift in Sources */,
