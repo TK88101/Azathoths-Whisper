@@ -351,6 +351,30 @@ struct CoverFlowViewModelSlideTests {
         #expect(model.centerID == "C2", "左鄰是暫留的舊當前卡")
     }
 
+    /// 顯示上讓位的那張仍在正式牌組裡：它的封面恢復通知不得被丟掉
+    @Test func artworkRecoveryForTheYieldedCardIsKept() {
+        let model = slidingToC3()
+        model.artworkDidStore("T0")
+        #expect(model.artworkRevision(for: "T0") == 1)
+        model.slideDidSettle(generation: 1)
+        #expect(model.artworkRevision(for: "T0") == 1)
+    }
+
+    /// 落定後牌組換回正式牌組：預取集合跟著重排，不再含暫留卡
+    @Test func settlingReschedulesThePrefetch() async {
+        let artwork = StubArtworkProvider()
+        let model = makeModel(artwork: artwork)
+        model.setVisible(true)
+        settleOnC2(model)
+        model.apply(nextDeck, isRealChange: true)
+        await model.prefetchTaskForTesting?.value
+
+        model.slideDidSettle(generation: 1)
+        await model.prefetchTaskForTesting?.value
+
+        #expect(await artwork.prefetchCommands.last == ["T4", "T1", "T5", "T0"])
+    }
+
     @Test func prefetchCoversTheKeptCard() async {
         let artwork = StubArtworkProvider()
         let model = makeModel(artwork: artwork)

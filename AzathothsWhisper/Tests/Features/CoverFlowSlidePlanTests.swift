@@ -23,11 +23,22 @@ struct CoverFlowSlidePlanTests {
 
     private func ids(_ cards: [DeckCard]?) -> [String]? { cards?.map(\.id) }
 
-    /// `.slide` 的過渡顯示牌組（由同一組參數經 `display` 算出）
+    /// `.slide` 的過渡顯示牌組
     private func display(of plan: CoverFlowSlidePlan, canonical: DeckSnapshot) -> [DeckCard]? {
-        guard case .slide(let old, let target, let slots, let targetIndex) = plan else { return nil }
-        return CoverFlowSlidePlan.display(canonical: canonical, old: old, target: target, slots: slots,
-                                          targetIndex: targetIndex, limit: Self.limit)
+        guard case .slide(let placement) = plan else { return nil }
+        return CoverFlowSlidePlan.display(canonical: canonical, placement: placement, limit: Self.limit)
+    }
+
+    private func slide(old: DeckCard, target: String, slots: Int, targetIndex: Int) -> CoverFlowSlidePlan {
+        .slide(SlidePlacement(old: old, target: target, slots: slots, targetIndex: targetIndex))
+    }
+
+    private func display(canonical: DeckSnapshot, old: DeckCard, target: String, slots: Int, targetIndex: Int) -> [DeckCard]? {
+        CoverFlowSlidePlan.display(
+            canonical: canonical,
+            placement: SlidePlacement(old: old, target: target, slots: slots, targetIndex: targetIndex),
+            limit: Self.limit
+        )
     }
 
     // MARK: §3.2 對照表
@@ -40,7 +51,7 @@ struct CoverFlowSlidePlanTests {
 
         let plan = CoverFlowSlidePlan.make(previousDisplay: previous, old: old, canonical: canonical, hint: nil, limit: Self.limit)
 
-        #expect(plan == .slide(old: queue("A", .played), target: "q:0:B", slots: 1, targetIndex: 10))
+        #expect(plan == slide(old: queue("A", .played), target: "q:0:B", slots: 1, targetIndex: 10))
         #expect(ids(display(of: plan, canonical: canonical))
             == (2...10).map { "h:H\($0)#0" } + ["q:0:A", "q:0:B", "q:0:C", "q:0:D", "q:0:E"])
     }
@@ -53,7 +64,7 @@ struct CoverFlowSlidePlanTests {
 
         let plan = CoverFlowSlidePlan.make(previousDisplay: previous, old: old, canonical: canonical, hint: nil, limit: Self.limit)
 
-        #expect(plan == .slide(old: queue("A", .played), target: "q:0:B", slots: 1, targetIndex: 10))
+        #expect(plan == slide(old: queue("A", .played), target: "q:0:B", slots: 1, targetIndex: 10))
         #expect(ids(display(of: plan, canonical: canonical))
             == (2...10).map { "h:H\($0)#0" } + ["q:0:A", "q:0:B", "q:0:C", "q:0:D"])
     }
@@ -67,7 +78,7 @@ struct CoverFlowSlidePlanTests {
 
         let plan = CoverFlowSlidePlan.make(previousDisplay: previous, old: old, canonical: canonical, hint: hint, limit: Self.limit)
 
-        #expect(plan == .slide(old: queue("A", .upcoming), target: "o:B#0", slots: -1, targetIndex: 10))
+        #expect(plan == slide(old: queue("A", .upcoming), target: "o:B#0", slots: -1, targetIndex: 10))
         #expect(ids(display(of: plan, canonical: canonical)) == (1...10).map { "h:H\($0)#0" } + ["o:B#0", "q:0:A"])
     }
 
@@ -80,7 +91,7 @@ struct CoverFlowSlidePlanTests {
 
         let plan = CoverFlowSlidePlan.make(previousDisplay: previous, old: old, canonical: canonical, hint: nil, limit: Self.limit)
 
-        #expect(plan == .slide(old: observed("A", .played), target: "o:B#0", slots: 1, targetIndex: 10))
+        #expect(plan == slide(old: observed("A", .played), target: "o:B#0", slots: 1, targetIndex: 10))
         #expect(display(of: plan, canonical: canonical) == canonical.cards)
     }
 
@@ -166,31 +177,31 @@ struct CoverFlowSlidePlanTests {
     /// 履歴在過渡中追上：由「插入＋剔最左」變成「原位取代」，目標卡位次不變
     @Test func theDisplaySurvivesHistoryCatchingUp() {
         let caughtUp = deck(histories(2...10) + [played("A"), queue("B", .current)] + upcoming(["C"]), current: "q:0:B")
-        let cards = CoverFlowSlidePlan.display(canonical: caughtUp, old: queue("A", .played), target: "q:0:B", slots: 1,
-                                               targetIndex: 10, limit: Self.limit)
+        let cards = display(canonical: caughtUp, old: queue("A", .played), target: "q:0:B", slots: 1,
+                            targetIndex: 10)
         #expect(ids(cards) == (2...10).map { "h:H\($0)#0" } + ["q:0:A", "q:0:B", "q:0:C"])
     }
 
     /// 左側張數變了 → 目標卡位次對不上
     @Test func aChangedLeftCountEndsTheTransition() {
         let shrunk = deck(histories(1...5) + [queue("B", .current)], current: "q:0:B")
-        #expect(CoverFlowSlidePlan.display(canonical: shrunk, old: queue("A", .played), target: "q:0:B", slots: 1,
-                                           targetIndex: 10, limit: Self.limit) == nil)
+        #expect(display(canonical: shrunk, old: queue("A", .played), target: "q:0:B", slots: 1,
+                            targetIndex: 10) == nil)
     }
 
     /// 當前卡換了身分（往回跳後解析成佇列卡）
     @Test func aCurrentCardChangingIdentityEndsTheTransition() {
         let resolved = deck(histories(1...10) + [queue("B", .current), queue("A", .upcoming)], current: "q:0:B")
-        #expect(CoverFlowSlidePlan.display(canonical: resolved, old: queue("A", .upcoming), target: "o:B#0", slots: -1,
-                                           targetIndex: 10, limit: Self.limit) == nil)
+        #expect(display(canonical: resolved, old: queue("A", .upcoming), target: "o:B#0", slots: -1,
+                            targetIndex: 10) == nil)
     }
 
     /// 右側已滿時暫留在右鄰：剔掉最右一張，不超過上限
     @Test func insertingOnTheRightRespectsTheLimit() {
         let right = (1...10).map { "R\($0)" }
         let canonical = deck(histories(1...10) + [observed("B", .current)] + upcoming(right), current: "o:B#0")
-        let cards = CoverFlowSlidePlan.display(canonical: canonical, old: queue("A", .upcoming), target: "o:B#0", slots: -1,
-                                               targetIndex: 10, limit: Self.limit)
+        let cards = display(canonical: canonical, old: queue("A", .upcoming), target: "o:B#0", slots: -1,
+                            targetIndex: 10)
         #expect(cards?.count == Self.limit)
         #expect(ids(cards)?.suffix(3) == ["q:0:R7", "q:0:R8", "q:0:R9"])
         #expect(cards?[11].id == "q:0:A")
@@ -199,7 +210,7 @@ struct CoverFlowSlidePlanTests {
     /// canonical 裡已有同 ID 的卡但不在緊鄰位置：不重複放、也不滑
     @Test func anOldCardElsewhereInTheDeckEndsTheTransition() {
         let canonical = deck([queue("A", .played)] + histories(1...9) + [queue("B", .current)], current: "q:0:B")
-        #expect(CoverFlowSlidePlan.display(canonical: canonical, old: queue("A", .played), target: "q:0:B", slots: 1,
-                                           targetIndex: 10, limit: Self.limit) == nil)
+        #expect(display(canonical: canonical, old: queue("A", .played), target: "q:0:B", slots: 1,
+                            targetIndex: 10) == nil)
     }
 }

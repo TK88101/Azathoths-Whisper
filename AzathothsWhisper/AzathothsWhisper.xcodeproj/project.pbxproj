@@ -76,6 +76,7 @@
 		41E4C401554F86C1C2568605 /* CardDetailsReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DF066922F5836CCB3B1CF21 /* CardDetailsReaderTests.swift */; };
 		42C4293859EAA82F89856005 /* DotEnv.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD54B72B40F92C6C1AC2A839 /* DotEnv.swift */; };
 		465014A4EC7A454040B0FB65 /* TitleSanitizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AB844272FF974D1DCD7D90C /* TitleSanitizerTests.swift */; };
+		476EF5A2D599A62341CC1538 /* CoverFlowStripReactionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB87E40DB8BF38B3DB84E71 /* CoverFlowStripReactionTests.swift */; };
 		4D785BC70A4F48D4DFE0DD21 /* GatedPollClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = E88ADD80362DCB3452B7468D /* GatedPollClock.swift */; };
 		4F93BF80819A3D3C48808DC4 /* MaterialSymbol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 748E387ADDA437C553314752 /* MaterialSymbol.swift */; };
 		50143BC7DCEEF00D535CC294 /* LyricsFlowPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFB6F6305273A6868BE8228 /* LyricsFlowPresentationTests.swift */; };
@@ -115,6 +116,7 @@
 		7D7234F68BFF710C010BE8CB /* TrackLabelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 444BB9B9C52753FC96EFD492 /* TrackLabelTests.swift */; };
 		7DA63AE81BB7C69073148467 /* LyricsFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C61FC001523CA630A644E18 /* LyricsFlowUITests.swift */; };
 		8018A18F74E3C10F4907064E /* BatchImportCoverFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D344A222229810F246989A /* BatchImportCoverFlowUITests.swift */; };
+		81BBB0ADBD22B3EB72F814AE /* CoverFlowStripReaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = E232BBA841CFF454F0ACBD50 /* CoverFlowStripReaction.swift */; };
 		82D2A59B117FEF715AB31338 /* LyricsFlowUITestScenario.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70100D311C4A8C4190052A3D /* LyricsFlowUITestScenario.swift */; };
 		831555F2254CA8F6096D1173 /* ConfettiPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76BC696A65A425C5F1C1E2C4 /* ConfettiPhysics.swift */; };
 		851D1D1E511F03E5C40245E1 /* CoverFlowSlideSpikeS9Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C8D983101D2EC567F1651E3 /* CoverFlowSlideSpikeS9Support.swift */; };
@@ -292,6 +294,7 @@
 		3B974A62AA39BDB7C24C6369 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		3CF1077108A3D6897BF3A40D /* BundleAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleAssets.swift; sourceTree = "<group>"; };
 		3CFB6F6305273A6868BE8228 /* LyricsFlowPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFlowPresentationTests.swift; sourceTree = "<group>"; };
+		3FB87E40DB8BF38B3DB84E71 /* CoverFlowStripReactionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowStripReactionTests.swift; sourceTree = "<group>"; };
 		3FDC4E5904685D4136EF1FB7 /* BatchImportFinishedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchImportFinishedTests.swift; sourceTree = "<group>"; };
 		4184956D33F7336BE25EBE66 /* CoverFlowSlideGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowSlideGeometryTests.swift; sourceTree = "<group>"; };
 		41FC53AE3AD065E73AA496E4 /* LyricsSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsSource.swift; sourceTree = "<group>"; };
@@ -424,6 +427,7 @@
 		DDC7FE27DC56B6DE64CB64DF /* CoverFlowStripRenderGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowStripRenderGeometryTests.swift; sourceTree = "<group>"; };
 		DDF3DD13262175B062024A47 /* ArtworkFailureBackoffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkFailureBackoffTests.swift; sourceTree = "<group>"; };
 		E186C698CB1D1E33DFE3F3FD /* LyricsGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsGateTests.swift; sourceTree = "<group>"; };
+		E232BBA841CFF454F0ACBD50 /* CoverFlowStripReaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowStripReaction.swift; sourceTree = "<group>"; };
 		E2F7884E2BD6084D58D02973 /* NoLyricsMarksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoLyricsMarksTests.swift; sourceTree = "<group>"; };
 		E33DEF70828BA94A897DE135 /* MusicProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicProcess.swift; sourceTree = "<group>"; };
 		E4243624BD7A1223595A604E /* QueueSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueSnapshotTests.swift; sourceTree = "<group>"; };
@@ -739,6 +743,7 @@
 				274E9B45A05861B55549838A /* CoverFlowPrefetchWindowTests.swift */,
 				9A9879C61C594EBFBC199A9F /* CoverFlowReportTelemetryTests.swift */,
 				EF6A29B59968A7FAAA9AB990 /* CoverFlowSlidePlanTests.swift */,
+				3FB87E40DB8BF38B3DB84E71 /* CoverFlowStripReactionTests.swift */,
 				48B5785DBC8AE50D1A015696 /* CoverFlowUITestFixtureTests.swift */,
 				298C6019808B478E0D0EF144 /* CoverFlowUITestMusicTests.swift */,
 				F3A97A6F7C8C8A1218E12513 /* CoverFlowUITestTraceTests.swift */,
@@ -923,6 +928,7 @@
 				520D65C700949B2DDBC44E88 /* CoverFlowPrefetchWindow.swift */,
 				F90A5DFCD794FAE0271D0628 /* CoverFlowSlidePlan.swift */,
 				92141CE1E1632E95C5ADD861 /* CoverFlowStrip.swift */,
+				E232BBA841CFF454F0ACBD50 /* CoverFlowStripReaction.swift */,
 				88BBB0D3A2E6233A8FED3B35 /* CoverFlowView.swift */,
 				CEFCB2D70197F055F01640D5 /* CoverFlowViewModel.swift */,
 			);
@@ -1101,6 +1107,7 @@
 				BFD7D7F75E9D29EC97E731AE /* CoverFlowSlidePlanTests.swift in Sources */,
 				851D1D1E511F03E5C40245E1 /* CoverFlowSlideSpikeS9Support.swift in Sources */,
 				2DAAE161D065379561EDAFFE /* CoverFlowSlideSpikeS9Tests.swift in Sources */,
+				476EF5A2D599A62341CC1538 /* CoverFlowStripReactionTests.swift in Sources */,
 				3ACAFDC62889EFA144A2B517 /* CoverFlowStripRenderGeometryTests.swift in Sources */,
 				0A8DAD9C375EFE076842E89B /* CoverFlowStripStackingTests.swift in Sources */,
 				2B19F8A03FDA6AD5288A31A3 /* CoverFlowUITestFixtureTests.swift in Sources */,
@@ -1201,6 +1208,7 @@
 				AE08800C3FCF0F53126FADE7 /* CoverFlowReportTelemetry.swift in Sources */,
 				8C15F6B8E698244B775E3A09 /* CoverFlowSlidePlan.swift in Sources */,
 				FB26F20B6D6CBA3D8BDC32C3 /* CoverFlowStrip.swift in Sources */,
+				81BBB0ADBD22B3EB72F814AE /* CoverFlowStripReaction.swift in Sources */,
 				F832A340C58C89BB205E49F2 /* CoverFlowTraceFormat.swift in Sources */,
 				136F27EB5EA7F622814137DA /* CoverFlowUITestFixture.swift in Sources */,
 				95D6075E8719554755C734B1 /* CoverFlowUITestMusic.swift in Sources */,

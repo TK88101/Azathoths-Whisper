@@ -34,19 +34,16 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
     let itemWidth: CGFloat
     @Binding var centerID: Item.ID?
     let slide: CoverFlowSlideRequest?
-    let slideAnimation: Animation
     let onSlideSettled: (Int) -> Void
     let content: (Item, Bool) -> Content
 
     init(items: [Item], itemWidth: CGFloat, centerID: Binding<Item.ID?>,
-         slide: CoverFlowSlideRequest? = nil, slideAnimation: Animation = Theme.Motion.layerShift,
-         onSlideSettled: @escaping (Int) -> Void = { _ in },
+         slide: CoverFlowSlideRequest? = nil, onSlideSettled: @escaping (Int) -> Void = { _ in },
          @ViewBuilder content: @escaping (Item, _ isCentered: Bool) -> Content) {
         self.items = items
         self.itemWidth = itemWidth
         self._centerID = centerID
         self.slide = slide
-        self.slideAnimation = slideAnimation
         self.onSlideSettled = onSlideSettled
         self.content = content
     }
@@ -68,8 +65,7 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
 
     /// 指令剛到、還沒釋放：把整排往回推，畫面上舊當前卡仍在正中
     private var slideShift: CGFloat {
-        guard let slide, slide.generation != releasedGeneration else { return 0 }
-        return geometry.slideOffset(slots: slide.slots)
+        geometry.slideOffset(slots: CoverFlowStripReaction.pendingSlots(slide, releasedGeneration: releasedGeneration))
     }
 
     var body: some View {
@@ -120,42 +116,39 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
             // 內容一變就明確捲回正中那張，不帶動畫（`CoverFlowDeckSideChangeTests`）。
             // 卡 ID 序列與平移指令併成一個觀察值：兩者常在同一次更新一起變，順序由這裡決定
             .onChange(of: CoverFlowStripInput(ids: items.map(\.id), slide: slide), initial: true) { old, new in
-                if let request = new.slide, request.generation != releasedGeneration {
-                    consume(request, isInitial: old == new, reader: reader)
-                    return
-                }
-                guard new.ids != old.ids, let centerID else { return }
-                reader.scrollTo(centerID, anchor: .center)
+                perform(.resolve(from: old, to: new, releasedGeneration: releasedGeneration), reader: reader)
             }
           }
         }
         .coordinateSpace(.named(coverFlowViewportSpace))
     }
 
-    /// 還沒釋放的指令只在這裡處理一次
-    private func consume(_ request: CoverFlowSlideRequest, isInitial: Bool, reader: ScrollViewProxy) {
-        guard !isInitial else {
-            // 條帶出現時就帶著指令＝被重建：`onChange` 不會再為它觸發，不處理的話位移會卡在一個卡距上。
-            // 已釋放的指令不會走到這裡（條帶只是重新出現時 `@State` 還在），動畫照常由自己落定
-            releasedGeneration = request.generation
-            onSlideSettled(request.generation)
-            return
-        }
-        if let centerID {
-            reader.scrollTo(centerID, anchor: .center)
-        }
-        // 釋放要在「位移已套用」之後的另一次更新，才有起點可以動畫
-        withAnimation(slideAnimation, completionCriteria: .logicallyComplete) {
-            releasedGeneration = request.generation
-        } completion: {
-            onSlideSettled(request.generation)
+    /// 判斷在 `CoverFlowStripReaction.resolve`（純函式）；這裡只執行
+    private func perform(_ reaction: CoverFlowStripReaction, reader: ScrollViewProxy) {
+        switch reaction {
+        case .none:
+            break
+        case .recenter:
+            recenter(reader)
+        case .settleAtOnce(let generation):
+            // 條帶出現時就帶著指令＝被重建：`onChange` 不會再為它觸發，不處理的話位移會卡在一個卡距上
+            releasedGeneration = generation
+            onSlideSettled(generation)
+        case .slide(let generation):
+            recenter(reader)
+            // 釋放要在「位移已套用」之後的另一次更新，才有起點可以動畫
+            withAnimation(Theme.Motion.layerShift, completionCriteria: .logicallyComplete) {
+                releasedGeneration = generation
+            } completion: {
+                onSlideSettled(generation)
+            }
         }
     }
-}
 
-private struct CoverFlowStripInput<ID: Hashable>: Equatable {
-    let ids: [ID]
-    let slide: CoverFlowSlideRequest?
+    private func recenter(_ reader: ScrollViewProxy) {
+        guard let centerID else { return }
+        reader.scrollTo(centerID, anchor: .center)
+    }
 }
 
 /// 單張卡的疊放與可點判定：讀自己的**佈局位置**（與 `.visualEffect` 旋轉同一份幾何），離中心愈遠愈下沉。

@@ -1,5 +1,19 @@
 import Foundation
 
+/// 換歌方向的佐證，由 `QueueSession.slideHint(to:)` 在解析新位置之前取得
+/// （計劃 `docs/plans/2026-09-26-coverflow-follow-playback-slide.md` §3.1-4 (iii)）
+struct SlideHint: Equatable, Sendable {
+    enum Direction: Equatable, Sendable {
+        case next
+        case previous
+    }
+
+    let oldCardID: String
+    let oldPersistentID: String
+    let targetPersistentID: String
+    let direction: Direction
+}
+
 /// 佇列 session：最後一份有效的 `QueueSnapshot`＋當前出現位置＋itID epoch（計劃 AC8、R3-1、R4-4、AC8b）。
 /// 值型別：每個操作回傳新值。
 ///
@@ -64,7 +78,7 @@ struct QueueSession: Equatable, Sendable {
     func slideHint(to persistentID: String) -> SlideHint? {
         guard !persistentID.isEmpty, let snapshot, let currentIndex, snapshot.entries.indices.contains(currentIndex)
         else { return nil }
-        let matches = snapshot.entries.indices.filter { snapshot.entries[$0].persistentID == persistentID }
+        let matches = occurrences(of: persistentID, isRealChange: true)
         guard matches.count == 1, let direction = Self.direction(from: currentIndex, to: matches[0]) else { return nil }
         return SlideHint(
             oldCardID: cardID(at: currentIndex),

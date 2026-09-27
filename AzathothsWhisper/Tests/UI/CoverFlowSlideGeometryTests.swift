@@ -10,8 +10,6 @@ import Testing
 // 平移不動捲動位置，位移量由卡層位置還原：最靠近視口中點的卡層之帶號偏移（卡格相位）逐幀累加，
 // 跨半個卡距時折返。每一步都斷言——S9 量測碼只印統計，不是回歸證據。
 
-private let viewSize = CGSize(width: 1192, height: 620)
-
 @MainActor
 private enum SlideProbe {
     static let stride = CoverFlowGeometry(itemWidth: CoverFlowView.itemWidth).slideOffset(slots: 1)
@@ -23,38 +21,8 @@ private enum SlideProbe {
         let isPlayingCardCentered: Bool
     }
 
-    static func openWindow<Content: View>(_ content: Content) -> NSWindow {
-        let screen = NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
-        let window = NSWindow(
-            contentRect: CGRect(x: screen.midX - viewSize.width / 2, y: screen.midY - viewSize.height / 2,
-                                width: viewSize.width, height: viewSize.height),
-            styleMask: [.titled], backing: .buffered, defer: false
-        )
-        window.isReleasedWhenClosed = false
-        window.level = .floating
-        window.contentView = NSHostingView(rootView: content)
-        window.makeKeyAndOrderFront(nil)
-        return window
-    }
-
-    /// 連兩次層樹簽名與捲動原點相同才算落定
-    static func settled(_ window: NSWindow, timeout: TimeInterval = 10) async -> StackFrame? {
-        var previous: StackFrame?
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(100))
-            let current = StackReader.read(window)
-            if let current, let previous, current.cards.count >= 2,
-               current.signature == previous.signature, current.scrollX == previous.scrollX {
-                return current
-            }
-            previous = current
-        }
-        return nil
-    }
-
     static func phase(_ frame: StackFrame?) -> CGFloat {
-        frame.flatMap { f in f.cards.map { $0.midX - f.viewportMidX }.min { abs($0) < abs($1) } } ?? .infinity
+        frame?.centerOffset ?? .infinity
     }
 
     /// 逐幀取樣（16ms）。`isCentered` 由呼叫端提供：正式 View 讀 VM，條帶測試自己記
@@ -99,7 +67,7 @@ private struct SlideHarness: View {
     var body: some View {
         CoverFlowView(model: model, isInteractive: false, focus: $focused, upcoming: .available,
                       prefersReducedMotion: prefersReducedMotion, onTapPlayingCard: {})
-            .frame(width: viewSize.width, height: viewSize.height)
+            .frame(width: CoverFlowTestWindow.size.width, height: CoverFlowTestWindow.size.height)
     }
 }
 
@@ -127,7 +95,7 @@ private struct StripHarness: View {
         ) { _ in
             CoverFlowItem(artwork: nil, size: CoverFlowView.itemWidth)
         }
-        .frame(width: viewSize.width, height: viewSize.height)
+        .frame(width: CoverFlowTestWindow.size.width, height: CoverFlowTestWindow.size.height)
         .background(Color.black)
     }
 }
@@ -169,10 +137,10 @@ struct CoverFlowSlideGeometryTests {
     /// 先空牌掛載、渲染後才首次給牌（production 的順序；掛載當下就帶牌組會走初值路徑、停在第一張）
     private static func stage(playing n: Int, prefersReducedMotion: Bool = false) async throws -> Stage {
         let model = CoverFlowViewModel(artwork: StubArtworkProvider(), clock: GatedPollClock())
-        let window = SlideProbe.openWindow(SlideHarness(model: model, prefersReducedMotion: prefersReducedMotion))
+        let window = CoverFlowTestWindow.open(SlideHarness(model: model, prefersReducedMotion: prefersReducedMotion))
         try? await Task.sleep(for: .milliseconds(300))
         model.apply(queueDeck(playing: n), isRealChange: true)
-        _ = try #require(await SlideProbe.settled(window), "起點未穩定")
+        _ = try #require(await CoverFlowTestWindow.settled(window), "起點未穩定")
         try #require(await SlideProbe.waitUntil { model.isPlayingCardCentered }, "條帶沒有回報播放卡在正中")
         #expect(model.prefersReducedMotion == prefersReducedMotion, "View 應把減少動態效果同步給 VM")
         return Stage(model: model, window: window)
@@ -193,7 +161,7 @@ struct CoverFlowSlideGeometryTests {
         #expect(samples.allSatisfy { abs($0.scrollX - before) < 0.5 }, "第 \(step) 步捲動位置動了")
         #expect(samples.first?.isPlayingCardCentered == false, "第 \(step) 步起滑時目標卡不該已算在正中")
 
-        let landed = await SlideProbe.settled(stage.window)
+        let landed = await CoverFlowTestWindow.settled(stage.window)
         #expect(abs(SlideProbe.phase(landed)) < 1, "第 \(step) 步落定未對齊")
         #expect(abs((landed?.scrollX ?? .infinity) - before) < 0.5)
         #expect(await SlideProbe.waitUntil { model.slide == nil }, "第 \(step) 步完成回呼沒有送到 VM")
@@ -274,7 +242,7 @@ struct CoverFlowSlideGeometryTests {
         stage.model.apply(Self.queueDeck(playing: 102), isRealChange: true)
 
         #expect(stage.model.slide == nil)
-        let landed = await SlideProbe.settled(stage.window)
+        let landed = await CoverFlowTestWindow.settled(stage.window)
         #expect(abs(SlideProbe.phase(landed)) < 1)
         #expect(stage.model.centerID == "q:0:102")
         #expect(await SlideProbe.waitUntil { stage.model.isPlayingCardCentered })
@@ -288,10 +256,10 @@ struct CoverFlowSlideGeometryTests {
         driver.cards = (0...20).map(StripCard.init)
         driver.center = 10
         driver.slide = CoverFlowSlideRequest(generation: 7, slots: 1)
-        let window = SlideProbe.openWindow(StripHarness(driver: driver))
+        let window = CoverFlowTestWindow.open(StripHarness(driver: driver))
         defer { window.orderOut(nil) }
 
-        let landed = try #require(await SlideProbe.settled(window))
+        let landed = try #require(await CoverFlowTestWindow.settled(window))
 
         #expect(driver.settled == [7])
         #expect(abs(SlideProbe.phase(landed)) < 1, "位移應為 0")
@@ -300,12 +268,12 @@ struct CoverFlowSlideGeometryTests {
     /// 動畫途中條帶被移出視窗再放回（沒被重建）：照常由動畫自己落定，只回報一次
     @Test func reappearingMidSlideDoesNotSettleEarly() async throws {
         let driver = StripDriver()
-        let window = SlideProbe.openWindow(StripHarness(driver: driver))
+        let window = CoverFlowTestWindow.open(StripHarness(driver: driver))
         defer { window.orderOut(nil) }
         try? await Task.sleep(for: .milliseconds(300))
         driver.cards = (0...20).map(StripCard.init)
         driver.center = 10
-        _ = try #require(await SlideProbe.settled(window))
+        _ = try #require(await CoverFlowTestWindow.settled(window))
 
         driver.cards = (1...21).map(StripCard.init)
         driver.center = 11
@@ -316,7 +284,7 @@ struct CoverFlowSlideGeometryTests {
         window.contentView = nil
         window.contentView = hosting
 
-        _ = await SlideProbe.settled(window)
+        _ = await CoverFlowTestWindow.settled(window)
         try? await Task.sleep(for: .milliseconds(Int(Theme.Motion.layerShiftDuration * 1000)))
         #expect(driver.settled == [1])
     }

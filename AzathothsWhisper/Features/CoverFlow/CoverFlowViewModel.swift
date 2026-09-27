@@ -38,7 +38,7 @@ final class CoverFlowViewModel {
 
     /// 給條帶的平移指令；沒有過渡就沒有指令
     var slide: CoverFlowSlideRequest? {
-        transition.map { CoverFlowSlideRequest(generation: $0.generation, slots: $0.slots) }
+        transition.map { CoverFlowSlideRequest(generation: $0.generation, slots: $0.placement.slots) }
     }
 
     /// 系統「減少動態效果」。View 同步實值之前先當作已開：寧可不滑
@@ -110,15 +110,7 @@ final class CoverFlowViewModel {
         if isRealChange {
             userHasOverriddenAutoCenter = false
         }
-        let liveIDs = Set(cards.map(\.id))
-        if userHasOverriddenAutoCenter, let centerID, liveIDs.contains(centerID) {
-            schedulePrefetch(movingFrom: previousCenter)
-            return
-        }
-        // 使用者停著的那張已不在牌組 → 回到當前那張，抑制隨之解除
-        userHasOverriddenAutoCenter = false
-        centerProgrammatically(on: newDeck.currentCardID ?? newDeck.cards.last?.id)
-        schedulePrefetch(movingFrom: previousCenter)
+        reconcileCenter(movingFrom: previousCenter)
     }
 
     /// 條帶回報平移動畫跑完（或逾時保險到期、或條帶被重建時的補救）。
@@ -226,7 +218,7 @@ final class CoverFlowViewModel {
     /// provider 回報某首歌從失敗中恢復（「是否為恢復」由 provider 判定）
     func artworkDidStore(_ persistentID: String) {
         // 牌組外的殘留通知不得寫進字典，否則長時間聽歌會讓它無界增長
-        guard cards.contains(where: { $0.persistentID == persistentID }) else { return }
+        guard livePersistentIDs.contains(persistentID) else { return }
         artworkRevisions[persistentID, default: 0] += 1
     }
 
@@ -252,8 +244,8 @@ final class CoverFlowViewModel {
 
     /// `deck` 已換成新牌組之後呼叫
     private func updateTransition(for plan: CoverFlowSlidePlan, isRealChange: Bool) {
-        if case .slide(let old, let target, let slots, let targetIndex) = plan {
-            beginTransition(old: old, target: target, slots: slots, targetIndex: targetIndex)
+        if case .slide(let placement) = plan {
+            beginTransition(placement)
             return
         }
         guard let transition else { return }
@@ -263,10 +255,10 @@ final class CoverFlowViewModel {
         }
     }
 
-    private func beginTransition(old: DeckCard, target: String, slots: Int, targetIndex: Int) {
+    private func beginTransition(_ placement: SlidePlacement) {
         slideGeneration += 1
         let generation = slideGeneration
-        transition = SlideTransition(generation: generation, old: old, target: target, slots: slots, targetIndex: targetIndex)
+        transition = SlideTransition(generation: generation, placement: placement)
         slideTimeoutTask?.cancel()
         slideTimeoutTask = clock.schedule(after: Self.slideTimeout) { [weak self] in
             self?.slideDidSettle(generation: generation)
@@ -279,28 +271,41 @@ final class CoverFlowViewModel {
         slideTimeoutTask = nil
     }
 
-    /// 過渡結束後收尾：暫留卡的資料此時才清；使用者若停在暫留卡上，回到當前那張
+    /// 過渡結束後收尾：暫留卡的資料此時才清；牌組換回正式牌組，居中與預取照換牌的規矩重走一遍
     private func finishTransition() {
         endTransition()
         pruneCaches()
-        guard let centerID, !deck.cards.contains(where: { $0.id == centerID }) else { return }
-        userHasOverriddenAutoCenter = false
-        centerProgrammatically(on: deck.currentCardID ?? deck.cards.last?.id)
+        reconcileCenter(movingFrom: centerID)
     }
 
     private static func display(of deck: DeckSnapshot, during transition: SlideTransition) -> [DeckCard]? {
-        CoverFlowSlidePlan.display(canonical: deck, old: transition.old, target: transition.target,
-                                   slots: transition.slots, targetIndex: transition.targetIndex, limit: cardLimit)
+        CoverFlowSlidePlan.display(canonical: deck, placement: transition.placement, limit: cardLimit)
     }
 
-    /// 只保留牌組內的歌。顯示牌組與正式牌組都算：暫留卡在過渡中留著，顯示上讓位的那張也還在正式牌組裡
+    /// 牌組內的歌。顯示牌組與正式牌組都算：暫留卡在過渡中留著，顯示上讓位的那張也還在正式牌組裡
+    private var livePersistentIDs: Set<String> {
+        Set((deck.cards + displayCards).map(\.persistentID))
+    }
+
     private func pruneCaches() {
-        let livePIDs = Set((deck.cards + displayCards).map(\.persistentID))
-        artworkRevisions = artworkRevisions.filter { livePIDs.contains($0.key) }
-        details = details.filter { livePIDs.contains($0.key) }
+        let live = livePersistentIDs
+        artworkRevisions = artworkRevisions.filter { live.contains($0.key) }
+        details = details.filter { live.contains($0.key) }
     }
 
     // MARK: 居中與預取
+
+    /// 條帶吃的牌變了之後：使用者接管中且停著的那張還在 → 不動；否則回到當前那張
+    private func reconcileCenter(movingFrom previousCenter: String?) {
+        if userHasOverriddenAutoCenter, let centerID, cards.contains(where: { $0.id == centerID }) {
+            schedulePrefetch(movingFrom: previousCenter)
+            return
+        }
+        // 使用者停著的那張已不在牌組 → 回到當前那張，抑制隨之解除
+        userHasOverriddenAutoCenter = false
+        centerProgrammatically(on: deck.currentCardID ?? deck.cards.last?.id)
+        schedulePrefetch(movingFrom: previousCenter)
+    }
 
     private func centerProgrammatically(on id: String?) {
         isCenteringProgrammatically = true
