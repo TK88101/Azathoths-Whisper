@@ -3,7 +3,8 @@ import Foundation
 /// Music 的換歌／播放狀態變化訊號（計劃 2026-09-27-coverflow-f1-f2 §3.1）。
 ///
 /// **只傳「變了」，不帶內容**：當前曲一律由 `NowPlayingMonitor` 經 AE 讀取（單一資料來源），
-/// 通知的 userInfo 在此丟棄——兩個來源會在歌詞、暫停狀態、AE 失敗時分歧（Codex R1 ④）
+/// 通知的內容不往下傳——兩個來源會在歌詞、暫停狀態、AE 失敗時分歧（Codex R1 ④）。
+/// 唯一例外是「要不要觸發」的閘門：明確的 `Stopped` 不觸發（見 `isStopped(_:)`）
 @MainActor
 protocol PlayerChangeSignaling: AnyObject {
     /// 冪等：已在監聽時再呼叫不重複註冊
@@ -15,6 +16,14 @@ protocol PlayerChangeSignaling: AnyObject {
 @MainActor
 final class MusicPlayerInfoSignal: PlayerChangeSignaling {
     static let musicPlayerInfo = Notification.Name("com.apple.Music.playerInfo")
+
+    /// 在清單中點歌時 Music 先送 `Stopped`、約 40–90ms 後才送 `Playing`；那一刻讀會讀到「沒在播」，
+    /// 畫面閃成空的再換回來（計劃 2026-09-27-coverflow-f1-f2 §10，Codex＋Jev 裁決 A）。
+    /// 真的停止由 3 秒輪詢發現（＝加通知之前的行為）。**失敗放行**：只有明確等於 `Stopped` 才丟，
+    /// 缺欄位、型別不符、未知值一律觸發——通知格式漂移不得讓換歌默默退回輪詢
+    nonisolated static func isStopped(_ userInfo: [AnyHashable: Any]?) -> Bool {
+        (userInfo?["Player State"] as? String) == "Stopped"
+    }
 
     private let name: Notification.Name
     private var observer: (any NSObjectProtocol)?
@@ -33,7 +42,8 @@ final class MusicPlayerInfoSignal: PlayerChangeSignaling {
         let current = generation
         observer = DistributedNotificationCenter.default().addObserver(
             forName: name, object: nil, queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
+            guard !Self.isStopped(notification.userInfo) else { return }
             MainActor.assumeIsolated { self?.deliver(generation: current) }
         }
     }

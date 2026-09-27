@@ -271,3 +271,31 @@ A.2 #1（合併窗）的辯論結果：
 
 ### 9.2 使用者拍板（2026-09-27 23:29）
 **採乙**：時點改為 5.2／6／7 秒（`LyricsFlowModel.historyRecheckOffsets`）。契約測試改為 `recheckOffsetsCoverTheMeasuredWriteDelay`（紅：舊值 100／300／700ms → 綠）；`LyricsFlowHistoryRecheckTests` 13 條＋`LyricsFlowModelTests` 36 條全綠。§3.3「末項 ≤ slideTimeout」的約束隨之作廢（實測下平移中不可能追上）。
+
+## 10. U3 實機結果與修法（2026-09-27 23:5x，使用者授權我操控 Music；production 原檔編成的命令列工具，從終端機執行）
+
+工具：`NowPlayingMonitor`＋`MusicPlayerInfoSignal`＋`MusicAppleEventsClient` 原檔＋最小 main（scratchpad `f1cli`），記錄「通知 → monitor 事件」延遲。
+
+| 情境 | 結果 |
+|---|---|
+| 播放中下一首 ×2、上一首 | 通知後 77／79／133ms 送出 `trackChanged`（F1 成立；先前最慢 3 秒） |
+| 暫停中下一首 | 80ms |
+| 播放／暫停切換 | 只有通知、沒有事件（同一首，正確） |
+| **在清單中直接播某首（`play track … of playlist`，模擬使用者點歌）** | `Stopped` 通知 → **13ms 後送出 `notPlaying`** → 25ms 後 `trackChanged` |
+| 單曲清單播完 | `notPlaying`（真的停了，正確） |
+
+**U3 成立（已核）**：點歌時 F1 會讓 LyricsFlow／Editor 先收到一次 `notPlaying`，Cover Flow 變成「沒在播」（只剩左側）再換回來，平移也被打斷。F1 之前只在 3 秒輪詢剛好撞上約 40ms 空窗時發生；F1 讓它每次點歌都發生——**是 F1 引入的回歸，發版前必修**。
+
+**副作用（照實記錄）**：模擬點歌把 Music 的「接下來」換成只有一首；已還原原曲、47 秒、暫停，但「接下來」無法原樣還原成原本那張專輯的 25 首（現為資料庫順序）。
+
+### 10.1 修法選項（待 thecure／Codex／Jev 裁決）
+- **A 訊號端過濾 `Stopped`**：`MusicPlayerInfoSignal` 讀通知的 `Player State` 一個欄位，是 `Stopped` 就不觸發讀取；真的停止由 3 秒輪詢發現（＝F1 之前的行為，H-04 ≤3s）。改動 1 檔、數行。偏離 R1 ④「丟棄 userInfo」：但只用來決定要不要讀，不當資料來源。
+- **B 通知觸發的讀取讀到「沒在播」先不發，隔一小段（例如 150ms）再確認**：monitor 內新增確認讀取與計時；輪詢路徑不變。要再注入一個時鐘、單飛狀態多一種理由。
+- **C 一律要連續兩次讀到「沒在播」才發 `notPlaying`**：輪詢與通知都延後一次讀取；真停止的發現從「下一次輪詢」變成「再下一次」（最多約 6 秒）。
+
+### 10.2 裁決與實作（2026-09-27 23:5x）
+- Jev（`jev-latest`＝jev-1.13.0，Choice）：A 0.93／B 0.07／C 0.00；「A 讓既有行為退步」0.23；「A 違反單一資料來源」0.15。輸入 scratchpad `jev-u3.json`。
+- Codex（thecure，scratchpad `codex-u3.txt`）：推薦 A，信心 0.91；附條件——只讀 `Player State` 當閘門、**失敗放行**（只有字串且精確等於 `Stopped` 才丟）。B 引入計時與新狀態、150ms 是未驗證的魔數；C 真停止最壞 6 秒。**全部採納**。
+- 實作：`MusicPlayerInfoSignal.isStopped(_:)`＋observer 閘門。TDD：`PlayerChangeSignalTests.aStoppedNotificationDoesNotTriggerARead` 紅→綠；`everyOtherNotificationTriggersARead` 6 個參數案例（Paused／Playing／小寫 stopped／缺欄位／非字串／無 userInfo）為守衛。
+- 實機再驗（重編命令列工具）：清單中點歌 3 次，皆約 120ms 直接 `trackChanged`，**零次 `notPlaying`**。
+- 已知行為（接受）：真的停止由 3 秒輪詢發現（＝加通知前的行為）；若 Music 只送 `Stopped` 而不再送任何通知就換了歌，也退回輪詢（≤3 秒）。

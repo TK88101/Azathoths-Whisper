@@ -12,9 +12,9 @@ struct PlayerChangeSignalTests {
         Notification.Name("com.ibridgezhao.azathothswhisper.tests.playerChange.\(UUID().uuidString)")
     }
 
-    private static func post(_ name: Notification.Name) {
+    private static func post(_ name: Notification.Name, userInfo: [AnyHashable: Any]? = ["Player State": "Playing"]) {
         DistributedNotificationCenter.default().postNotificationName(
-            name, object: nil, userInfo: ["Player State": "Playing"], deliverImmediately: true
+            name, object: nil, userInfo: userInfo, deliverImmediately: true
         )
     }
 
@@ -78,6 +78,43 @@ struct PlayerChangeSignalTests {
         defer { signal.stop() }
         Self.post(name)
         #expect(await Self.waitDelivered { calls == 12 }, "stop 後再 start 照常回呼一次")
+    }
+
+    /// U3（計劃 §10，Codex＋Jev 裁決 A）：在清單中點歌時 Music 先送 `Stopped`，那一刻讀會讀到「沒在播」。
+    /// 只丟明確的 `Stopped`；其餘一律放行（失敗放行：格式漂移不得讓換歌默默退回 3 秒輪詢）
+    @Test func aStoppedNotificationDoesNotTriggerARead() async {
+        let name = Self.uniqueName()
+        let signal = MusicPlayerInfoSignal(name: name)
+        var calls = 0
+        signal.start { calls += 1 }
+        defer { signal.stop() }
+
+        Self.post(name, userInfo: ["Player State": "Stopped"])
+        Self.post(name, userInfo: ["Player State": "Playing"])     // 後發的哨兵
+
+        #expect(await Self.waitDelivered { calls >= 1 })
+        #expect(calls == 1, "Stopped 不觸發，只有後面的 Playing 觸發")
+    }
+
+    @Test("非 Stopped 或讀不懂的通知一律觸發", arguments: [
+        "Paused", "Playing", "stopped", "missing", "notAString", "noUserInfo",
+    ])
+    func everyOtherNotificationTriggersARead(kind: String) async {
+        let name = Self.uniqueName()
+        let signal = MusicPlayerInfoSignal(name: name)
+        var calls = 0
+        signal.start { calls += 1 }
+        defer { signal.stop() }
+
+        let userInfo: [AnyHashable: Any]? = switch kind {
+        case "missing": ["Name": "x"]
+        case "notAString": ["Player State": 1]
+        case "noUserInfo": nil
+        default: ["Player State": kind]
+        }
+        Self.post(name, userInfo: userInfo)
+
+        #expect(await Self.waitDelivered { calls == 1 }, "\(kind) 應觸發讀取")
     }
 
     @Test func noopSignalNeverCallsBack() {
