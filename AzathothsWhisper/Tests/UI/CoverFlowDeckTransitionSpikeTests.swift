@@ -267,3 +267,237 @@ struct CoverFlowDeckSideChangeTests {
         #expect(abs(nearest ?? .infinity) < 1, "\(name)：沒有任何卡對齊正中（停在兩張之間）")
     }
 }
+
+// MARK: - S7（docs/plans/2026-09-26-coverflow-follow-playback-slide.md §4）：真實換歌以動畫平移
+//
+// 量測碼，預設關閉：只在 `TEST_RUNNER_AZW_SPIKE_S7=1` 時執行，結果印成 `S7 …` 行寫進該計劃 §8。
+// 量三件事：落定是否在目標且對齊正中、途中 binding 回寫是否有非目標值（K5）、
+// 目標卡離正中的距離是否逐幀單調縮小且有 ≥3 幀落在起訖之間（證明是平移不是跳）。
+
+/// 牌組形狀：換歌後舊中心在不在新牌組
+enum S7Shape: String, CaseIterable, Sendable {
+    /// 下一首，舊中心留在左側（窗口右移一格）
+    case keepOld
+    /// 下一首，舊中心離開牌組（佇列模式下 History.dat 尚未追上，計劃 §1 事實 7）
+    case dropOld
+    /// 上一首，舊中心留在右側（窗口左移一格）
+    case previous
+}
+
+/// 觸發方式（計劃 §3.2 方向 A 的兩種排法）
+enum S7Method: String, CaseIterable, Sendable {
+    /// 同一次更新內換牌，中心用 withAnimation 設（條帶 onChange(items)→scrollTo 同時觸發）
+    case sameUpdate
+    /// 先換牌（中心不變，條帶無動畫捲回舊中心），下一幀再 withAnimation 設中心
+    case splitUpdate
+}
+
+@Suite("S7 換歌平移（spike）", .serialized,
+       .enabled(if: ProcessInfo.processInfo.environment["AZW_SPIKE_S7"] == "1"))
+@MainActor
+struct CoverFlowSlideSpikeS7Tests {
+    /// 計劃 §3.4 初值：曲線沿用升降，時長 0.45s
+    private static let slide = Animation.timingCurve(0.16, 1, 0.3, 1, duration: 0.45)
+    private static let steps = 10
+
+    private static func deck(centeredOn id: Int) -> [SpikeCard] {
+        ((id - 10)...(id + 10)).map(SpikeCard.init)
+    }
+
+    private static func next(from center: Int, shape: S7Shape) -> (cards: [SpikeCard], target: Int) {
+        switch shape {
+        case .keepOld: return (deck(centeredOn: center + 1), center + 1)
+        case .dropOld: return (deck(centeredOn: center + 1).filter { $0.id != center }, center + 1)
+        case .previous: return (deck(centeredOn: center - 1), center - 1)
+        }
+    }
+
+    @Test("換歌動畫：落定、回寫、平移", arguments: S7Shape.allCases, S7Method.allCases)
+    func slide(shape: S7Shape, method: S7Method) async throws {
+        let session = try await CoverFlowDeckTransitionSpikeTests.prepared()
+        defer { session.close() }
+        let start = try #require(await session.settled(), "起點未穩定")
+        let viewportMidX = start.viewportMidX
+        var center = 10
+        var hits = 0, slid = 0, strayRuns = 0
+        var results: [String] = []
+
+        for step in 1...Self.steps {
+            let (cards, target) = Self.next(from: center, shape: shape)
+            session.deck.bindingWrites = []
+            session.deck.cards = cards
+            if method == .splitUpdate {
+                try? await Task.sleep(for: .milliseconds(16))
+            }
+            withAnimation(Self.slide) { session.deck.center = target }
+
+            // 逐幀取樣目標卡離正中的距離（0.8s，涵蓋 0.45s 動畫與收尾）
+            var samples: [CGFloat] = []
+            for _ in 0..<50 {
+                try? await Task.sleep(for: .milliseconds(16))
+                if let x = session.deck.midX[target] { samples.append(x - viewportMidX) }
+            }
+            let frame = await session.settled()
+            let shown = frame.flatMap { session.deck.centeredID(viewportMidX: $0.viewportMidX) }
+            let offset = frame.flatMap { f in f.cards.map { $0.midX - f.viewportMidX }.min { abs($0) < abs($1) } }
+            let landed = shown == target && abs(offset ?? .infinity) < 1
+            if landed { hits += 1 }
+
+            let inBetween = samples.filter { abs($0) > 4 && abs($0) < spikeStride - 4 }.count
+            let monotonic = zip(samples, samples.dropFirst()).allSatisfy { abs($1) <= abs($0) + 0.5 }
+            if inBetween >= 3, monotonic { slid += 1 }
+            let stray = session.deck.bindingWrites.compactMap { $0 }.filter { $0 != target }
+            if !stray.isEmpty { strayRuns += 1 }
+
+            var line = "\(step):landed=\(landed)(shown=\(shown.map(String.init) ?? "nil")/\(target),off=\(offset.map { String(format: "%.1f", $0) } ?? "nil")) "
+                + "mid=\(inBetween) mono=\(monotonic) writes=\(session.deck.bindingWrites.count) stray=\(stray)"
+            if step == 1 {
+                line += " samples=" + samples.prefix(24).map { String(format: "%.0f", $0) }.joined(separator: ",")
+            }
+            results.append(line)
+            center = target
+        }
+        print("S7 \(shape.rawValue)[\(method.rawValue)] landed=\(hits)/\(Self.steps) slid=\(slid)/\(Self.steps) "
+              + "strayRuns=\(strayRuns)/\(Self.steps) | " + results.joined(separator: " | "))
+    }
+}
+
+// MARK: - S8（docs/plans/2026-09-26-coverflow-follow-playback-slide.md §4）：production 路徑
+//
+// 量測碼，預設關閉：只在 `TEST_RUNNER_AZW_SPIKE_S8=1` 時執行，結果印成 `S8 …` 行寫進該計劃 §8.2。
+// 真實 `CoverFlowView`＋`CoverFlowViewModel`（binding setter → `scrollPositionDidChange`）。不改生產碼：
+//   - 中間回寫：逐幀取樣 VM 的 `centerID`。production setter 收到「≠ 中心」的值會改 `centerID` 並記接管，
+//     故取樣到 {old, target} 以外的值＝動畫途中有非目標回寫（R2 的 K5 前提）
+//   - 平移：逐幀取樣 NSScrollView 捲動原點，≥3 幀介於起訖且單調＝平移
+// 兩段以「apply 一副中心仍為 old 的新牌組」模擬 staged，再以三種觸發設 `centerID = target`（動畫 0.62s，§7-1）。
+
+enum S8Trigger: String, CaseIterable, Sendable {
+    /// DispatchQueue.main.async
+    case mainAsync
+    /// 固定 16ms（S7 的做法）
+    case sleep16
+    /// Task.yield（R1-P1 質疑的做法，作對照）
+    case yield
+}
+
+enum S8Direction: String, CaseIterable, Sendable {
+    case next
+    case previous
+}
+
+private struct S8Harness: View {
+    let model: CoverFlowViewModel
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        CoverFlowView(model: model, isInteractive: false, focus: $focused, upcoming: .available,
+                      prefersReducedMotion: true, onTapPlayingCard: {})
+            .frame(width: spikeViewSize.width, height: spikeViewSize.height)
+    }
+}
+
+@Suite("S8 production 換歌平移（spike）", .serialized,
+       .enabled(if: ProcessInfo.processInfo.environment["AZW_SPIKE_S8"] == "1"))
+@MainActor
+struct CoverFlowSlideSpikeS8Tests {
+    private static let slide = Animation.timingCurve(0.16, 1, 0.3, 1, duration: 0.62)
+    private static let steps = 20
+
+    private static func id(_ n: Int) -> String { "q:0:\(n)" }
+
+    /// 窗口 [center−10, center+10]；`current` 為 VM 當下要居中的卡（staged 時＝舊中心）
+    private static func deck(window center: Int, current: Int) -> DeckSnapshot {
+        let cards = ((center - 10)...(center + 10)).map { n in
+            DeckCard(id: id(n), persistentID: "P\(n)", side: n < center ? .played : (n == center ? .current : .upcoming))
+        }
+        return DeckSnapshot(cards: cards, currentCardID: id(current), upcoming: .available)
+    }
+
+    private static func settled(_ window: NSWindow, timeout: TimeInterval = 10) async -> StackFrame? {
+        var previous: StackFrame?
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(200))
+            let current = StackReader.read(window)
+            if let current, let previous, current.cards.count >= 2,
+               current.signature == previous.signature, current.scrollX == previous.scrollX {
+                return current
+            }
+            previous = current
+        }
+        return nil
+    }
+
+    @Test("production 兩段換歌：平移、落定、非目標回寫", arguments: S8Trigger.allCases, S8Direction.allCases)
+    func slide(trigger: S8Trigger, direction: S8Direction) async throws {
+        let model = CoverFlowViewModel(artwork: StubArtworkProvider())
+        let screen = NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let window = NSWindow(
+            contentRect: CGRect(x: screen.midX - spikeViewSize.width / 2, y: screen.midY - spikeViewSize.height / 2,
+                                width: spikeViewSize.width, height: spikeViewSize.height),
+            styleMask: [.titled], backing: .buffered, defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.level = .floating
+        window.contentView = NSHostingView(rootView: S8Harness(model: model))
+        window.makeKeyAndOrderFront(nil)
+        defer { window.orderOut(nil) }
+
+        var center = 100
+        model.apply(Self.deck(window: center, current: center), isRealChange: true)
+        _ = try #require(await Self.settled(window), "起點未穩定（讀不到 production 卡層？）")
+        _ = try #require(await Self.settled(window), "起點二次確認未穩定")
+
+        var slid = 0, landed = 0, strayRuns = 0
+        var results: [String] = []
+        for step in 1...Self.steps {
+            let target = direction == .next ? center + 1 : center - 1
+            let old = Self.id(center)
+            guard let before = StackReader.read(window)?.scrollX else { results.append("\(step):no-scrollX"); continue }
+
+            // staged：新牌組（窗口已移到 target），VM 居中仍在 old
+            model.apply(Self.deck(window: target, current: center), isRealChange: false)
+            let animate = { withAnimation(Self.slide) { model.centerID = Self.id(target) } }
+            switch trigger {
+            case .mainAsync: DispatchQueue.main.async(execute: animate)
+            case .sleep16:
+                try? await Task.sleep(for: .milliseconds(16))
+                animate()
+            case .yield:
+                await Task.yield()
+                animate()
+            }
+
+            var scrolls: [CGFloat] = []
+            var centres = Set<String>()
+            for _ in 0..<60 {
+                try? await Task.sleep(for: .milliseconds(16))
+                if let x = StackReader.read(window)?.scrollX { scrolls.append(x) }
+                if let c = model.centerID { centres.insert(c) }
+            }
+            let frame = await Self.settled(window)
+            let after = frame?.scrollX ?? scrolls.last ?? before
+            let offset = frame.flatMap { f in f.cards.map { $0.midX - f.viewportMidX }.min { abs($0) < abs($1) } }
+            // 窗口隨中心移動：staged 時條帶無動畫退到 old（原點 ∓ stride），動畫再回到原點。
+            // 平移＝軌跡由「距終點約一個 stride」逐幀單調收斂到終點，且 ≥3 幀落在兩者之間
+            let distance = scrolls.map { abs($0 - after) }
+            let inBetween = distance.filter { $0 > 4 && $0 < spikeStride - 4 }.count
+            let monotonic = zip(distance, distance.dropFirst()).allSatisfy { $1 <= $0 + 0.5 }
+            let delta = scrolls.map { $0 - after }
+            let moved = distance.max() ?? 0
+            let ok = abs(after - before) < 2 && abs(offset ?? .infinity) < 1 && model.centerID == Self.id(target)
+            if ok { landed += 1 }
+            if inBetween >= 3, monotonic { slid += 1 }
+            let stray = centres.subtracting([old, Self.id(target)])
+            if !stray.isEmpty { strayRuns += 1 }
+            var line = "\(step):n=\(scrolls.count) moved=\(Int(moved)) mid=\(inBetween) mono=\(monotonic) land=\(ok) stray=\(stray.sorted())"
+            if step == 1 {
+                line += " dx=" + delta.prefix(20).map { String(format: "%.0f", $0) }.joined(separator: ",")
+            }
+            results.append(line)
+            center = target
+        }
+        print("S8 \(trigger.rawValue)[\(direction.rawValue)] slid=\(slid)/\(Self.steps) landed=\(landed)/\(Self.steps) "
+              + "strayRuns=\(strayRuns)/\(Self.steps) stride=\(Int(spikeStride)) | " + results.joined(separator: " | "))
+    }
+}

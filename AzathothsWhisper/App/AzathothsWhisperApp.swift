@@ -2,6 +2,7 @@ import SwiftUI
 
 // 單窗 app（py:1863-1871：1200×800、可縮放、標題固定英文）。
 // 菜單 1:1（py:1909-1923）：Settings → Token/Language Settings…；Help → About。
+// 2.1 新增 Settings → Notification Settings…（計劃 2026-09-26-lyrics-notification §4.4）。
 // 文案硬編碼英文、不隨語言變（ACCEPTANCE A-07）。
 @main
 struct AzathothsWhisperApp: App {
@@ -23,6 +24,9 @@ struct AzathothsWhisperApp: App {
                 }
                 Button { model.openSettings(.language) } label: {
                     Text(verbatim: "Language Settings...")
+                }
+                Button { model.openSettings(.notifications) } label: {
+                    Text(verbatim: "Notification Settings...")
                 }
             }
 

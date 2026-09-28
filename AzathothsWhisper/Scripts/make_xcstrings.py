@@ -40,6 +40,18 @@ NEW_KEYS = {
     "coverflow_hide": {"en": "Hide Cover Flow", "zh_TW": "隱藏封面瀏覽", "ja": "カバーフローを隠す"},
     # 鍵名帶 %@：SwiftUI 的 Text("edit_lyrics_of \(title)") 以插值後的格式字串當鍵查找
     "edit_lyrics_of %@": {"en": "Edit lyrics of %@", "zh_TW": "編輯「%@」的歌詞", "ja": "「%@」の歌詞を編集"},
+    # 歌詞寫入通知（docs/plans/2026-09-26-lyrics-notification.md §3.3；版式＝樣式 A）
+    "notify_subtitle": {"en": "%1$@ · %2$@", "zh_TW": "%1$@ · 《%2$@》", "ja": "%1$@ · 『%2$@』"},
+    "notify_list_separator": {"en": ", ", "zh_TW": "、", "ja": "、"},
+    "notify_single_ok": {"en": "Lyrics saved for \"%@\"", "zh_TW": "「%@」歌詞寫入成功", "ja": "「%@」の歌詞を書き込みました"},
+    "notify_batch_full": {"en": "Lyrics saved for all %lld tracks", "zh_TW": "整張專輯 %lld 首歌詞寫入成功", "ja": "アルバム全 %lld 曲の歌詞を書き込みました"},
+    "notify_batch_some": {"en": "Lyrics saved for %1$lld tracks: %2$@", "zh_TW": "%1$lld 首歌詞寫入成功：%2$@", "ja": "%1$lld 曲の歌詞を書き込みました：%2$@"},
+    "notify_batch_partial": {"en": "%1$lld/%2$lld saved, %3$lld failed: %4$@", "zh_TW": "%1$lld / %2$lld 首寫入成功，%3$lld 首失敗：%4$@", "ja": "%1$lld/%2$lld 曲成功、%3$lld 曲失敗：%4$@"},
+    "notify_batch_all_failed": {"en": "Failed to save lyrics for %lld tracks", "zh_TW": "%lld 首歌詞全部寫入失敗", "ja": "%lld 曲すべての書き込みに失敗しました"},
+    # 參數＝未列出的剩餘首數（三語同義；zh 原稿「等 N 首」為總數，2026-09-27 統一為剩餘數）
+    "notify_more": {"en": "and %lld more", "zh_TW": "及另外 %lld 首", "ja": "ほか %lld 曲"},
+    "settings_notify_label": {"en": "Notifications", "zh_TW": "通知", "ja": "通知"},
+    "settings_notify_toggle": {"en": "Notify when lyrics are saved", "zh_TW": "歌詞寫入後顯示系統通知", "ja": "歌詞の書き込み後に通知する"},
 }
 LANG_MAP = {"en": "en", "zh_TW": "zh-Hant", "ja": "ja"}
 

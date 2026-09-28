@@ -151,6 +151,42 @@ struct EditorViewModelTests {
         #expect(failed == ["A"])
     }
 
+    /// 通知（計劃 2026-09-26-lyrics-notification §4.2）：成功時帶出寫入目標的完整曲目資訊，
+    /// 與 D8③ 同理在 hop 前擷取——寫入等待期間換歌，通知仍是原曲
+    @Test func successfulSaveReportsTheTrackCapturedBeforeTheBusyHop() async {
+        let music = MockMusicClient()
+        let gate = LyricsGate()
+        await music.setWriteGate(gate)
+        let model = makeModel(music: music)
+        var saved: [TrackInfo] = []
+        model.onSavedTrack = { saved.append($0) }
+        model.handle(.trackChanged(.fixture(id: "A", title: "Alpha"), existingLyrics: "a words"))
+
+        let saving = Task { await model.save() }
+        await settle()
+        model.handle(.trackChanged(.fixture(id: "B", title: "Beta"), existingLyrics: "b words"))
+        await gate.open()
+        await saving.value
+
+        #expect(saved == [.fixture(id: "A", title: "Alpha")])
+    }
+
+    @Test("寫入失敗不送通知", arguments: [
+        Result<Bool, MusicError>.success(false), .failure(.permissionDenied),
+    ])
+    func failedSaveDoesNotReportTheTrack(outcome: Result<Bool, MusicError>) async {
+        let music = MockMusicClient()
+        await music.setSetLyricsOutcome(outcome)
+        let model = makeModel(music: music)
+        var saved: [TrackInfo] = []
+        model.onSavedTrack = { saved.append($0) }
+        model.handle(.trackChanged(.fixture(), existingLyrics: "w"))
+
+        await model.save()
+
+        #expect(saved.isEmpty)
+    }
+
     @Test func userEditsAreReported() {
         let model = makeModel()
         var edits = 0

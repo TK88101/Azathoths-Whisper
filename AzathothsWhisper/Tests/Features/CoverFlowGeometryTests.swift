@@ -171,4 +171,14 @@ struct CoverFlowGeometryTests {
         let face = CGRect(x: 370, y: 200, width: 260, height: 260)
         #expect(CoverFlowGeometry.acceptsPlayingCardTap(isCentered: isCentered, location: location, face: face) == accepted)
     }
+
+    // MARK: 換歌平移的起點位移（docs/plans/2026-09-26-coverflow-follow-playback-slide.md §3.4）
+
+    /// 卡距＝卡寬＋間距（間距為負）；下一首往右推、上一首往左推
+    @Test("位移＝卡距數 × 卡距", arguments: [(1, 127.6), (-1, -127.6), (0, 0.0), (2, 255.2)])
+    func slideOffsetIsSlotsTimesTheStride(slots: Int, expected: Double) {
+        let g = CoverFlowGeometry(itemWidth: itemWidth)
+        #expect(abs(g.slideOffset(slots: slots) - expected) < 0.0001)
+        #expect(abs(g.slideOffset(slots: slots) - CGFloat(slots) * (itemWidth + g.spacing)) < 0.0001)
+    }
 }

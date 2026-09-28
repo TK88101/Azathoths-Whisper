@@ -18,6 +18,14 @@ final class LyricsFlowModel {
     static let riseDelay: Duration = ConfettiTiming.lifetime
     /// D1：左右各幾張（S6：左右合計 ≤ 20 首一批讀詳情）
     static let window = 10
+    /// 換歌後 History.dat 重讀的時點（相對換歌事件的**絕對時點**；0ms＝換歌當下既有的讀檔）。
+    /// 實測 Music 在換歌後 4.86–5.05 秒才寫履歴（4 次自然播完）；第一點晚於最大值，後兩點防負載尾端，
+    /// 7 秒仍沒追上就放棄、交給 3 秒輪詢（F2，使用者 2026-09-27 拍板，計劃 2026-09-27-coverflow-f1-f2 §8.1、§9 乙）
+    static let historyRecheckOffsets: [Duration] = [.milliseconds(5200), .seconds(6), .seconds(7)]
+
+    /// 實際 sleep 的是相鄰時點的差（R1-5）
+    static let historyRecheckGaps: [Duration] =
+        zip(historyRecheckOffsets, [.zero] + historyRecheckOffsets.dropLast()).map { $0 - $1 }
 
     private(set) var state = LyricsFlowState()
     /// 右側可用性（AC8b）：`unavailable` 時畫面標明「接下來的歌暫時讀不到」
@@ -37,6 +45,7 @@ final class LyricsFlowModel {
     private let detailsReader: CardDetailsReader
     private let queueSource: QueueFileSource
     private let clock: any PollClock
+    private let historyRecheckClock: any PollClock
     private let coverFlow: CoverFlowViewModel
     private let isMusicRunning: () -> Bool
     private let forceRefresh: () -> Void
@@ -54,12 +63,20 @@ final class LyricsFlowModel {
     @ObservationIgnored private var latestWrites: [String: Int] = [:]
     @ObservationIgnored private var writeSerial = 0
     @ObservationIgnored private var pollTask: Task<Void, Never>?
+    @ObservationIgnored private var historyRecheckTask: Task<Void, Never>?
+    /// 單調遞增：新的真實換歌、停止輪詢時加一。`Task.cancel()` 不保證對方已停，醒來的舊追趕以此自我作廢
+    @ObservationIgnored private var historyRecheckGeneration = 0
+    @ObservationIgnored private var isStopped = false
+    /// 待入履歴的暫定左鄰卡（§12）。`baseline`＝建立時的履歴：尾端碰巧已是同一首的舊記錄時，
+    /// 要等履歴**變了**且尾端是它才算追上
+    @ObservationIgnored private var pendingPlayed: (card: DeckSnapshot.PendingPlayed, baseline: HistorySnapshot?)?
 
     init(
         configStore: ConfigStore,
         detailsReader: CardDetailsReader,
         queueSource: QueueFileSource,
         clock: any PollClock,
+        historyRecheckClock: any PollClock,
         coverFlow: CoverFlowViewModel,
         isMusicRunning: @escaping () -> Bool,
         forceRefresh: @escaping () -> Void,
@@ -69,6 +86,7 @@ final class LyricsFlowModel {
         self.detailsReader = detailsReader
         self.queueSource = queueSource
         self.clock = clock
+        self.historyRecheckClock = historyRecheckClock
         self.coverFlow = coverFlow
         self.isMusicRunning = isMusicRunning
         self.forceRefresh = forceRefresh
@@ -95,6 +113,7 @@ final class LyricsFlowModel {
     private func nowPlaying(_ track: TrackInfo, lyrics: String?) {
         let identity = NowPlayingIdentity(track: track)
         let isRealChange = identity != state.nowPlaying
+        let finishedID = current?.persistentID     // 在 `current` 換成新歌之前取
         // AC8b：真實換歌時把「前一首」記進聆聽歷史（History.dat 不可讀時的左側來源）
         if isRealChange, let previous = current {
             listening = listening.recording(.init(persistentID: previous.persistentID, occurrence: previous.occurrence))
@@ -112,11 +131,26 @@ final class LyricsFlowModel {
                 enqueue { _ in await reader.updateLyrics(lyrics, for: track.persistentID) }
             }
         }
+        // 換歌平移的方向佐證要在推進位置**之前**取：往回跳時 `resolvingCurrent` 會把位置清成 nil
+        let slideHint = isRealChange ? queue.slideHint(to: track.persistentID) : nil
+        let previousIndex = queue.currentIndex
+        let previousCardID = previousIndex.map { queue.cardID(at: $0) }
         // AC8：換歌（同一份清單）只移中心——以手上的快照推進位置；真實換歌才解除使用者接管（H-05）
         queue = queue.resolvingCurrent(persistentID: track.persistentID, isRealChange: isRealChange)
-        publish(isRealChange: isRealChange)
+        if isRealChange {
+            // 任何真實換歌先作廢舊的暫定卡；只有順向相鄰（清單的下一項）才記新的——往回跳時舊當前卡在右側
+            pendingPlayed = nil
+            if history != nil, let finishedID, !finishedID.isEmpty, let previousIndex, let previousCardID,
+               queue.currentIndex == previousIndex + 1 {
+                pendingPlayed = (DeckSnapshot.PendingPlayed(persistentID: finishedID, cardID: previousCardID), history)
+            }
+        }
+        publish(isRealChange: isRealChange, slideHint: slideHint)
         // D16：每次換歌立即檢查兩個檔的屬性
         enqueue { model in await model.readSources(isPollTick: false) }
+        if isRealChange {
+            restartHistoryRecheck(expecting: finishedID)
+        }
     }
 
     // MARK: - 使用者操作與 Editor 回報
@@ -186,6 +220,7 @@ final class LyricsFlowModel {
 
     func startPolling(clock: any PollClock = SystemPollClock(), interval: Duration = NowPlayingMonitor.interval) {
         guard pollTask == nil else { return }
+        isStopped = false
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 do {
@@ -199,6 +234,9 @@ final class LyricsFlowModel {
     }
 
     func stopPolling() {
+        isStopped = true
+        pendingPlayed = nil
+        cancelHistoryRecheck()
         pollTask?.cancel()
         pollTask = nil
     }
@@ -241,14 +279,7 @@ final class LyricsFlowModel {
 
     private func scheduleRise(_ token: RiseToken) {
         riseTask?.cancel()
-        let clock = self.clock
-        riseTask = Task { [weak self] in
-            do {
-                try await clock.sleep(for: Self.riseDelay)
-            } catch {
-                return
-            }
-            guard !Task.isCancelled else { return }
+        riseTask = clock.schedule(after: Self.riseDelay) { [weak self] in
             self?.dispatch(.riseDue(token))
         }
     }
@@ -270,6 +301,7 @@ final class LyricsFlowModel {
     private func readSources(isPollTick: Bool) async {
         guard isMusicRunning() else {
             queue = queue.invalidated()
+            pendingPlayed = nil
             await queueSource.forgetQueue()
             publish(isRealChange: false)
             return
@@ -290,23 +322,102 @@ final class LyricsFlowModel {
         if isPollTick || queueRewritten, let current {
             queue = queue.resolvingCurrent(persistentID: current.persistentID, isRealChange: false)
         }
-        switch await queueSource.readHistory(keepLast: Self.window) {
-        case .snapshot(let snapshot):
-            history = snapshot
-        case .missing:
-            history = nil
-        case .failed, .unchanged:
-            break       // 保留最後一份有效的履歴（R3-3 同一紀律）
-        }
+        _ = applyHistoryRead(await queueSource.readHistory(keepLast: Self.window))
         publish(isRealChange: false)
     }
 
-    private func publish(isRealChange: Bool) {
+    /// 履歴的狀態轉移只留這一處（輪詢讀檔與換歌後的短重讀共用）。回傳 `history` 的值是否真的變了
+    private func applyHistoryRead(_ read: QueueFileSource.Read<HistorySnapshot>) -> Bool {
+        let changed: Bool
+        switch read {
+        case .snapshot(let next):
+            changed = history != next
+            history = next
+        case .missing:
+            changed = history != nil
+            history = nil               // 退回本 app 觀察到的歷史（AC8b）
+        case .failed, .unchanged:
+            return false                // 保留最後一份有效的履歴（R3-3 同一紀律）
+        }
+        // 暫定卡交棒：Music 寫進履歴了（同一首的 h: 卡原位接手），或履歴不可讀（觀察模式不需要它）
+        if let pending = pendingPlayed,
+           history == nil || hasCaughtUp(with: pending.card.persistentID, since: pending.baseline) {
+            pendingPlayed = nil
+        }
+        return changed
+    }
+
+    // MARK: - 換歌後的履歴短重讀（F2）
+
+    private func restartHistoryRecheck(expecting finishedID: String?) {
+        cancelHistoryRecheck()
+        guard !isStopped, let finishedID, !finishedID.isEmpty else { return }
+        let generation = historyRecheckGeneration
+        let baseline = history
+        // 排在換歌當下那次讀檔之後：它已追上就不必重讀
+        enqueue { model in
+            model.scheduleHistoryRecheck(expecting: finishedID, since: baseline, generation: generation)
+        }
+    }
+
+    private func cancelHistoryRecheck() {
+        historyRecheckGeneration += 1
+        historyRecheckTask?.cancel()
+        historyRecheckTask = nil
+    }
+
+    /// 履歴相對換歌當下**變了**且尾端是剛離開的那首。只看尾端不夠：同一首先前播完過時，尾端本來就是它
+    private func hasCaughtUp(with finishedID: String, since baseline: HistorySnapshot?) -> Bool {
+        history != baseline && history?.recent.last?.persistentID == finishedID
+    }
+
+    private func scheduleHistoryRecheck(expecting finishedID: String, since baseline: HistorySnapshot?, generation: Int) {
+        guard generation == historyRecheckGeneration, !hasCaughtUp(with: finishedID, since: baseline) else { return }
+        let clock = historyRecheckClock
+        historyRecheckTask = Task { [weak self] in
+            for gap in Self.historyRecheckGaps {
+                do {
+                    try await clock.sleep(for: gap)
+                } catch {
+                    return
+                }
+                guard let self, generation == self.historyRecheckGeneration, !Task.isCancelled else { return }
+                self.enqueue { model in await model.recheckHistory(generation: generation) }
+                await self.workTask?.value
+                // 本次或期間的輪詢已追上（不論讀到的是新內容還是 .unchanged）就停
+                guard generation == self.historyRecheckGeneration,
+                      !self.hasCaughtUp(with: finishedID, since: baseline)
+                else { return }
+            }
+            // 7 秒仍沒寫：只播幾秒就跳過的歌 Music 不記——暫定卡移除，左側回到履歴的真相
+            self?.enqueue { model in model.dropPendingPlayed(generation: generation) }
+        }
+    }
+
+    private func dropPendingPlayed(generation: Int) {
+        guard generation == historyRecheckGeneration, pendingPlayed != nil else { return }
+        pendingPlayed = nil
+        publish(isRealChange: false)
+    }
+
+    /// 只讀 History.dat（屬性沒變＝一次 stat）；履歴的值真的變了才 publish——publish 會順帶補讀詳情，
+    /// 沒變就不多問 Music（R1-4）。讀完一律套用：讀到的是檔案的最新內容，丟掉它會讓屬性戳已更新的
+    /// 那份內容永遠不再被讀到（因此讀完後不再比對世代，只在讀之前比對）
+    private func recheckHistory(generation: Int) async {
+        guard generation == historyRecheckGeneration else { return }
+        if applyHistoryRead(await queueSource.readHistory(keepLast: Self.window)) {
+            publish(isRealChange: false)
+        }
+    }
+
+    private func publish(isRealChange: Bool, slideHint: SlideHint? = nil) {
         let played: DeckSnapshot.PlayedSource = history.map { .musicHistory($0) } ?? .observed(listening)
-        let deck = DeckSnapshot.build(nowPlaying: current, played: played, queue: queue, window: Self.window)
+        let deck = DeckSnapshot.build(
+            nowPlaying: current, played: played, pendingPlayed: pendingPlayed?.card, queue: queue, window: Self.window
+        )
         upcoming = deck.upcoming
         if deck != coverFlow.deck || isRealChange {
-            coverFlow.apply(deck, isRealChange: isRealChange)
+            coverFlow.apply(deck, isRealChange: isRealChange, slideHint: slideHint)
         }
         fetchDetails(for: deck)
     }

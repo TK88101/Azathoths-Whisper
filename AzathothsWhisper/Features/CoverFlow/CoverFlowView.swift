@@ -9,6 +9,8 @@ struct CoverFlowView: View {
     var focus: FocusState<Bool>.Binding
     /// 右側可用性（AC8b）：`unavailable` 才標明讀不到
     let upcoming: DeckSnapshot.Upcoming
+    /// 系統「減少動態效果」。由上層讀環境值後傳入（環境值唯讀，測試無法覆寫）
+    let prefersReducedMotion: Bool
     let onTapPlayingCard: () -> Void
 
     /// 條帶的實際尺寸：推算正中那張封面正面的位置（點擊、懸停、無障碍按鈕都以它為準）
@@ -39,6 +41,10 @@ struct CoverFlowView: View {
         .focusEffectDisabled()
         .onKeyPress(.leftArrow) { step(-1) }
         .onKeyPress(.rightArrow) { step(1) }
+        // 不在 body 內改狀態：出現時與變更時各同步一次
+        .onChange(of: prefersReducedMotion, initial: true) { _, prefers in
+            model.setPrefersReducedMotion(prefers)
+        }
     }
 
     private func step(_ offset: Int) -> KeyPress.Result {
@@ -61,7 +67,9 @@ struct CoverFlowView: View {
                     #endif
                     model.scrollPositionDidChange(to: newValue)
                 }
-            )
+            ),
+            slide: model.slide,
+            onSlideSettled: { model.slideDidSettle(generation: $0) }
         ) { card, isCentered in
             // 卡片純展示、**不掛任何手勢**：實測（2026-09-23 E1–E5）條帶內容一帶手勢（Button、點擊、懸停），
             // 換牌後的捲動定位就失效——VM 的中心已是播放卡，畫面卻停在第一張

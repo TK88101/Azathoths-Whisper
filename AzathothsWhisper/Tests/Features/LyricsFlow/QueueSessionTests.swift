@@ -177,4 +177,47 @@ struct QueueSessionTests {
         #expect(session.currentIndex == nil)
         #expect(session.upcoming == .pending)
     }
+
+    // MARK: 換歌平移的方向佐證（docs/plans/2026-09-26-coverflow-follow-playback-slide.md §3.1-4 (iii)）
+
+    private func sessionPlayingTheSecond(_ items: [Item]) -> QueueSession {
+        QueueSession()
+            .applying(snapshot(items))
+            .resolvingCurrent(persistentID: pid(items[1].trackID ?? 0), isRealChange: true)
+    }
+
+    @Test func slideHintForTheUniqueNextEntry() {
+        let session = sessionPlayingTheSecond([Item(1, itemID: 10), Item(2, itemID: 11), Item(3, itemID: 12)])
+        #expect(session.slideHint(to: pid(3)) == SlideHint(
+            oldCardID: "q:0:11", oldPersistentID: pid(2), targetPersistentID: pid(3), direction: .next
+        ))
+    }
+
+    /// 往回跳：`resolvingCurrent` 會把位置清成 nil，佐證要在它之前取
+    @Test func slideHintForTheUniquePreviousEntry() {
+        let session = sessionPlayingTheSecond([Item(1, itemID: 10), Item(2, itemID: 11), Item(3, itemID: 12)])
+        #expect(session.slideHint(to: pid(1)) == SlideHint(
+            oldCardID: "q:0:11", oldPersistentID: pid(2), targetPersistentID: pid(1), direction: .previous
+        ))
+        #expect(session.resolvingCurrent(persistentID: pid(1), isRealChange: true).slideHint(to: pid(2)) == nil,
+                "位置未解析就沒有佐證")
+    }
+
+    /// 同一首在清單出現兩次：即使其中一次就在隔壁，也無從確定播的是哪一次
+    @Test func noSlideHintWhenTheTargetAppearsTwice() {
+        let session = sessionPlayingTheSecond([Item(1, itemID: 10), Item(2, itemID: 11), Item(3, itemID: 12), Item(1, itemID: 13)])
+        #expect(session.slideHint(to: pid(1)) == nil)
+    }
+
+    @Test func noSlideHintForANonAdjacentEntry() {
+        let session = sessionPlayingTheSecond([Item(1, itemID: 10), Item(2, itemID: 11), Item(3, itemID: 12), Item(4, itemID: 13)])
+        #expect(session.slideHint(to: pid(4)) == nil)
+    }
+
+    @Test func noSlideHintWithoutASnapshotOrForAnAbsentTrack() {
+        #expect(QueueSession().slideHint(to: pid(1)) == nil)
+        let session = sessionPlayingTheSecond([Item(1, itemID: 10), Item(2, itemID: 11)])
+        #expect(session.slideHint(to: pid(9)) == nil)
+        #expect(session.slideHint(to: "") == nil)
+    }
 }

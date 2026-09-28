@@ -12,6 +12,7 @@ struct SettingsModalView: View {
                 switch model.group {
                 case .token: tokenGroup
                 case .language: languageGroup
+                case .notifications: notificationsGroup
                 }
             }
             .padding(.top, 24)
@@ -121,6 +122,33 @@ struct SettingsModalView: View {
             modalButton(titleKey: "save_btn") { model.saveLanguage() }
                 .padding(.top, 16)
         }
+    }
+
+    // MARK: Notifications（2.1 新增，計劃 2026-09-26-lyrics-notification §4.4）
+
+    private var notificationsGroup: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            fieldLabel("settings_notify_label")
+            Toggle(isOn: notificationsBinding) {
+                Text("settings_notify_toggle")
+                    .font(Theme.Fonts.display(14))
+                    .foregroundStyle(.white)
+            }
+            .toggleStyle(.switch)
+            .tint(Theme.success)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.black)
+            .overlay(Rectangle().strokeBorder(Theme.Gray.g800, lineWidth: 1))
+        }
+    }
+
+    /// 切換即存：setter 直接交給 ViewModel，不另設 Save 鈕
+    private var notificationsBinding: Binding<Bool> {
+        Binding(
+            get: { model.notificationsEnabled },
+            set: { model.setNotificationsEnabled($0) }
+        )
     }
 
     // MARK: 零件

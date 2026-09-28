@@ -9,6 +9,7 @@ struct ConfigStore: @unchecked Sendable {
         static let token = "GENIUS_ACCESS_TOKEN"
         static let language = "AppLanguage"
         static let migrationVersion = "LegacyConfigMigratedVersion"
+        static let notificationsEnabled = "LyricsNotificationsEnabled"
     }
 
     /// 遷移格式版本；日後若 legacy 讀取語義再變，遞增此值即可重跑遷移。
@@ -55,6 +56,17 @@ struct ConfigStore: @unchecked Sendable {
 
     func markLegacyMigrated() {
         defaults.set(Self.currentMigrationVersion, forKey: Key.migrationVersion)
+    }
+
+    /// 歌詞寫入通知開關，**預設開**（計劃 §4.4）。不能用 `bool(forKey:)`：未設定時它回 false
+    var notificationsEnabled: Bool {
+        defaults.object(forKey: Key.notificationsEnabled) == nil
+            ? true
+            : defaults.bool(forKey: Key.notificationsEnabled)
+    }
+
+    func setNotificationsEnabled(_ value: Bool) {
+        defaults.set(value, forKey: Key.notificationsEnabled)
     }
 }
 

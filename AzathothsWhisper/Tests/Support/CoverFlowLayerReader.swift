@@ -1,5 +1,6 @@
 import AppKit
 import QuartzCore
+import SwiftUI
 
 // Cover Flow 條帶的層樹讀取器（由 CoverFlowStripStackingTests 抽出，供疊放與牌組轉場測試共用）。
 // 讀 CALayer 而非 AX：in-process 讀 AX 會讓 LazyHStack 多具現一張卡、改變捲動落點（fix4 §13 F-AX）。
@@ -30,6 +31,12 @@ struct StackFrame {
         return neighbours.allSatisfy { sorted[$0].order < sorted[g].order }
     }
 
+    /// 最靠近視口中點的那張卡離中點多遠（帶號；右正左負）。沒有卡層時為 nil
+    var centerOffset: CGFloat? {
+        guard !cards.isEmpty else { return nil }
+        return byPosition[centerPosition].midX - viewportMidX
+    }
+
     var signature: String {
         byPosition.map { "\(Int($0.midX.rounded())):\($0.order)" }.joined(separator: ",")
     }
@@ -40,6 +47,43 @@ struct StackFrame {
         return "vpMidX=\(Int(viewportMidX)) " + sorted.enumerated().map { i, card in
             (i == g ? "[G]" : "") + "x=\(Int(card.midX.rounded()))/z\(card.order)"
         }.joined(separator: " ")
+    }
+}
+
+/// 量幾何用的測試視窗與落定判定。新的測試用這裡的；既有測試檔各自的版本尚未收斂（另立項）
+@MainActor
+enum CoverFlowTestWindow {
+    nonisolated static let size = CGSize(width: 1192, height: 620)
+
+    /// 置中、浮在最上層：不上屏的視窗不會被合成，層樹讀不到動畫中的值
+    static func open<Content: View>(_ content: Content) -> NSWindow {
+        let screen = NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let window = NSWindow(
+            contentRect: CGRect(x: screen.midX - size.width / 2, y: screen.midY - size.height / 2,
+                                width: size.width, height: size.height),
+            styleMask: [.titled], backing: .buffered, defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.level = .floating
+        window.contentView = NSHostingView(rootView: content)
+        window.makeKeyAndOrderFront(nil)
+        return window
+    }
+
+    /// 連兩次讀到相同的層樹簽名與捲動原點才算落定；逾時回 nil
+    static func settled(_ window: NSWindow, timeout: TimeInterval = 10) async -> StackFrame? {
+        var previous: StackFrame?
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(100))
+            let current = StackReader.read(window)
+            if let current, let previous, current.cards.count >= 2,
+               current.signature == previous.signature, current.scrollX == previous.scrollX {
+                return current
+            }
+            previous = current
+        }
+        return nil
     }
 }
 

@@ -34,6 +34,8 @@ final class EditorViewModel {
     /// 寫入成功：（寫入目標, 寫入的文字）——兩者都在 busy 的 actor hop 之前擷取（D8③）
     var onSaved: ((String, String) -> Void)?
     var onSaveFailed: ((String) -> Void)?
+    /// 寫入成功的曲目資訊（系統通知用，計劃 2026-09-26-lyrics-notification §4.2）；同樣在 hop 之前擷取
+    var onSavedTrack: ((TrackInfo) -> Void)?
     /// 使用者在歌詞框打字（取消待升回，計劃 §6 `editorTextEdited`）
     var onUserEditedLyrics: (() -> Void)?
 
@@ -234,6 +236,7 @@ final class EditorViewModel {
         // D8③：寫入目標與文字在 busy 的 actor hop **之前**擷取。hop 期間事件迴圈可能處理掉
         // 一個換歌事件、把 Editor 改綁到下一首——之後才讀就會把 A 的詞寫給 B、還回報成 B
         let target = boundTrackID
+        let targetTrack = boundTrack
         let text = lyricsText
         await withBusy {
             statusText = StatusText.savingToMusic
@@ -250,6 +253,7 @@ final class EditorViewModel {
                 if didWrite {
                     confettiTrigger += 1
                     onSaved?(persistentID, text)
+                    if let targetTrack { onSavedTrack?(targetTrack) }
                 } else {
                     onSaveFailed?(persistentID)
                 }

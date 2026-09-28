@@ -29,6 +29,13 @@ final class AppModel {
     private let httpClient: any HTTPClient
     private let monitor: NowPlayingMonitor
     private let splashDuration: Duration
+    /// 歌詞寫入通知（計劃 2026-09-26-lyrics-notification §4.5）。**不給預設值**：漏注入＝編譯錯誤
+    private let notifier: any LyricsNotifying
+    /// Music 的換歌通知（F1，計劃 2026-09-27-coverflow-f1-f2 §3.1）。**不給預設值**：漏注入＝編譯錯誤
+    private let playerSignal: any PlayerChangeSignaling
+    /// Batch 成功後自動切回 Editor 分頁的計時（§4.6）。只與 LyricsFlow 升回共用時長常數，不共用排程（R1-6）
+    private let batchSwitchClock: any PollClock
+    @ObservationIgnored private var pendingReturnToEditor: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
     private var didStart = false
 
@@ -38,6 +45,8 @@ final class AppModel {
         music: any MusicControlling,
         monitor: NowPlayingMonitor,
         validator: any TokenValidating,
+        notifier: any LyricsNotifying,
+        playerSignal: any PlayerChangeSignaling,
         initialToken: String,
         initialLanguage: AppLanguage,
         splashDuration: Duration = .milliseconds(3500),    // py:1896
@@ -49,6 +58,9 @@ final class AppModel {
         queueDirectory: URL? = nil,
         /// 升回計時（寫入成功後等彩帶撒完）
         lyricsFlowClock: any PollClock = SystemPollClock(),
+        /// 換歌後履歴短重讀的時鐘（F2）。不與升回共用：可控時鐘依請求序放行，混用會放錯等待者
+        historyRecheckClock: any PollClock = SystemPollClock(),
+        batchSwitchClock: any PollClock = SystemPollClock(),
         isMusicRunning: @escaping () -> Bool = MusicProcess.isRunning
     ) {
         self.configStore = configStore
@@ -57,6 +69,9 @@ final class AppModel {
         self.token = initialToken
         self.language = initialLanguage
         self.splashDuration = splashDuration
+        self.notifier = notifier
+        self.playerSignal = playerSignal
+        self.batchSwitchClock = batchSwitchClock
         self.editor = EditorViewModel(
             lyricsService: Self.makeLyricsService(client: httpClient, token: initialToken),
             music: music
@@ -81,6 +96,7 @@ final class AppModel {
             detailsReader: CardDetailsReader(music: music),
             queueSource: QueueFileSource(directory: queueDirectory),
             clock: lyricsFlowClock,
+            historyRecheckClock: historyRecheckClock,
             coverFlow: coverFlow,
             isMusicRunning: isMusicRunning,
             // 寫入期間 monitor 為 busy、換歌會漏掉：寫入後唯讀補讀一次（Codex R1-4）
@@ -92,6 +108,7 @@ final class AppModel {
             validator: validator,
             onTokenSaved: { [weak self] token in self?.saveToken(token) },
             onLanguageSaved: { [weak self] language in self?.saveLanguage(language) },
+            onNotificationsToggled: { [weak self] enabled in self?.saveNotificationsEnabled(enabled) },
             onClose: { [weak self] in self?.closeModal() }
         )
 
@@ -107,6 +124,11 @@ final class AppModel {
         editor.isMarkedNoLyrics = { [weak self] in self?.lyricsFlow.isMarkedNoLyrics($0) ?? false }
         editor.onSaved = { [weak self] persistentID, text in
             self?.lyricsFlow.saved(persistentID: persistentID, text: text)
+        }
+        editor.onSavedTrack = { [weak self] track in
+            self?.postIfEnabled(
+                LyricsNotificationContent.single(artist: track.artist, title: track.title, album: track.album)
+            )
         }
         editor.onSaveFailed = { [weak self] persistentID in
             self?.lyricsFlow.saveFailed(persistentID: persistentID)
@@ -130,6 +152,7 @@ final class AppModel {
         batch.onLyricsWritten = { [weak self] persistentID, text in
             self?.lyricsFlow.batchSaved(persistentID: persistentID, text: text)
         }
+        batch.onImportFinished = { [weak self] result in self?.batchImportFinished(result) }
     }
 
     /// 封面磁碟快取的位置。放 Caches 是刻意的：內容可再生，系統空間吃緊時清掉不損失資料
@@ -186,6 +209,16 @@ final class AppModel {
         // 安裝條件由 shouldInstall 一處決定（路徑非空 ∧ 非單元測試 host），fixture ON 的分支已在上面裝過
         CoverFlowUITestTrace.installIfRequested(environment: environment)
         let isTestHost = environment[unitTestHostFlag] == "1"
+        // 自動化測試＝單元測試 host（"1"）或 UI 測試（AppUITestCase 顯式設 "0"，仍走真 Keychain 驗 A-05）。
+        // 換歌通知同理：自動化測試不監聽使用者機上的 Music（F1）。
+        // 兩者一律不碰真的通知中心，否則 start() 的授權請求會在 UI 測試期間彈系統權限提示（計劃 §4.5 R0-5）
+        let isAutomatedTest = environment[unitTestHostFlag] != nil
+        let notifier: any LyricsNotifying = isAutomatedTest
+            ? NoopLyricsNotifier()
+            : SystemLyricsNotifier(center: SystemNotificationCenter())
+        let playerSignal: any PlayerChangeSignaling = isAutomatedTest
+            ? NoopPlayerChangeSignal()
+            : MusicPlayerInfoSignal()
         let store = isTestHost
             ? ConfigStore(secrets: EphemeralSecretStore())
             : ConfigStore(secrets: KeychainStore())
@@ -193,6 +226,8 @@ final class AppModel {
         #else
         let store = ConfigStore(secrets: KeychainStore())
         let shouldMigrate = true
+        let notifier: any LyricsNotifying = SystemLyricsNotifier(center: SystemNotificationCenter())
+        let playerSignal: any PlayerChangeSignaling = MusicPlayerInfoSignal()
         #endif
 
         if shouldMigrate {
@@ -221,6 +256,8 @@ final class AppModel {
             music: music,
             monitor: NowPlayingMonitor(music: music),
             validator: GeniusTokenValidator(client: client),
+            notifier: notifier,
+            playerSignal: playerSignal,
             initialToken: store.token,
             initialLanguage: store.language,
             artworkDiskDirectory: artworkCacheDirectory,
@@ -248,9 +285,15 @@ final class AppModel {
     func start() async {
         guard !didStart else { return }
         didStart = true
+        // 開關為關時不要權限，等使用者打開開關那一刻（§4.5）
+        if configStore.notificationsEnabled {
+            notifier.requestAuthorization()
+        }
 
         startEventLoop()
         await monitor.start()
+        // 換歌當下就讀，不等下一次 3 秒輪詢（F1）；輪詢保留作通知漏送時的保底
+        playerSignal.start { [monitor] in Task { await monitor.playerDidChange() } }
         lyricsFlow.startPolling()
 
         try? await Task.sleep(for: splashDuration)
@@ -276,12 +319,21 @@ final class AppModel {
         eventTask?.cancel()
         eventTask = nil
         lyricsFlow.stopPolling()
+        playerSignal.stop()
         Task { await monitor.stop() }
     }
 
     // MARK: 導航與 modal
 
+    /// 使用者導覽。**任何一次呼叫都取消待執行的自動切頁，含選到目前的同一分頁**
+    /// （契約，防 Batch→Editor→Batch 的 ABA，R1-4；有測試釘住，勿優化成同分頁 no-op）
     func select(_ tab: AppTab) {
+        cancelPendingReturnToEditor()
+        applySelection(tab)
+    }
+
+    /// 分頁切換本體。自動切頁走這裡而不經 `select`，避免計時 task 取消自己（R2-4）
+    private func applySelection(_ tab: AppTab) {
         self.tab = tab
         editor.isEditorTabActive = (tab == .editor)   // py:481
         // C-01：切入 Batch 且列表為空時自動載入當前專輯（py:396）
@@ -300,7 +352,7 @@ final class AppModel {
     }
 
     func openSettings(_ group: SettingsViewModel.Group) {
-        settings.open(group, token: token, language: language)
+        settings.open(group, token: token, language: language, notificationsEnabled: configStore.notificationsEnabled)
         activeModal = .settings
     }
 
@@ -325,5 +377,59 @@ final class AppModel {
     private func saveLanguage(_ newLanguage: AppLanguage) {
         configStore.setLanguage(newLanguage)
         language = newLanguage      // E-09：重啟後生效
+    }
+
+    /// D-14：切換即存。關→開時請求授權（系統冪等，只在第一次詢問）；關閉不撤銷系統權限
+    private func saveNotificationsEnabled(_ enabled: Bool) {
+        configStore.setNotificationsEnabled(enabled)
+        if enabled {
+            notifier.requestAuthorization()
+        }
+    }
+
+    // MARK: 歌詞寫入通知與 Batch 成功後切回 Editor（計劃 2026-09-26-lyrics-notification §4.5／§4.6）
+
+    /// 每次讀開關：Settings 切換即時生效
+    private func postIfEnabled(_ payload: NotificationPayload?) {
+        guard let payload, configStore.notificationsEnabled else { return }
+        notifier.post(payload)
+    }
+
+    private func batchImportFinished(_ result: BatchImportResult) {
+        switch result {
+        case .single(let artist, let title, let album, _):
+            postIfEnabled(LyricsNotificationContent.single(artist: artist, title: title, album: album))
+        case .batch(let summary, _):
+            postIfEnabled(LyricsNotificationContent.batch(summary))
+        }
+        if result.returnsToEditor {
+            scheduleReturnToEditor()
+        }
+    }
+
+    /// 彩紙撒完（`riseDelay`）再切；新的成功事件重排，以最後一次為準
+    private func scheduleReturnToEditor() {
+        cancelPendingReturnToEditor()
+        let generation = batch.operationGeneration
+        pendingReturnToEditor = batchSwitchClock.schedule(after: LyricsFlowModel.riseDelay) { [weak self] in
+            self?.returnToEditorIfUndisturbed(since: generation)
+        }
+    }
+
+    /// 到期時仍在 Batch、期間沒開始新工作（⑧）、沒有任何彈框開著（⑦）才切
+    private func returnToEditorIfUndisturbed(since generation: Int) {
+        pendingReturnToEditor = nil
+        guard tab == .batch, batch.operationGeneration == generation, !isShowingDialog else { return }
+        applySelection(.editor)
+    }
+
+    /// Settings／About modal，或 Batch 自己的彈框
+    private var isShowingDialog: Bool {
+        activeModal != nil || batch.isShowingDialog
+    }
+
+    private func cancelPendingReturnToEditor() {
+        pendingReturnToEditor?.cancel()
+        pendingReturnToEditor = nil
     }
 }

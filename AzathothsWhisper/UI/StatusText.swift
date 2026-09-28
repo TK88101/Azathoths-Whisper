@@ -27,6 +27,7 @@ enum StatusText {
     // Settings modal（py:788-858）
     static let tokenSettingsTitle = "Token Settings"
     static let languageSettingsTitle = "Language Settings"
+    static let notificationSettingsTitle = "Notification Settings"     // D-03 慣例（2.1 新增，D-14）
     static let tokenCannotBeEmpty = "Token cannot be empty."
     static let validating = "Validating..."
     static let tokenValidAndSaved = "Success! Token is valid and saved."
@@ -57,6 +58,10 @@ enum StatusText {
     static let batchSaved = "Saved."                                   // py:700
     static let batchSaveFailed = "Save failed."                        // py:703
     static let batchErrorSaving = "Error saving."                      // py:707
+    // C-31 ⚠️（使用者 2026-09-26 拍板）：Import All 部分失敗；帶句點同 C-28
+    static func savedSomeFailed(saved: Int, of total: Int, failed: Int) -> String {
+        "Saved \(saved) of \(total). \(failed) failed."
+    }
 
     // C-27 進度文案
     static func fetchingTracks(_ count: Int) -> String { "Fetching \(count) tracks..." }   // py:658

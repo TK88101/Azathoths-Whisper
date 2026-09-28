@@ -32,6 +32,13 @@ struct DeckSnapshot: Equatable, Sendable {
         case observed(ListeningHistory)
     }
 
+    /// 待入履歴的暫定左鄰卡（計劃 2026-09-27-coverflow-f1-f2 §12）：剛順向離開正中、Music 還沒寫進履歴的那首
+    /// （Music 換歌後約 5 秒才寫）。沿用它離開正中前的卡 ID——平移的暫留卡就是它，落定時畫面不動
+    struct PendingPlayed: Equatable, Sendable {
+        let persistentID: String
+        let cardID: String
+    }
+
     struct NowPlaying: Equatable, Sendable {
         let persistentID: String
         let occurrence: Int
@@ -43,8 +50,16 @@ struct DeckSnapshot: Equatable, Sendable {
 
     static let empty = DeckSnapshot(cards: [], currentCardID: nil, upcoming: .pending)
 
-    static func build(nowPlaying: NowPlaying?, played: PlayedSource, queue: QueueSession, window: Int) -> DeckSnapshot {
+    static func build(
+        nowPlaying: NowPlaying?, played: PlayedSource, pendingPlayed: PendingPlayed? = nil, queue: QueueSession, window: Int
+    ) -> DeckSnapshot {
         let left = playedCards(played, window: window)
+        // 觀察模式在換歌當下就記下前一首，不需要暫定卡
+        let pending: DeckCard? = if case .musicHistory = played, let pendingPlayed {
+            DeckCard(id: pendingPlayed.cardID, persistentID: pendingPlayed.persistentID, side: .played)
+        } else {
+            nil
+        }
         guard let nowPlaying else {
             return DeckSnapshot(cards: unique(left), currentCardID: nil, upcoming: .pending)
         }
@@ -56,7 +71,10 @@ struct DeckSnapshot: Equatable, Sendable {
             let right = ((index + 1)..<(index + 1 + rightCount)).map {
                 DeckCard(id: queue.cardID(at: $0), persistentID: snapshot.entries[$0].persistentID, side: .upcoming)
             }
-            return DeckSnapshot(cards: around(current, left: left, right: right), currentCardID: current.id, upcoming: .available)
+            return DeckSnapshot(
+                cards: around(current, left: left, pending: pending, right: right, window: window),
+                currentCardID: current.id, upcoming: .available
+            )
         }
         let current = DeckCard(
             id: "o:\(nowPlaying.persistentID)#\(nowPlaying.occurrence)",
@@ -64,13 +82,24 @@ struct DeckSnapshot: Equatable, Sendable {
             side: .current
         )
         let upcoming: Upcoming = queue.upcoming == .available ? .pending : queue.upcoming
-        return DeckSnapshot(cards: around(current, left: left, right: []), currentCardID: current.id, upcoming: upcoming)
+        return DeckSnapshot(
+            cards: around(current, left: left, pending: pending, right: [], window: window),
+            currentCardID: current.id, upcoming: upcoming
+        )
     }
 
     /// 中心卡＝播放中，永遠在：兩側若有與它同 ID 的卡，剔兩側、保中心（對抗覆核 P2）
-    private static func around(_ current: DeckCard, left: [DeckCard], right: [DeckCard]) -> [DeckCard] {
+    /// 暫定卡排在左鄰、履歴讓出最舊的一張（左側張數不變）；它的 ID 若與牌內任何一張衝突就不放——
+    /// 寧可少一張暫定卡，也不讓 `unique` 靜默吃掉正式的卡
+    private static func around(
+        _ current: DeckCard, left: [DeckCard], pending: DeckCard?, right: [DeckCard], window: Int
+    ) -> [DeckCard] {
         let others = { (cards: [DeckCard]) in cards.filter { $0.id != current.id } }
-        return unique(others(left) + [current] + others(right))
+        var played = others(left)
+        if let pending, !([current] + right + played).contains(where: { $0.id == pending.id }) {
+            played = Array(played.suffix(max(0, window - 1))) + [pending]
+        }
+        return unique(played + [current] + others(right))
     }
 
     private static func playedCards(_ source: PlayedSource, window: Int) -> [DeckCard] {

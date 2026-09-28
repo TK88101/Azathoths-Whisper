@@ -16,6 +16,7 @@ struct SettingsViewModelTests {
         var savedToken: String?
         var savedLanguage: AppLanguage?
         var closeCount = 0
+        var notificationToggles: [Bool] = []
     }
 
     private func makeModel(
@@ -27,6 +28,7 @@ struct SettingsViewModelTests {
             clock: ImmediateClock(),
             onTokenSaved: { recorder.savedToken = $0 },
             onLanguageSaved: { recorder.savedLanguage = $0 },
+            onNotificationsToggled: { recorder.notificationToggles.append($0) },
             onClose: { recorder.closeCount += 1 }
         )
         return (model, recorder)
@@ -103,5 +105,34 @@ struct SettingsViewModelTests {
         model.dismissLanguageAlert()
         #expect(model.languageAlert == nil)
         #expect(recorder.closeCount == 1)
+    }
+
+    // MARK: - 通知開關（計劃 2026-09-26-lyrics-notification §4.4，ACCEPTANCE D-14）
+
+    // D-03 慣例：標題英文覆寫
+    @Test func notificationGroupHasEnglishTitle() {
+        let (model, _) = makeModel()
+        model.open(.notifications, token: "", language: .system, notificationsEnabled: true)
+        #expect(model.group == .notifications)
+        #expect(model.title == "Notification Settings")
+    }
+
+    @Test func openPrefillsTheNotificationSwitch() {
+        let (model, _) = makeModel()
+        model.open(.notifications, token: "", language: .system, notificationsEnabled: false)
+        #expect(!model.notificationsEnabled)
+    }
+
+    // 切換即存（toggle 慣例）：不另設 Save 鈕、也不關 modal
+    @Test func togglingSavesImmediatelyAndKeepsTheModalOpen() {
+        let (model, recorder) = makeModel()
+        model.open(.notifications, token: "", language: .system, notificationsEnabled: true)
+
+        model.setNotificationsEnabled(false)
+        model.setNotificationsEnabled(true)
+
+        #expect(recorder.notificationToggles == [false, true])
+        #expect(model.notificationsEnabled)
+        #expect(recorder.closeCount == 0)
     }
 }

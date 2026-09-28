@@ -24,28 +24,48 @@ private let coverFlowViewportSpace = "coverflow.viewport"
 /// **可點判定（計劃 D6、N2）**：內容閉包的第二個參數 `isCentered`＝該卡的佈局中點距視口中點 ≤ 0.2 個卡寬，
 /// 與疊放同一個 `onGeometryChange` 路徑算出——不用 `centerID`（捲動途中落後於畫面）、
 /// 也不用四捨五入後的疊放層級（跨中點時會有一張卡被誤判為正中）。
+///
+/// **換歌平移（`docs/plans/2026-09-26-coverflow-follow-playback-slide.md` v5.3）**：捲動位置照舊不帶動畫；
+/// 「滑過去」是內容位移（`.offset`）從一個卡距動畫歸零。凡是換牌的同一次更新要無動畫改捲動位置，
+/// 那次修正有機率晚一次畫面提交才生效（該計劃 §8.3）；位移不碰捲動位置，所以不閃。
+/// 位移量由輸入同步算出，與換牌在同一次更新生效；指令只在 `onChange` 一處被消費。
 struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
     let items: [Item]
     let itemWidth: CGFloat
     @Binding var centerID: Item.ID?
+    let slide: CoverFlowSlideRequest?
+    let onSlideSettled: (Int) -> Void
     let content: (Item, Bool) -> Content
 
     init(items: [Item], itemWidth: CGFloat, centerID: Binding<Item.ID?>,
+         slide: CoverFlowSlideRequest? = nil, onSlideSettled: @escaping (Int) -> Void = { _ in },
          @ViewBuilder content: @escaping (Item, _ isCentered: Bool) -> Content) {
         self.items = items
         self.itemWidth = itemWidth
         self._centerID = centerID
+        self.slide = slide
+        self.onSlideSettled = onSlideSettled
         self.content = content
     }
 
     /// 不需要可點判定的呼叫端（疊放／轉場的量測測試）
     init(items: [Item], itemWidth: CGFloat, centerID: Binding<Item.ID?>,
+         slide: CoverFlowSlideRequest? = nil, onSlideSettled: @escaping (Int) -> Void = { _ in },
          @ViewBuilder content: @escaping (Item) -> Content) {
-        self.init(items: items, itemWidth: itemWidth, centerID: centerID) { item, _ in content(item) }
+        self.init(items: items, itemWidth: itemWidth, centerID: centerID,
+                  slide: slide, onSlideSettled: onSlideSettled) { item, _ in content(item) }
     }
+
+    /// 位移已開始歸零的那次指令。條帶被重建時歸零，所以「出現時就帶著指令」看得出來
+    @State private var releasedGeneration = 0
 
     private var geometry: CoverFlowGeometry {
         CoverFlowGeometry(itemWidth: itemWidth)
+    }
+
+    /// 指令剛到、還沒釋放：把整排往回推，畫面上舊當前卡仍在正中
+    private var slideShift: CGFloat {
+        geometry.slideOffset(slots: CoverFlowStripReaction.pendingSlots(slide, releasedGeneration: releasedGeneration))
     }
 
     var body: some View {
@@ -58,7 +78,8 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
                     ForEach(items) { item in
                         CoverFlowStripCell(
                             geometry: geometry,
-                            viewportMidX: outer.frame(in: .named(coverFlowViewportSpace)).midX
+                            viewportMidX: outer.frame(in: .named(coverFlowViewportSpace)).midX,
+                            shift: slideShift
                         ) { isCentered in
                             content(item, isCentered)
                                 .frame(width: itemWidth)
@@ -84,6 +105,7 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
                 // 卡片上緣被把手切掉、點擊判定區也對不上，2026-09-24 UITest 截圖）
                 .frame(maxHeight: .infinity)
                 .scrollTargetLayout()
+                .offset(x: slideShift)
             }
             .scrollTargetBehavior(.viewAligned)
             .safeAreaPadding(.horizontal, geometry.edgePadding(viewWidth: outer.size.width))
@@ -91,24 +113,62 @@ struct CoverFlowStrip<Item: Identifiable, Content: View>: View {
             .scrollIndicators(.hidden)
             // 牌組換了而正中的卡沒變（履歴晚到、播完的歌由佇列卡換成履歴卡、窗口滑動）：scrollPosition 的值沒變就不會捲，
             // SwiftUI 保住的是數值位移而非 center 錨點——條帶停歪、正中那張被鄰張蓋住（2026-09-24 使用者實機）。
-            // 內容一變就明確捲回正中那張，不帶動畫（`CoverFlowDeckSideChangeTests`）
-            .onChange(of: items.map(\.id)) {
-                guard let centerID else { return }
-                reader.scrollTo(centerID, anchor: .center)
+            // 內容一變就明確捲回正中那張，不帶動畫（`CoverFlowDeckSideChangeTests`）。
+            // 卡 ID 序列與平移指令併成一個觀察值：兩者常在同一次更新一起變，順序由這裡決定
+            .onChange(of: CoverFlowStripInput(ids: items.map(\.id), slide: slide), initial: true) { old, new in
+                perform(.resolve(from: old, to: new, releasedGeneration: releasedGeneration), reader: reader)
             }
           }
         }
         .coordinateSpace(.named(coverFlowViewportSpace))
+    }
+
+    /// 判斷在 `CoverFlowStripReaction.resolve`（純函式）；這裡只執行
+    private func perform(_ reaction: CoverFlowStripReaction, reader: ScrollViewProxy) {
+        switch reaction {
+        case .none:
+            break
+        case .recenter:
+            recenter(reader)
+        case .settleAtOnce(let generation):
+            // 條帶出現時就帶著指令＝被重建：`onChange` 不會再為它觸發，不處理的話位移會卡在一個卡距上
+            releasedGeneration = generation
+            onSlideSettled(generation)
+        case .slide(let generation):
+            recenter(reader)
+            // 釋放要在「位移已套用」之後的另一次更新，才有起點可以動畫
+            withAnimation(Theme.Motion.layerShift, completionCriteria: .logicallyComplete) {
+                releasedGeneration = generation
+            } completion: {
+                onSlideSettled(generation)
+            }
+        }
+    }
+
+    private func recenter(_ reader: ScrollViewProxy) {
+        guard let centerID else { return }
+        reader.scrollTo(centerID, anchor: .center)
     }
 }
 
 /// 單張卡的疊放與可點判定：讀自己的**佈局位置**（與 `.visualEffect` 旋轉同一份幾何），離中心愈遠愈下沉。
 /// 層級按卡位量化（`CoverFlowGeometry.stackingOrder`），捲動時只在越過兩卡中點時改值；
 /// `isCentered` 只在越過 ±0.2 容差時改值——兩者都不逐幀寫狀態。
-private struct CoverFlowStripCell<Card: View>: View {
+///
+/// `Animatable`：換歌平移期間 SwiftUI 逐幀以內插後的 `shift` 重算 body，疊放與正中判定才跟得上畫面。
+/// `shift` **只**加進這兩者：`onGeometryChange` 讀到的版面位置不含 `.offset`；
+/// 旋轉／縮放走 `.visualEffect`，它的幾何本來就含 `.offset`，再加會算兩次（該計劃 §8.3 事實 6）
+private struct CoverFlowStripCell<Card: View>: View, @preconcurrency Animatable {
     let geometry: CoverFlowGeometry
     let viewportMidX: CGFloat
+    /// 條帶內容此刻的位移（版面位置之外、畫面上多移的量）
+    var shift: CGFloat
     @ViewBuilder let card: (Bool) -> Card
+
+    var animatableData: CGFloat {
+        get { shift }
+        set { shift = newValue }
+    }
 
     @State private var placement = CoverFlowStripPlacement(stackingOrder: 0, isCentered: false)
     /// 量到自己的位置前不顯示。滑動中新具現的卡，SwiftUI 偶爾會先把它放在別張的位置、
@@ -117,9 +177,9 @@ private struct CoverFlowStripCell<Card: View>: View {
 
     var body: some View {
         card(placement.isCentered)
-            .onGeometryChange(for: CoverFlowStripPlacement.self) { [geometry, viewportMidX] proxy in
+            .onGeometryChange(for: CoverFlowStripPlacement.self) { [geometry, viewportMidX, shift] proxy in
                 let d = geometry.normalizedDistance(
-                    itemMidX: proxy.frame(in: .named(coverFlowViewportSpace)).midX,
+                    itemMidX: proxy.frame(in: .named(coverFlowViewportSpace)).midX + shift,
                     viewportMidX: viewportMidX
                 )
                 return CoverFlowStripPlacement(stackingOrder: geometry.stackingOrder(forDistance: d), isCentered: geometry.isCentered(forDistance: d))

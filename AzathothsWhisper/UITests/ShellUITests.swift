@@ -133,12 +133,12 @@ final class ShellUITests: AppUITestCase {
         app.menuItems["About"].click()
 
         XCTAssertTrue(app.staticTexts["iBridge Zhao"].waitForExistence(timeout: 5))
-        // D-10：版本行＝「Version 2.0.1 (Build <建置號>)」；不寫死建置號，打包 +1 時免改測試
+        // D-10：版本行＝「Version 2.0.2 (Build <建置號>)」；不寫死建置號，打包 +1 時免改測試
         // SwiftUI 的 Text 在 macOS AX 樹上把文字放在 value、label 為空（見 AppUITestCase.staticText(containing:)），兩者都比
         XCTAssertTrue(
             app.staticTexts.matching(NSPredicate(
                 format: "(value BEGINSWITH[c] %@ OR label BEGINSWITH[c] %@) AND (value CONTAINS[c] %@ OR label CONTAINS[c] %@)",
-                "Version 2.0.1", "Version 2.0.1", "(Build ", "(Build "
+                "Version 2.0.2", "Version 2.0.2", "(Build ", "(Build "
             )).firstMatch.exists,
             "D-10：版本行應含建置號"
         )
@@ -199,6 +199,11 @@ final class ShellUITests: AppUITestCase {
         XCTAssertTrue(menuBar()["Settings"].exists, "A-07 菜單硬編碼英文")
         XCTAssertTrue(menuBar()["Help"].exists)
         attach("editor-ja")
+
+        // A-07（2.1 補）：Settings 選單新增的第三項同樣硬編碼英文。以點擊開關選單，不用按鍵模擬
+        menuBar()["Settings"].click()
+        XCTAssertTrue(app.menuItems["Notification Settings..."].waitForExistence(timeout: 2))
+        menuBar()["Settings"].click()
     }
 
     /// E-04／E-07：繁中冷啟動

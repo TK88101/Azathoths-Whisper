@@ -11,6 +11,13 @@ enum Theme {
     // 全 0 圓角（About modal 例外在其視圖內自定義）
     static let cornerRadius: CGFloat = 0
 
+    /// 層的位移動畫（設計稿：cubic-bezier(.16, 1, .3, 1) 620ms）。
+    /// Cover Flow 的升降與換歌平移共用這一份，兩者才保證同長同曲線
+    enum Motion {
+        static let layerShiftDuration: Double = 0.62
+        static let layerShift = Animation.timingCurve(0.16, 1, 0.3, 1, duration: layerShiftDuration)
+    }
+
     // 文字 glow：text-shadow 0 0 8px rgba(255,255,255,0.15)
     static let glowColor = Color.white.opacity(0.15)
     static let glowRadius: CGFloat = 8

@@ -51,6 +51,10 @@ struct LocalizationTests {
             "mark_no_lyrics", "lyrics_status_present", "lyrics_status_missing", "lyrics_status_marked",
             "lyrics_status_unknown", "edit_lyrics_hint", "upnext_unavailable", "coverflow_show",
             "coverflow_hide", "edit_lyrics_of %@",
+            // 歌詞寫入通知（計劃 2026-09-26-lyrics-notification §3.3）
+            "notify_subtitle", "notify_list_separator", "notify_single_ok", "notify_batch_full",
+            "notify_batch_some", "notify_batch_partial", "notify_batch_all_failed", "notify_more",
+            "settings_notify_label", "settings_notify_toggle",
         ]
         for language in ["en", "zh-Hant", "ja"] {
             for key in keys {

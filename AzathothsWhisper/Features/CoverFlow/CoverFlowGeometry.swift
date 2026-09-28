@@ -23,6 +23,15 @@ struct CoverFlowGeometry {
     /// `LazyHStack` 的間距：負值造成覆疊
     var spacing: CGFloat { Self.overlapRatio * itemWidth }
 
+    /// 卡距（相鄰兩卡中點的距離）以卡寬為單位：卡寬＋間距
+    private static let strideRatio: CGFloat = 1 + overlapRatio
+
+    /// 換歌平移的起點位移：條帶內容往回推 `slots` 個卡距。
+    /// +1＝下一首（內容先往右推一格，再滑回原位）；−1＝上一首
+    func slideOffset(slots: Int) -> CGFloat {
+        CGFloat(slots) * Self.strideRatio * itemWidth
+    }
+
     // MARK: 距離
 
     /// 以 itemWidth 為單位的帶號距離：中心為 0，右側為正、左側為負。
@@ -53,8 +62,7 @@ struct CoverFlowGeometry {
     /// 依**畫面位置**的疊放層級（H-02 缺陷 2）：距離先換算成「離中心第幾個卡位」再取 −|卡位|。
     /// 用卡位而非連續距離：捲動時只在越過兩卡中點的那一刻改值，不逐幀寫狀態
     func stackingOrder(forDistance d: CGFloat) -> Double {
-        let strideRatio = 1 + Self.overlapRatio
-        return zIndex(forDistance: (d / strideRatio).rounded())
+        zIndex(forDistance: (d / Self.strideRatio).rounded())
     }
 
     /// 可點判定的容差（計劃 D6、N2）：|d| ≤ 0.2 個卡寬才算「在正中」。

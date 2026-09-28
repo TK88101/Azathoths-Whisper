@@ -271,7 +271,7 @@ private struct StackSession {
 
 /// 合成觸控板水平捲動事件，直接送進測試視窗（in-process，不需輔助使用權限、不動使用者的游標）
 @MainActor
-private enum StackGesture {
+enum StackGesture {
     private static let phaseBegan: Int64 = 1      // kCGScrollPhaseBegan
     private static let phaseChanged: Int64 = 2    // kCGScrollPhaseChanged
     private static let phaseEnded: Int64 = 4      // kCGScrollPhaseEnded
