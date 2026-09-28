@@ -332,3 +332,10 @@ A.2 #1（合併窗）的辯論結果：
 - `LyricsFlowModelTests`／`LyricsFlowHistoryRecheckTests`：順向換歌後左鄰＝暫定卡（ID＝舊當前卡）；平移落定後仍在；履歴寫入後換成同一首的 `h:` 卡且位置不變；7 秒放棄後移除；往回跳不記；下一次換歌取代。
 - 既有 `advancingWithinTheSameQueueSlidesToTheNextCard`、`historyCatchingUpBeforeTheSlideSettlesKeepsItGoing` 等照跑。
 - 實機：GUI 觀測左鄰在換歌後不再變成更早那首。
+
+### 12.3 Codex R1 裁決、實作與驗證（2026-09-28 08:0x–08:3x）
+- Codex R1（scratchpad `codex-d-r1.txt`）P0×2、P1×4、P2×3。採納：7 秒放棄的觸發點（recheck 跑完入鏈 `dropPendingPlayed(generation:)`）；追上以換歌當下的履歴為基準（`hasCaughtUp(with:since:)`，重複曲不誤判）；任何真實換歌先作廢舊暫定卡；ID 衝突 fail-closed（`around` 內檢查）；左側未滿時照舊 direct（已知限制）；跳播不處理。駁回：「隨機／重複曲修不到」——判定用換歌前後索引相差 1（`resolvingCurrent` 的結果），不依 `slideHint`，兩者皆涵蓋。不修：`h:` 卡重編號（既有）。
+- TDD：樁下 6 條紅（`DeckSnapshotTests.aPendingPlayedCardSitsNextToTheCentreAndKeepsTheWindow`、`LyricsFlowHistoryRecheckTests` 5 條）→ 綠。既有測試依新行為改寫 4 條（左鄰由「更早那首」改為暫定卡）；`anUnchangedOrIdenticalRecheckDoesNotFetchDetails` 改為「前兩點不問、放棄時只為換進來的那張問一次」。
+- 實作後 codex review（`codex-review-d.txt`）：P2×1——同一首連續 ≥10 次時履歴窗口不變、無法辨識寫入，暫定卡到 7 秒移除（畫面同一首，遺留）。
+- 全量單元 827 條，僅基線 7 斷言紅（逐條相同）；coverage 95.3%；no_playback_gate PASS；Scripts 333 OK。
+- GUI 實機（使用者在場授權 Keychain 後）：自然播完 → 111ms 正中換新、左鄰＝剛播完那張（`q:`）→ History.dat 在 +5.1s 寫入 → +5.4s 左鄰原位換成同一首的 `h:` 卡；只播 3 秒就跳過 → 約 7.7s 後移除。
