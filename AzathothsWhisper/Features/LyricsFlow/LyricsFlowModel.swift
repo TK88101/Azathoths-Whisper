@@ -252,6 +252,11 @@ final class LyricsFlowModel {
         }
     }
 
+    #if DEBUG
+    /// 測試用：目前的履歴追趕 task。只供測試判定追趕的「這一步做完了」（再度入睡或結束），不得用於產品邏輯
+    var historyRecheckTaskForTesting: Task<Void, Never>? { historyRecheckTask }
+    #endif
+
     // MARK: - 狀態機
 
     private func dispatch(_ event: LyricsFlowEvent) {
