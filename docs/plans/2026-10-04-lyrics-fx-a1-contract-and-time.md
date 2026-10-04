@@ -171,6 +171,7 @@
 
 ### 8.2 既有不穩定測試（不在 A1 範圍，未修）
 - `LyricsFlowHistoryRecheckTests.anUnchangedOrIdenticalRecheckDoesNotFetchDetails`：全量第 2 輪紅（`:214` `trackDetailsRequests.count == before + 1`）。本分支孤立跑 6/6 紅；**main 558aed4 的臨時 worktree 孤立跑 3 次 1 綠 2 紅** → main 上原本就不穩定，與 A1 改動無關。推測：斷言前沒有等詳情 task 排上（未驗證）。不在本次 6 項內，未調查、未修，交使用者決定是否另案。
+- **已另案修復（2026-10-04）**：根因＝測試 helper 沒等到追趕 task 的放棄尾巴（非產品時序）；`fix/history-recheck-flaky` 併入 main（71839d6）後合進本分支（14d1271）。本分支孤立 20/20 綠，全量 972 tests 僅基線 7 斷言紅。詳見 `2026-10-04-history-recheck-flaky.md`。
 
 ### 8.3 閘門
 - `no_playback_gate.sh` exit 0；`Scripts` Python 333 tests OK；白名單 4 條綠。
