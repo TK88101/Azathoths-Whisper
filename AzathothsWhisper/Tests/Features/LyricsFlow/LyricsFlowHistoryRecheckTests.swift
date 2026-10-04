@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 
 @testable import AzathothsWhisper
@@ -73,11 +74,30 @@ struct LyricsFlowHistoryRecheckTests {
 
     private func gated(_ h: Harness) -> GatedPollClock { h.recheckClock as! GatedPollClock }
 
-    /// 放行下一個重讀時點，等它讀完（讀檔走工作鏈）
+    /// 放行下一個重讀時點，等追趕的這一步做完，再等它排的工作落地。
+    ///
+    /// 「這一步做完」只有兩種訊號：追趕再度入睡（時鐘多一筆 sleep 請求——只在這一步的讀檔與 guard
+    /// 都做完後才會請求），或追趕 task 結束（追上／作廢／放棄；放棄工作是 task 的最後一個同步動作，
+    /// 結束時它已在工作鏈上）。不能固定讓幾輪：放行後要經真的讀檔才排得到後續工作，
+    /// 而 `settleForTesting` 只追工作鏈與詳情、不知道追趕 task 還有尾巴（計劃 2026-10-04-history-recheck-flaky）。
+    /// 也不能直接等 task：沒結束的那一步會等到測試自己還沒放行的時鐘。
+    ///
+    /// 前置條件：`recheckClock` 只有追趕在用；先前被取消的追趕在取消當下已停在時鐘裡
+    /// （否則它遲到的 sleep 請求會被誤認成這一步再度入睡）
     private func releaseNextRecheck(_ h: Harness) async {
-        await gated(h).waitUntilPending(1)
-        await gated(h).releaseNext()
-        await settle(200)
+        let clock = gated(h)
+        await waitFor { await clock.pendingCount >= 1 }     // 不含已取消者
+        let asked = await clock.requested.count
+        let task = h.model.historyRecheckTaskForTesting
+        let finished = OSAllocatedUnfairLock(initialState: false)
+        await clock.releaseNext()
+        Task { await task?.value; finished.withLock { $0 = true } }
+        let stepDone: @Sendable () async -> Bool = {
+            if finished.withLock({ $0 }) { return true }
+            return await clock.requested.count > asked
+        }
+        await waitFor(stepDone)
+        #expect(await stepDone(), "追趕這一步沒做完（既沒再入睡也沒結束）")
         await h.model.settleForTesting()
     }
 
