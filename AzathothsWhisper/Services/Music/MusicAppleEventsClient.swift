@@ -14,6 +14,8 @@ import ScriptingBridge
     @objc optional var lyrics: String { get }
     @objc optional var discNumber: Int { get }
     @objc optional var trackNumber: Int { get }
+    @objc optional var genre: String { get }
+    @objc optional var duration: Double { get }
     @objc optional func setLyrics(_ value: String)
     @objc optional func artworks() -> SBElementArray
 }
@@ -21,6 +23,7 @@ import ScriptingBridge
 @objc(AZWMusicAppProto) private protocol MusicAppProto {
     @objc optional var playerState: UInt32 { get }
     @objc optional var currentTrack: SBObject { get }
+    @objc optional var playerPosition: Double { get }
     @objc optional func tracks() -> SBElementArray
 }
 
@@ -54,6 +57,7 @@ struct MusicAppleEventsClient: MusicControlling {
         }
     }
 
+    /// genre／duration 與歌詞各自讀完立刻看 lastError：後一次成功會蓋掉前一次的失敗（A1 計劃 §3.1，Codex R1）
     func nowPlaying() async throws -> NowPlayingRead? {
         // 自行檢查 lastError：歌詞讀取失敗只讓歌詞成為 nil，曲目仍有效（run 的預設檢查會讓整次失敗）
         try await run(checksLastError: false) { app in
@@ -70,9 +74,10 @@ struct MusicAppleEventsClient: MusicControlling {
             }
             let track = Self.makeTrackInfo(pinned)
             try Self.throwIfFailed(app)
-            let lyrics = (pinned as MusicTrackProto).lyrics
-            let lyricsFailed = Self.lastError(of: app) != nil
-            return NowPlayingRead(track: track, lyrics: lyricsFailed ? nil : (lyrics ?? ""))
+            let proto = pinned as MusicTrackProto
+            let lyrics = Self.unlessFailed(app, proto.lyrics ?? "")
+            let metadata = TrackMetadata(genre: Self.unlessFailed(app, proto.genre), duration: Self.unlessFailed(app, proto.duration))
+            return NowPlayingRead(track: track, lyrics: lyrics, metadata: metadata)
         }
     }
 
@@ -150,7 +155,26 @@ struct MusicAppleEventsClient: MusicControlling {
         }
     }
 
+    /// 雙讀 ID：position 是 app 屬性、不跟釘住的曲目走；前後 ID 不同就丟（A1 計劃 §3.1，Codex R1）。
+    /// 組裝與判斷在 `PlaybackPosition.make`（可測），這裡只讀原始值
+    func playbackPosition() async throws -> PlaybackPosition? {
+        try await run { app in
+            let state = Self.decodeState(app.playerState ?? 0)
+            guard state.hasCurrentTrack else { return nil }
+            let idBefore = (app.currentTrack as MusicTrackProto?)?.persistentID
+            let before = ContinuousClock.now
+            let seconds = app.playerPosition
+            let after = ContinuousClock.now
+            let idAfter = (app.currentTrack as MusicTrackProto?)?.persistentID
+            return PlaybackPosition.make(state: state, idBefore: idBefore, seconds: seconds, idAfter: idAfter, before: before, after: after)
+        }
+    }
+
     // MARK: 內部
+
+    private static func unlessFailed<T>(_ app: MusicAppProto, _ value: T?) -> T? {
+        lastError(of: app) == nil ? value : nil
+    }
 
     private static func decodeState(_ raw: UInt32) -> PlayerState {
         switch raw {
@@ -172,6 +196,8 @@ struct MusicAppleEventsClient: MusicControlling {
         case .discNumber: return #selector(getter: MusicTrackProto.discNumber)
         case .trackNumber: return #selector(getter: MusicTrackProto.trackNumber)
         case .lyrics: return #selector(getter: MusicTrackProto.lyrics)
+        case .genre: return #selector(getter: MusicTrackProto.genre)
+        case .duration: return #selector(getter: MusicTrackProto.duration)
         }
     }
 

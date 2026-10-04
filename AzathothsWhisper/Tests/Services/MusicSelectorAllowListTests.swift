@@ -16,9 +16,10 @@ import Testing
 // 計劃 AC9 ②：Music `@objc` 協議只准唯讀 getter＋setLyrics:（無播控、不改 Music 狀態）
 @Suite("MusicSelectorAllowList")
 struct MusicSelectorAllowListTests {
-    static let appAllowed: Set<String> = ["playerState", "currentTrack", "tracks"]
+    static let appAllowed: Set<String> = ["playerState", "currentTrack", "tracks", "playerPosition"]
     static let trackAllowed: Set<String> = [
         "name", "artist", "album", "persistentID", "lyrics", "discNumber", "trackNumber", "artworks",
+        "genre", "duration",   // 歌詞特效 A1（計劃 2026-10-04-lyrics-fx-a1 §3.1）：唯讀
     ]
 
     @Test func appProtocolDeclaresOnlyAllowedGetters() {

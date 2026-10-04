@@ -82,12 +82,14 @@ struct TrackDetailsColumnsTests {
             [NSNumber(value: 1), NSNumber(value: 2)],
             [NSNumber(value: 7), NSNull()],
             ["words", NSNull()],
+            ["Black Metal", NSNull()],                       // genre（歌詞特效 A1）
+            [NSNumber(value: 245.5), NSNull()],              // duration
         ])
         #expect(details == [
             TrackDetails(persistentID: "00000000000000AA", artist: "Artist A", title: "Title A", album: "Album A",
-                         discNumber: 1, trackNumber: 7, lyrics: "words"),
+                         discNumber: 1, trackNumber: 7, lyrics: "words", genre: "Black Metal", duration: 245.5),
             TrackDetails(persistentID: "00000000000000BB", artist: "Artist B", title: "Title B", album: "",
-                         discNumber: 2, trackNumber: 0, lyrics: nil),
+                         discNumber: 2, trackNumber: 0, lyrics: nil, genre: nil, duration: nil),
         ])
     }
 

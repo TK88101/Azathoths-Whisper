@@ -5,8 +5,11 @@ import OSLog
 // 差異（已批准的安全修正）：曲目身分用 persistentID，專輯鍵用 (artist, album)。
 
 enum PlaybackEvent: Equatable, Sendable {
-    /// `existingLyrics` 為 nil＝歌詞讀取失敗（unknown），與空字串（缺詞）不同（計劃 D9）
-    case trackChanged(TrackInfo, existingLyrics: String?)
+    /// `existingLyrics` 為 nil＝歌詞讀取失敗（unknown），與空字串（缺詞）不同（計劃 D9）。
+    /// `metadata` 與歌詞同一次讀取（歌詞特效 A1）
+    case trackChanged(TrackInfo, existingLyrics: String?, metadata: TrackMetadata = .unknown)
+    /// 同一首的歌詞快照變了，或由讀不到變成讀得到（A1 計劃 §3.2）。v1 只有歌詞特效消費
+    case lyricsChanged(persistentID: String, lyrics: String)
     case albumChanged(String)          // albumKey
     case notPlaying
     case permissionDenied
@@ -56,9 +59,11 @@ actor NowPlayingMonitor {
     nonisolated let events: AsyncStream<PlaybackEvent>
 
     private var lastSignature: String?
+    /// 當前曲上次讀到的歌詞指紋（只記指紋、不記文字）；nil＝還沒讀到過（A1 計劃 §3.2）
+    private var lastLyrics: LyricsFingerprint?
     private var lastAlbumKey: String?
     private var lastWasNotPlaying = false
-    private var busySources: Set<BusySource> = []
+    private var busyLedger = BusyLedger()
     /// 單飛：至多一個讀取進行中（輪詢與通知共用；actor 重入下兩個讀取交錯會讓後完成者覆寫 lastSignature）
     private var isReading = false
     /// 讀取進行中又來的理由：完成後再讀一次（多次合併成一次）
@@ -86,18 +91,12 @@ actor NowPlayingMonitor {
     /// 由本型別自己記錄「誰還忙著」，而非讓組裝根替它記帳；新增來源（如 M7 Cover Flow）
     /// 只需擴 `BusySource`，不必動 `AppModel`。
     func setBusy(_ busy: Bool, source: BusySource) async {
-        if busy {
-            busySources.insert(source)
-        } else {
-            busySources.remove(source)
-            // Editor 寫入成功後要求的補讀發生在它解除 busy 之前（計劃 §6 `writeSucceeded`）；
-            // busy 期間的換歌通知同樣在此補（F1）。多個理由只讀一次
-            if busySources.isEmpty, !deferred.isEmpty {
-                let reasons = deferred
-                deferred = []
-                await beginRead(reasons: reasons)
-            }
-        }
+        // Editor 寫入成功後要求的補讀發生在它解除 busy 之前（計劃 §6 `writeSucceeded`）；
+        // busy 期間的換歌通知同樣在此補（F1）。多個理由只讀一次
+        guard busyLedger.set(busy, source: source) == .becameIdle, !deferred.isEmpty else { return }
+        let reasons = deferred
+        deferred = []
+        await beginRead(reasons: reasons)
     }
 
     func start() {
@@ -142,7 +141,7 @@ actor NowPlayingMonitor {
 
     private func request(_ reason: ReadReason) async {
         guard !isStopped else { return }
-        guard busySources.isEmpty else {
+        guard busyLedger.isIdle else {
             if reason != .poll { deferred.insert(reason) }
             return
         }
@@ -167,7 +166,7 @@ actor NowPlayingMonitor {
             guard !followUp.isEmpty else { break }
             reasons = followUp
             followUp = []
-            guard busySources.isEmpty, !isStopped else {
+            guard busyLedger.isIdle, !isStopped else {
                 deferred.formUnion(reasons.subtracting([.poll]))
                 break
             }
@@ -179,6 +178,7 @@ actor NowPlayingMonitor {
         if reasons.contains(.forceRefresh) {
             // 在這次讀取開始時才清：進行中的那次讀完會寫回同一首，提早清會被它蓋掉
             lastSignature = nil
+            lastLyrics = nil
             lastWasNotPlaying = false
         }
         readSerial += 1
@@ -201,6 +201,7 @@ actor NowPlayingMonitor {
                 if !lastWasNotPlaying {
                     lastWasNotPlaying = true
                     lastSignature = nil
+                    lastLyrics = nil
                     continuation.yield(.notPlaying)
                 }
                 return
@@ -213,14 +214,28 @@ actor NowPlayingMonitor {
                 continuation.yield(.albumChanged(track.albumKey))
             }
 
-            guard track.signature != lastSignature else { return }
+            guard track.signature != lastSignature else {
+                yieldIfLyricsChanged(track, lyrics: read.lyrics)
+                return
+            }
             lastSignature = track.signature
-            continuation.yield(.trackChanged(track, existingLyrics: read.lyrics))
+            lastLyrics = read.lyrics.map(LyricsFingerprint.of)
+            continuation.yield(.trackChanged(track, existingLyrics: read.lyrics, metadata: read.metadata))
         } catch MusicError.permissionDenied {
             continuation.yield(.permissionDenied)
         } catch {
             // 其餘失敗（Music 未啟動、AE 暫時性錯誤）安靜跳過本輪，下一輪重試——對齊原版行為
         }
+    }
+
+    /// 同一首：歌詞指紋變了（含由讀不到變成讀得到）才發。讀失敗不是改詞，也不抹掉上次的指紋
+    private func yieldIfLyricsChanged(_ track: TrackInfo, lyrics: String?) {
+        guard let lyrics else { return }
+        let fingerprint = LyricsFingerprint.of(lyrics)
+        guard fingerprint != lastLyrics else { return }
+        lastLyrics = fingerprint
+        monitorLog.debug("lyrics changed on the current track")
+        continuation.yield(.lyricsChanged(persistentID: track.persistentID, lyrics: lyrics))
     }
 }
 

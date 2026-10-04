@@ -72,7 +72,7 @@ final class EditorViewModel {
 
     func handle(_ event: PlaybackEvent) {
         switch event {
-        case .trackChanged(let track, let existingLyrics):
+        case .trackChanged(let track, let existingLyrics, _):
             apply(track: track, existingLyrics: existingLyrics)
         case .notPlaying:
             applyNotPlaying()
@@ -80,6 +80,8 @@ final class EditorViewModel {
             applyPermissionDenied()
         case .albumChanged:
             break   // Batch / Cover Flow 消費
+        case .lyricsChanged:
+            break   // v1 只給歌詞特效（母計劃 §2.8）；Editor 行為照舊
         }
     }
 

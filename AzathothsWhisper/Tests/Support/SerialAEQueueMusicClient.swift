@@ -70,6 +70,10 @@ actor SerialAEQueueMusicClient: MusicControlling {
         await enqueue("setLyrics") { true }
     }
 
+    func playbackPosition() async throws -> PlaybackPosition? {
+        await enqueue("playbackPosition") { nil }
+    }
+
     func artworkData(persistentID: String) async throws -> Data? {
         let gate = artworkGate
         let payload = artwork[persistentID]

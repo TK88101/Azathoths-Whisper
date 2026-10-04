@@ -53,6 +53,24 @@ struct NowPlayingRead: Equatable, Sendable {
     let track: TrackInfo
     /// nil＝歌詞讀取失敗（→ unknown）。**不得折疊成空字串**：那會被當成缺詞而降下 Editor
     let lyrics: String?
+    /// 與歌詞同一次讀取（母計劃 §2.8 (a)）
+    let metadata: TrackMetadata
+
+    init(track: TrackInfo, lyrics: String?, metadata: TrackMetadata = .unknown) {
+        self.track = track
+        self.lyrics = lyrics
+        self.metadata = metadata
+    }
+}
+
+/// 曲目的 genre 與曲長（歌詞特效用，母計劃 §2.2）。
+/// `nil`＝讀不到（未知）；`""`／`0`＝Music 說沒有——兩者不折疊（A1 計劃 §2）
+struct TrackMetadata: Equatable, Sendable {
+    static let unknown = TrackMetadata(genre: nil, duration: nil)
+
+    let genre: String?
+    /// 秒
+    let duration: Double?
 }
 
 /// Cover Flow 卡片需要的曲目詳情（計劃 D14），以 persistentID 批次讀取
@@ -65,12 +83,38 @@ struct TrackDetails: Equatable, Sendable {
     let trackNumber: Int
     /// nil＝讀不到（→ unknown）
     let lyrics: String?
+    /// 歌詞特效用（母計劃 §2.2）；nil＝讀不到
+    let genre: String?
+    let duration: Double?
+
+    init(
+        persistentID: String, artist: String, title: String, album: String,
+        discNumber: Int, trackNumber: Int, lyrics: String?, genre: String? = nil, duration: Double? = nil
+    ) {
+        self.persistentID = persistentID
+        self.artist = artist
+        self.title = title
+        self.album = album
+        self.discNumber = discNumber
+        self.trackNumber = trackNumber
+        self.lyrics = lyrics
+        self.genre = genre
+        self.duration = duration
+    }
 }
 
 extension TrackDetails {
+    /// 只換歌詞、其餘照舊（唯一定義：Cover Flow 卡片與詳情快取都走這裡，新增欄位不會在某處被默默清掉）
+    func replacingLyrics(_ lyrics: String?) -> TrackDetails {
+        TrackDetails(
+            persistentID: persistentID, artist: artist, title: title, album: album,
+            discNumber: discNumber, trackNumber: trackNumber, lyrics: lyrics, genre: genre, duration: duration
+        )
+    }
+
     /// 批次讀取的欄位順序（`MusicAppleEventsClient.trackDetails` 依此送 AE）
     enum Column: Int, CaseIterable {
-        case persistentID, artist, title, album, discNumber, trackNumber, lyrics
+        case persistentID, artist, title, album, discNumber, trackNumber, lyrics, genre, duration
     }
 
     /// 各欄（依 `Column` 順序）→ 卡片詳情。欄數不對或各欄長度不一致＝批次讀取不完整，整批不採用（卡片退為 unknown）；
@@ -90,7 +134,9 @@ extension TrackDetails {
                 album: value(.album) as? String ?? "",
                 discNumber: (value(.discNumber) as? NSNumber)?.intValue ?? 0,
                 trackNumber: (value(.trackNumber) as? NSNumber)?.intValue ?? 0,
-                lyrics: value(.lyrics) as? String
+                lyrics: value(.lyrics) as? String,
+                genre: value(.genre) as? String,
+                duration: (value(.duration) as? NSNumber)?.doubleValue
             )
         }
     }
@@ -126,6 +172,8 @@ protocol MusicControlling: Sendable {
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack]
     func setLyrics(persistentID: String, lyrics: String) async throws -> Bool
     func artworkData(persistentID: String) async throws -> Data?
+    /// 歌詞特效的位置讀數（母計劃 §2.2）：沒在播或讀的途中換了歌＝nil
+    func playbackPosition() async throws -> PlaybackPosition?
 }
 
 // Cover Flow 的穩定排序（Plan §4.8，M2 審查 M12）：disc → track → AE 返回序

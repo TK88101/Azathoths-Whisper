@@ -63,6 +63,7 @@ actor LyricsFlowUITestMusic: MusicControlling {
 
     /// 無封面＝佔位（H-08）；封面不是本組 UITests 的觀察對象
     func artworkData(persistentID: String) async throws -> Data? { nil }
+    func playbackPosition() async throws -> PlaybackPosition? { nil }
 
     private static func track(at index: Int) -> TrackInfo {
         TrackInfo(

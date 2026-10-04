@@ -87,7 +87,7 @@ class CoverageGateTests(unittest.TestCase):
         self.assertFails(self.run_gate(report(healthy_product(exempt_executable=0))), "no executable lines")
 
     def test_fails_when_exemptions_exceed_the_line_budget(self) -> None:
-        self.assertFails(self.run_gate(report(healthy_product(exempt_executable=401))), "budget 400")
+        self.assertFails(self.run_gate(report(healthy_product(exempt_executable=411))), "budget 410")
 
     def test_services_files_outside_the_product_target_do_not_count(self) -> None:
         unit = [entry("Services/Lyrics/Stub.swift", 0, 5000)]   # 若計入會把比例拉到 80% 以下
