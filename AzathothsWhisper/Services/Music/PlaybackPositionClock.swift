@@ -45,6 +45,8 @@ final class PlaybackPositionClock {
     @ObservationIgnored private var isReading = false
     @ObservationIgnored private var readAgain = false
     @ObservationIgnored private var lastState: PlayerState = .stopped
+    /// 上一筆套用的讀數時刻：重錨時記「距上一筆多久」，即拖進度後跟上時間的上界（A2 計劃 §6）
+    @ObservationIgnored private var lastReadAt: ContinuousClock.Instant?
     @ObservationIgnored private var loopTask: Task<Void, Never>?
 
     init(
@@ -99,6 +101,7 @@ final class PlaybackPositionClock {
 
     private func restart() {
         generation += 1
+        lastReadAt = nil
         loopTask?.cancel()
         loopTask = nil
         setAnchor(nil)
@@ -168,6 +171,8 @@ final class PlaybackPositionClock {
     private func apply(_ reading: PlaybackPosition) {
         lastState = reading.state
         let roundTrip = Int(reading.roundTrip.inSeconds * 1000)
+        let sinceLast = lastReadAt.map { Int((reading.readAt - $0).inSeconds * 1000) } ?? -1
+        lastReadAt = reading.readAt
         guard reading.state == .playing else {
             setAnchor(.frozen(seconds: reading.seconds))
             clockLog.debug("reading \(self.readSerial, privacy: .public) paused \(roundTrip, privacy: .public)ms")
@@ -179,7 +184,7 @@ final class PlaybackPositionClock {
             return
         }
         setAnchor(.running(origin: reading.readAt - .seconds(reading.seconds)))
-        clockLog.debug("reading \(self.readSerial, privacy: .public) reanchored \(roundTrip, privacy: .public)ms")
+        clockLog.debug("reading \(self.readSerial, privacy: .public) reanchored \(roundTrip, privacy: .public)ms sinceLast \(sinceLast, privacy: .public)ms")
     }
 
     /// 值不變不寫：Observation 對任何指派都會通知

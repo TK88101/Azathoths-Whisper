@@ -10,6 +10,8 @@ enum PlaybackEvent: Equatable, Sendable {
     case trackChanged(TrackInfo, existingLyrics: String?, metadata: TrackMetadata = .unknown)
     /// 同一首的歌詞快照變了，或由讀不到變成讀得到（A1 計劃 §3.2）。v1 只有歌詞特效消費
     case lyricsChanged(persistentID: String, lyrics: String)
+    /// 同一首的 genre／曲長後來才讀到，或在 Music 被改了（A2 計劃 §3.0）。只有歌詞特效消費
+    case metadataChanged(persistentID: String, metadata: TrackMetadata)
     case albumChanged(String)          // albumKey
     case notPlaying
     case permissionDenied
@@ -61,6 +63,8 @@ actor NowPlayingMonitor {
     private var lastSignature: String?
     /// 當前曲上次讀到的歌詞指紋（只記指紋、不記文字）；nil＝還沒讀到過（A1 計劃 §3.2）
     private var lastLyrics: LyricsFingerprint?
+    /// 當前曲已知的 genre／曲長（逐欄合併，讀不到不覆蓋；A2 計劃 §3.0）
+    private var lastMetadata = TrackMetadata.unknown
     private var lastAlbumKey: String?
     private var lastWasNotPlaying = false
     private var busyLedger = BusyLedger()
@@ -179,6 +183,7 @@ actor NowPlayingMonitor {
             // 在這次讀取開始時才清：進行中的那次讀完會寫回同一首，提早清會被它蓋掉
             lastSignature = nil
             lastLyrics = nil
+            lastMetadata = .unknown
             lastWasNotPlaying = false
         }
         readSerial += 1
@@ -202,6 +207,7 @@ actor NowPlayingMonitor {
                     lastWasNotPlaying = true
                     lastSignature = nil
                     lastLyrics = nil
+                    lastMetadata = .unknown
                     continuation.yield(.notPlaying)
                 }
                 return
@@ -216,10 +222,12 @@ actor NowPlayingMonitor {
 
             guard track.signature != lastSignature else {
                 yieldIfLyricsChanged(track, lyrics: read.lyrics)
+                yieldIfMetadataChanged(track, metadata: read.metadata)
                 return
             }
             lastSignature = track.signature
             lastLyrics = read.lyrics.map(LyricsFingerprint.of)
+            lastMetadata = read.metadata
             continuation.yield(.trackChanged(track, existingLyrics: read.lyrics, metadata: read.metadata))
         } catch MusicError.permissionDenied {
             continuation.yield(.permissionDenied)
@@ -236,6 +244,15 @@ actor NowPlayingMonitor {
         lastLyrics = fingerprint
         monitorLog.debug("lyrics changed on the current track")
         continuation.yield(.lyricsChanged(persistentID: track.persistentID, lyrics: lyrics))
+    }
+
+    /// 同一首：genre／曲長後來才讀到或被改了才發（換歌那次讀曲長失敗，特效整首都沒有時間軸，A2 計劃 §1 P2-1）
+    private func yieldIfMetadataChanged(_ track: TrackInfo, metadata: TrackMetadata) {
+        let merged = lastMetadata.mergingLatestKnown(with: metadata)
+        guard merged != lastMetadata else { return }
+        lastMetadata = merged
+        monitorLog.debug("metadata changed on the current track")
+        continuation.yield(.metadataChanged(persistentID: track.persistentID, metadata: merged))
     }
 }
 

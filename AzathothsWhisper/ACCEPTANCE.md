@@ -247,9 +247,9 @@ awk -F'|' '/^\| [A-H]-[0-9]+[a-z]? \|/{n++; s=$(NF-1);
 ```
 **狀態欄不得同時出現兩種狀態字形**——否則統計結果會依賴 awk 的判斷順序（M8 評審發現）。
 
-## I 歌詞特效（A1 契約層，無畫面；計劃 `docs/plans/2026-10-03-lyrics-fx-mode.md`＋`docs/plans/2026-10-04-lyrics-fx-a1-contract-and-time.md`）
+## I 歌詞特效（計劃 `docs/plans/2026-10-03-lyrics-fx-mode.md`＋A1 `docs/plans/2026-10-04-lyrics-fx-a1-contract-and-time.md`＋A2 `docs/plans/2026-10-06-lyrics-fx-a2-mono-render.md`）
 
-A1 只交付資料契約與時間，使用者看不到任何畫面變化；可見行為的條目（切換、隨播放出字、風格探針簽字、減少動態效果）在 A2／B 補。
+I-01–I-09 是 A1 的資料契約與時間；I-10 起是 A2 的可見行為（只有 mono 一種風格）。風格探針簽字在 B 段補。
 
 | ID | 行為描述 | 依據 | 驗證方式 | 狀態 |
 |---|---|---|---|---|
@@ -262,7 +262,14 @@ A1 只交付資料契約與時間，使用者看不到任何畫面變化；可�
 | I-07 | 未播放／權限被拒：特效狀態層清空、時鐘停讀、狀態字用既有英文常數 | 母計劃 §2.8（R2-Q4） | `LyricsFXViewModelTests.notPlayingClearsEverythingAndInvalidatesTheIdentity`／`.permissionDeniedClearsWithItsOwnStatusText` | ✅ |
 | I-08 | 曲風 → 日本語系／英語系＋家族；曲庫 69 個標籤全數有期望值；pagan／heathen 歸 frost | 母計劃 §2.5；A1 計劃附錄 A.3（2026-10-04 查證定論） | `GenreStyleResolverTests`（含 69 筆參數化） | ✅ |
 | I-09 | 時間軸存檔：單一資料夾 `<persistentID>.json`（ID 大寫正規化、只認 ASCII 16 位 hex）、只讀一般檔且 ≤ 1 MiB、壞檔當未知可取代、認不出來的檔（較新版本、超大、符號連結）拒絕覆寫、合併規則、7 天重試 | 母計劃 C.1／C.4 | `TimingStoreTests`、`TimingRecordMergeTests`、`TimingLookupPolicyTests` | ✅ 單測（A1 生產路徑不讀寫，C 段接上） |
-| I-10 | A1 期間生產路徑不啟動位置時鐘（可見性在 A2 接上） | A1 計劃 §0 | `AppModelLyricsFXTests.theClockStaysIdleUntilSomethingMakesLyricsFXVisible` | ✅ |
+| I-10 | 只有「特效可見（Editor 分頁、升起、升起層畫面＝歌詞特效）且有詞」才讀播放位置；其餘情況零位置讀取（A2 改寫，原「A1 期間不啟動」） | A1 計劃 §0；A2 計劃 §3.1 | `AppModelLyricsFXTests.theDefaultCoverFlowStyleNeverReadsThePosition`／`.choosingLyricsFXSwapsVisibilityAndStartsReading`／`.leavingTheEditorTabHidesLyricsFX`／`.loweringHidesLyricsFX`；`LyricsFXViewModelTests`（無詞不啟動時鐘） | ✅ 單測 |
+| I-11 | 升起層畫面偏好：預設 Cover Flow；把手右端兩格圖示按鈕切換（封面／歌詞），只換內容、不升降；重啟保留；無選單項、無快捷鍵。切到歌詞特效時 Cover Flow 走與降下相同的不可見路徑（停止預取、放掉鍵盤焦點），切回恢復 | 母計劃 §2.1、§9-C；A2 計劃 §3.1–§3.3（Codex R1 #4／#5） | 單元：`ConfigStoreRaisedLayerStyleTests`（3 條）、`AppModelLyricsFXTests.theChoiceIsSavedAndReadBackOnTheNextLaunch`／`.aStoredLyricsFXStyleIsUsedOnceRaised`、`LyricsFlowHandleStyleKeyTests`。E2E：`LyricsFXUITests.testStyleButtonsSwapTheRaisedLayerWithoutLowering`／`.testTheChosenStyleSurvivesARelaunch`／`.testArrowKeysLeaveCoverFlowAloneWhileLyricsFXShows` | ✅（2026-10-06 使用者在場：E2E 3 條綠；真機切換與重開保留皆過） |
+| I-12 | mono：當前行大（Space Grotesk、左對齊）、下一行小灰；當前行淡入上移 0.35 s、舊行淡出；間奏空檔無字、距下一行 ≤ 2 s 先出預覽；暫停停住；拖進度典型 ≤ 2 s 跟上（量測值見 A2 計劃 §8）；換歌、同曲改詞、寫入後顯示新詞 | 母計劃 §2.6 mono 列、§2.7；A2 計劃 §3.4 | 單元：`LyricsFXFrameTests`（13 條）、`MonoLayoutTests`（5 條）、`LyricsFXScheduleTests`、`LyricsFXPreviewRenderTests`（離屏出字）。E2E：`LyricsFXUITests.testAFrozenPreviewShowsTheLineAtThatSecond`。實機：使用者在場 | ✅（2026-10-06 真機：跟著走、暫停停住、換歌換詞皆過；拖進度靠 2 s 輪詢，最壞約 2.1 s、平均約 1 s。時間準度待 C 段：曲庫無內嵌 LRC，目前是估算） |
+| I-13 | 沒有詞可畫時：已標記無詞／讀不到→背景＋既有狀態字；未播放／權限被拒→既有英文狀態字；不跑動畫、不讀位置 | 母計劃 §2.1（R1-7①）、§9-H | `LyricsFXView` 的狀態 overlay；`LyricsFXViewModelTests`（status 非有詞不建時間軸、不啟動時鐘）；`LyricsFXScheduleTests` | ✅ 單測 |
+| I-14 | 減少動態效果：靜態的當前行＋下一行，無淡入淡出與位移；每 0.25 s 換算一次位置 | 母計劃 §2.6、§2.7（R1-5）；A2 計劃 §3.5 | `LyricsFXFrameTests.reducedMotionIsStaticAndHasNoFadingLine`、`LyricsFXScheduleTests`；定格圖 `7-reduced.png` | ✅ 單測 |
+| I-15 | 同曲 metadata 補讀：曲長／曲風晚一步才讀到或在 Music 被改了，monitor 發 `metadataChanged`（讀不到不覆蓋已知值），特效隨之補上時間軸 | A2 計劃 §1 P2-1、§3.0 | `NowPlayingMonitorMetadataChangedTests`（7 條）、`TrackMetadataMergeTests`（4 條）、`LyricsFXViewModelTests`（4 條）；Editor／LyricsFlow 對此事件 no-op | ✅ |
+| I-16 | 特效層無障礙：VoiceOver 只讀當前行（label＝歌詞特效、value＝當前行） | 母計劃 §2.9 | `LyricsFXUITests.testAFrozenPreviewShowsTheLineAtThatSecond`（當前行由一枚隱形文字承載：Canvas 的 a11y value 在 macOS 讀不到） | ✅ E2E（2026-10-06） |
+| I-17 | 把手拆成兩塊：左側（標題到刻度）點了升降，右端兩格只切換畫面、不升降；標題與升降的無障礙文字跟著畫面走（Cover Flow／歌詞特效） | A2 計劃 §3.2（Codex R1 #7：產品變更） | `LyricsFlowHandleStyleKeyTests`；既有 `LyricsFlowUITests`（點 `lyricsflow-handle` 升降）9 條照跑 | ✅（2026-10-06） |
 
 ## 附錄：M6 行為真源複核（2026-08-14）
 

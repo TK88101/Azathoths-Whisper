@@ -74,21 +74,6 @@ final class LyricsFlowUITests: AppUITestCase {
         attach(name)
     }
 
-    /// 負向斷言需要一段觀察窗：條件在窗內一旦成立即失敗
-    private func assertStaysFalse(
-        _ condition: @autoclosure () -> Bool, for seconds: TimeInterval, _ message: String,
-        file: StaticString = #filePath, line: UInt = #line
-    ) {
-        let deadline = Date().addingTimeInterval(seconds)
-        while Date() < deadline {
-            if condition() {
-                XCTFail(message, file: file, line: line)
-                return
-            }
-            usleep(200_000)
-        }
-    }
-
     // MARK: AC1／AC2
 
     /// AC1：正在播的歌有詞 → Cover Flow；把手可見

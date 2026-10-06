@@ -183,4 +183,56 @@ struct LyricsFXViewModelTests {
         h.model.handle(.albumChanged("x"))
         #expect(h.model.identity == nil && h.model.statusText == nil)
     }
+
+    // MARK: P2-1 同曲 metadata 補讀（A2 計劃 §3.0）
+
+    @Test func metadataReadLaterBuildsTheMissingTimeline() async {
+        let h = await harness()
+        h.model.handle(.trackChanged(Self.track, existingLyrics: Self.lyrics, metadata: TrackMetadata(genre: "Black Metal", duration: nil)))
+        #expect(h.model.timeline == nil, "沒有曲長估不出來")
+        h.model.handle(.metadataChanged(persistentID: Self.track.persistentID, metadata: Self.metadata))
+        #expect(h.model.timeline != nil)
+        #expect(h.model.identity?.revision == 2)
+    }
+
+    @Test func aGenreChangeUpdatesTheStyle() async {
+        let h = await harness()
+        h.model.handle(.trackChanged(Self.track, existingLyrics: Self.lyrics, metadata: Self.metadata))
+        h.model.handle(.metadataChanged(persistentID: Self.track.persistentID, metadata: TrackMetadata(genre: "Death Metal", duration: 200)))
+        #expect(h.model.genreStyle == GenreStyle(family: .slab))
+        #expect(h.model.identity?.revision == 2)
+    }
+
+    @Test func metadataForAnotherTrackIsIgnored() async {
+        let h = await harness()
+        h.model.handle(.trackChanged(Self.track, existingLyrics: Self.lyrics, metadata: .unknown))
+        h.model.handle(.metadataChanged(persistentID: "FEDCBA9876543210", metadata: Self.metadata))
+        #expect(h.model.timeline == nil)
+        #expect(h.model.identity?.revision == 1)
+    }
+
+    @Test func identicalMetadataIsANoOp() async {
+        let h = await harness()
+        h.model.handle(.trackChanged(Self.track, existingLyrics: Self.lyrics, metadata: Self.metadata))
+        h.model.handle(.metadataChanged(persistentID: Self.track.persistentID, metadata: Self.metadata))
+        #expect(h.model.identity?.revision == 1)
+    }
+
+    /// 同一首重發（強制重讀）而這次曲長讀失敗：沿用已知值，歌詞不得消失（codex R3）
+    @Test func aResentTrackWithUnreadableMetadataKeepsTheTimeline() async {
+        let h = await harness()
+        h.model.handle(.trackChanged(Self.track, existingLyrics: Self.lyrics, metadata: Self.metadata))
+        h.model.handle(.trackChanged(Self.track, existingLyrics: Self.lyrics, metadata: .unknown))
+        #expect(h.model.timeline != nil)
+        #expect(h.model.genreStyle?.family == .frost)
+        #expect(h.model.identity?.revision == 1)
+    }
+
+    /// 換了一首就不沿用上一首的曲長
+    @Test func aDifferentTrackDoesNotInheritMetadata() async {
+        let h = await harness()
+        h.model.handle(.trackChanged(Self.track, existingLyrics: Self.lyrics, metadata: Self.metadata))
+        h.model.handle(.trackChanged(TrackInfo.fixture(id: "FEDCBA9876543210"), existingLyrics: Self.lyrics, metadata: .unknown))
+        #expect(h.model.timeline == nil)
+    }
 }

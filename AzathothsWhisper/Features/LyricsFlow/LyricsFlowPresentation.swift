@@ -102,6 +102,34 @@ extension HandleTick {
 }
 
 enum LyricsFlowHandle {
+    /// 把手左側的標題跟著升起層畫面走（A2 計劃 §3.2）
+    static func titleKey(style: RaisedLayerStyle) -> String {
+        styleLabelKey(style)
+    }
+
+    /// 升降按鈕的無障礙文字
+    static func raiseLabelKey(style: RaisedLayerStyle, isRaised: Bool) -> String {
+        switch style {
+        case .coverFlow: return isRaised ? "coverflow_hide" : "coverflow_show"
+        case .lyricsFX: return isRaised ? "lyricsfx_hide" : "lyricsfx_show"
+        }
+    }
+
+    /// 風格按鈕的無障礙文字
+    static func styleLabelKey(_ style: RaisedLayerStyle) -> String {
+        switch style {
+        case .coverFlow: return "nav_coverflow"
+        case .lyricsFX: return "raised_style_lyricsfx"
+        }
+    }
+
+    static func styleIdentifier(_ style: RaisedLayerStyle) -> String {
+        switch style {
+        case .coverFlow: return AccessibilityID.styleCoverFlow
+        case .lyricsFX: return AccessibilityID.styleLyricsFX
+        }
+    }
+
     static func ticks(cards: [DeckCard], status: (DeckCard) -> LyricsStatus) -> [HandleTick] {
         cards.map { HandleTick(side: $0.side, tone: LyricsBadge.tone(for: status($0))) }
     }

@@ -20,9 +20,11 @@ final class AppModel {
     let coverFlow: CoverFlowViewModel
     /// Editor 頁內的 Cover Flow 升降（計劃 §6、Q3b）
     let lyricsFlow: LyricsFlowModel
-    /// 歌詞特效的狀態層（母計劃 §2.8；A1 只有狀態與時鐘，沒有畫面）
+    /// 歌詞特效（母計劃 §2.8）：狀態層與位置時鐘；畫面在 `LyricsFXView`
     let lyricsFX: LyricsFXViewModel
     private(set) var settings: SettingsViewModel!
+    /// 升起層畫 Cover Flow 還是歌詞特效（A2 計劃 §3.1）；改它只換內容、不升降
+    private(set) var raisedLayerStyle: RaisedLayerStyle
 
     /// Editor 與 Batch 任一存檔成功都要放紙花（py:545／701／737）
     var confettiTrigger: Int { editor.confettiTrigger + batch.confettiTrigger }
@@ -72,6 +74,7 @@ final class AppModel {
         self.monitor = monitor
         self.token = initialToken
         self.language = initialLanguage
+        self.raisedLayerStyle = configStore.raisedLayerStyle
         self.splashDuration = splashDuration
         self.notifier = notifier
         self.playerSignal = playerSignal
@@ -145,7 +148,7 @@ final class AppModel {
         }
         editor.onUserEditedLyrics = { [weak self] in self?.lyricsFlow.userEditedLyrics() }
         lyricsFlow.onSurfaceChanged = { [weak self] _ in
-            self?.updateCoverFlowVisibility()
+            self?.updateRaisedLayerVisibility()
             self?.lyricsFX.refreshStatus()   // 標記「這首沒有詞」只會經由升降變更被看見
         }
         lyricsFlow.onWriteNotConfirmed = { [weak self] _ in
@@ -362,13 +365,24 @@ final class AppModel {
         } else {
             batch.tabDeactivated()
         }
-        updateCoverFlowVisibility()
+        updateRaisedLayerVisibility()
     }
 
-    /// Cover Flow 可見＝Editor 分頁在前 ∧ 畫面＝Cover Flow（不可見時不預取、不佔 AE）。
-    /// 由 `select` 與畫面變更兩處呼叫
-    private func updateCoverFlowVisibility() {
-        coverFlow.setVisible(tab == .editor && lyricsFlow.surface == .coverFlow)
+    /// 可見性的唯一定義（A2 計劃 §2／§3.1）：升起層可見＝Editor 分頁在前 ∧ 升起；
+    /// 兩個畫面依偏好二選一，不可見的那個不預取、不讀 Music、不繪製。
+    /// 由分頁切換、升降變更、選風格三處呼叫
+    private func updateRaisedLayerVisibility() {
+        let raised = tab == .editor && lyricsFlow.surface == .coverFlow
+        coverFlow.setVisible(raised && raisedLayerStyle == .coverFlow)
+        lyricsFX.setVisible(raised && raisedLayerStyle == .lyricsFX)
+    }
+
+    /// 把手右端的兩格按鈕（A2 計劃 §3.2）。存檔後重算兩個畫面的可見性
+    func selectRaisedLayerStyle(_ style: RaisedLayerStyle) {
+        guard style != raisedLayerStyle else { return }
+        raisedLayerStyle = style
+        configStore.setRaisedLayerStyle(style)
+        updateRaisedLayerVisibility()
     }
 
     func openSettings(_ group: SettingsViewModel.Group) {

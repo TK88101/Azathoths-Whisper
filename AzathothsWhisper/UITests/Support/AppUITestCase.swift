@@ -133,6 +133,21 @@ class AppUITestCase: XCTestCase {
         try? screenshot.pngRepresentation.write(to: url)
     }
 
+    /// 負向斷言需要一段觀察窗：條件在窗內一旦成立即失敗
+    func assertStaysFalse(
+        _ condition: @autoclosure () -> Bool, for seconds: TimeInterval, _ message: String,
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            if condition() {
+                XCTFail(message, file: file, line: line)
+                return
+            }
+            usleep(200_000)
+        }
+    }
+
     /// 以 identifier 定位任意型別的 AX 元素（identifier 不隨語言變，是唯一可靠的定位鍵）
     func element(_ identifier: String) -> XCUIElement {
         app.descendants(matching: .any)[identifier]

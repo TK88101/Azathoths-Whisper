@@ -82,6 +82,8 @@ final class EditorViewModel {
             break   // Batch / Cover Flow 消費
         case .lyricsChanged:
             break   // v1 只給歌詞特效（母計劃 §2.8）；Editor 行為照舊
+        case .metadataChanged:
+            break   // 只給歌詞特效（A2 計劃 §3.0）
         }
     }
 

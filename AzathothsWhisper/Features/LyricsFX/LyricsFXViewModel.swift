@@ -24,6 +24,9 @@ final class LyricsFXViewModel {
 
     let positionClock: PlaybackPositionClock
 
+    /// 預覽場景強制「減少動態效果」（XCUITest 改不了系統設定）；只有 UI 測試組裝會設成 true
+    @ObservationIgnored var forcesReducedMotion = false
+
     /// 「已標記無詞」的唯讀判斷式，由 AppModel 接到 `lyricsFlow`（與 Editor 同一份標記，D8）
     @ObservationIgnored var isMarkedNoLyrics: (String) -> Bool = { _ in false }
 
@@ -43,6 +46,8 @@ final class LyricsFXViewModel {
             nowPlaying(track, lyrics: lyrics, metadata: metadata)
         case .lyricsChanged(let persistentID, let lyrics):
             lyricsUpdated(persistentID: persistentID, text: lyrics)
+        case .metadataChanged(let persistentID, let metadata):
+            metadataUpdated(persistentID: persistentID, metadata: metadata)
         case .notPlaying:
             clear(statusText: StatusText.noTrackPlaying)
         case .permissionDenied:
@@ -58,6 +63,13 @@ final class LyricsFXViewModel {
         let new = LyricsFingerprint.of(text)
         guard new != fingerprint else { return }
         apply(persistentID: persistentID, lyrics: text)
+    }
+
+    /// 同一首的 genre／曲長後來才讀到或被改了（A2 計劃 §3.0）：時間軸與風格隨之重建，revision +1
+    func metadataUpdated(persistentID: String, metadata: TrackMetadata) {
+        guard let identity, identity.persistentID == persistentID, metadata != self.metadata else { return }
+        self.metadata = metadata
+        apply(persistentID: persistentID, lyrics: lyrics)
     }
 
     /// 可見性由 A2 的切換接上；不可見或沒有詞時時鐘不讀 Music
@@ -86,6 +98,8 @@ final class LyricsFXViewModel {
     private func nowPlaying(_ track: TrackInfo, lyrics: String?, metadata: TrackMetadata) {
         statusText = nil
         let isSameTrack = identity?.persistentID == track.persistentID
+        // 同一首重發（強制重讀）而這次 genre／曲長讀失敗：沿用已知值，正在顯示的歌詞不得消失（codex R3）
+        let metadata = isSameTrack ? self.metadata.mergingLatestKnown(with: metadata) : metadata
         let isSameSnapshot = isSameTrack && lyrics.map(LyricsFingerprint.of) == fingerprint && metadata == self.metadata
         self.metadata = metadata
         // trackChanged 帶的是整份快照：同一首（forceRefresh 重發）只有詞或 genre／曲長變了才重建

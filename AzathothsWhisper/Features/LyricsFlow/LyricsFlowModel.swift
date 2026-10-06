@@ -109,6 +109,8 @@ final class LyricsFlowModel {
             break
         case .lyricsChanged:
             break   // v1 只給歌詞特效；Cover Flow 徽章的同曲改詞另案（母計劃 §2.8）
+        case .metadataChanged:
+            break   // 只給歌詞特效（A2 計劃 §3.0）
         }
     }
 

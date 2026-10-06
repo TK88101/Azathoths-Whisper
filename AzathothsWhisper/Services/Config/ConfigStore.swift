@@ -10,6 +10,7 @@ struct ConfigStore: @unchecked Sendable {
         static let language = "AppLanguage"
         static let migrationVersion = "LegacyConfigMigratedVersion"
         static let notificationsEnabled = "LyricsNotificationsEnabled"
+        static let raisedLayerStyle = "RaisedLayerStyle"
     }
 
     /// 遷移格式版本；日後若 legacy 讀取語義再變，遞增此值即可重跑遷移。
@@ -67,6 +68,15 @@ struct ConfigStore: @unchecked Sendable {
 
     func setNotificationsEnabled(_ value: Bool) {
         defaults.set(value, forKey: Key.notificationsEnabled)
+    }
+
+    /// 升起層畫面，**預設 Cover Flow**；認不得的值也當 Cover Flow（A2 計劃 §3.1）
+    var raisedLayerStyle: RaisedLayerStyle {
+        defaults.string(forKey: Key.raisedLayerStyle).flatMap(RaisedLayerStyle.init(rawValue:)) ?? .coverFlow
+    }
+
+    func setRaisedLayerStyle(_ value: RaisedLayerStyle) {
+        defaults.set(value.rawValue, forKey: Key.raisedLayerStyle)
     }
 }
 

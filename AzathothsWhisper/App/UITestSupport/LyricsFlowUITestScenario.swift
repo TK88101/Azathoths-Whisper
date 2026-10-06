@@ -18,6 +18,9 @@ enum LyricsFlowUITestScenario: String, CaseIterable, Sendable {
     /// 播放中有詞 → Cover Flow；Batch 載入整張專輯、Fetch Missing 從替身專輯頁補上缺詞的 1、4
     /// （2026-09-25 回報：Batch 匯入後徽章不刷新）
     case batchImport
+    /// 歌詞特效預覽（A2 計劃 §3.6）：播放中、歌詞是內嵌 LRC 的自編句子；假 Music 回假播放位置
+    /// （`LyricsFXPreviewFixture`：定格或以牆鐘前進）
+    case lyricsFX
 
     // MARK: 環境變數（UITest 以 launchEnvironment 注入）
 
@@ -26,6 +29,8 @@ enum LyricsFlowUITestScenario: String, CaseIterable, Sendable {
     static let resetDefaultsVariable = "AZW_UITEST_RESET_DEFAULTS"
     /// 逗號分隔的 persistentID：預植「沒有歌詞」標記
     static let seedMarksVariable = "AZW_UITEST_SEED_MARKS"
+    /// `RaisedLayerStyle.rawValue`：啟動前預植升起層畫面（未設＝沿用 suite 裡存的值）
+    static let raisedStyleVariable = "AZW_UITEST_RAISED_STYLE"
     /// 測試專屬的設定 suite：**從不碰使用者的 `.standard`**（D4）
     static let defaultsSuiteName = "com.ibridgezhao.azathothswhisper.uitest"
 
@@ -75,10 +80,11 @@ enum LyricsFlowUITestScenario: String, CaseIterable, Sendable {
     }
 
     /// 各首的初始檔內歌詞：播放中那首有詞與否由場景決定，其餘見 `fixtureLyrics(at:)`
-    func initialLyrics(at index: Int) -> String {
+    func initialLyrics(at index: Int, environment: [String: String] = [:]) -> String {
         guard index == Self.playingIndex else { return Self.fixtureLyrics(at: index) }
         switch self {
         case .present, .batchImport: return "fixture lyrics"
+        case .lyricsFX: return LyricsFXPreviewFixture.lyrics(in: environment)
         case .missing, .marked, .notPlaying: return ""
         }
     }

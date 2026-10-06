@@ -10,6 +10,10 @@ struct LyricsFlowPageView: View {
     let editor: EditorViewModel
     let lyricsFlow: LyricsFlowModel
     let coverFlow: CoverFlowViewModel
+    let lyricsFX: LyricsFXViewModel
+    /// 升起層畫什麼（A2 計劃 §3.3）
+    let raisedStyle: RaisedLayerStyle
+    let onSelectStyle: (RaisedLayerStyle) -> Void
     /// Editor 分頁在前（Batch 覆蓋時為 false）
     let isActive: Bool
 
@@ -20,6 +24,8 @@ struct LyricsFlowPageView: View {
     private static let riseAnimation = Theme.Motion.layerShift
 
     private var isRaised: Bool { lyricsFlow.surface == .coverFlow }
+    /// Cover Flow 可互動、可持有焦點：升起 ∧ 分頁在前 ∧ 畫面＝Cover Flow（Codex R1 #5：觀察值要含風格，焦點才會真的放掉）
+    private var coverFlowIsInteractive: Bool { isRaised && isActive && raisedStyle == .coverFlow }
 
     var body: some View {
         GeometryReader { proxy in
@@ -40,25 +46,24 @@ struct LyricsFlowPageView: View {
             .clipped()
         }
         // AC14：升起時 Cover Flow 持有焦點（方向鍵步進），降下時交還（Editor 可打字）
-        .onChange(of: isRaised && isActive, initial: true) { _, focusable in
+        .onChange(of: coverFlowIsInteractive, initial: true) { _, focusable in
             coverFlowFocused = focusable
         }
         #if DEBUG
         .overlay(alignment: .topTrailing) { surfaceProbe }
+        .overlay(alignment: .topLeading) { styleProbe }
         #endif
     }
 
     #if DEBUG
     /// UITests 判定升降用（見 `AccessibilityID.surfaceProbe`）
     private var surfaceProbe: some View {
-        let value = isRaised ? AccessibilityID.raised : AccessibilityID.lowered
-        return Text(verbatim: value)
-            .font(.system(size: 1))
-            .foregroundStyle(Color.clear)
-            .frame(width: 1, height: 1)
-            .allowsHitTesting(false)
-            .accessibilityIdentifier(AccessibilityID.surfaceProbe)
-            .accessibilityValue(value)
+        AccessibilityProbe(id: AccessibilityID.surfaceProbe, value: isRaised ? AccessibilityID.raised : AccessibilityID.lowered)
+    }
+
+    /// UITests 判定升起層畫面用（見 `AccessibilityID.raisedStyleProbe`）
+    private var styleProbe: some View {
+        AccessibilityProbe(id: AccessibilityID.raisedStyleProbe, value: raisedStyle.rawValue)
     }
     #endif
 
@@ -78,17 +83,29 @@ struct LyricsFlowPageView: View {
             LyricsFlowHandleView(
                 isRaised: isRaised,
                 ticks: LyricsFlowHandle.ticks(cards: coverFlow.cards) { coverFlow.status(for: $0) },
-                action: lyricsFlow.toggleHandle
+                style: raisedStyle,
+                action: lyricsFlow.toggleHandle,
+                onSelectStyle: onSelectStyle
             )
-            CoverFlowView(
-                model: coverFlow,
-                isInteractive: isRaised && isActive,
-                focus: $coverFlowFocused,
-                upcoming: lyricsFlow.upcoming,
-                prefersReducedMotion: reduceMotion,
-                // 傳實際判定值給狀態機（Codex R7-③）：可點資格以條帶最新回報的幾何為準
-                onTapPlayingCard: { lyricsFlow.tapPlayingCard(isCentered: coverFlow.isPlayingCardCentered) }
-            )
+            // Cover Flow 常駐、不因切換而重新掛載（H-02 缺陷 3：條帶不得經初始值路徑）；切到特效時只是看不見、點不到
+            ZStack {
+                CoverFlowView(
+                    model: coverFlow,
+                    isInteractive: coverFlowIsInteractive,
+                    focus: $coverFlowFocused,
+                    upcoming: lyricsFlow.upcoming,
+                    prefersReducedMotion: reduceMotion,
+                    // 傳實際判定值給狀態機（Codex R7-③）：可點資格以條帶最新回報的幾何為準
+                    onTapPlayingCard: { lyricsFlow.tapPlayingCard(isCentered: coverFlow.isPlayingCardCentered) }
+                )
+                .opacity(raisedStyle == .coverFlow ? 1 : 0)
+                .allowsHitTesting(raisedStyle == .coverFlow)
+                // 不加 `.accessibilityHidden`：透明度 0 本來就不在無障礙樹上；而在這層掛它（即使是 false）
+                // 會讓播放卡按鈕的 AX 位置變成無限大、點不到（2026-10-06 UI 測試實測）
+                if raisedStyle == .lyricsFX {
+                    LyricsFXView(model: lyricsFX, reduceMotion: reduceMotion || lyricsFX.forcesReducedMotion)
+                }
+            }
         }
         .background(Theme.background)
         .accessibilityElement(children: .contain)

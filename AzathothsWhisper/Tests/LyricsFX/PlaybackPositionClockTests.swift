@@ -154,6 +154,23 @@ struct PlaybackPositionClockTests {
         #expect(await h.music.maxPlaybackPositionInFlight == 1)
     }
 
+    /// 換歌時 Music 連發 playerInfo（A2 計劃 §1 P2-3）：讀取在飛中來 N 次，只多讀一次；之後等輪詢，不再自己讀
+    @Test func aBurstOfResyncsDuringAGatedReadCausesExactlyOneMore() async {
+        let gate = LyricsGate()
+        let h = await harness([Self.reading(10, at: 0), Self.reading(10, at: 0.5), Self.reading(10, at: 1)])
+        await h.music.setPlaybackPositionGateQueue([gate])
+        h.clock.setTrack(Self.id)
+        h.clock.setActive(true)
+        await waitFor { await h.music.playbackPositionCalls == 1 }
+        for _ in 0..<5 { h.clock.resync() }
+        await gate.open()
+        await processed(h, 2)
+        await h.poll.waitUntilPending(1)
+        await settle()
+        #expect(await h.music.playbackPositionCalls == 2)
+        #expect(await h.music.maxPlaybackPositionInFlight == 1)
+    }
+
     @Test func resyncWhileIdleBetweenPollsReadsWithoutWaitingForTheSleep() async {
         let h = await harness([Self.reading(10, at: 0), Self.reading(30, at: 1)])
         await start(h)

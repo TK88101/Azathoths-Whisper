@@ -71,6 +71,17 @@ struct TrackMetadata: Equatable, Sendable {
     let genre: String?
     /// 秒
     let duration: Double?
+
+    /// 非有限的曲長（NaN／∞）在這裡就當成讀不到：換歌事件與補讀事件帶的是同一種正規化後的值
+    init(genre: String?, duration: Double?) {
+        self.genre = genre
+        self.duration = duration.flatMap { $0.isFinite ? $0 : nil }
+    }
+
+    /// 同一首的新讀值併入已知值：nil＝讀不到，不覆蓋；非 nil（含 `""`／`0`）一律取新值（A2 計劃 §3.0）
+    func mergingLatestKnown(with newer: TrackMetadata) -> TrackMetadata {
+        TrackMetadata(genre: newer.genre ?? genre, duration: newer.duration ?? duration)
+    }
 }
 
 /// Cover Flow 卡片需要的曲目詳情（計劃 D14），以 persistentID 批次讀取

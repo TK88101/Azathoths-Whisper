@@ -26,10 +26,13 @@ extension AppModel {
             seeds.append(Scenario.persistentID(at: Scenario.playingIndex))
         }
         seeds.forEach { store.markNoLyrics($0) }
+        if let style = environment[Scenario.raisedStyleVariable].flatMap(RaisedLayerStyle.init(rawValue:)) {
+            store.setRaisedLayerStyle(style)
+        }
 
-        let music = LyricsFlowUITestMusic(scenario: scenario)
+        let music = LyricsFlowUITestMusic(scenario: scenario, environment: environment)
         let client = UITestStubHTTPClient(pages: scenario == .batchImport ? LyricsFlowUITestLyricsPage.pages : [:])
-        return AppModel(
+        let model = AppModel(
             configStore: store,
             httpClient: client,
             music: music,
@@ -44,6 +47,8 @@ extension AppModel {
             queueDirectory: try? LyricsFlowUITestQueueFiles.write(),
             isMusicRunning: { true }
         )
+        model.lyricsFX.forcesReducedMotion = environment[LyricsFXPreviewFixture.reduceMotionVariable] == "1"
+        return model
     }
 }
 #endif

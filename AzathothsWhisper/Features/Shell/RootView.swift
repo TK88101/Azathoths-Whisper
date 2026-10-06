@@ -135,6 +135,9 @@ struct RootView: View {
                 editor: model.editor,
                 lyricsFlow: model.lyricsFlow,
                 coverFlow: model.coverFlow,
+                lyricsFX: model.lyricsFX,
+                raisedStyle: model.raisedLayerStyle,
+                onSelectStyle: model.selectRaisedLayerStyle,
                 isActive: model.tab == .editor && !model.isSplashVisible
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -152,15 +155,8 @@ struct RootView: View {
 
     #if DEBUG
     /// 計劃 §9.4：「未自動抓詞」以抓詞計數判定——Editor 升起時不掛載，故探針放在頁層、恆存在
-    /// 用 1pt 透明文字而非色塊：文字必定是 AX 元素，UITests 讀得到它的 value（色塊實測沒有 value）
     private func countProbe(_ count: Int, id: String) -> some View {
-        Text(verbatim: "\(count)")
-            .font(.system(size: 1))
-            .foregroundStyle(Color.clear)
-            .frame(width: 1, height: 1)
-            .allowsHitTesting(false)
-            .accessibilityIdentifier(id)
-            .accessibilityValue("\(count)")
+        AccessibilityProbe(id: id, value: "\(count)")
     }
     #endif
 
