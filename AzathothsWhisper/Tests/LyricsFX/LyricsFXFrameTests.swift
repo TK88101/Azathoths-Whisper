@@ -6,7 +6,7 @@ import Testing
 
 /// 每個字寬＝0.5 × 字級：測試只看版面規則，不看真字型
 struct FixedWidthMeasurer: TextMeasuring {
-    func advances(of text: String, fontSize: CGFloat, weight: GlyphWeight) -> [CGFloat] {
+    func advances(of text: String, face: FontFace, fontSize: CGFloat) -> [CGFloat] {
         (0...text.count).map { CGFloat($0) * fontSize * 0.5 }
     }
 }
@@ -48,13 +48,13 @@ struct LyricsFXFrameTests {
     @Test func withinTwoSecondsOfTheFirstLineOnlyItsPreviewShows() {
         let glyphs = plan(-0.5).glyphs
         #expect(text(glyphs) == "Paperboatsatdawn")
-        #expect(glyphs.allSatisfy { $0.tone == .secondary && $0.opacity == LyricsFXFrame.Mono.previewOpacity })
+        #expect(glyphs.allSatisfy { $0.color == .dim && $0.opacity == LyricsFXFrame.Mono.previewOpacity })
     }
 
     @Test func theCurrentLineHasOneGlyphPerNonBlankCharacterAndThePreviewFollows() throws {
         let glyphs = plan(3).glyphs
-        let current = glyphs.filter { $0.tone == .primary }
-        let preview = glyphs.filter { $0.tone == .secondary }
+        let current = glyphs.filter { $0.color == .fg }
+        let preview = glyphs.filter { $0.color == .dim }
         #expect(text(current) == "Paperboatsatdawn")
         #expect(text(preview) == "Quietharbor")
         #expect(current.allSatisfy { $0.opacity == 1 })
@@ -65,7 +65,7 @@ struct LyricsFXFrameTests {
     }
 
     @Test func theCurrentLineFadesInAndRisesMonotonically() throws {
-        let samples = stride(from: 1.0, through: 1.4, by: 0.05).compactMap { plan($0).glyphs.first { $0.tone == .primary } }
+        let samples = stride(from: 1.0, through: 1.4, by: 0.05).compactMap { plan($0).glyphs.first { $0.color == .fg } }
         try #require(samples.count == 9)
         for (earlier, later) in zip(samples, samples.dropFirst()) {
             #expect(later.opacity >= earlier.opacity)
@@ -84,14 +84,14 @@ struct LyricsFXFrameTests {
         #expect(plan(7.9).glyphs.isEmpty)
         let preview = plan(8.5).glyphs
         #expect(text(preview) == "Quietharbor")
-        #expect(preview.allSatisfy { $0.tone == .secondary })
+        #expect(preview.allSatisfy { $0.color == .dim })
     }
 
     @Test func atALineChangeTheOldLineFadesOutWhileTheNewOneFadesIn() {
         let back = LyricsTimeline(lines: [Self.line(1, 4, "Paper boats"), Self.line(4, 8, "Quiet harbor")], source: .embeddedLRC, duration: 60)
         let glyphs = plan(4.1, timeline: back).glyphs
         let old = glyphs.filter { $0.text == "P" }
-        let new = glyphs.filter { $0.text == "Q" && $0.tone == .primary }
+        let new = glyphs.filter { $0.text == "Q" && $0.color == .fg }
         #expect(old.count == 1 && new.count == 1)
         #expect(old.allSatisfy { $0.opacity < 1 && $0.opacity > 0 })
         #expect(new.allSatisfy { $0.opacity < 1 && $0.opacity > 0 })
@@ -117,9 +117,9 @@ struct LyricsFXFrameTests {
     }
 
     @Test func reducedMotionIsStaticAndHasNoFadingLine() {
-        let entering = plan(1.05, .reduced).glyphs.filter { $0.tone == .primary }
+        let entering = plan(1.05, .reduced).glyphs.filter { $0.color == .fg }
         #expect(entering.allSatisfy { $0.opacity == 1 })
-        #expect(entering.map(\.origin.y) == plan(3, .reduced).glyphs.filter { $0.tone == .primary }.map(\.origin.y))
+        #expect(entering.map(\.origin.y) == plan(3, .reduced).glyphs.filter { $0.color == .fg }.map(\.origin.y))
         #expect(plan(4.1, .reduced).glyphs.isEmpty)
     }
 
@@ -129,7 +129,7 @@ struct LyricsFXFrameTests {
 
     @Test func blankLinesNeverBecomeThePreview() {
         let withBlank = LyricsTimeline(lines: [Self.line(1, 4, "Paper boats"), Self.line(4, 6, "   "), Self.line(6, 9, "Quiet harbor")], source: .estimated, duration: 9)
-        #expect(text(plan(2, timeline: withBlank).glyphs.filter { $0.tone == .secondary }) == "Quietharbor")
+        #expect(text(plan(2, timeline: withBlank).glyphs.filter { $0.color == .dim }) == "Quietharbor")
     }
 
     @Test func theCurrentLineText() {
@@ -145,22 +145,22 @@ struct MonoLayoutTests {
 
     @Test func wrapsAtWordsWithinTheWidth() {
         // 字級 20 → 每字 10 pt；寬 100 放得下 10 字
-        let rows = MonoLayout.rows(of: "paper boats at dawn", fontSize: 20, weight: .medium, maxWidth: 100, maxRows: 4, measurer: measurer)
+        let rows = MonoLayout.rows(of: "paper boats at dawn", fontSize: 20, face: .displayMedium, maxWidth: 100, maxRows: 4, measurer: measurer)
         #expect(rows == ["paper", "boats at", "dawn"])
     }
 
     @Test func aWordWiderThanTheLineBreaksByCharacter() {
-        let rows = MonoLayout.rows(of: "abcdefghijklmn", fontSize: 20, weight: .medium, maxWidth: 100, maxRows: 4, measurer: measurer)
+        let rows = MonoLayout.rows(of: "abcdefghijklmn", fontSize: 20, face: .displayMedium, maxWidth: 100, maxRows: 4, measurer: measurer)
         #expect(rows == ["abcdefghij", "klmn"])
     }
 
     @Test func cjkBreaksAnywhere() {
-        let rows = MonoLayout.rows(of: "灯籠が川を流れてゆく夜", fontSize: 20, weight: .medium, maxWidth: 50, maxRows: 4, measurer: measurer)
+        let rows = MonoLayout.rows(of: "灯籠が川を流れてゆく夜", fontSize: 20, face: .displayMedium, maxWidth: 50, maxRows: 4, measurer: measurer)
         #expect(rows == ["灯籠が川を", "流れてゆく", "夜"])
     }
 
     @Test func extraRowsAreCut() {
-        let rows = MonoLayout.rows(of: "aa bb cc dd ee", fontSize: 20, weight: .medium, maxWidth: 20, maxRows: 2, measurer: measurer)
+        let rows = MonoLayout.rows(of: "aa bb cc dd ee", fontSize: 20, face: .displayMedium, maxWidth: 20, maxRows: 2, measurer: measurer)
         #expect(rows == ["aa", "bb"])
     }
 

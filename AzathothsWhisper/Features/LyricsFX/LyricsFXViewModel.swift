@@ -23,6 +23,8 @@ final class LyricsFXViewModel {
     private(set) var isVisible = false
 
     let positionClock: PlaybackPositionClock
+    /// 這次播放的組合配方（B1 計劃 §3.7）：換曲或停播後再播才重抽，一次播放內固定
+    private(set) var recipe: SessionRecipe = .mono
 
     /// 預覽場景強制「減少動態效果」（XCUITest 改不了系統設定）；只有 UI 測試組裝會設成 true
     @ObservationIgnored var forcesReducedMotion = false
@@ -36,8 +38,29 @@ final class LyricsFXViewModel {
     @ObservationIgnored private var lyrics: String?
     @ObservationIgnored private var metadata: TrackMetadata = .unknown
 
-    init(positionClock: PlaybackPositionClock) {
+    /// 預覽場景可換成固定 nonce（`AppModel+LyricsFlowUITest`）
+    @ObservationIgnored var nonceSource: any FXNonceSource
+    #if DEBUG
+    /// 預覽場景直接指定配方（效能量測用最重的組合）；只在得到 profile 時套用
+    @ObservationIgnored var recipeOverride: ((SongProfile) -> ComposedRecipe?)?
+    #endif
+    /// session 身分＝`track.signature`（空 persistentID 時退回三元組，不會全體撞種子；Codex 辯論 J4″）
+    @ObservationIgnored private var sessionSignature: String?
+    @ObservationIgnored private var sessionArtist = ""
+    @ObservationIgnored private var sessionNonce: UInt64 = 0
+    /// recipe 已定格（得到 profile 或確定是 mono）：之後同一 session 內不再重組
+    @ObservationIgnored private var isRecipeSettled = false
+
+    /// 同一首歌上一次的配方：下次每槽排除它（生產＝`StoredRecipeHistory`，由 AppModel 注入）
+    @ObservationIgnored private let recipeHistory: any LyricsFXRecipeHistory
+
+    init(
+        positionClock: PlaybackPositionClock, nonceSource: any FXNonceSource = SystemNonceSource(),
+        recipeHistory: any LyricsFXRecipeHistory = InMemoryRecipeHistory()
+    ) {
         self.positionClock = positionClock
+        self.nonceSource = nonceSource
+        self.recipeHistory = recipeHistory
     }
 
     func handle(_ event: PlaybackEvent) {
@@ -70,6 +93,7 @@ final class LyricsFXViewModel {
         guard let identity, identity.persistentID == persistentID, metadata != self.metadata else { return }
         self.metadata = metadata
         apply(persistentID: persistentID, lyrics: lyrics)
+        settleRecipeIfNeeded()
     }
 
     /// 可見性由 A2 的切換接上；不可見或沒有詞時時鐘不讀 Music
@@ -97,15 +121,19 @@ final class LyricsFXViewModel {
 
     private func nowPlaying(_ track: TrackInfo, lyrics: String?, metadata: TrackMetadata) {
         statusText = nil
-        let isSameTrack = identity?.persistentID == track.persistentID
+        // 「同一首」只有一個定義＝signature 相同（空 persistentID 時退回三元組）：
+        // 兩首都沒有 persistentID 時不得把前一首的 genre／曲長併進新曲（simcodex R1 層級評審）
+        let isSameTrack = identity != nil && track.signature == sessionSignature
         // 同一首重發（強制重讀）而這次 genre／曲長讀失敗：沿用已知值，正在顯示的歌詞不得消失（codex R3）
         let metadata = isSameTrack ? self.metadata.mergingLatestKnown(with: metadata) : metadata
         let isSameSnapshot = isSameTrack && lyrics.map(LyricsFingerprint.of) == fingerprint && metadata == self.metadata
         self.metadata = metadata
+        if !isSameTrack { startSession(track) }
         // trackChanged 帶的是整份快照：同一首（forceRefresh 重發）只有詞或 genre／曲長變了才重建
         guard !isSameSnapshot else { return }
         positionClock.setTrack(track.persistentID.isEmpty ? nil : track.persistentID)
         apply(persistentID: track.persistentID, lyrics: lyrics)
+        settleRecipeIfNeeded()
     }
 
     private func apply(persistentID: String, lyrics: String?) {
@@ -134,9 +162,47 @@ final class LyricsFXViewModel {
         timeline = nil
         genreStyle = nil
         statusText = text
+        sessionSignature = nil
+        recipe = .mono
         positionClock.setTrack(nil)
         updateClock()
     }
+
+    /// 新 session：抽 nonce、recipe 回 mono 等定格（B1 計劃 §3.7）
+    private func startSession(_ track: TrackInfo) {
+        sessionSignature = track.signature
+        sessionArtist = track.artist
+        sessionNonce = nonceSource.next()
+        isRecipeSettled = false
+        recipe = .mono
+    }
+
+    /// 第一次得到可用的目標值時組一次並定格；genre 還沒讀到（pending）就先維持 mono 等下次
+    private func settleRecipeIfNeeded() {
+        guard !isRecipeSettled, let signature = sessionSignature else { return }
+        switch SongProfileResolver.resolve(artist: sessionArtist, genre: metadata.genre) {
+        case .pending:
+            return
+        case .mono:
+            recipe = .mono
+        case .profile(let profile):
+            #if DEBUG
+            if let forced = recipeOverride?(profile) {
+                recipe = .composed(forced)
+                break
+            }
+            #endif
+            recipe = Composer.compose(
+                profile: profile, seed: FXHash.fnv1a64(signature) ^ sessionNonce ^ Self.recipeSchemaVersion,
+                avoiding: recipeHistory.lastPicks(forTrack: signature)?.asPrevious
+            )
+        }
+        if case .composed(let composed) = recipe { recipeHistory.record(RecipePicks(composed), forTrack: signature) }
+        isRecipeSettled = true
+    }
+
+    /// 目錄或抽樣規則改版時加 1：同 nonce 也抽出不同配方
+    static let recipeSchemaVersion: UInt64 = 3
 
     private func updateClock() {
         positionClock.setActive(isVisible && status == .present)

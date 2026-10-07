@@ -90,4 +90,40 @@ final class LyricsFXUITests: AppUITestCase {
         waitForValue(element(ID.lyricsFXLayer), "Paper boats drift past the harbor lights", timeout: Self.timeout, "應顯示 3.5 秒的行")
         attach("lyricsfx-frozen-3.5s")
     }
+
+    // MARK: B1（B1 計劃 §5）：風格依曲風自動選
+
+    private func waitForRecipe(_ predicate: @escaping (String) -> Bool, _ message: String, file: StaticString = #filePath, line: UInt = #line) {
+        let probe = element(ID.lyricsFXRecipeProbe)
+        XCTAssertTrue(probe.waitForExistence(timeout: Self.timeout), "配方探針", file: file, line: line)
+        let deadline = Date().addingTimeInterval(Self.timeout)
+        while Date() < deadline, !predicate(probe.value as? String ?? "") {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        XCTAssertTrue(predicate(probe.value as? String ?? ""), "\(message)：實得 \(probe.value as? String ?? "nil")", file: file, line: line)
+    }
+
+    /// I-18：黑金屬曲風 → 組合配方，字型屬黑金屬群（Catacombs／Grimoire／Fraktur）
+    func testABlackMetalTrackGetsAComposedStyle() {
+        start(.lyricsFX, extra: [Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.genreVariable: "Black Metal"])
+        waitForStyle("lyricsFX")
+        waitForRecipe({ ["Catacombs", "Grimoire", "Fraktur", "Cenobyte", "DarkMetal", "Mirage"].contains($0) }, "黑金屬應抽到黑金屬群字型")
+    }
+
+    /// I-18：認不得的曲風 → mono
+    func testAnUnknownGenreStaysMono() {
+        start(.lyricsFX, extra: [Scenario.raisedStyleVariable: "lyricsFX"])
+        waitForStyle("lyricsFX")
+        waitForRecipe({ $0 == "mono" }, "Pop 不在 B1 的兩個家族內")
+    }
+
+    /// I-21：減少動態效果一律 mono
+    func testReducedMotionFallsBackToMono() {
+        start(.lyricsFX, extra: [
+            Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.genreVariable: "Black Metal",
+            LyricsFXPreviewFixture.reduceMotionVariable: "1",
+        ])
+        waitForStyle("lyricsFX")
+        waitForRecipe({ $0 == "mono" }, "減少動態效果應畫 mono")
+    }
 }

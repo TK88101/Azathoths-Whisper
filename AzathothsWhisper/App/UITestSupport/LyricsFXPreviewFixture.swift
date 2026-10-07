@@ -12,6 +12,12 @@ enum LyricsFXPreviewFixture {
     static let denseVariable = "AZW_LYRICSFX_PREVIEW_DENSE"
     /// "1"＝強制「減少動態效果」（出定格圖用；XCUITest 改不了系統設定）
     static let reduceMotionVariable = "AZW_LYRICSFX_REDUCE_MOTION"
+    /// 預覽曲目的樂團名（走樂團覆寫表）／曲風（走關鍵字合成）／nonce（固定配方的抽籤）——B1 計劃 §3.10
+    static let artistVariable = "AZW_LYRICSFX_PREVIEW_ARTIST"
+    static let genreVariable = "AZW_LYRICSFX_PREVIEW_GENRE"
+    static let nonceVariable = "AZW_LYRICSFX_PREVIEW_NONCE"
+    /// 直接指定七個元件 id（font,backdrop,enter,exit,fx1,fx2,palette）：效能量測用最重的組合（B1 計劃 T10）
+    static let recipeVariable = "AZW_LYRICSFX_PREVIEW_RECIPE"
     static let duration: Double = 60
 
     /// 12 個時間點：含兩段空檔（間奏）、一行長句、一行 CJK

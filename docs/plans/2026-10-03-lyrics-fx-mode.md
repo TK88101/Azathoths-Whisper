@@ -321,6 +321,10 @@ Codex 最擔心的一點：把 Jev 的 confidence 誤讀成「樂團審美判斷
 - **P10（2026-10-04，artifact v12）**：使用者：「Rammstein 明明是工業金屬，為什麼這麼 Nu-Metal？顏色鬧的」。根因：Rammstein 目標值標了 `industrial＋nu`，而酸綠配色、掃描線、網格、打字機、切帶、RGB 分離、機甲字都同時掛 `industrial` 與 `nu` 標籤。→ 規則：**工業金屬與 Nu-Metal 不共用任何元件**；工業金屬專屬元件＝鋼灰＋火焰紅／純黑＋一種紅、冷鋼板＋頂燈、行首火焰噴發、整詞重砸（行軍節拍）、每詞整屏下沉、字緣灼熱紅光、燒盡退場、紀念碑式大寫／德式 fraktur；Rammstein 目標值＝冷 0.8、戲劇 0.85、速度 0.35、彈跳 0。測試加 `ComposerTests.rammsteinNeverGetsNuMetalComponents`。教訓：標籤共用是串味的根源，新增元件時每個標籤都要問「這個樂團會不會被它帶歪」。
 - **P11（2026-10-04，artifact v13）**：使用者：「Cradle of Filth 的交響黑金屬字體和風格太溫柔，整體像 Nightwish」。根因：Cradle 目標值侵略只有 0.6、優雅 0.8、明亮 0.3，且光柱／金色光暈／緩升／金＋深藍／Cinzel 這些溫柔交響元件沒有任何對侵略的限制。→ 規則：**溫柔交響元件一律 `forbid aggression ≥ 0.65`**（光柱、金色光暈、緩升、金＋深藍、Cinzel、Cormorant 斜體、Haunting、字級呼吸）；交響黑金屬專屬元件＝深紅濃霧＋重暈影、鞭劈進場、墨黑＋鮮血紅＋骨白。Cradle＝侵略 0.88、腐朽 0.7、明亮 0.05、優雅 0.45；Dimmu＝侵略 0.8、冷 0.6。測試加 `ComposerTests.cradleNeverGetsNightwishComponents`。
 
+- **P12（2026-10-06，B1 真視窗預覽：Catacombs＋飄雪＋煙霧進場＋溶解退場＋影印錯位＋抖動）**：使用者：「從無到有的漸入漸出效果，持續時間稍微長了一點點，導致字有點發虛」。→ 規則：淡入型進場（condense、smoke、rise）時長縮短 40%；殘留淡出（fade／dissolve）降暗 0.7→0.4 s、淡掉 2.4→1.4 s；砸入、鞭劈等快速進場不動。測試 `ComposedStyleFrameTests.fadeInEntrancesAndTrailsAreShortenedP12`。改後使用者：「這回可以了」。
+
+- **B1 探針簽字（2026-10-06）**：黑金屬（genre＝Black Metal）與交響（genre＝Symphonic Metal）各 3 次重抽的組合配方，使用者：「都是對的，沒問題」。
+
 ## 附錄 C　LRCLIB 缺歌時的備用來源（2026-10-04）
 - **使用者提供的對比**（`~/Downloads/lrclib-missing-synced-lyrics.txt`）：曲庫中 LRCLIB 拿不到時間軸的共 3,990 首。①完全找不到 1,682 首（289 個樂團，地下黑金屬為主：Rossomahaar 54、Marduk 48、Avathar 41、Gehenna 31…）；②有歌詞但無時間軸 1,888 首（AC/DC 79、HIM 68、Oasis 63、Marduk 43、Immortal 37、The Offspring 36…）；③純音樂 385 首（Nightwish 50、LINKIN PARK 44、Daft Punk 17…）。
 - **實測**（從①②隨機抽 40 首，seed 20261004，原始結果 `docs/plans/2026-10-04-lyrics-fx-sync-source-probe.json`）：

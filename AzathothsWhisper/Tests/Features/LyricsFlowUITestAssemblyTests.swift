@@ -257,4 +257,35 @@ struct LyricsFlowUITestAssemblyTests {
         let time = model.lyricsFX.positionClock.position(at: .now)
         #expect(LyricsFXFrame.currentLineText(timeline: model.lyricsFX.timeline, time: time) == "Paper boats drift past the harbor lights")
     }
+
+    // B1 計劃 §3.10：預覽可指定樂團、曲風、nonce 與固定配方（探針與效能量測用）
+    @Test func thePreviewCanOverrideTheArtistAndGenre() async throws {
+        let music = LyricsFlowUITestMusic(scenario: .lyricsFX, environment: [
+            LyricsFXPreviewFixture.artistVariable: "Mayhem", LyricsFXPreviewFixture.genreVariable: "Black Metal",
+        ])
+        let read = try #require(try await music.nowPlaying())
+        #expect(read.track.artist == "Mayhem" && read.metadata.genre == "Black Metal")
+    }
+
+    @Test func aPreviewNonceFixesTheRecipe() async throws {
+        defer { cleanUp() }
+        let environment = [Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.genreVariable: "Black Metal", LyricsFXPreviewFixture.nonceVariable: "42"]
+        let first = try makeLyricsFX(environment)
+        await pollOnce(first)
+        await waitUntil({ first.lyricsFX.recipe != .mono }, iterations: 20_000)
+        cleanUp()
+        let second = try makeLyricsFX(environment)
+        await pollOnce(second)
+        await waitUntil({ second.lyricsFX.recipe != .mono }, iterations: 20_000)
+        #expect(first.lyricsFX.recipe == second.lyricsFX.recipe && first.lyricsFX.recipe != .mono)
+    }
+
+    @Test func aForcedRecipeParsesItsSevenIDs() throws {
+        let recipe = try #require(LyricsFXPreviewRecipe.forced(
+            in: [LyricsFXPreviewFixture.recipeVariable: "Catacombs,film,smoke,dissolve,misreg,shake,ice"],
+            profile: SongProfile(axes: [.aggression: 0.9], tags: [.black])
+        ))
+        #expect(recipe.font == "Catacombs" && recipe.enter == "smoke" && recipe.fx2 == "shake" && recipe.palette == "ice")
+        #expect(LyricsFXPreviewRecipe.forced(in: [LyricsFXPreviewFixture.recipeVariable: "a,b"], profile: SongProfile(axes: [:], tags: [])) == nil)
+    }
 }

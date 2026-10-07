@@ -75,6 +75,13 @@ enum GenreStyleResolver {
         return Double(japanese.count) / Double(letters.count)
     }
 
+    /// 同一套切詞＋整詞規則判斷 genre 是否命中關鍵字（歌曲目標值 `SongProfileResolver` 共用；B1 計劃 §3.5）
+    static func genre(_ genre: String?, matches keyword: String) -> Bool {
+        let tag = (genre ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let tokens = Set(tag.components(separatedBy: separators).filter { !$0.isEmpty })
+        return matches(keyword, tag: tag, tokens: tokens)
+    }
+
     private static func matches(_ keyword: String, tag: String, tokens: Set<String>) -> Bool {
         let hasSeparator = keyword.unicodeScalars.contains { separators.contains($0) }
         if !hasSeparator && keyword.count <= wholeWordMaxLength {

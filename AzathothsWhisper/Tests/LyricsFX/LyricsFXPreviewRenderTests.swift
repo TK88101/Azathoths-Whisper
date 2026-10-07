@@ -22,7 +22,7 @@ struct LyricsFXPreviewRenderTests {
         let measurer = CoreTextMeasurer()
         let view = Canvas { context, size in
             let plan = LyricsFXFrame.plan(timeline: timeline, time: time, size: size, motion: motion, measurer: measurer)
-            LyricsFXCanvas.draw(plan, in: context, paths: GlyphPathCache())
+            LyricsFXCanvas.draw(plan, in: context, size: size, paths: GlyphPathCache())
         }
         .frame(width: size.width, height: size.height)
         .background(Theme.background)

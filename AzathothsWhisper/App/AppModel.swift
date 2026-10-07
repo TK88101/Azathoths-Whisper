@@ -111,7 +111,10 @@ final class AppModel {
             cancelAutoFetch: { editor.cancelAutoFetch(for: $0) }
         )
 
-        self.lyricsFX = LyricsFXViewModel(positionClock: PlaybackPositionClock(music: music, pollClock: positionPollClock))
+        self.lyricsFX = LyricsFXViewModel(
+            positionClock: PlaybackPositionClock(music: music, pollClock: positionPollClock),
+            recipeHistory: StoredRecipeHistory(store: configStore)
+        )
 
         self.settings = SettingsViewModel(
             validator: validator,

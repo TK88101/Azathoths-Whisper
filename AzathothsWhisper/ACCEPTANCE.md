@@ -247,9 +247,9 @@ awk -F'|' '/^\| [A-H]-[0-9]+[a-z]? \|/{n++; s=$(NF-1);
 ```
 **狀態欄不得同時出現兩種狀態字形**——否則統計結果會依賴 awk 的判斷順序（M8 評審發現）。
 
-## I 歌詞特效（計劃 `docs/plans/2026-10-03-lyrics-fx-mode.md`＋A1 `docs/plans/2026-10-04-lyrics-fx-a1-contract-and-time.md`＋A2 `docs/plans/2026-10-06-lyrics-fx-a2-mono-render.md`）
+## I 歌詞特效（計劃 `docs/plans/2026-10-03-lyrics-fx-mode.md`＋A1 `docs/plans/2026-10-04-lyrics-fx-a1-contract-and-time.md`＋A2 `docs/plans/2026-10-06-lyrics-fx-a2-mono-render.md`＋B1 `docs/plans/2026-10-06-lyrics-fx-b1-engine-composer.md`）
 
-I-01–I-09 是 A1 的資料契約與時間；I-10 起是 A2 的可見行為（只有 mono 一種風格）。風格探針簽字在 B 段補。
+I-01–I-09 是 A1 的資料契約與時間；I-10–I-17 是 A2 的可見行為（只有 mono 一種風格）；I-18 起是 B1 的風格與組合器（黑金屬＋交響兩個家族）。
 
 | ID | 行為描述 | 依據 | 驗證方式 | 狀態 |
 |---|---|---|---|---|
@@ -270,6 +270,16 @@ I-01–I-09 是 A1 的資料契約與時間；I-10 起是 A2 的可見行為（�
 | I-15 | 同曲 metadata 補讀：曲長／曲風晚一步才讀到或在 Music 被改了，monitor 發 `metadataChanged`（讀不到不覆蓋已知值），特效隨之補上時間軸 | A2 計劃 §1 P2-1、§3.0 | `NowPlayingMonitorMetadataChangedTests`（7 條）、`TrackMetadataMergeTests`（4 條）、`LyricsFXViewModelTests`（4 條）；Editor／LyricsFlow 對此事件 no-op | ✅ |
 | I-16 | 特效層無障礙：VoiceOver 只讀當前行（label＝歌詞特效、value＝當前行） | 母計劃 §2.9 | `LyricsFXUITests.testAFrozenPreviewShowsTheLineAtThatSecond`（當前行由一枚隱形文字承載：Canvas 的 a11y value 在 macOS 讀不到） | ✅ E2E（2026-10-06） |
 | I-17 | 把手拆成兩塊：左側（標題到刻度）點了升降，右端兩格只切換畫面、不升降；標題與升降的無障礙文字跟著畫面走（Cover Flow／歌詞特效） | A2 計劃 §3.2（Codex R1 #7：產品變更） | `LyricsFlowHandleStyleKeyTests`；既有 `LyricsFlowUITests`（點 `lyricsflow-handle` 升降）9 條照跑 | ✅（2026-10-06） |
+| I-18 | 風格自動選：歌曲目標值＝樂團覆寫表（原型 27 團）命中即用，否則由 genre 的所有命中關鍵字合成（硬軸取 max、軟軸取平均、generic 只在沒有 specific 時算）；組合器在六槽各抽一個合身元件（標籤閘門、req／forbid、前 5 名 fit 加權——不平方，見 I-27），效果抽兩個且不重複；未知曲風與 B1 未涵蓋的家族＝mono | 母計劃 §2.10；B1 計劃 §3.5、§3.6 | `SongProfileResolverTests`、`ArtistNormalizationTests`、`FitTests`、`ComposerTests`、`CatalogValidatorTests` | ✅ 單測 |
+| I-19 | 重抽與固定：換曲（signature 不同）或停播後再播時抽新 nonce；第一次得到可用目標值時定格，之後同一次播放內（拖進度、暫停、同曲改詞、寫入、metadata 補讀）不換；genre 晚到時先 mono、讀到時定格一次。**已知限制**：單曲循環不重抽；權限被拒後恢復、同一首不會重新出現（既有行為） | 母計劃 §2.10（R4-Q7）；B1 計劃 §3.7（Codex 辯論 J4／O3） | `LyricsFXRecipeTests`（9 條） | ✅ 單測 |
+| I-20 | 硬規則：Cradle of Filth 抽不到使用者點名的溫柔交響元件（Cinzel、Cormorant 斜體、光柱、緩升、金＋深藍、字級呼吸），Nightwish 抽得到；Mayhem 抽不到純交響元件；任一必選槽無候選＝整份 mono；工業金屬與 Nu-Metal 元件不共用 | 母計劃附錄 B P10／P11；B1 計劃 §3.6、附錄 A.3 | `ComposerTests.cradleNeverGetsTheGentleSymphonicComponents`／`.nightwishDoesGetThem`／`.mayhemNeverGetsASymphonicOnlyComponent`、`CatalogValidatorTests` | ✅ 單測 |
+| I-21 | 逐字個性：每字各有出場時刻（詞內等比＋抖動＋30% 連發）、進場／停留／退場模板與字級／高低／傾斜／散落變異；整詞模板（彈片）整詞同時出、到壽命硬切；同配方重畫相同（fnv1a64＋SplitMix64，不用 Hasher）；減少動態效果一律 mono | 母計劃 §2.6 前言、§2.7；B1 計劃 §3.4 | `FXSeedTests`、`GlyphTemplatesTests`、`GlyphPersonalityTests`、`ComposedStyleFrameTests`（18 條） | ✅ 單測 |
+| I-22 | mono 不因引擎換形而變：型別換形前錄的 2374 筆 golden 逐欄相等；像素差只在淡入淡出途中（透明度量化到 0.05 一階） | B1 計劃 T2 DoD | `MonoGoldenTests` | ✅ 單測 |
+| I-27 | 六槽抽籤：每一槽都以 fit（不平方）加權；同一首歌下次播放時，每一槽都排除上一次的元件（相鄰不重複；該槽只剩一個候選才允許重複），排除與抽取是同一次取樣、不重抽；有 persistentID 的曲目跨重啟記得（UserDefaults `LyricsFXLastPicks`，最多 500 首 LRU、只存 ID 與六個元件代號），沒有 ID 的只在本次開啟期間記得 | 使用者 2026-10-06 經 /thecure＋Jev 收斂定案，同日推廣到六槽（「全部都要隨機起來」）；B1 計劃 附錄 A.4 | `ComposerSamplingTests`（`avoidingThePreviousRecipeChangesEverySlotThatHasAnAlternative`、`avoidingOnlyTheFontLeavesTheOtherSlotsUntouched`、`withASingleCandidateTheAvoidedOneIsStillAllowed`）、`LyricsFXRecipeTests.theSameSongNeverRepeatsAnySlotTwiceInARow`／`.theRecipeHistoryOutlivesTheViewModel`、`ConfigStoreRecipeHistoryTests`（7 條）；Codex review（b11bc98，2026-10-07）無回歸 | ✅ 單測 |
+| I-23 | 黑金屬家族探針簽字（含 P12：淡入淡出縮短 40%） | B1 計劃 §3.10；母計劃附錄 B P12 | 離屏定格＋6 秒動圖（3 個 nonce）＋真視窗預覽 | ✅ 使用者簽字（2026-10-06：「都是對的，沒問題」） |
+| I-24 | 交響家族探針簽字 | B1 計劃 §3.10 | 同上 | ✅ 使用者簽字（2026-10-06） |
+| I-25 | 每幀（-O 量測建置、主執行緒、真視窗）：Grimoire／Cinzel 帶最重效果 p50 ≤ 1.7 ms、p95 ≤ 2.7 ms；Catacombs 真實字數下 p50 0.7–1.6 ms，但壓力負載（同時 ~138 字＋300 份副本）p50 達 5.3 ms、長句換行 p95 達 5.4 ms——**未過、已知**，使用者 2026-10-06 看過真視窗後裁定維持現狀照實記錄，字形點陣快取列 B2。組合版面同時最多約 138 字（字級＝畫面高 12%），不是 200。**整幀**（2026-10-07，xctrace Animation Hitches 15 s、視窗在前景、120 Hz 內建螢幕、Catacombs 最重組合壓力負載）：render server 每幀 p50 2.4 ms／p95 4.9 ms／最大 15.3 ms、離屏 pass 0；hitch 804 筆（多為晚一個 vsync 8.3 ms，最大 25 ms）；主執行緒短暫無回應 7 次（89–292 ms，成因 TBD）——同屬上述已知未過的負載，照實記錄，無另設門檻 | B1 計劃 §3.0、§8.2、§8.6 | `LyricsFXFrameMeter` 真視窗量測；xctrace | ⚠️ 部分未過（使用者裁定） |
+| I-26 | 內建字型：授權明確者（Catacombs、Grimoire of Death、UnifrakturMaguntia、Cinzel、Cormorant Garamond）＋**授權未確認、使用者 2026-10-06 裁定自擔風險收錄**者（Cenobyte、Mirage Gothic、Dark Metal）；隨附的授權／說明文字隨 app 出貨，README 照實列明；每枚都真的載入（不退回系統字） | 母計劃 §2.6 字型表；B1 計劃 §3.8 | `LyricsFXProbeRenderTests.everyCatalogFontIsRegistered`／`.eachBundledFontShipsWithItsLicence` | ✅ 單測 |
 
 ## 附錄：M6 行為真源複核（2026-08-14）
 

@@ -48,6 +48,10 @@ extension AppModel {
             isMusicRunning: { true }
         )
         model.lyricsFX.forcesReducedMotion = environment[LyricsFXPreviewFixture.reduceMotionVariable] == "1"
+        if let nonce = LyricsFXPreviewRecipe.nonce(in: environment) {
+            model.lyricsFX.nonceSource = FixedNonceSource(nonce)
+        }
+        model.lyricsFX.recipeOverride = { LyricsFXPreviewRecipe.forced(in: environment, profile: $0) }
         return model
     }
 }

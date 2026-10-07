@@ -14,6 +14,8 @@ enum AccessibilityID {
     static let lyricsFXLayer = "lyricsflow-lyricsfx"
     /// DEBUG 限定的風格探針：value＝`RaisedLayerStyle.rawValue`（同 `surfaceProbe` 的理由）
     static let raisedStyleProbe = "lyricsflow-raised-style"
+    /// DEBUG 限定的配方探針：value＝組合配方的字型元件 id，或 `mono`（B1 計劃 §5）
+    static let lyricsFXRecipeProbe = "lyricsflow-lyricsfx-recipe"
     /// Cover Flow 層常駐（降下時只露把手），只看「存在」判斷不了升降
     static let coverFlowLayer = "lyricsflow-coverflow"
     /// DEBUG 限定的升降探針：value＝`raised`／`lowered`。容器（`children: .contain`）上的 value
