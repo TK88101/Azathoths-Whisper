@@ -6,7 +6,7 @@ import Foundation
 actor MockMusicClient: MusicControlling {
     enum Response: Sendable {
         /// `lyrics` 為 nil＝歌詞讀取失敗
-        case track(TrackInfo, lyrics: String?)
+        case track(TrackInfo, lyrics: String?, metadata: TrackMetadata = .unknown)
         case notPlaying
         case failure(MusicError)
     }
@@ -51,6 +51,22 @@ actor MockMusicClient: MusicControlling {
     private(set) var maxNowPlayingInFlight = 0
     /// 逐首覆寫（優先於 `setLyricsOutcome`）：Import All 部分失敗用
     private var setLyricsOutcomes: [String: Result<Bool, MusicError>] = [:]
+
+    /// `playbackPosition()` 的腳本：依序取用、最後一筆重複；空＝nil
+    private var positionScript: [Result<PlaybackPosition?, MusicError>] = []
+    private var positionGateQueue: [LyricsGate] = []
+    private(set) var playbackPositionCalls = 0
+    private var playbackPositionInFlight = 0
+    private(set) var maxPlaybackPositionInFlight = 0
+
+    func setPlaybackPositions(_ readings: [Result<PlaybackPosition?, MusicError>]) {
+        positionScript = readings
+    }
+
+    /// 逐次閘門：第 n 次 `playbackPosition()` 等第 n 個（回應在呼叫當下取定）
+    func setPlaybackPositionGateQueue(_ gates: [LyricsGate]) {
+        positionGateQueue = gates
+    }
 
     func setSetLyricsOutcome(_ outcome: Result<Bool, MusicError>) {
         setLyricsOutcome = outcome
@@ -151,7 +167,7 @@ actor MockMusicClient: MusicControlling {
     func currentTrack() async throws -> TrackInfo? {
         currentTrackCalls += 1
         switch next() {
-        case .track(let info, _): return info
+        case .track(let info, _, _): return info
         case .notPlaying: return nil
         case .failure(let error): throw error
         }
@@ -172,7 +188,7 @@ actor MockMusicClient: MusicControlling {
             maxNowPlayingInFlight = max(maxNowPlayingInFlight, nowPlayingInFlight + 1)
         }
         switch response {
-        case .track(let info, let lyrics): return NowPlayingRead(track: info, lyrics: lyrics)
+        case .track(let info, let lyrics, let metadata): return NowPlayingRead(track: info, lyrics: lyrics, metadata: metadata)
         case .notPlaying: return nil
         case .failure(let error): throw error
         }
@@ -215,6 +231,21 @@ actor MockMusicClient: MusicControlling {
         case .failure(let error):
             throw error
         }
+    }
+
+    func playbackPosition() async throws -> PlaybackPosition? {
+        let call = playbackPositionCalls
+        playbackPositionCalls += 1
+        let response: Result<PlaybackPosition?, MusicError> = positionScript.count > 1
+            ? positionScript.removeFirst()
+            : positionScript.first ?? .success(nil)
+        playbackPositionInFlight += 1
+        maxPlaybackPositionInFlight = max(maxPlaybackPositionInFlight, playbackPositionInFlight)
+        if call < positionGateQueue.count {
+            await positionGateQueue[call].wait()
+        }
+        playbackPositionInFlight -= 1
+        return try response.get()
     }
 
     func artworkData(persistentID: String) async throws -> Data? {

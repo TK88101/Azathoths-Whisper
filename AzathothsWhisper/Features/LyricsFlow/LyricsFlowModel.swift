@@ -99,7 +99,7 @@ final class LyricsFlowModel {
 
     func handle(_ event: PlaybackEvent) {
         switch event {
-        case .trackChanged(let track, let lyrics):
+        case .trackChanged(let track, let lyrics, _):
             nowPlaying(track, lyrics: lyrics)
         case .notPlaying:
             dispatch(.notPlaying)
@@ -107,6 +107,10 @@ final class LyricsFlowModel {
             dispatch(.permissionDenied)
         case .albumChanged:
             break
+        case .lyricsChanged:
+            break   // v1 只給歌詞特效；Cover Flow 徽章的同曲改詞另案（母計劃 §2.8）
+        case .metadataChanged:
+            break   // 只給歌詞特效（A2 計劃 §3.0）
         }
     }
 
@@ -500,15 +504,6 @@ final class LyricsFlowModel {
         TrackDetails(
             persistentID: track.persistentID, artist: track.artist, title: track.title, album: track.album,
             discNumber: track.discNumber, trackNumber: track.trackNumber, lyrics: lyrics
-        )
-    }
-}
-
-extension TrackDetails {
-    func replacingLyrics(_ lyrics: String?) -> TrackDetails {
-        TrackDetails(
-            persistentID: persistentID, artist: artist, title: title, album: album,
-            discNumber: discNumber, trackNumber: trackNumber, lyrics: lyrics
         )
     }
 }

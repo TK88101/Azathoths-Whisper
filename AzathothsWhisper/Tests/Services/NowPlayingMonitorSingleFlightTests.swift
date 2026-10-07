@@ -9,7 +9,7 @@ struct NowPlayingMonitorSingleFlightTests {
     private func trackEvents(_ monitor: NowPlayingMonitor, count: Int) async -> [TrackInfo] {
         var tracks: [TrackInfo] = []
         for await event in monitor.events {
-            if case .trackChanged(let track, _) = event { tracks.append(track) }
+            if case .trackChanged(let track, _, _) = event { tracks.append(track) }
             if tracks.count == count { break }
         }
         return tracks

@@ -11,12 +11,21 @@ actor LyricsFlowUITestMusic: MusicControlling {
 
     private let scenario: LyricsFlowUITestScenario
     private var lyrics: [String: String]
+    /// 歌詞特效預覽的假時鐘：定格秒數（nil＝跑動）與跑動的起點
+    private let frozenSeconds: Double?
+    /// 預覽的樂團名與曲風（nil＝場景預設）
+    private let previewArtist: String?
+    private let previewGenre: String?
+    private let start = ContinuousClock.now
 
-    init(scenario: LyricsFlowUITestScenario) {
+    init(scenario: LyricsFlowUITestScenario, environment: [String: String] = [:]) {
         self.scenario = scenario
         self.lyrics = Dictionary(uniqueKeysWithValues: (0..<Fixture.trackCount).map { index in
-            (Fixture.persistentID(at: index), scenario.initialLyrics(at: index))
+            (Fixture.persistentID(at: index), scenario.initialLyrics(at: index, environment: environment))
         })
+        self.frozenSeconds = LyricsFXPreviewFixture.frozenSeconds(in: environment)
+        self.previewArtist = environment[LyricsFXPreviewFixture.artistVariable]
+        self.previewGenre = environment[LyricsFXPreviewFixture.genreVariable]
     }
 
     func playerState() async throws -> PlayerState {
@@ -28,8 +37,15 @@ actor LyricsFlowUITestMusic: MusicControlling {
     }
 
     func nowPlaying() async throws -> NowPlayingRead? {
-        guard let track = try await currentTrack() else { return nil }
-        return NowPlayingRead(track: track, lyrics: lyrics[track.persistentID] ?? "")
+        guard var track = try await currentTrack() else { return nil }
+        let metadata = scenario == .lyricsFX ? TrackMetadata(genre: previewGenre ?? "Pop", duration: LyricsFXPreviewFixture.duration) : .unknown
+        if scenario == .lyricsFX, let previewArtist {
+            track = TrackInfo(
+                persistentID: track.persistentID, artist: previewArtist, title: track.title, album: track.album,
+                discNumber: track.discNumber, trackNumber: track.trackNumber
+            )
+        }
+        return NowPlayingRead(track: track, lyrics: lyrics[track.persistentID] ?? "", metadata: metadata)
     }
 
     func trackDetails(persistentIDs: [String]) async throws -> [TrackDetails] {
@@ -63,6 +79,17 @@ actor LyricsFlowUITestMusic: MusicControlling {
 
     /// 無封面＝佔位（H-08）；封面不是本組 UITests 的觀察對象
     func artworkData(persistentID: String) async throws -> Data? { nil }
+
+    /// 只有歌詞特效預覽有位置：定格＝暫停在該秒，否則以牆鐘前進（A2 計劃 §3.6）
+    func playbackPosition() async throws -> PlaybackPosition? {
+        guard scenario == .lyricsFX else { return nil }
+        let now = ContinuousClock.now
+        let seconds = frozenSeconds ?? LyricsFXPreviewFixture.runningSeconds(since: start, now: now)
+        return PlaybackPosition(
+            persistentID: Fixture.persistentID(at: Fixture.playingIndex), seconds: seconds,
+            state: frozenSeconds == nil ? .playing : .paused, readAt: now, roundTrip: .zero
+        )
+    }
 
     private static func track(at index: Int) -> TrackInfo {
         TrackInfo(

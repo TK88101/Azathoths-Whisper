@@ -42,9 +42,6 @@ actor CardDetailsReader {
         sequence += 1
         stamps[persistentID] = sequence
         guard let current = cache[persistentID] else { return }
-        cache[persistentID] = TrackDetails(
-            persistentID: current.persistentID, artist: current.artist, title: current.title, album: current.album,
-            discNumber: current.discNumber, trackNumber: current.trackNumber, lyrics: lyrics
-        )
+        cache[persistentID] = current.replacingLyrics(lyrics)
     }
 }

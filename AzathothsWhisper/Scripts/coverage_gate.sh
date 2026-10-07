@@ -42,7 +42,9 @@ EXEMPTIONS = [
         "approvedOn": "2026-09-23",
     },
 ]
-EXEMPT_LINE_BUDGET = 400   # 豁免檔可執行行數合計上限（批准時 384）；調高須經評審並記入計劃
+# 2026-10-04 使用者批准 400→410：歌詞特效 A1 新增 genre／duration／playerPosition 的唯讀讀取（實測 408 行；
+# docs/plans/2026-10-04-lyrics-fx-a1-contract-and-time.md §8.3／§9-Q5，實機 LiveLyricsFXMeasurementTests 已驗）
+EXEMPT_LINE_BUDGET = 410   # 豁免檔可執行行數合計上限；調高須經評審並記入計劃
 
 root = os.path.realpath(os.getcwd())
 report = json.load(open(os.environ["AZW_COVERAGE_REPORT"]))

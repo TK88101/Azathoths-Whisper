@@ -38,6 +38,10 @@ NEW_KEYS = {
     "upnext_unavailable": {"en": "Up next isn't available right now", "zh_TW": "接下來的歌暫時讀不到", "ja": "次の曲を読み取れません"},
     "coverflow_show": {"en": "Show Cover Flow", "zh_TW": "顯示封面瀏覽", "ja": "カバーフローを表示"},
     "coverflow_hide": {"en": "Hide Cover Flow", "zh_TW": "隱藏封面瀏覽", "ja": "カバーフローを隠す"},
+    # 歌詞特效 A2：升起層畫面切換（docs/plans/2026-10-06-lyrics-fx-a2-mono-render.md §3.2）
+    "raised_style_lyricsfx": {"en": "Lyrics FX", "zh_TW": "歌詞特效", "ja": "歌詞エフェクト"},
+    "lyricsfx_show": {"en": "Show Lyrics FX", "zh_TW": "顯示歌詞特效", "ja": "歌詞エフェクトを表示"},
+    "lyricsfx_hide": {"en": "Hide Lyrics FX", "zh_TW": "隱藏歌詞特效", "ja": "歌詞エフェクトを隠す"},
     # 鍵名帶 %@：SwiftUI 的 Text("edit_lyrics_of \(title)") 以插值後的格式字串當鍵查找
     "edit_lyrics_of %@": {"en": "Edit lyrics of %@", "zh_TW": "編輯「%@」的歌詞", "ja": "「%@」の歌詞を編集"},
     # 歌詞寫入通知（docs/plans/2026-09-26-lyrics-notification.md §3.3；版式＝樣式 A）

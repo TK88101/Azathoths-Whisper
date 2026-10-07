@@ -140,7 +140,7 @@ struct LyricsFlowUITestAssemblyTests {
 
         await model.batch.loadAlbum()
         #expect(model.batch.tracks.map(\.persistentID) == (0..<Scenario.trackCount).map(Scenario.persistentID(at:)))
-        #expect(model.batch.tracks.map(\.lyrics) == (0..<Scenario.trackCount).map(Scenario.batchImport.initialLyrics(at:)))
+        #expect(model.batch.tracks.map(\.lyrics) == (0..<Scenario.trackCount).map { Scenario.batchImport.initialLyrics(at: $0) })
     }
 
     /// 經真實 LyricsService → DarkLyricsSource → 替身專輯頁：Fetch Missing 補上 1、4；Import All 後兩卡 ✓（E2E 的單元版）
@@ -195,5 +195,97 @@ struct LyricsFlowUITestAssemblyTests {
             let music = LyricsFlowUITestMusic(scenario: scenario)
             #expect(try await music.albumTracks(artist: Scenario.artist, album: Scenario.album).isEmpty)
         }
+    }
+
+    // MARK: 歌詞特效預覽場景（A2 計劃 §3.6）
+
+    private func makeLyricsFX(_ extra: [String: String]) throws -> AppModel {
+        var environment = Scenario.environment(.lyricsFX, resetDefaults: true)
+        environment.merge(extra) { $1 }
+        return try #require(AppModel.makeLyricsFlowUITestModelIfRequested(environment: environment))
+    }
+
+    @Test func lyricsFXScenarioPlaysTheFixtureWithATimeline() async throws {
+        defer { cleanUp() }
+        let model = try makeLyricsFX([Scenario.raisedStyleVariable: "lyricsFX"])
+        #expect(model.raisedLayerStyle == .lyricsFX)
+        await pollOnce(model)
+        await waitUntil({ model.lyricsFX.timeline != nil && model.lyricsFlow.surface == .coverFlow }, iterations: 20_000)
+        #expect(model.lyricsFX.timeline?.source == .embeddedLRC)
+        #expect(model.lyricsFX.isVisible)
+    }
+
+    @Test func withoutTheStyleVariableTheStoredDefaultIsKept() throws {
+        defer { cleanUp() }
+        #expect(try makeLyricsFX([:]).raisedLayerStyle == .coverFlow)
+    }
+
+    @Test func previewAtFreezesThePosition() async throws {
+        let music = LyricsFlowUITestMusic(scenario: .lyricsFX, environment: [LyricsFXPreviewFixture.previewAtVariable: "5.62"])
+        let reading = try #require(try await music.playbackPosition())
+        #expect(reading.state == .paused)
+        #expect(reading.seconds == 5.62)
+        #expect(reading.persistentID == Scenario.persistentID(at: Scenario.playingIndex))
+    }
+
+    @Test func withoutPreviewAtThePositionRuns() async throws {
+        let music = LyricsFlowUITestMusic(scenario: .lyricsFX, environment: [:])
+        let first = try #require(try await music.playbackPosition())
+        try await Task.sleep(for: .milliseconds(50))
+        let second = try #require(try await music.playbackPosition())
+        #expect(first.state == .playing)
+        #expect(second.seconds > first.seconds)
+    }
+
+    @Test func otherScenariosHaveNoPosition() async throws {
+        #expect(try await LyricsFlowUITestMusic(scenario: .present).playbackPosition() == nil)
+    }
+
+    @Test func theDenseVariableSwapsInThe200GlyphLyrics() async throws {
+        let music = LyricsFlowUITestMusic(scenario: .lyricsFX, environment: [LyricsFXPreviewFixture.denseVariable: "1"])
+        #expect(try await music.nowPlaying()?.lyrics == LyricsFXPreviewFixture.denseLyrics)
+        #expect(try await music.nowPlaying()?.metadata.duration == LyricsFXPreviewFixture.duration)
+    }
+
+    /// 定格預覽：時鐘凍結在指定秒數，當前行算得出來（`LyricsFXUITests.testAFrozenPreviewShowsTheLineAtThatSecond` 的地基）
+    @Test func aFrozenPreviewResolvesTheLineAtThatSecond() async throws {
+        defer { cleanUp() }
+        let model = try makeLyricsFX([Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.previewAtVariable: "3.5"])
+        await pollOnce(model)
+        await waitUntil({ model.lyricsFX.positionClock.anchor != nil }, iterations: 20_000)
+        #expect(model.lyricsFX.positionClock.anchor == .frozen(seconds: 3.5))
+        let time = model.lyricsFX.positionClock.position(at: .now)
+        #expect(LyricsFXFrame.currentLineText(timeline: model.lyricsFX.timeline, time: time) == "Paper boats drift past the harbor lights")
+    }
+
+    // B1 計劃 §3.10：預覽可指定樂團、曲風、nonce 與固定配方（探針與效能量測用）
+    @Test func thePreviewCanOverrideTheArtistAndGenre() async throws {
+        let music = LyricsFlowUITestMusic(scenario: .lyricsFX, environment: [
+            LyricsFXPreviewFixture.artistVariable: "Mayhem", LyricsFXPreviewFixture.genreVariable: "Black Metal",
+        ])
+        let read = try #require(try await music.nowPlaying())
+        #expect(read.track.artist == "Mayhem" && read.metadata.genre == "Black Metal")
+    }
+
+    @Test func aPreviewNonceFixesTheRecipe() async throws {
+        defer { cleanUp() }
+        let environment = [Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.genreVariable: "Black Metal", LyricsFXPreviewFixture.nonceVariable: "42"]
+        let first = try makeLyricsFX(environment)
+        await pollOnce(first)
+        await waitUntil({ first.lyricsFX.recipe != .mono }, iterations: 20_000)
+        cleanUp()
+        let second = try makeLyricsFX(environment)
+        await pollOnce(second)
+        await waitUntil({ second.lyricsFX.recipe != .mono }, iterations: 20_000)
+        #expect(first.lyricsFX.recipe == second.lyricsFX.recipe && first.lyricsFX.recipe != .mono)
+    }
+
+    @Test func aForcedRecipeParsesItsSevenIDs() throws {
+        let recipe = try #require(LyricsFXPreviewRecipe.forced(
+            in: [LyricsFXPreviewFixture.recipeVariable: "Catacombs,film,smoke,dissolve,misreg,shake,ice"],
+            profile: SongProfile(axes: [.aggression: 0.9], tags: [.black])
+        ))
+        #expect(recipe.font == "Catacombs" && recipe.enter == "smoke" && recipe.fx2 == "shake" && recipe.palette == "ice")
+        #expect(LyricsFXPreviewRecipe.forced(in: [LyricsFXPreviewFixture.recipeVariable: "a,b"], profile: SongProfile(axes: [:], tags: [])) == nil)
     }
 }

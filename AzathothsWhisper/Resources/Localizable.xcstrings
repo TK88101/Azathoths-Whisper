@@ -530,6 +530,52 @@
         }
       }
     },
+    "lyricsfx_hide": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Lyrics FX"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌詞エフェクトを隠す"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隱藏歌詞特效"
+          }
+        }
+      }
+    },
+    "lyricsfx_show": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Lyrics FX"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌詞エフェクトを表示"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示歌詞特效"
+          }
+        }
+      }
+    },
     "manual_check": {
       "extractionState": "manual",
       "localizations": {
@@ -1055,6 +1101,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "偏好設置..."
+          }
+        }
+      }
+    },
+    "raised_style_lyricsfx": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lyrics FX"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌詞エフェクト"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌詞特效"
           }
         }
       }

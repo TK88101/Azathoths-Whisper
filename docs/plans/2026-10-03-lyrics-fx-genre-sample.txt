@@ -1,0 +1,69 @@
+3378 ロック
+ 970 Metal
+ 926 Alternative
+ 892 Hard Rock
+ 612 Indie Rock
+ 591 Rock
+ 412 Black Metal
+ 247 Death Metal/Black Metal
+ 138 Pop
+ 110 Electronica
+  84 Symphony Black Metal
+  83 Melodic Death Metal
+  82 Adult Alternative
+  79 Industrial Metal
+  65 Britpop
+  64 J-Pop
+  54 Dance & House
+  44 Viking/Power Metal
+  44 Neoclassic
+  43 Symphony Metal
+  41 Punk Rock
+  33 emo-rock
+  32 Nu-Metal
+  30 Alternative Rock
+  29 Black/Death Metal
+  26 Symphonic Metal
+  23 Worldwide
+  23 Hip-Hop/Rap
+  23 Folk
+  23 BritPop
+  21 Folk/Viking Metal
+  21 Folk Black Metal
+  20 Pagan Black Metal
+  17 Thrash Metal
+  14 Gothic/Symphonic Metal
+  14 Electronic
+  14 Death Metal
+  13 Gothic Metal
+  12 Viking/Black Metal
+  12 Melodic Doom Death Metal
+  12 Gothic Rock
+  11 Viking Metal
+  11 Symphonic Black Metal
+  11 Progressive Black Metal
+  11 Melodic Death/Black Metal
+  11 Country & Folk
+  10 Symphony Power Metal
+  10 New Wave of American Heavy Metal
+  10 Epic Pagan Metal
+  10 Death/Viking Metal
+  10 Death/Doom Metal
+   9 Sympho Power Metal
+   9 Ambient Black Metal
+   8 Power Metal
+   8 Pagan Metal
+   8 Neoclassical Black Metal
+   8 Music
+   8 Death/Black Metal
+   8 Atmospheric Doom Metal
+   7 Progressive Metal
+   7 Epic heathen Metal
+   6 Hrad Rock
+   6 Depressive Black Metal
+   4 Soundtrack
+   1 Tropical/Grit/POP
+   1 R&B/Soul
+   1 Original Score
+   1 Country
+   1 Afro-Pop

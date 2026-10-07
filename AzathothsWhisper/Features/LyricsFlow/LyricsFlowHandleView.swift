@@ -12,23 +12,42 @@ extension LyricsBadge.Tone {
 }
 
 /// Cover Flow 頂端的把手（計劃 Q4；設計稿 64pt）：升降兩態皆顯示——降下時只露這一條。
-/// 左＝標題與箭頭（升起時向下＝收起），中＝每張卡一道刻度（播過的短、接下來的長、播放中白色）
+/// 左＝標題與箭頭（升起時向下＝收起），中＝每張卡一道刻度（播過的短、接下來的長、播放中白色），
+/// 右＝升起層畫面的兩格切換（A2 計劃 §3.2）。**右端兩格不觸發升降**：升降按鈕只涵蓋標題到刻度，
+/// 按鈕不能巢狀，所以拆成並排的兩塊、共用背景與上邊線
 struct LyricsFlowHandleView: View {
     static let height: CGFloat = 64
+    static let horizontalPadding: CGFloat = 24
 
     let isRaised: Bool
     let ticks: [HandleTick]
+    let style: RaisedLayerStyle
     let action: () -> Void
+    let onSelectStyle: (RaisedLayerStyle) -> Void
 
     @State private var isHovering = false
 
     var body: some View {
+        HStack(spacing: 16) {
+            raiseButton
+            RaisedLayerStyleToggle(selected: style, onSelect: onSelectStyle)
+                .padding(.trailing, Self.horizontalPadding)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: Self.height)
+        .background(Theme.cardBackground)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.border).frame(height: 1)
+        }
+    }
+
+    private var raiseButton: some View {
         Button(action: action) {
             HStack(spacing: 20) {
                 HStack(spacing: 8) {
                     Image(systemName: isRaised ? "chevron.down" : "chevron.up")
                         .font(.system(size: 10, weight: .semibold))
-                    Text("nav_coverflow")
+                    Text(LocalizedStringKey(LyricsFlowHandle.titleKey(style: style)))
                 }
                 .font(Theme.Fonts.display(11))
                 .tracking(2)
@@ -39,19 +58,15 @@ struct LyricsFlowHandleView: View {
                 tickRow
                     .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 24)
+            .padding(.leading, Self.horizontalPadding)
             .frame(maxWidth: .infinity)
             .frame(height: Self.height)
-            .background(Theme.cardBackground)
-            .overlay(alignment: .top) {
-                Rectangle().fill(Theme.border).frame(height: 1)
-            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
         .accessibilityIdentifier(AccessibilityID.lyricsFlowHandle)
-        .accessibilityLabel(Text(isRaised ? "coverflow_hide" : "coverflow_show"))
+        .accessibilityLabel(Text(LocalizedStringKey(LyricsFlowHandle.raiseLabelKey(style: style, isRaised: isRaised))))
     }
 
     private var tickRow: some View {

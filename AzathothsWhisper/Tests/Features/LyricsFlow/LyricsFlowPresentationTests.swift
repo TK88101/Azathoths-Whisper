@@ -127,3 +127,29 @@ struct LyricsFlowPresentationTests {
         ])
     }
 }
+
+// 把手跟著升起層畫面換標題與無障礙文字（A2 計劃 §3.2）
+@Suite("LyricsFlowHandle style keys")
+struct LyricsFlowHandleStyleKeyTests {
+    @Test func theTitleFollowsTheStyle() {
+        #expect(LyricsFlowHandle.titleKey(style: .coverFlow) == "nav_coverflow")
+        #expect(LyricsFlowHandle.titleKey(style: .lyricsFX) == "raised_style_lyricsfx")
+    }
+
+    @Test(arguments: [
+        (RaisedLayerStyle.coverFlow, true, "coverflow_hide"),
+        (.coverFlow, false, "coverflow_show"),
+        (.lyricsFX, true, "lyricsfx_hide"),
+        (.lyricsFX, false, "lyricsfx_show"),
+    ])
+    func theRaiseLabelFollowsTheStyle(style: RaisedLayerStyle, isRaised: Bool, expected: String) {
+        #expect(LyricsFlowHandle.raiseLabelKey(style: style, isRaised: isRaised) == expected)
+    }
+
+    @Test func theStyleButtonsAreLabelledAndIdentified() {
+        #expect(LyricsFlowHandle.styleLabelKey(.coverFlow) == "nav_coverflow")
+        #expect(LyricsFlowHandle.styleLabelKey(.lyricsFX) == "raised_style_lyricsfx")
+        #expect(LyricsFlowHandle.styleIdentifier(.coverFlow) == AccessibilityID.styleCoverFlow)
+        #expect(LyricsFlowHandle.styleIdentifier(.lyricsFX) == AccessibilityID.styleLyricsFX)
+    }
+}

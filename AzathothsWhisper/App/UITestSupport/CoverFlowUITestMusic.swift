@@ -58,6 +58,9 @@ struct CoverFlowUITestMusic: MusicControlling {
 
     func setLyrics(persistentID: String, lyrics: String) async throws -> Bool { false }
 
+    /// 歌詞特效不在此 UI 測試的範圍：不給位置
+    func playbackPosition() async throws -> PlaybackPosition? { nil }
+
     func artworkData(persistentID: String) async throws -> Data? {
         guard let index = Fixture.index(of: persistentID) else { return nil }
         return Self.solidPNG(Fixture.color(at: index))

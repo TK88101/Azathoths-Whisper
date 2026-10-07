@@ -230,6 +230,9 @@ The app bundles third-party components, whose license texts ship inside the app
 |---|---|
 | [SwiftSoup](https://github.com/scinfu/SwiftSoup) | MIT |
 | Space Grotesk | SIL Open Font License 1.1 |
+| Grimoire of Death, UnifrakturMaguntia, Cinzel, Cormorant Garamond | SIL Open Font License 1.1 |
+| Catacombs (ToughCrest Studio) | Freeware for personal and commercial use; redistribution requires crediting ToughCrest Studio |
+| Cenobyte (Chad Savage), Mirage Gothic, Dark Metal | Commercial-use terms not confirmed (Cenobyte: "Freeware"; Mirage Gothic: "All rights reserved" embedded; Dark Metal: no license file). Included at the maintainer's own risk |
 | Material Symbols | Apache License 2.0 |
 
 ## Disclaimer

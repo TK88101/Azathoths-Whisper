@@ -20,7 +20,11 @@ final class AppModel {
     let coverFlow: CoverFlowViewModel
     /// Editor 頁內的 Cover Flow 升降（計劃 §6、Q3b）
     let lyricsFlow: LyricsFlowModel
+    /// 歌詞特效（母計劃 §2.8）：狀態層與位置時鐘；畫面在 `LyricsFXView`
+    let lyricsFX: LyricsFXViewModel
     private(set) var settings: SettingsViewModel!
+    /// 升起層畫 Cover Flow 還是歌詞特效（A2 計劃 §3.1）；改它只換內容、不升降
+    private(set) var raisedLayerStyle: RaisedLayerStyle
 
     /// Editor 與 Batch 任一存檔成功都要放紙花（py:545／701／737）
     var confettiTrigger: Int { editor.confettiTrigger + batch.confettiTrigger }
@@ -61,6 +65,8 @@ final class AppModel {
         /// 換歌後履歴短重讀的時鐘（F2）。不與升回共用：可控時鐘依請求序放行，混用會放錯等待者
         historyRecheckClock: any PollClock = SystemPollClock(),
         batchSwitchClock: any PollClock = SystemPollClock(),
+        /// 歌詞特效位置時鐘的輪詢節奏（母計劃 §2.3）
+        positionPollClock: any PollClock = SystemPollClock(),
         isMusicRunning: @escaping () -> Bool = MusicProcess.isRunning
     ) {
         self.configStore = configStore
@@ -68,6 +74,7 @@ final class AppModel {
         self.monitor = monitor
         self.token = initialToken
         self.language = initialLanguage
+        self.raisedLayerStyle = configStore.raisedLayerStyle
         self.splashDuration = splashDuration
         self.notifier = notifier
         self.playerSignal = playerSignal
@@ -104,6 +111,11 @@ final class AppModel {
             cancelAutoFetch: { editor.cancelAutoFetch(for: $0) }
         )
 
+        self.lyricsFX = LyricsFXViewModel(
+            positionClock: PlaybackPositionClock(music: music, pollClock: positionPollClock),
+            recipeHistory: StoredRecipeHistory(store: configStore)
+        )
+
         self.settings = SettingsViewModel(
             validator: validator,
             onTokenSaved: { [weak self] token in self?.saveToken(token) },
@@ -112,8 +124,10 @@ final class AppModel {
             onClose: { [weak self] in self?.closeModal() }
         )
 
+        // 同一組 busy 來源扇出到 monitor 與位置時鐘（母計劃 §2.3 R2）
         editor.onBusyChange = { [weak self] busy in
             guard let self else { return }
+            self.lyricsFX.positionClock.setBusy(busy, source: .editor)
             await self.monitor.setBusy(busy, source: .editor)
         }
         editor.onRequestHydrate = { [weak self] in
@@ -122,8 +136,10 @@ final class AppModel {
         }
         // D8：Editor 只拿唯讀判斷式與回報出口，不持有標記 store 與狀態機
         editor.isMarkedNoLyrics = { [weak self] in self?.lyricsFlow.isMarkedNoLyrics($0) ?? false }
+        lyricsFX.isMarkedNoLyrics = { [weak self] in self?.lyricsFlow.isMarkedNoLyrics($0) ?? false }
         editor.onSaved = { [weak self] persistentID, text in
             self?.lyricsFlow.saved(persistentID: persistentID, text: text)
+            self?.lyricsFX.lyricsUpdated(persistentID: persistentID, text: text)
         }
         editor.onSavedTrack = { [weak self] track in
             self?.postIfEnabled(
@@ -134,7 +150,10 @@ final class AppModel {
             self?.lyricsFlow.saveFailed(persistentID: persistentID)
         }
         editor.onUserEditedLyrics = { [weak self] in self?.lyricsFlow.userEditedLyrics() }
-        lyricsFlow.onSurfaceChanged = { [weak self] _ in self?.updateCoverFlowVisibility() }
+        lyricsFlow.onSurfaceChanged = { [weak self] _ in
+            self?.updateRaisedLayerVisibility()
+            self?.lyricsFX.refreshStatus()   // 標記「這首沒有詞」只會經由升降變更被看見
+        }
         lyricsFlow.onWriteNotConfirmed = { [weak self] _ in
             self?.editor.setExternalStatus(StatusText.writeNotConfirmed)
         }
@@ -142,6 +161,7 @@ final class AppModel {
         // C-18：只有「載入專輯」會停輪詢，Fetch Missing／Import 期間輪詢照跑
         batch.onBusyChange = { [weak self] busy in
             guard let self else { return }
+            self.lyricsFX.positionClock.setBusy(busy, source: .batch)
             await self.monitor.setBusy(busy, source: .batch)
         }
         // C-23：載入三態文案寫在 Editor 狀態欄
@@ -151,6 +171,7 @@ final class AppModel {
         // Batch 寫入成功 → Cover Flow 徽章（2026-09-25 回報：匯入後卡片仍顯示缺詞）
         batch.onLyricsWritten = { [weak self] persistentID, text in
             self?.lyricsFlow.batchSaved(persistentID: persistentID, text: text)
+            self?.lyricsFX.lyricsUpdated(persistentID: persistentID, text: text)
         }
         batch.onImportFinished = { [weak self] result in self?.batchImportFinished(result) }
     }
@@ -293,7 +314,10 @@ final class AppModel {
         startEventLoop()
         await monitor.start()
         // 換歌當下就讀，不等下一次 3 秒輪詢（F1）；輪詢保留作通知漏送時的保底
-        playerSignal.start { [monitor] in Task { await monitor.playerDidChange() } }
+        playerSignal.start { [monitor, weak self] in
+            Task { await monitor.playerDidChange() }
+            self?.lyricsFX.positionClock.resync()
+        }
         lyricsFlow.startPolling()
 
         try? await Task.sleep(for: splashDuration)
@@ -306,10 +330,11 @@ final class AppModel {
         guard eventTask == nil else { return }
         eventTask = Task { [weak self] in
             guard let self else { return }
-            // D7：editor → lyricsFlow（同步）→ batch；迴圈內不 await 任何 AE
+            // D7：editor → lyricsFlow（同步）→ lyricsFX（同步）→ batch；迴圈內不 await 任何 AE
             for await event in self.monitor.events {
                 self.editor.handle(event)
                 self.lyricsFlow.handle(event)
+                self.lyricsFX.handle(event)
                 self.batch.handle(event)      // C-17：albumChanged 由 Batch 消費
             }
         }
@@ -319,6 +344,7 @@ final class AppModel {
         eventTask?.cancel()
         eventTask = nil
         lyricsFlow.stopPolling()
+        lyricsFX.setVisible(false)
         playerSignal.stop()
         Task { await monitor.stop() }
     }
@@ -342,13 +368,24 @@ final class AppModel {
         } else {
             batch.tabDeactivated()
         }
-        updateCoverFlowVisibility()
+        updateRaisedLayerVisibility()
     }
 
-    /// Cover Flow 可見＝Editor 分頁在前 ∧ 畫面＝Cover Flow（不可見時不預取、不佔 AE）。
-    /// 由 `select` 與畫面變更兩處呼叫
-    private func updateCoverFlowVisibility() {
-        coverFlow.setVisible(tab == .editor && lyricsFlow.surface == .coverFlow)
+    /// 可見性的唯一定義（A2 計劃 §2／§3.1）：升起層可見＝Editor 分頁在前 ∧ 升起；
+    /// 兩個畫面依偏好二選一，不可見的那個不預取、不讀 Music、不繪製。
+    /// 由分頁切換、升降變更、選風格三處呼叫
+    private func updateRaisedLayerVisibility() {
+        let raised = tab == .editor && lyricsFlow.surface == .coverFlow
+        coverFlow.setVisible(raised && raisedLayerStyle == .coverFlow)
+        lyricsFX.setVisible(raised && raisedLayerStyle == .lyricsFX)
+    }
+
+    /// 把手右端的兩格按鈕（A2 計劃 §3.2）。存檔後重算兩個畫面的可見性
+    func selectRaisedLayerStyle(_ style: RaisedLayerStyle) {
+        guard style != raisedLayerStyle else { return }
+        raisedLayerStyle = style
+        configStore.setRaisedLayerStyle(style)
+        updateRaisedLayerVisibility()
     }
 
     func openSettings(_ group: SettingsViewModel.Group) {
