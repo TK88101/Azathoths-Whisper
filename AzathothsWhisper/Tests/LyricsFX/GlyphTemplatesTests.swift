@@ -55,7 +55,9 @@ struct GlyphTemplatesTests {
         for step in 0...200 {
             let value = template.transform(time: Double(step) * 0.037, context: Self.context)
             #expect(abs(value.dx) <= Self.context.em * 0.13 && abs(value.dy) <= Self.context.em * 0.13, "\(template)")
-            #expect(abs(value.rotation) <= 0.11 && abs(value.scale - 1) <= 0.041 && value.alpha == 1)
+            #expect(abs(value.rotation) <= 0.11 && abs(value.scale - 1) <= 0.041)
+            // 停留不改透明度；唯一例外是燭火閃爍（B2 批 1 簽字的元件，範圍見 GlyphTemplatesB2Tests）
+            if template != .flicker { #expect(value.alpha == 1, "\(template)") }
         }
     }
 
@@ -132,6 +134,61 @@ struct GlyphPersonalityTests {
         let personalities = LinePersonalities.make(line: Self.line, seed: 11, style: Self.style)
         for word in Dictionary(grouping: personalities, by: \.wordIndex).values {
             #expect(Set(word.map(\.angle)).count == 1 && Set(word.map(\.bend)).count == 1)
+        }
+    }
+}
+
+// B2 計劃 T4：批 1（rock 系）新增的模板，原樣移植原型 lyrics-fx-preview.html:202-251
+@Suite("Glyph templates — B2 batch 1")
+struct GlyphTemplatesB2Tests {
+    static let context = GlyphTemplatesTests.context
+
+    @Test func stampStartsThreeTimesLargerAndTiltedThenSettles() {
+        let start = EnterTemplate.stamp.transform(progress: 0, context: Self.context)
+        #expect(abs(start.scale - 3.2) < 1e-9)
+        #expect(abs(start.rotation - 0.3) < 1e-9)
+        #expect(start.alpha == 0)
+    }
+
+    @Test func popOvershootsBeforeSettling() {
+        let peak = (1...19).map { EnterTemplate.pop.transform(progress: Double($0) / 20, context: Self.context).scale }.max() ?? 0
+        #expect(peak > 1.05, "彈出要有回彈")
+        #expect(EnterTemplate.pop.transform(progress: 0, context: Self.context).scale > 0)
+    }
+
+    @Test func fallInDropsFromAboveWithATilt() {
+        let start = EnterTemplate.fallIn.transform(progress: 0, context: Self.context)
+        #expect(abs(start.dy - -60) < 1e-9, "從 1.5 em 上方落下")
+        #expect(abs(start.rotation - 0.4) < 1e-9)
+    }
+
+    @Test func slideComesFromTheWordsFlightDirection() {
+        let start = EnterTemplate.slide.transform(progress: 0, context: Self.context)
+        #expect(abs(start.dx - cos(2.1) * 495) < 1e-6 && abs(start.dy - sin(2.1) * 495) < 1e-6)
+        #expect(start.rotation == 0)
+    }
+
+    @Test(arguments: [ExitTemplate.fall, .shrink, .up, .slideOut])
+    func newExitsStartUntouched(template: ExitTemplate) {
+        let start = template.transform(progress: 0, context: Self.context)
+        #expect(start.alpha == 1 && start.dx == 0 && start.dy == 0 && start.scale == 1, "\(template)")
+    }
+
+    @Test func newExitsEndWhereThePrototypeEnds() {
+        let fall = ExitTemplate.fall.transform(progress: 1, context: Self.context)
+        #expect(abs(fall.dy - 280) < 1e-9 && abs(fall.rotation - 0.5) < 1e-9 && fall.alpha == 0.5, "落下半個畫面高、只淡一半")
+        #expect(ExitTemplate.shrink.transform(progress: 1, context: Self.context).alpha == 0)
+        #expect(abs(ExitTemplate.up.transform(progress: 1, context: Self.context).dy - -48) < 1e-9)
+        let away = ExitTemplate.slideOut.transform(progress: 1, context: Self.context)
+        #expect(abs(away.dx - cos(2.1) * 495) < 1e-6 && away.alpha == 0)
+    }
+
+    @Test func bobWobbleAndFlickerStaySmall() {
+        for step in 0...60 {
+            let t = Double(step) * 0.1
+            #expect(abs(HoldTemplate.bob.transform(time: t, context: Self.context).dy) <= 40 * 0.06 + 1e-9)
+            #expect(abs(HoldTemplate.wobble.transform(time: t, context: Self.context).rotation) <= 0.06 + 1e-9)
+            #expect((0.6...1).contains(HoldTemplate.flicker.transform(time: t, context: Self.context).alpha))
         }
     }
 }

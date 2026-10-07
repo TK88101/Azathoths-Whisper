@@ -110,6 +110,15 @@ final class LyricsFXUITests: AppUITestCase {
         waitForRecipe({ ["Catacombs", "Grimoire", "Fraktur", "Cenobyte", "DarkMetal", "Mirage"].contains($0) }, "黑金屬應抽到黑金屬群字型")
     }
 
+    /// B2 批 1：樂團覆寫優先於曲風——曲風寫 Pop（目錄外），樂團是 AC/DC 仍得到硬搖滾群字型
+    func testASignedRockBandGetsItsComposedStyleRegardlessOfGenre() {
+        start(.lyricsFX, extra: [
+            Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.artistVariable: "AC/DC", LyricsFXPreviewFixture.genreVariable: "Pop",
+        ])
+        waitForStyle("lyricsFX")
+        waitForRecipe({ ["AlfaSlab", "Bebas", "Oswald", "Anton"].contains($0) }, "AC/DC 應抽到硬搖滾群字型")
+    }
+
     /// I-18：認不得的曲風 → mono
     func testAnUnknownGenreStaysMono() {
         start(.lyricsFX, extra: [Scenario.raisedStyleVariable: "lyricsFX"])

@@ -23,9 +23,13 @@ struct ResolvedStyle: Sendable {
         }
         let aggression = recipe.profile.axes[.aggression] ?? 0
         let elegance = recipe.profile.axes[.elegance] ?? 0
-        let hold: [(HoldTemplate, Double)] = effects.contains(.breathe)
-            ? [(.breathe, 3), (.still, 2)]
-            : (aggression > 0.7 ? [(.still, 5), (.twitch, 1)] : [(.still, 3), (.drift, 1), (.float, 1)])
+        // 停留的優先序照原型：bob → wobble → flicker → breathe → 依侵略度
+        let hold: [(HoldTemplate, Double)] =
+            if effects.contains(.bob) { [(.bob, 3), (.still, 2)] }
+            else if effects.contains(.wobble) { [(.wobble, 2), (.still, 3)] }
+            else if effects.contains(.flicker) { [(.flicker, 3), (.still, 2)] }
+            else if effects.contains(.breathe) { [(.breathe, 3), (.still, 2)] }
+            else { aggression > 0.7 ? [(.still, 5), (.twitch, 1)] : [(.still, 3), (.drift, 1), (.float, 1)] }
         self.face = face
         self.palette = palette
         self.backdrop = backdrop
@@ -62,6 +66,16 @@ enum ComposedStyle {
     static let trailAlpha = 0.3
     /// 每幀粒子上限（G0 定案）；超過先砍字旁的冰屑
     static let maxParticles = 300
+    /// thump：詞首 0.12 s 內整屏放大到 1.04（原型）
+    static let thumpWindow = 0.12
+    static let thumpScale: CGFloat = 0.04
+    /// 光暈：原型 shadowBlur 18 × glowAmt(polish 0.4)≈14.8；Canvas 的 blur 約為 SwiftUI shadow 半徑的 2 倍
+    static let glowRadius: CGFloat = 7.4
+    /// 霓虹描邊寬（em 比例）
+    static let strokeRatio: CGFloat = 0.06
+    /// 倒影：在字下方 0.95 em、16% 透明度
+    static let reflectionOffset: CGFloat = 0.95
+    static let reflectionAlpha = 0.16
     /// 詞首後多久內整屏抖
     static let shakeWindow = 0.07
     static let specksPerGlyph = 10
@@ -108,9 +122,15 @@ enum ComposedStyle {
         }
         // 先減粒子不減字：冰屑只用剩下的預算
         frame.back += ComposedBackdrop.particleLayers(specks.prefix(max(maxParticles - particleCount(frame.back), 0)), color: style.palette.fg)
-        if style.effects.contains(.shake), let current = visible.first(where: { $0.exit == 0 && $0.trail == nil }) {
+        let current = visible.first(where: { $0.exit == 0 && $0.trail == nil })
+        if style.effects.contains(.shake), let current {
             frame.shake = shake(current.line, time: time)
         }
+        if style.effects.contains(.thump), let current {
+            frame.zoom = 1 + thumpScale * CGFloat(wordHit(current.line, time: time, window: thumpWindow))
+        }
+        if style.effects.contains(.glow) || style.effects.contains(.neonstroke) { frame.glow = glowRadius }
+        if style.effects.contains(.neonstroke) { frame.stroke = size.height * emRatio * strokeRatio }
         return frame
     }
 
@@ -145,6 +165,7 @@ enum ComposedStyle {
         let rowHeight = em * lineHeight
         let baseY = size.height * baseYRatio - CGFloat(laid.rowWidths.count) * rowHeight / 2 + rowHeight * 0.8
         let misregistered = style.effects.contains(.misreg)
+        let reflected = style.effects.contains(.reflect)
         for glyph in laid.glyphs {
             let personality = personalities[glyph.index]
             guard let transform = glyphTransform(glyph, personality: personality, entry: entry, time: time, size: size, em: em, style: style, rowWidth: laid.rowWidths[glyph.row]) else { continue }
@@ -168,7 +189,7 @@ enum ComposedStyle {
             if transform.specks > 0 {
                 specks += speckParticles(around: center, em: fontSize, strength: transform.specks, alpha: alpha, random: &random)
             }
-            emit(base, glyphWidth: glyph.width, center: center, transform: transform, misregistered: misregistered, random: &random, into: &frame)
+            emit(base, glyphWidth: glyph.width, center: center, transform: transform, misregistered: misregistered, reflected: reflected, random: &random, into: &frame)
         }
     }
 
@@ -192,7 +213,7 @@ enum ComposedStyle {
 
     /// 依效果把一個字放進繪製指令：殘影（只畫副本、不畫本體）、負片（色塊＋底色字）、影印錯位（黑影＋白光＋本體）或本體
     private static func emit(
-        _ base: GlyphDraw, glyphWidth: CGFloat, center: CGPoint, transform: GlyphTransform, misregistered: Bool,
+        _ base: GlyphDraw, glyphWidth: CGFloat, center: CGPoint, transform: GlyphTransform, misregistered: Bool, reflected: Bool,
         random: inout SplitMix64, into frame: inout FramePlan
     ) {
         let alpha = base.opacity
@@ -214,6 +235,11 @@ enum ComposedStyle {
             if misregistered {
                 frame.ghosts.append(base.shifted(dx: 2.5, dy: 2.5, opacity: alpha * 0.6, color: .black))
                 frame.ghosts.append(base.shifted(dx: -1, dy: -1, opacity: alpha * 0.08, color: .white))
+            }
+            if reflected {
+                var mirror = base.shifted(dx: 0, dy: base.fontSize * reflectionOffset, opacity: alpha * reflectionAlpha, color: .fg)
+                mirror.scaleY = -base.scaleY
+                frame.ghosts.append(mirror)
             }
             frame.glyphs.append(base)
         }
@@ -284,12 +310,17 @@ enum ComposedStyle {
         }
     }
 
+    /// 最近一個詞首的衝擊強度：詞首當下 1，`window` 秒內線性降到 0
+    private static func wordHit(_ line: TimedLine, time: Double, window: Double) -> Double {
+        line.words.reduce(0.0) { strongest, word in
+            let since = time - word.start
+            return since >= 0 && since < window ? max(strongest, 1 - since / window) : strongest
+        }
+    }
+
     /// 詞首 70 ms 內整屏抖（原型 html:1009-1010）；以 1/60 s 為一格取亂數
     private static func shake(_ line: TimedLine, time: Double) -> CGSize {
-        let hit = line.words.reduce(0.0) { strongest, word in
-            let since = time - word.start
-            return since >= 0 && since < shakeWindow ? max(strongest, 1 - since / shakeWindow) : strongest
-        }
+        let hit = wordHit(line, time: time, window: shakeWindow)
         guard hit > 0 else { return .zero }
         var random = SplitMix64(seed: UInt64(max(time * 60, 0)))
         return CGSize(width: (random.unit() - 0.5) * 12 * hit, height: (random.unit() - 0.5) * 8 * hit)

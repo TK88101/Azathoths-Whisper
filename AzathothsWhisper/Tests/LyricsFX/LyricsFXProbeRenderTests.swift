@@ -58,7 +58,10 @@ struct LyricsFXProbeRenderTests {
     }
 
     @Test func eachBundledFontShipsWithItsLicence() {
-        for name in ["LICENSE-Catacombs", "OFL-GrimoireOfDeath", "OFL-UnifrakturMaguntia", "OFL-Cinzel", "OFL-CormorantGaramond", "README-Cenobyte"] {
+        for name in ["LICENSE-Catacombs", "OFL-GrimoireOfDeath", "OFL-UnifrakturMaguntia", "OFL-Cinzel", "OFL-CormorantGaramond", "README-Cenobyte",
+                     // B2 批 1
+                     "OFL-AbrilFatface", "OFL-AlfaSlabOne", "OFL-Anton", "OFL-ArchivoBlack", "OFL-BebasNeue", "OFL-Bungee", "LICENSE-SpecialElite",
+                     "OFL-Oswald", "OFL-PlayfairDisplay", "OFL-Righteous", "LICENSE-Syncopate"] {
             #expect(Bundle.main.url(forResource: name, withExtension: "txt") != nil, "\(name)")
         }
     }

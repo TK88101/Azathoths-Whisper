@@ -33,15 +33,30 @@ enum ColorSlot: Sendable, Hashable, CaseIterable {
 struct RGB: Equatable, Sendable {
     let red, green, blue: Double
 
+    init(red: Double, green: Double, blue: Double) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+    }
+
     init(hex: UInt32) {
         red = Double((hex >> 16) & 0xFF) / 255
         green = Double((hex >> 8) & 0xFF) / 255
         blue = Double(hex & 0xFF) / 255
     }
+
+    /// WCAG 2 相對亮度（sRGB 線性化後加權）
+    var relativeLuminance: Double {
+        func linear(_ c: Double) -> Double { c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
+    }
 }
 
 struct FXPalette: Equatable, Sendable {
     let bg, fg, acc, dim: RGB
+
+    /// 亮底：底色的相對亮度（WCAG 公式）超過 0.5
+    var isLight: Bool { bg.relativeLuminance > 0.5 }
 
     /// mono：`Theme.background`／`Theme.coldWhite`／（同 fg）／`Theme.Gray.g500`
     static let mono = FXPalette(bg: RGB(hex: 0x000000), fg: RGB(hex: 0xE0E0E0), acc: RGB(hex: 0xE0E0E0), dim: RGB(hex: 0x6B7280))
@@ -101,7 +116,6 @@ struct GlowStop: Equatable, Sendable {
 /// 字之外的整層繪製（有序；純資料）。顏色已解析成 RGB（背景元件有自己的固定色，原型 html:1004-1031）
 enum LayerDraw: Equatable, Sendable {
     case fill(RGB, opacity: Double)
-    case linearGradient(top: RGB, bottom: RGB)
     /// `center` 與 `radius` 以畫布寬為單位
     case radialGlow(center: CGPoint, radius: CGFloat, stops: [GlowStop])
     /// 垂直光柱：`xs` 是左緣（畫布寬為單位），中心最亮、兩側透明
@@ -112,6 +126,12 @@ enum LayerDraw: Equatable, Sendable {
     case grain(opacity: Double, frame: Int, overlay: Bool)
     /// 底片刮痕：垂直細線（畫布座標 x）
     case scratches(xs: [CGFloat], opacity: Double)
+    /// 沿 `start`→`end` 的漸層鋪滿整個畫布（座標以畫布寬、高為單位；端點外延用端點色）
+    case axialGlow(start: CGPoint, end: CGPoint, stops: [GlowStop])
+    /// 半調網點：只帶參數，點陣路徑由 Canvas 依畫布尺寸快取（每幀不重建約 2,500 個圓）
+    case halftone(step: CGFloat, color: RGB, opacity: Double)
+    /// 每隔 `spacing` 點一條水平細線（報紙紋）
+    case hairlines(spacing: CGFloat, color: RGB, opacity: Double)
 }
 
 /// 影印負片時字後的一塊色塊（原型 html:1040）
@@ -139,6 +159,12 @@ struct FramePlan: Equatable, Sendable {
     var front: [LayerDraw] = []
     /// 整屏抖動（套在 back 與字上，不套 front；原型 html:1010）
     var shake: CGSize = .zero
+    /// 整屏以畫面中心縮放（thump；套用範圍同 shake）
+    var zoom: CGFloat = 1
+    /// 字的光暈半徑（點；配色 acc 色）。0＝無
+    var glow: CGFloat = 0
+    /// 字的描邊寬（點；配色 acc 色，先描後填）。0＝無
+    var stroke: CGFloat = 0
 }
 
 /// 字寬量測：回傳 `text` 每個 grapheme 起點的 x 位移，末項＝總寬（共 `text.count + 1` 項）。

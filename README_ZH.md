@@ -221,6 +221,8 @@ MIT —— 見 [LICENSE](LICENSE)。
 | [SwiftSoup](https://github.com/scinfu/SwiftSoup) | MIT |
 | Space Grotesk | SIL Open Font License 1.1 |
 | Grimoire of Death, UnifrakturMaguntia, Cinzel, Cormorant Garamond | SIL Open Font License 1.1 |
+| Abril Fatface, Alfa Slab One, Anton, Archivo Black, Bebas Neue, Bungee, Oswald, Playfair Display, Righteous | SIL Open Font License 1.1 |
+| Special Elite, Syncopate | Apache License 2.0 |
 | Catacombs（ToughCrest Studio） | 個人與商業用途免費；再散布須署名 ToughCrest Studio |
 | Cenobyte（Chad Savage）、Mirage Gothic、Dark Metal | 商用條款未確認（Cenobyte 只寫「Freeware」；Mirage Gothic 內嵌「All rights reserved」；Dark Metal 無授權檔）。維護者自行承擔風險收錄 |
 | Material Symbols | Apache License 2.0 |

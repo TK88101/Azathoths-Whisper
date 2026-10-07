@@ -1,0 +1,561 @@
+{
+ "signed": "2026-10-07",
+ "probe": "P13",
+ "note": "B2 批 1：使用者看原型探針後簽字的樂團目標值與每槽候選元件（原型 fit>0，不含サビ／關鍵字觸發的效果）。只含樂團名與元件代號，不含曲庫資料。",
+ "bands": [
+  {
+   "name": "AC/DC",
+   "aliases": [],
+   "tags": [
+    "hardrock"
+   ],
+   "axes": {
+    "raw": 0.6,
+    "theatrical": 0.3,
+    "cold": 0.1,
+    "aggression": 0.65,
+    "speed": 0.6,
+    "elegance": 0.05,
+    "decay": 0.2,
+    "bright": 0.5,
+    "bounce": 0.55,
+    "warm": 0.6
+   },
+   "candidates": {
+    "font": [
+     "AlfaSlab",
+     "Anton",
+     "Bebas",
+     "Oswald"
+    ],
+    "backdrop": [
+     "ampGlow",
+     "embers",
+     "smokeHaze",
+     "spot",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "slide",
+     "stamp",
+     "swagger"
+    ],
+    "exit": [
+     "dropOut",
+     "fall",
+     "slideOut"
+    ],
+    "fx": [
+     "flicker",
+     "none",
+     "thump",
+     "wobble"
+    ],
+    "palette": [
+     "ampRed",
+     "hazard",
+     "whiskey"
+    ]
+   }
+  },
+  {
+   "name": "Guns N' Roses",
+   "aliases": [],
+   "tags": [
+    "hardrock",
+    "glam"
+   ],
+   "axes": {
+    "raw": 0.65,
+    "theatrical": 0.55,
+    "cold": 0.15,
+    "aggression": 0.65,
+    "speed": 0.65,
+    "elegance": 0.25,
+    "decay": 0.45,
+    "bright": 0.4,
+    "bounce": 0.35,
+    "warm": 0.5
+   },
+   "candidates": {
+    "font": [
+     "AlfaSlab",
+     "Anton",
+     "Bebas",
+     "Oswald",
+     "Righteous"
+    ],
+    "backdrop": [
+     "ampGlow",
+     "embers",
+     "smokeHaze",
+     "spot",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "slide",
+     "stamp",
+     "strut",
+     "swagger",
+     "swoop"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "fall",
+     "slideOut"
+    ],
+    "fx": [
+     "flicker",
+     "none",
+     "reflect",
+     "thump",
+     "wobble"
+    ],
+    "palette": [
+     "ampRed",
+     "hazard",
+     "royal",
+     "tuxedo",
+     "whiskey"
+    ]
+   }
+  },
+  {
+   "name": "Queen",
+   "aliases": [],
+   "tags": [
+    "glam",
+    "classicrock",
+    "arena"
+   ],
+   "axes": {
+    "raw": 0.1,
+    "theatrical": 0.95,
+    "cold": 0.15,
+    "aggression": 0.3,
+    "speed": 0.5,
+    "elegance": 0.8,
+    "decay": 0.05,
+    "bright": 0.8,
+    "bounce": 0.5,
+    "warm": 0.6
+   },
+   "candidates": {
+    "font": [
+     "Abril",
+     "AlfaSlab",
+     "Bebas",
+     "Oswald",
+     "PlayfairIt",
+     "Righteous",
+     "Syncopate"
+    ],
+    "backdrop": [
+     "ampGlow",
+     "spot",
+     "stars",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "strut",
+     "swoop"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "fall",
+     "floatAway",
+     "up"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "reflect",
+     "thump"
+    ],
+    "palette": [
+     "cream60",
+     "dusk",
+     "hazard",
+     "royal",
+     "starlight",
+     "tuxedo",
+     "vegas",
+     "whiskey"
+    ]
+   }
+  },
+  {
+   "name": "The Beatles",
+   "aliases": [],
+   "tags": [
+    "classicrock",
+    "britpop"
+   ],
+   "axes": {
+    "raw": 0.25,
+    "theatrical": 0.35,
+    "cold": 0.1,
+    "aggression": 0.1,
+    "speed": 0.45,
+    "elegance": 0.5,
+    "decay": 0.15,
+    "bright": 0.8,
+    "bounce": 0.6,
+    "warm": 0.8
+   },
+   "candidates": {
+    "font": [
+     "Abril",
+     "AlfaSlab",
+     "Archivo",
+     "Bebas",
+     "Bungee",
+     "Oswald",
+     "PlayfairIt"
+    ],
+    "backdrop": [
+     "ampGlow",
+     "halftone",
+     "spot",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "hop",
+     "swagger"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "slideOut",
+     "up"
+    ],
+    "fx": [
+     "bob",
+     "none",
+     "wobble"
+    ],
+    "palette": [
+     "britRed",
+     "cream60",
+     "mancSky",
+     "parka",
+     "popArt",
+     "tuxedo",
+     "whiskey"
+    ]
+   }
+  },
+  {
+   "name": "Pink Floyd",
+   "aliases": [],
+   "tags": [
+    "psych",
+    "classicrock"
+   ],
+   "axes": {
+    "raw": 0.15,
+    "theatrical": 0.75,
+    "cold": 0.6,
+    "aggression": 0.15,
+    "speed": 0.1,
+    "elegance": 0.75,
+    "decay": 0.3,
+    "bright": 0.25,
+    "bounce": 0,
+    "warm": 0.25
+   },
+   "candidates": {
+    "font": [
+     "Abril",
+     "AlfaSlab",
+     "PlayfairIt",
+     "Syncopate"
+    ],
+    "backdrop": [
+     "ampGlow",
+     "haze",
+     "prism",
+     "spot",
+     "stars",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "hop"
+    ],
+    "exit": [
+     "fadeShort",
+     "floatAway",
+     "up"
+    ],
+    "fx": [
+     "bob",
+     "breathe",
+     "flicker",
+     "none",
+     "reflect"
+    ],
+    "palette": [
+     "cream60",
+     "dusk",
+     "prismBlack",
+     "tuxedo",
+     "whiskey"
+    ]
+   }
+  },
+  {
+   "name": "Oasis",
+   "aliases": [],
+   "tags": [
+    "britpop"
+   ],
+   "axes": {
+    "raw": 0.55,
+    "theatrical": 0.3,
+    "cold": 0.2,
+    "aggression": 0.4,
+    "speed": 0.45,
+    "elegance": 0.2,
+    "decay": 0.3,
+    "bright": 0.5,
+    "bounce": 0.3,
+    "warm": 0.55
+   },
+   "candidates": {
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Bungee",
+     "Oswald"
+    ],
+    "backdrop": [
+     "halftone",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "hop",
+     "swagger"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "slideOut",
+     "up"
+    ],
+    "fx": [
+     "bob",
+     "none",
+     "wobble"
+    ],
+    "palette": [
+     "britRed",
+     "cream60",
+     "mancSky",
+     "parka",
+     "popArt"
+    ]
+   }
+  },
+  {
+   "name": "Blur",
+   "aliases": [],
+   "tags": [
+    "britpop",
+    "indie"
+   ],
+   "axes": {
+    "raw": 0.35,
+    "theatrical": 0.35,
+    "cold": 0.25,
+    "aggression": 0.25,
+    "speed": 0.55,
+    "elegance": 0.35,
+    "decay": 0.2,
+    "bright": 0.7,
+    "bounce": 0.65,
+    "warm": 0.5
+   },
+   "candidates": {
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Bungee",
+     "Elite",
+     "Grotesk",
+     "Oswald"
+    ],
+    "backdrop": [
+     "halftone",
+     "haze",
+     "paper",
+     "sunset",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "hop",
+     "swagger"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "slideOut",
+     "up"
+    ],
+    "fx": [
+     "bob",
+     "none",
+     "wobble"
+    ],
+    "palette": [
+     "britRed",
+     "cream60",
+     "mancSky",
+     "newsprint",
+     "parka",
+     "popArt"
+    ]
+   }
+  },
+  {
+   "name": "The Killers",
+   "aliases": [],
+   "tags": [
+    "arena"
+   ],
+   "axes": {
+    "raw": 0.15,
+    "theatrical": 0.7,
+    "cold": 0.3,
+    "aggression": 0.3,
+    "speed": 0.6,
+    "elegance": 0.5,
+    "decay": 0.1,
+    "bright": 0.75,
+    "bounce": 0.5,
+    "warm": 0.5
+   },
+   "candidates": {
+    "font": [
+     "Bebas",
+     "Oswald",
+     "PlayfairIt",
+     "Syncopate"
+    ],
+    "backdrop": [
+     "ampGlow",
+     "spot",
+     "stars",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "strut",
+     "swoop"
+    ],
+    "exit": [
+     "fadeShort",
+     "floatAway",
+     "up"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "thump"
+    ],
+    "palette": [
+     "dusk",
+     "hazard",
+     "starlight",
+     "tuxedo",
+     "vegas"
+    ]
+   }
+  },
+  {
+   "name": "Coldplay",
+   "aliases": [
+    "Coldplay X BTS",
+    "Coldplay X Selena Gomez",
+    "Coldplay X We Are KING X Jacob Collier"
+   ],
+   "tags": [
+    "arena"
+   ],
+   "axes": {
+    "raw": 0.05,
+    "theatrical": 0.55,
+    "cold": 0.3,
+    "aggression": 0.05,
+    "speed": 0.3,
+    "elegance": 0.75,
+    "decay": 0.05,
+    "bright": 0.8,
+    "bounce": 0.25,
+    "warm": 0.65
+   },
+   "candidates": {
+    "font": [
+     "Bebas",
+     "Oswald",
+     "PlayfairIt",
+     "Syncopate"
+    ],
+    "backdrop": [
+     "ampGlow",
+     "spot",
+     "stars",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "strut",
+     "swoop"
+    ],
+    "exit": [
+     "fadeShort",
+     "floatAway",
+     "up"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "thump"
+    ],
+    "palette": [
+     "dusk",
+     "hazard",
+     "starlight",
+     "tuxedo",
+     "vegas"
+    ]
+   }
+  }
+ ]
+}

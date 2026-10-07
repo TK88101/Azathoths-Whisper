@@ -5,14 +5,33 @@ enum FXSlot: String, CaseIterable, Sendable {
     case font, backdrop, enter, exit, fx, palette
 }
 
-/// 背景（B1 子集；原型 `styleFromRecipe.draw`，html:1004-1031）
+/// 背景（B1 子集＋B2 批 1；原型 `styleFromRecipe.draw`，html:1004-1031）
 enum BackdropKind: String, Sendable {
     case void, film, snow, ash, crimsonFog, shafts
+    case ampGlow, embers, halftone, haze, paper, prism, smokeHaze, spot, stars, sunset, tapeLeak
+
+    /// 這個背景要配暗底還是亮底的配色（nil＝都可以）；組合器在背景之後抽配色時先濾成相容者（B2 計劃 §7.3）。
+    /// sunset、shafts 會把整面塗成淺色／深色漸層，等於自帶底色（T3 對比測試抓到：配錯邊時字幾乎看不見）
+    var tone: BackdropTone? {
+        switch self {
+        case .ampGlow, .spot, .smokeHaze, .prism, .stars, .shafts: .dark
+        case .halftone, .sunset: .light
+        case .void, .film, .snow, .ash, .crimsonFog, .embers, .haze, .paper, .tapeLeak: nil
+        }
+    }
 }
 
-/// 效果（B1 子集）：不含依サビ或關鍵字觸發者（B1 計劃 §3.8）
+enum BackdropTone: Sendable {
+    case dark, light
+
+    func accepts(_ palette: FXPalette) -> Bool { palette.isLight == (self == .light) }
+}
+
+/// 效果（B1 子集＋B2 批 1）：不含依サビ或關鍵字觸發者（B1 計劃 §3.8）。
+/// bob／wobble／flicker 是停留時的小動作（換停留模板）；glow／neonstroke 是整層的光暈與描邊；thump 是逐詞的整屏縮放
 enum FXEffect: String, Sendable {
     case none, shake, misreg, breathe
+    case glow, neonstroke, reflect, thump, bob, wobble, flicker
 }
 
 struct EnterSpec: Sendable {
