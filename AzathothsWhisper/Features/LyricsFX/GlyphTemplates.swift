@@ -56,9 +56,11 @@ enum FXEasing {
     }
 }
 
-/// 進場模板（B1 兩個家族用到的子集，原型 html:202-235）。`progress` 0→1，1＝落定（恆等）
+/// 進場模板（B1 兩個家族＋B2 批 1 用到的子集，原型 html:202-235）。`progress` 0→1，1＝落定（恆等）
 enum EnterTemplate: String, CaseIterable, Sendable {
     case fadeUp, grow, slam, condense, negative, fling, slant, swoop, orbit, smoke, rise
+    case stamp, pop, fallIn, slide
+    case tumble
 
     func transform(progress p: Double, context c: GlyphContext) -> GlyphTransform {
         let em = Double(c.em)
@@ -107,6 +109,20 @@ enum EnterTemplate: String, CaseIterable, Sendable {
         case .rise:
             // 原型組合模式不畫 glow（styleFromRecipe 的 paint 不讀它，html:1034-1046）
             return GlyphTransform(dy: CGFloat((1 - FXEasing.outCubic(p)) * em * 1.2), alpha: p)
+        case .stamp:
+            let u = 1 - FXEasing.outExpo(p)
+            return GlyphTransform(rotation: CGFloat(u * 0.3) * c.dir, scale: CGFloat(1 + u * 2.2), alpha: min(1, p * 4))
+        case .pop:
+            return GlyphTransform(scale: CGFloat(max(0.01, FXEasing.outBack(p))), alpha: min(1, p * 3))
+        case .fallIn:
+            return GlyphTransform(dy: CGFloat(-(1 - FXEasing.outBack(p)) * em * 1.5), rotation: CGFloat(1 - p) * c.dir * 0.4, alpha: p)
+        case .slide:
+            let u = 1 - FXEasing.outCubic(p)
+            return GlyphTransform(dx: CGFloat(cos(c.angle) * Double(c.radius) * u), dy: CGFloat(sin(c.angle) * Double(c.radius) * u), alpha: min(1, p * 2))
+        case .tumble:
+            // 從上方翻一整圈落下
+            let u = CGFloat(1 - FXEasing.outCubic(p))
+            return GlyphTransform(dx: u * c.dir * c.em, dy: -u * c.height * 0.7, rotation: u * c.dir * 2 * .pi, alpha: min(1, p * 3))
         }
     }
 }
@@ -114,6 +130,8 @@ enum EnterTemplate: String, CaseIterable, Sendable {
 /// 停留模板（原型 html:242-251）：`time` 是絕對秒數
 enum HoldTemplate: String, CaseIterable, Sendable {
     case still, twitch, drift, float, breathe
+    case bob, wobble, flicker
+    case jitter, tilt
 
     func transform(time t: Double, context c: GlyphContext) -> GlyphTransform {
         let em = Double(c.em)
@@ -130,13 +148,27 @@ enum HoldTemplate: String, CaseIterable, Sendable {
             return GlyphTransform(dy: CGFloat(sin(t * 0.9 + c.phase) * em * 0.12), rotation: CGFloat(sin(t * 0.7 + c.phase) * 0.05))
         case .breathe:
             return GlyphTransform(scale: CGFloat(1 + 0.04 * sin(t * 4.2 + c.phase)))
+        case .bob:
+            return GlyphTransform(dy: CGFloat(sin(t * 2.2 + c.phase) * em * 0.06))
+        case .wobble:
+            return GlyphTransform(rotation: CGFloat(sin(t * 1.7 + c.phase) * 0.06))
+        case .flicker:
+            return GlyphTransform(alpha: 0.8 + 0.2 * sin(t * 3.1 + c.phase) * sin(t * 7.3 + c.phase))
+        case .jitter:
+            // 影印抖動：約 1 點的高頻微顫（原型 jitter，TONE.raw 0.6 推得振幅 1.2／0.8）
+            return GlyphTransform(dx: CGFloat(sin(t * 62.8 + c.phase) * 1.2), dy: CGFloat(cos(t * 55 + c.phase) * 0.8))
+        case .tilt:
+            // 字字微傾：固定角度，方向依字而定，不隨時間動
+            return GlyphTransform(rotation: c.phase > .pi ? 0.05 : -0.05)
         }
     }
 }
 
-/// 退場模板（原型 html:237-240）。`progress` 0→1
+/// 退場模板（原型 html:237-246）。`progress` 0→1
 enum ExitTemplate: String, CaseIterable, Sendable {
     case cut, scatter, fade, dissolve
+    case fall, shrink, up, slideOut
+    case tumbleOut
 
     func transform(progress x: Double, context c: GlyphContext) -> GlyphTransform {
         switch self {
@@ -144,6 +176,17 @@ enum ExitTemplate: String, CaseIterable, Sendable {
         case .scatter: return GlyphTransform(alpha: (1 - x) * (1 - x))
         case .fade: return GlyphTransform(alpha: 1 - x)
         case .dissolve: return GlyphTransform(alpha: 1 - x, specks: x)
+        case .fall:
+            return GlyphTransform(dy: CGFloat(FXEasing.inCubic(x)) * c.height * 0.5, rotation: c.dir * CGFloat(x) * 0.5, alpha: 1 - x * 0.5)
+        case .shrink:
+            return GlyphTransform(scale: CGFloat(max(0.01, 1 - FXEasing.inCubic(x))), alpha: 1 - x)
+        case .up:
+            return GlyphTransform(dy: -CGFloat(FXEasing.inCubic(x)) * c.em * 1.2, alpha: 1 - x)
+        case .slideOut:
+            let k = FXEasing.inCubic(x) * Double(c.radius)
+            return GlyphTransform(dx: CGFloat(cos(c.angle) * k), dy: CGFloat(sin(c.angle) * k), alpha: 1 - x)
+        case .tumbleOut:
+            return GlyphTransform(dy: CGFloat(FXEasing.inCubic(x)) * c.height * 0.6, rotation: c.dir * CGFloat(x) * 4, alpha: 1 - x * 0.3)
         }
     }
 }

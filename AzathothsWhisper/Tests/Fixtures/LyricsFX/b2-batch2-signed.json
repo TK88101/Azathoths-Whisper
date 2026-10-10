@@ -1,0 +1,1206 @@
+{
+ "signed": "2026-10-09",
+ "probe": "P14",
+ "note": "B2 批 2：使用者看原型探針後簽字的樂團目標值與每槽合格元件（原型 fit>0，不含サビ／關鍵字觸發的效果）。只含樂團名與元件代號，不含曲庫資料。",
+ "bands": [
+  {
+   "name": "Fall Out Boy",
+   "aliases": [],
+   "tags": [
+    "poppunk",
+    "poprock",
+    "arena"
+   ],
+   "axes": {
+    "raw": 0.2,
+    "theatrical": 0.7,
+    "cold": 0.2,
+    "aggression": 0.4,
+    "speed": 0.75,
+    "elegance": 0.35,
+    "decay": 0.1,
+    "bright": 0.8,
+    "bounce": 0.7,
+    "warm": 0.5
+   },
+   "candidates": {
+    "font": [
+     "Bangers",
+     "Bebas",
+     "Dela",
+     "Gochi",
+     "Lilita",
+     "Oswald",
+     "PlayfairIt",
+     "Rubik",
+     "Syncopate"
+    ],
+    "backdrop": [
+     "ampGlow",
+     "bokeh",
+     "flat",
+     "skyGrad",
+     "spot",
+     "stars",
+     "sunset",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "ease",
+     "fadeUp",
+     "hop",
+     "pop",
+     "strut",
+     "swoop"
+    ],
+    "exit": [
+     "drift",
+     "fadeShort",
+     "floatAway",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "fx": [
+     "bob",
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "speedlines",
+     "thump",
+     "tilt"
+    ],
+    "palette": [
+     "daydream",
+     "dusk",
+     "hazard",
+     "mallPink",
+     "polaroid",
+     "starlight",
+     "sunsetInk",
+     "tuxedo",
+     "vegas",
+     "yellowBlack"
+    ]
+   }
+  },
+  {
+   "name": "Rise Against",
+   "aliases": [],
+   "tags": [
+    "melodichc",
+    "punk",
+    "skatepunk"
+   ],
+   "axes": {
+    "raw": 0.5,
+    "theatrical": 0.3,
+    "cold": 0.3,
+    "aggression": 0.75,
+    "speed": 0.9,
+    "elegance": 0.15,
+    "decay": 0.3,
+    "bright": 0.4,
+    "bounce": 0.2,
+    "warm": 0.3
+   },
+   "candidates": {
+    "font": [
+     "Anton",
+     "Bangers",
+     "Elite",
+     "Marker",
+     "Oswald",
+     "SairaStencil"
+    ],
+    "backdrop": [
+     "flat",
+     "gig",
+     "paper",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "tumbleOut"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "shake",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mono",
+     "newsprint",
+     "skateTeal",
+     "sunsetInk",
+     "yellowBlack"
+    ]
+   }
+  },
+  {
+   "name": "NOFX",
+   "aliases": [],
+   "tags": [
+    "skatepunk",
+    "punk"
+   ],
+   "axes": {
+    "raw": 0.6,
+    "theatrical": 0.2,
+    "cold": 0.1,
+    "aggression": 0.5,
+    "speed": 0.95,
+    "elegance": 0.05,
+    "decay": 0.3,
+    "bright": 0.6,
+    "bounce": 0.55,
+    "warm": 0.5
+   },
+   "candidates": {
+    "font": [
+     "Anton",
+     "Bangers",
+     "Elite",
+     "Marker",
+     "Oswald"
+    ],
+    "backdrop": [
+     "flat",
+     "gig",
+     "paper",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "tumbleOut"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "speedlines",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mono",
+     "newsprint",
+     "skateTeal",
+     "sunsetInk",
+     "yellowBlack"
+    ]
+   }
+  },
+  {
+   "name": "The Interrupters",
+   "aliases": [],
+   "tags": [
+    "ska",
+    "punk"
+   ],
+   "axes": {
+    "raw": 0.4,
+    "theatrical": 0.3,
+    "cold": 0.1,
+    "aggression": 0.4,
+    "speed": 0.8,
+    "elegance": 0.1,
+    "decay": 0.2,
+    "bright": 0.7,
+    "bounce": 0.9,
+    "warm": 0.6
+   },
+   "candidates": {
+    "font": [
+     "Anton",
+     "Bangers",
+     "Elite",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "backdrop": [
+     "checker",
+     "flat",
+     "gig",
+     "paper",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "hop",
+     "pop",
+     "skank",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "fx": [
+     "bob",
+     "jitter",
+     "none",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mono",
+     "newsprint",
+     "twoTone",
+     "twoToneLight",
+     "yellowBlack"
+    ]
+   }
+  },
+  {
+   "name": "Mayday Parade",
+   "aliases": [],
+   "tags": [
+    "poprock",
+    "poppunk"
+   ],
+   "axes": {
+    "raw": 0.15,
+    "theatrical": 0.55,
+    "cold": 0.2,
+    "aggression": 0.25,
+    "speed": 0.55,
+    "elegance": 0.5,
+    "decay": 0.1,
+    "bright": 0.6,
+    "bounce": 0.35,
+    "warm": 0.65
+   },
+   "candidates": {
+    "font": [
+     "Bangers",
+     "Dela",
+     "Gochi",
+     "Lilita",
+     "Oswald",
+     "Rubik"
+    ],
+    "backdrop": [
+     "bokeh",
+     "flat",
+     "skyGrad",
+     "sunset",
+     "void"
+    ],
+    "enter": [
+     "ease",
+     "fadeUp",
+     "hop",
+     "pop"
+    ],
+    "exit": [
+     "drift",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "fx": [
+     "bob",
+     "none",
+     "speedlines",
+     "thump",
+     "tilt"
+    ],
+    "palette": [
+     "daydream",
+     "mallPink",
+     "polaroid",
+     "sunsetInk",
+     "yellowBlack"
+    ]
+   }
+  },
+  {
+   "name": "Good Charlotte",
+   "aliases": [],
+   "tags": [
+    "poppunk",
+    "skatepunk"
+   ],
+   "axes": {
+    "raw": 0.3,
+    "theatrical": 0.4,
+    "cold": 0.15,
+    "aggression": 0.45,
+    "speed": 0.75,
+    "elegance": 0.15,
+    "decay": 0.2,
+    "bright": 0.65,
+    "bounce": 0.6,
+    "warm": 0.5
+   },
+   "candidates": {
+    "font": [
+     "Anton",
+     "Bangers",
+     "Dela",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "backdrop": [
+     "flat",
+     "gig",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "hop",
+     "pop",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "fx": [
+     "bob",
+     "jitter",
+     "none",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mallPink",
+     "mono",
+     "skateTeal",
+     "sunsetInk",
+     "yellowBlack"
+    ]
+   }
+  },
+  {
+   "name": "Weezer",
+   "aliases": [],
+   "tags": [
+    "powerpop",
+    "indie"
+   ],
+   "axes": {
+    "raw": 0.35,
+    "theatrical": 0.2,
+    "cold": 0.25,
+    "aggression": 0.3,
+    "speed": 0.55,
+    "elegance": 0.3,
+    "decay": 0.1,
+    "bright": 0.7,
+    "bounce": 0.5,
+    "warm": 0.5
+   },
+   "candidates": {
+    "font": [
+     "Archivo",
+     "Elite",
+     "Grotesk",
+     "Rubik"
+    ],
+    "backdrop": [
+     "flat",
+     "haze",
+     "paper",
+     "skyGrad",
+     "sunset",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "ease",
+     "fadeUp",
+     "hop",
+     "pop",
+     "swagger"
+    ],
+    "exit": [
+     "drift",
+     "fadeShort",
+     "snapOut",
+     "up"
+    ],
+    "fx": [
+     "bob",
+     "none",
+     "tilt"
+    ],
+    "palette": [
+     "britRed",
+     "chalk",
+     "newsprint",
+     "parka",
+     "sunsetInk",
+     "weezBlue"
+    ]
+   }
+  }
+ ],
+ "linked": [
+  {
+   "name": "The Offspring",
+   "decision": "new",
+   "signed": "2026-10-09",
+   "reason": "2026-10-09 探針 P14：使用者看本機探針頁後整組採用新版（「這回對了。行，就這樣」）",
+   "eligible": {
+    "font": [
+     "Anton",
+     "Bangers",
+     "Elite",
+     "Marker",
+     "Oswald"
+    ],
+    "backdrop": [
+     "flat",
+     "gig",
+     "paper",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "tumbleOut",
+     "up"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "speedlines",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mono",
+     "newsprint",
+     "skateTeal",
+     "sunsetInk",
+     "yellowBlack"
+    ]
+   },
+   "playable": {
+    "backdrop": [
+     "gig",
+     "paper",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Bangers",
+     "Elite",
+     "Marker",
+     "Oswald"
+    ],
+    "fx1": [
+     "jitter",
+     "none",
+     "speedlines",
+     "tilt",
+     "wobble"
+    ],
+    "fx2": [
+     "jitter",
+     "none",
+     "speedlines",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "gig": [
+      "gigRed",
+      "mono",
+      "skateTeal"
+     ],
+     "paper": [
+      "gigRed",
+      "mono",
+      "newsprint",
+      "skateTeal",
+      "sunsetInk"
+     ],
+     "sunset": [
+      "newsprint",
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "void": [
+      "gigRed",
+      "mono",
+      "newsprint",
+      "skateTeal",
+      "sunsetInk"
+     ],
+     "xerox": [
+      "gigRed",
+      "mono",
+      "newsprint",
+      "skateTeal",
+      "sunsetInk"
+     ]
+    }
+   }
+  },
+  {
+   "name": "Blink-182",
+   "decision": "new",
+   "signed": "2026-10-09",
+   "reason": "2026-10-09 探針 P14：使用者看本機探針頁後整組採用新版（「這回對了。行，就這樣」）",
+   "eligible": {
+    "font": [
+     "Anton",
+     "Bangers",
+     "Dela",
+     "Elite",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "backdrop": [
+     "flat",
+     "gig",
+     "paper",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "hop",
+     "pop",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "fx": [
+     "bob",
+     "jitter",
+     "none",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mallPink",
+     "mono",
+     "newsprint",
+     "skateTeal",
+     "sunsetInk",
+     "yellowBlack"
+    ]
+   },
+   "playable": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "paper",
+     "sunset",
+     "xerox"
+    ],
+    "enter": [
+     "hop",
+     "pop",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Bangers",
+     "Dela",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "fx1": [
+     "bob",
+     "ransomPop",
+     "speedlines",
+     "tilt",
+     "wobble"
+    ],
+    "fx2": [
+     "bob",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "flat": [
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "gig": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal"
+     ],
+     "paper": [
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "sunset": [
+      "newsprint",
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "xerox": [
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "sunsetInk",
+      "yellowBlack"
+     ]
+    }
+   }
+  },
+  {
+   "name": "Green Day",
+   "decision": "new",
+   "signed": "2026-10-09",
+   "reason": "2026-10-09 探針 P14：使用者看本機探針頁後整組採用新版（「這回對了。行，就這樣」）",
+   "eligible": {
+    "font": [
+     "Anton",
+     "Bangers",
+     "Dela",
+     "Elite",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "backdrop": [
+     "flat",
+     "gig",
+     "paper",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "pop",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mallPink",
+     "mono",
+     "newsprint",
+     "sunsetInk",
+     "yellowBlack"
+    ]
+   },
+   "playable": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "paper",
+     "sunset",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "pop",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Bangers",
+     "Dela",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "fx1": [
+     "jitter",
+     "ransomPop",
+     "speedlines",
+     "tilt",
+     "wobble"
+    ],
+    "fx2": [
+     "jitter",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "flat": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "newsprint",
+      "yellowBlack"
+     ],
+     "gig": [
+      "gigRed",
+      "mallPink",
+      "mono"
+     ],
+     "paper": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "newsprint",
+      "yellowBlack"
+     ],
+     "sunset": [
+      "newsprint",
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "xerox": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "newsprint",
+      "yellowBlack"
+     ]
+    }
+   }
+  },
+  {
+   "name": "Sum 41",
+   "decision": "new",
+   "signed": "2026-10-09",
+   "reason": "2026-10-09 探針 P14：使用者看本機探針頁後整組採用新版（「這回對了。行，就這樣」）",
+   "eligible": {
+    "font": [
+     "Anton",
+     "Bangers",
+     "Dela",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "backdrop": [
+     "flat",
+     "gig",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "pop",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mallPink",
+     "mono",
+     "skateTeal",
+     "sunsetInk",
+     "yellowBlack"
+    ]
+   },
+   "playable": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "pop",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Bangers",
+     "Dela",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "fx1": [
+     "jitter",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt"
+    ],
+    "fx2": [
+     "jitter",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "flat": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "yellowBlack"
+     ],
+     "gig": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal"
+     ],
+     "sunset": [
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "void": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "yellowBlack"
+     ],
+     "xerox": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "yellowBlack"
+     ]
+    }
+   }
+  },
+  {
+   "name": "Ramones",
+   "decision": "new",
+   "signed": "2026-10-09",
+   "reason": "2026-10-09 探針 P14：使用者看本機探針頁後整組採用新版（「這回對了。行，就這樣」）",
+   "eligible": {
+    "font": [
+     "Anton",
+     "Elite",
+     "Marker",
+     "Oswald"
+    ],
+    "backdrop": [
+     "gig",
+     "paper",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "tumbleOut"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "ransom",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mono",
+     "newsprint"
+    ]
+   },
+   "playable": {
+    "backdrop": [
+     "gig",
+     "paper",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "tumbleOut"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Marker",
+     "Oswald"
+    ],
+    "fx1": [
+     "jitter",
+     "none",
+     "ransom",
+     "wobble"
+    ],
+    "fx2": [
+     "jitter",
+     "none",
+     "ransom",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "gig": [
+      "gigRed",
+      "mono"
+     ],
+     "paper": [
+      "gigRed",
+      "mono",
+      "newsprint"
+     ],
+     "void": [
+      "gigRed",
+      "mono",
+      "newsprint"
+     ],
+     "xerox": [
+      "gigRed",
+      "mono",
+      "newsprint"
+     ]
+    }
+   }
+  },
+  {
+   "name": "Sex Pistols",
+   "decision": "new",
+   "signed": "2026-10-09",
+   "reason": "2026-10-09 探針 P14：使用者看本機探針頁後整組採用新版（「這回對了。行，就這樣」）；曲庫 0 首，與 Ramones 同標籤綁定，只有目標值層的探針",
+   "eligible": {
+    "font": [
+     "Anton",
+     "Elite",
+     "Marker",
+     "Oswald"
+    ],
+    "backdrop": [
+     "gig",
+     "paper",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "tumbleOut"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "ransom",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mono",
+     "newsprint"
+    ]
+   },
+   "playable": {
+    "backdrop": [
+     "gig",
+     "paper",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "tumbleOut"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Marker",
+     "Oswald"
+    ],
+    "fx1": [
+     "jitter",
+     "none",
+     "ransom",
+     "wobble"
+    ],
+    "fx2": [
+     "jitter",
+     "none",
+     "ransom",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "gig": [
+      "gigRed",
+      "mono"
+     ],
+     "paper": [
+      "gigRed",
+      "mono",
+      "newsprint"
+     ],
+     "void": [
+      "gigRed",
+      "mono",
+      "newsprint"
+     ],
+     "xerox": [
+      "gigRed",
+      "mono",
+      "newsprint"
+     ]
+    }
+   }
+  }
+ ],
+ "unassigned": []
+}

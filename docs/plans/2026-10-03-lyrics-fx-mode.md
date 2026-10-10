@@ -325,6 +325,9 @@ Codex 最擔心的一點：把 Jev 的 confidence 誤讀成「樂團審美判斷
 
 - **B1 探針簽字（2026-10-06）**：黑金屬（genre＝Black Metal）與交響（genre＝Symphonic Metal）各 3 次重抽的組合配方，使用者：「都是對的，沒問題」。
 
+- **P13（2026-10-07，B2 批 1 rock 系 9 團）**：記錄在 `docs/plans/2026-10-07-lyrics-fx-b2-artist-profiles.md` §7.3（移除西部木刻；裝飾藝術圓角不給 The Killers）。
+- **P14（2026-10-09，B2 批 2 龐克系 12 個對象，本機探針頁 v15）**：使用者：「整體上還差不多，沒什麼問題」；「Blink-182、Sum 41 和 Green Day……可以把勒索信的這個效果加進去」；看過修改後：「這回對了。行，就這樣」。→ 規則：**勒索信（每字一張歪斜色紙）給 Ramones、Sex Pistols、Blink-182、Sum 41、Green Day；The Offspring 與其他流行龐克團不給**（修訂 2026-10-03 的「Blink-182 勉強、Green Day 一半一半」）。同批確立的做法：新元件搬進 app 時只帶該批專屬的標籤；舊團被新元件連帶改到時要一起進探針簽字。細節與預檢結果見 `docs/plans/2026-10-09-lyrics-fx-b2-batch2.md` §9.3–§9.4。
+
 ## 附錄 C　LRCLIB 缺歌時的備用來源（2026-10-04）
 - **使用者提供的對比**（`~/Downloads/lrclib-missing-synced-lyrics.txt`）：曲庫中 LRCLIB 拿不到時間軸的共 3,990 首。①完全找不到 1,682 首（289 個樂團，地下黑金屬為主：Rossomahaar 54、Marduk 48、Avathar 41、Gehenna 31…）；②有歌詞但無時間軸 1,888 首（AC/DC 79、HIM 68、Oasis 63、Marduk 43、Immortal 37、The Offspring 36…）；③純音樂 385 首（Nightwish 50、LINKIN PARK 44、Daft Punk 17…）。
 - **實測**（從①②隨機抽 40 首，seed 20261004，原始結果 `docs/plans/2026-10-04-lyrics-fx-sync-source-probe.json`）：

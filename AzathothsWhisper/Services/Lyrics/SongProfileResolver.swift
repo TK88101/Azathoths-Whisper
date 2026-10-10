@@ -10,6 +10,10 @@ enum FXTag: String, CaseIterable, Sendable {
     case black, symphonic, gothic, doom, death, melodeath, grind, thrash, heavy, power, hardcore, nu, industrial
     case techno, idm, electro, house, frenchhouse, bigbeat, ambient
     case punk, punk77 = "77punk", poppunk, skatepunk, rock, indie, pop
+    /// B2 批 1（rock 系）：既有的 `rock` 是原型替龐克團做的，硬搖滾／英倫等另立標籤（B2 計劃 §7.3）
+    case hardrock, classicrock, glam, psych, britpop, arena
+    /// B2 批 2（龐克系）：旋律硬核、ska、power pop、抒情流行搖滾
+    case melodichc, ska, powerpop, poprock
 }
 
 /// 歌曲目標值
@@ -37,7 +41,59 @@ enum SongProfileResolver {
 
     /// 樂團覆寫表：使用者在探針 P2、P9–P11 給的判據，原樣抄自原型 `composer.js:123-152` 的 TARGETS（等 D 段 Jev 取代）。
     /// 鍵＝`normalizedArtist`
-    static let overrides: [String: SongProfile] = Dictionary(uniqueKeysWithValues: bandTargets.map { (normalizedArtist($0.0), $0.1) })
+    static let overrides: [String: SongProfile] = overrides(from: bandTable)
+
+    /// 覆寫表的一列：正式名＋曲庫裡實際出現的其他寫法（合作名等；不做模糊比對，沒列到的照舊走曲風）
+    struct BandEntry: Sendable {
+        let name: String
+        var aliases: [String] = []
+        let profile: SongProfile
+
+        var keys: [String] { ([name] + aliases).map(SongProfileResolver.normalizedArtist) }
+    }
+
+    static let bandTable: [BandEntry] = batchOne + batchTwo + batchThree
+
+    /// B1：抄自原型的 28 團
+    static let batchOne: [BandEntry] = bandTargets.map { BandEntry(name: $0.0, profile: $0.1) }
+
+    /// B2 批 1：使用者 2026-10-07 看原型探針後簽字（P13）；值與 `Tests/Fixtures/LyricsFX/b2-batch1-signed.json` 一致（`B2SignedFixtureTests` 把關）。
+    /// Coldplay 的別名是曲庫裡實際出現的合作曲寫法
+    static let batchTwo: [BandEntry] = [
+        BandEntry(name: "AC/DC", profile: SongProfile(axes: [.raw: 0.6, .theatrical: 0.3, .cold: 0.1, .aggression: 0.65, .speed: 0.6, .elegance: 0.05, .decay: 0.2, .bright: 0.5, .bounce: 0.55, .warm: 0.6], tags: [.hardrock])),
+        BandEntry(name: "Guns N' Roses", profile: SongProfile(axes: [.raw: 0.65, .theatrical: 0.55, .cold: 0.15, .aggression: 0.65, .speed: 0.65, .elegance: 0.25, .decay: 0.45, .bright: 0.4, .bounce: 0.35, .warm: 0.5], tags: [.hardrock, .glam])),
+        BandEntry(name: "Queen", profile: SongProfile(axes: [.raw: 0.1, .theatrical: 0.95, .cold: 0.15, .aggression: 0.3, .speed: 0.5, .elegance: 0.8, .decay: 0.05, .bright: 0.8, .bounce: 0.5, .warm: 0.6], tags: [.glam, .classicrock, .arena])),
+        BandEntry(name: "The Beatles", profile: SongProfile(axes: [.raw: 0.25, .theatrical: 0.35, .cold: 0.1, .aggression: 0.1, .speed: 0.45, .elegance: 0.5, .decay: 0.15, .bright: 0.8, .bounce: 0.6, .warm: 0.8], tags: [.classicrock, .britpop])),
+        BandEntry(name: "Pink Floyd", profile: SongProfile(axes: [.raw: 0.15, .theatrical: 0.75, .cold: 0.6, .aggression: 0.15, .speed: 0.1, .elegance: 0.75, .decay: 0.3, .bright: 0.25, .bounce: 0, .warm: 0.25], tags: [.psych, .classicrock])),
+        BandEntry(name: "Oasis", profile: SongProfile(axes: [.raw: 0.55, .theatrical: 0.3, .cold: 0.2, .aggression: 0.4, .speed: 0.45, .elegance: 0.2, .decay: 0.3, .bright: 0.5, .bounce: 0.3, .warm: 0.55], tags: [.britpop])),
+        BandEntry(name: "Blur", profile: SongProfile(axes: [.raw: 0.35, .theatrical: 0.35, .cold: 0.25, .aggression: 0.25, .speed: 0.55, .elegance: 0.35, .decay: 0.2, .bright: 0.7, .bounce: 0.65, .warm: 0.5], tags: [.britpop, .indie])),
+        BandEntry(name: "The Killers", profile: SongProfile(axes: [.raw: 0.15, .theatrical: 0.7, .cold: 0.3, .aggression: 0.3, .speed: 0.6, .elegance: 0.5, .decay: 0.1, .bright: 0.75, .bounce: 0.5, .warm: 0.5], tags: [.arena])),
+        BandEntry(name: "Coldplay", aliases: ["Coldplay X BTS", "Coldplay X Selena Gomez", "Coldplay X We Are KING X Jacob Collier"], profile: SongProfile(axes: [.raw: 0.05, .theatrical: 0.55, .cold: 0.3, .aggression: 0.05, .speed: 0.3, .elegance: 0.75, .decay: 0.05, .bright: 0.8, .bounce: 0.25, .warm: 0.65], tags: [.arena])),
+    ]
+
+    /// B2 批 2（表內第三段；`batchOne`＝B1、`batchTwo`＝B2 批 1）：使用者 2026-10-09 看原型探針後簽字（P14）；
+    /// 值與 `Tests/Fixtures/LyricsFX/b2-batch2-signed.json` 一致（`B2BatchTwoSignedFixtureTests` 把關）。曲庫裡這七團沒有別的寫法
+    static let batchThree: [BandEntry] = [
+        BandEntry(name: "Fall Out Boy", profile: SongProfile(axes: [.raw: 0.2, .theatrical: 0.7, .cold: 0.2, .aggression: 0.4, .speed: 0.75, .elegance: 0.35, .decay: 0.1, .bright: 0.8, .bounce: 0.7, .warm: 0.5], tags: [.poppunk, .poprock, .arena])),
+        BandEntry(name: "Rise Against", profile: SongProfile(axes: [.raw: 0.5, .theatrical: 0.3, .cold: 0.3, .aggression: 0.75, .speed: 0.9, .elegance: 0.15, .decay: 0.3, .bright: 0.4, .bounce: 0.2, .warm: 0.3], tags: [.melodichc, .punk, .skatepunk])),
+        BandEntry(name: "NOFX", profile: SongProfile(axes: [.raw: 0.6, .theatrical: 0.2, .cold: 0.1, .aggression: 0.5, .speed: 0.95, .elegance: 0.05, .decay: 0.3, .bright: 0.6, .bounce: 0.55, .warm: 0.5], tags: [.skatepunk, .punk])),
+        BandEntry(name: "The Interrupters", profile: SongProfile(axes: [.raw: 0.4, .theatrical: 0.3, .cold: 0.1, .aggression: 0.4, .speed: 0.8, .elegance: 0.1, .decay: 0.2, .bright: 0.7, .bounce: 0.9, .warm: 0.6], tags: [.ska, .punk])),
+        BandEntry(name: "Mayday Parade", profile: SongProfile(axes: [.raw: 0.15, .theatrical: 0.55, .cold: 0.2, .aggression: 0.25, .speed: 0.55, .elegance: 0.5, .decay: 0.1, .bright: 0.6, .bounce: 0.35, .warm: 0.65], tags: [.poprock, .poppunk])),
+        BandEntry(name: "Good Charlotte", profile: SongProfile(axes: [.raw: 0.3, .theatrical: 0.4, .cold: 0.15, .aggression: 0.45, .speed: 0.75, .elegance: 0.15, .decay: 0.2, .bright: 0.65, .bounce: 0.6, .warm: 0.5], tags: [.poppunk, .skatepunk])),
+        BandEntry(name: "Weezer", profile: SongProfile(axes: [.raw: 0.35, .theatrical: 0.2, .cold: 0.25, .aggression: 0.3, .speed: 0.55, .elegance: 0.3, .decay: 0.1, .bright: 0.7, .bounce: 0.5, .warm: 0.5], tags: [.powerpop, .indie])),
+    ]
+
+    /// 正規化後撞鍵的名字（跨正式名與別名）；表要維持空集合（`ArtistOverrideTableTests`）
+    static func duplicateKeys(in table: [BandEntry]) -> [String] {
+        let counts = table.flatMap(\.keys).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+        return counts.filter { $0.value > 1 }.map(\.key).sorted()
+    }
+
+    /// 撞鍵時先列的團勝出（Release 不因資料錯誤在啟動時 trap）
+    static func overrides(from table: [BandEntry]) -> [String: SongProfile] {
+        assert(duplicateKeys(in: table).isEmpty, "樂團覆寫表有重複的鍵")
+        return Dictionary(table.flatMap { band in band.keys.map { ($0, band.profile) } }, uniquingKeysWith: { first, _ in first })
+    }
 
     /// 單一關鍵字列的軸值由覆寫表中該曲風的代表樂團平均而來（可追溯，不另行手填）；B1 只填黑金屬與交響兩列，其餘 genre＝mono
     static let keywordRows: [KeywordRow] = [

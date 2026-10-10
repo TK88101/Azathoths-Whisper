@@ -57,14 +57,27 @@ enum LyricsFXCanvas {
         context.fill(Path(bounds), with: .color(palette.bg.color))
         var shaken = context
         shaken.translateBy(x: plan.shake.width, y: plan.shake.height)
+        if plan.zoom != 1 {
+            shaken.translateBy(x: bounds.midX, y: bounds.midY)
+            shaken.scaleBy(x: plan.zoom, y: plan.zoom)
+            shaken.translateBy(x: -bounds.midX, y: -bounds.midY)
+        }
         for layer in plan.back { draw(layer, in: shaken, bounds: bounds) }
         fill(plan.ghosts, in: shaken, palette: palette, paths: paths)
         for box in plan.boxes { draw(box, in: shaken, palette: palette) }
-        fill(plan.glyphs, in: shaken, palette: palette, paths: paths)
+        if plan.glow > 0 {
+            // 濾鏡套在整層的合成結果上，只做一次模糊（不是每個透明度 run 各做一次）
+            shaken.drawLayer { lit in
+                lit.addFilter(.shadow(color: palette.acc.color, radius: plan.glow))
+                fill(plan.glyphs, in: lit, palette: palette, paths: paths, stroke: plan.stroke)
+            }
+        } else {
+            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, stroke: plan.stroke)
+        }
         for layer in plan.front { draw(layer, in: context, bounds: bounds) }
     }
 
-    private static func fill(_ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache) {
+    private static func fill(_ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, stroke: CGFloat = 0) {
         for run in runs(of: glyphs) {
             let path = CGMutablePath()
             for glyph in glyphs[run.range] where opacityLevel(glyph.opacity) > 0 {
@@ -73,7 +86,9 @@ enum LyricsFXCanvas {
             }
             var layer = context
             layer.opacity = opacity(ofLevel: run.level)
-            layer.fill(Path(path), with: .color(palette[run.color].color))
+            let shape = Path(path)
+            if stroke > 0 { layer.stroke(shape, with: .color(palette.acc.color), lineWidth: stroke) }
+            layer.fill(shape, with: .color(palette[run.color].color))
         }
     }
 
@@ -91,13 +106,14 @@ enum LyricsFXCanvas {
             var fill = context
             fill.opacity = opacity
             fill.fill(Path(bounds), with: .color(color.color))
-        case .linearGradient(let top, let bottom):
-            context.fill(Path(bounds), with: .linearGradient(
-                Gradient(colors: [top.color, bottom.color]), startPoint: CGPoint(x: bounds.midX, y: 0), endPoint: CGPoint(x: bounds.midX, y: bounds.maxY)))
         case .radialGlow(let center, let radius, let stops):
-            context.fill(Path(bounds), with: .radialGradient(
-                Gradient(stops: stops.map { Gradient.Stop(color: $0.color.color.opacity($0.opacity), location: $0.location) }),
-                center: CGPoint(x: center.x * bounds.width, y: center.y * bounds.height), startRadius: 0, endRadius: radius * bounds.width))
+            let origin = CGPoint(x: center.x * bounds.width, y: center.y * bounds.height), reach = radius * bounds.width
+            // 最外圈透明時，圓外整片都是透明——只填圓的外接方框，畫面相同（失焦光斑一幀 14 個小光圈，不再各填滿全畫布）
+            let area = stops.last.map { $0.opacity == 0 && $0.location <= 1 } == true
+                ? bounds.intersection(CGRect(x: origin.x - reach, y: origin.y - reach, width: reach * 2, height: reach * 2))
+                : bounds
+            guard !area.isEmpty else { return }
+            context.fill(Path(area), with: .radialGradient(gradient(stops), center: origin, startRadius: 0, endRadius: reach))
         case .lightShafts(let xs, let width, let color, let opacity):
             for x in xs {
                 let left = x * bounds.width, right = left + width * bounds.width
@@ -133,6 +149,27 @@ enum LyricsFXCanvas {
             var lines = context
             lines.opacity = opacity
             lines.stroke(Path(path), with: .color(.white), lineWidth: 1)
+        case .axialGlow(let start, let end, let stops):
+            context.fill(Path(bounds), with: .linearGradient(
+                gradient(stops),
+                startPoint: CGPoint(x: start.x * bounds.width, y: start.y * bounds.height),
+                endPoint: CGPoint(x: end.x * bounds.width, y: end.y * bounds.height)))
+        case .halftone(let step, let color, let opacity):
+            var layer = context
+            layer.opacity = opacity
+            layer.fill(HalftonePathCache.shared.path(size: bounds.size, step: step), with: .color(color.color))
+        case .hairlines(let spacing, let color, let opacity):
+            let path = CGMutablePath()
+            for y in stride(from: CGFloat(0), to: bounds.height, by: max(spacing, 1)) { path.addRect(CGRect(x: 0, y: y, width: bounds.width, height: 1)) }
+            var layer = context
+            layer.opacity = opacity
+            layer.fill(Path(path), with: .color(color.color))
+        case .rects(let rects, let color, let opacity):
+            let path = CGMutablePath()
+            path.addRects(rects)
+            var layer = context
+            layer.opacity = opacity
+            layer.fill(Path(path), with: .color(color.color))
         }
     }
 }
@@ -228,5 +265,33 @@ struct LyricsFXView: View {
         } else if model.identity != nil, model.status != .present {
             LyricsStatusLabel(status: model.status)
         }
+    }
+}
+
+extension LyricsFXCanvas {
+    static func gradient(_ stops: [GlowStop]) -> Gradient {
+        Gradient(stops: stops.map { Gradient.Stop(color: $0.color.color.opacity($0.opacity), location: $0.location) })
+    }
+}
+
+/// 半調網點的路徑只跟畫布尺寸與格距有關：快取最近一組，換尺寸才重建
+final class HalftonePathCache: @unchecked Sendable {
+    static let shared = HalftonePathCache()
+
+    private let lock = NSLock()
+    private var key: (size: CGSize, step: CGFloat)?
+    private var cached = Path()
+
+    func path(size: CGSize, step: CGFloat) -> Path {
+        lock.lock()
+        defer { lock.unlock() }
+        if let key, key.size == size, key.step == step { return cached }
+        var path = Path()
+        for dot in ComposedBackdrop.halftoneDots(size: size, step: step) {
+            path.addEllipse(in: CGRect(x: dot.x - dot.size, y: dot.y - dot.size, width: dot.size * 2, height: dot.size * 2))
+        }
+        key = (size, step)
+        cached = path
+        return path
     }
 }

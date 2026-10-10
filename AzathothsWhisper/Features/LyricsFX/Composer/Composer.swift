@@ -41,6 +41,16 @@ enum Composer {
         return LinePersonalities.pick(pool.map { ($0, fit($0, profile)) }, &random)
     }
 
+    /// 背景宣告了要暗底或亮底時，配色候選先濾成相容者；濾完沒有合格者才不濾（取樣次數不變，B2 計劃 §7.3）
+    static func compatiblePalettes(_ catalog: [FXComponent], backdrop: String, profile: SongProfile) -> [FXComponent] {
+        let palettes = catalog.filter { $0.slot == .palette }
+        guard case .backdrop(let kind)? = catalog.first(where: { $0.id == backdrop })?.payload, let tone = kind.tone else { return palettes }
+        let matching = palettes.filter { component in
+            if case .palette(let palette) = component.payload { tone.accepts(palette) } else { false }
+        }
+        return matching.contains { fit($0, profile) > 0 } ? matching : palettes
+    }
+
     /// 兩個效果：第二個不得與第一個同 id；排除後沒有候選就是 none（fx2 不是必選槽，計劃評審 R1-2）
     static func pickEffects(_ effects: [FXComponent], _ profile: SongProfile, _ random: inout SplitMix64, avoiding: String? = nil) -> (String, String) {
         let first = sample(effects, profile, &random, avoiding: avoiding)?.id ?? FXEffect.none.rawValue
@@ -60,7 +70,8 @@ enum Composer {
         }
         guard let font = pick(.font, previous?.font, &random), let backdrop = pick(.backdrop, previous?.backdrop, &random),
               let enter = pick(.enter, previous?.enter, &random), let exit = pick(.exit, previous?.exit, &random),
-              let palette = pick(.palette, previous?.palette, &random) else { return .mono }
+              let palette = sample(compatiblePalettes(catalog, backdrop: backdrop, profile: profile), profile, &random, avoiding: previous?.palette)?.id
+        else { return .mono }
         let (fx1, fx2) = pickEffects(catalog.filter { $0.slot == .fx }, profile, &random, avoiding: previous?.fx1)
         return .composed(ComposedRecipe(
             font: font, backdrop: backdrop, enter: enter, exit: exit, fx1: fx1, fx2: fx2, palette: palette,

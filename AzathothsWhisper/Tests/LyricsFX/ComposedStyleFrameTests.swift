@@ -110,7 +110,7 @@ struct ComposedStyleFrameTests {
 
     @Test func backdropsBecomeLayers() {
         let shafts = plan(3, Self.recipe(backdrop: "shafts"))
-        if case .linearGradient = shafts.back.first {} else { Issue.record("光柱的底是漸層") }
+        if case .axialGlow = shafts.back.first {} else { Issue.record("光柱的底是漸層") }
         let film = plan(3, Self.recipe(backdrop: "film"))
         #expect(film.front.contains { if case .grain(_, _, true) = $0 { true } else { false } })
         for backdrop in ["void", "film", "snow", "ash", "crimsonFog", "shafts"] {

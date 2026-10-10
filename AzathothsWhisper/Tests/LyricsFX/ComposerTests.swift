@@ -129,8 +129,9 @@ struct ComposerTests {
     }
 
     @Test func aProfileOutsideTheCatalogFallsBackToMono() {
+        // 必選槽無候選＝整份 mono。拿掉整個字型槽，不依賴「哪個曲風剛好還沒有字型」（目錄每批都在長）
         let polka = SongProfile(axes: [.bounce: 1, .warm: 1], tags: [.pop])
-        #expect(Composer.compose(profile: polka, seed: 3) == .mono)
+        #expect(Composer.compose(profile: polka, seed: 3, catalog: LyricsFXCatalog.all.filter { $0.slot != .font }) == .mono)
     }
 
     /// fx2 不是必選槽：排除 fx1 後沒有候選就是 none（計劃評審 R1-2）
