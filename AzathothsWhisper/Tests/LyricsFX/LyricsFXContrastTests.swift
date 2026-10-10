@@ -89,16 +89,47 @@ struct LyricsFXContrastTests {
         }
     }()
 
+    /// 量一組（背景, 配色）的主字對比；不及格回傳失敗說明（`who`＝抽得到它的團，可省）
+    static func readabilityFailure(backdrop: String, palette: String, who: [String] = []) -> String? {
+        let label = "\(palette)＋\(backdrop)" + (who.isEmpty ? "" : "（\(who.joined(separator: "、"))）")
+        guard let result = contrast(recipe(backdrop: backdrop, palette: palette)) else { return "\(label)：量不到字" }
+        let floor = signedLowContrastPalettes.contains(palette) ? signedLowContrastFloor : minimum
+        return result.ratio < floor ? "\(label)：\(String(format: "%.2f", result.ratio))" : nil
+    }
+
     @Test func mainTextStaysReadableOnEveryReachableBackdrop() {
-        var failures: [String] = []
-        for pair in Self.reachablePairs {
-            guard let result = Self.contrast(Self.recipe(backdrop: pair.backdrop, palette: pair.palette)) else {
-                failures.append("\(pair.palette)＋\(pair.backdrop)：量不到字"); continue
-            }
-            let floor = Self.signedLowContrastPalettes.contains(pair.palette) ? Self.signedLowContrastFloor : Self.minimum
-            if result.ratio < floor { failures.append("\(pair.palette)＋\(pair.backdrop)：\(String(format: "%.2f", result.ratio))") }
+        let failures = Self.reachablePairs.compactMap { Self.readabilityFailure(backdrop: $0.backdrop, palette: $0.palette) }
+        #expect(failures.isEmpty, "\(failures.joined(separator: "；"))")
+    }
+
+    /// 各團實際抽得到的（背景, 配色）——含 `compatiblePalettes` 找不到相容配色而回退時抽到的不相容組合，
+    /// 那些不在 `reachablePairs` 裡（B2 批 2 計劃 V5）。值＝抽得到這一組的團
+    static let playablePairs: [String: [String]] = SongProfileResolver.bandTable.reduce(into: [:]) { pairs, band in
+        for (backdrop, palettes) in PlayableSpace.of(band.profile)?.paletteByBackdrop ?? [:] {
+            for palette in palettes { pairs["\(backdrop)|\(palette)", default: []].append(band.name) }
+        }
+    }
+
+    /// 上一條已量過的組合不重量（兩條共用同一份判定），這裡只補回退路徑才抽得到的那些
+    @Test func everyPlayablePairStaysReadable() {
+        let measured = Set(Self.reachablePairs.map { "\($0.backdrop)|\($0.palette)" })
+        let failures = Self.playablePairs.filter { !measured.contains($0.key) }.sorted { $0.key < $1.key }.compactMap { pair, bands in
+            let parts = pair.split(separator: "|").map(String.init)
+            return Self.readabilityFailure(backdrop: parts[0], palette: parts[1], who: bands)
         }
         #expect(failures.isEmpty, "\(failures.joined(separator: "；"))")
+    }
+
+    /// B2 批 2 起的團：抽得到的每組（背景, 配色）都亮暗相容——也就是沒有一組是靠回退抽到的
+    @Test func batchThreeNeverFallsBackToAnIncompatiblePalette() {
+        for band in SongProfileResolver.batchThree {
+            for (backdrop, palettes) in PlayableSpace.of(band.profile)?.paletteByBackdrop ?? [:] {
+                guard case .backdrop(let kind)? = LyricsFXCatalog.component(backdrop)?.payload, let tone = kind.tone else { continue }
+                for palette in palettes {
+                    #expect(LyricsFXCatalog.palette(palette).map(tone.accepts) == true, "\(band.name)：\(backdrop) 配到不相容的 \(palette)")
+                }
+            }
+        }
     }
 
     @Test func theSignedLowContrastPaletteIsStillReachable() {

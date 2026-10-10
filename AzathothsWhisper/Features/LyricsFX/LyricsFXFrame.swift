@@ -25,9 +25,11 @@ struct FontFace: Hashable, Sendable {
 }
 
 /// 每份配色恰四色（bg／fg／acc／dim）；繪製指令只帶槽位（分組鍵離散，B1 計劃 §3.2）。
-/// `black`／`white` 是與配色無關的固定色（影印錯位的陰影與高光，原型 html:1044）
+/// `black`／`white` 是與配色無關的固定色（影印錯位的陰影與高光，原型 html:1044）；
+/// `paperRed`／`paperYellow` 是勒索信紙片的另外兩種紙色（原型 paper 效果，固定色）
 enum ColorSlot: Sendable, Hashable, CaseIterable {
     case bg, fg, acc, dim, black, white
+    case paperRed, paperYellow
 }
 
 struct RGB: Equatable, Sendable {
@@ -69,6 +71,8 @@ struct FXPalette: Equatable, Sendable {
         case .dim: return dim
         case .black: return RGB(hex: 0x000000)
         case .white: return RGB(hex: 0xFFFFFF)
+        case .paperRed: return RGB(hex: 0xC8102E)
+        case .paperYellow: return RGB(hex: 0xF5D90A)
         }
     }
 }
@@ -132,6 +136,8 @@ enum LayerDraw: Equatable, Sendable {
     case halftone(step: CGFloat, color: RGB, opacity: Double)
     /// 每隔 `spacing` 點一條水平細線（報紙紋）
     case hairlines(spacing: CGFloat, color: RGB, opacity: Double)
+    /// 一批同色的實心矩形（畫布座標）：速度線、影印橫紋、棋盤格
+    case rects([CGRect], RGB, opacity: Double)
 }
 
 /// 影印負片時字後的一塊色塊（原型 html:1040）

@@ -23,11 +23,13 @@ struct ResolvedStyle: Sendable {
         }
         let aggression = recipe.profile.axes[.aggression] ?? 0
         let elegance = recipe.profile.axes[.elegance] ?? 0
-        // 停留的優先序照原型：bob → wobble → flicker → breathe → 依侵略度
+        // 停留的優先序照原型：bob → wobble → flicker → jitter → tilt → breathe → 依侵略度
         let hold: [(HoldTemplate, Double)] =
             if effects.contains(.bob) { [(.bob, 3), (.still, 2)] }
             else if effects.contains(.wobble) { [(.wobble, 2), (.still, 3)] }
             else if effects.contains(.flicker) { [(.flicker, 3), (.still, 2)] }
+            else if effects.contains(.jitter) { [(.jitter, 3), (.still, 2)] }
+            else if effects.contains(.tilt) { [(.tilt, 1)] }
             else if effects.contains(.breathe) { [(.breathe, 3), (.still, 2)] }
             else { aggression > 0.7 ? [(.still, 5), (.twitch, 1)] : [(.still, 3), (.drift, 1), (.float, 1)] }
         self.face = face
@@ -78,6 +80,15 @@ enum ComposedStyle {
     static let reflectionAlpha = 0.16
     /// 詞首後多久內整屏抖
     static let shakeWindow = 0.07
+    /// 速度線：行首 0.35 s 內 24 道、由 0.35 淡到 0，每 1/30 s 換一組位置（原型 speedLines）
+    static let speedLineWindow = 0.35
+    static let speedLineCount = 24
+    static let speedLineAlpha = 0.35
+    /// 勒索信：四種紙色（各配一種相反的字色）、紙比字寬 10%、高 1.05 em、中心在基線上方 0.325 em、每張再歪 ±0.15 rad（原型 paper）
+    static let paperStock: [(paper: ColorSlot, ink: ColorSlot)] = [(.black, .white), (.white, .black), (.paperRed, .white), (.paperYellow, .black)]
+    static let paperSize = CGSize(width: 1.1, height: 1.05)
+    static let paperLift: CGFloat = 0.325
+    static let paperTilt = 0.3
     static let specksPerGlyph = 10
 
     struct VisibleLine {
@@ -129,6 +140,9 @@ enum ComposedStyle {
         if style.effects.contains(.thump), let current {
             frame.zoom = 1 + thumpScale * CGFloat(wordHit(current.line, time: time, window: thumpWindow))
         }
+        if style.effects.contains(.speedlines), let current, time - current.line.start < speedLineWindow {
+            frame.back.append(speedLines(size: size, time: time, color: style.palette.fg, fade: 1 - (time - current.line.start) / speedLineWindow))
+        }
         if style.effects.contains(.glow) || style.effects.contains(.neonstroke) { frame.glow = glowRadius }
         if style.effects.contains(.neonstroke) { frame.stroke = size.height * emRatio * strokeRatio }
         return frame
@@ -166,6 +180,7 @@ enum ComposedStyle {
         let baseY = size.height * baseYRatio - CGFloat(laid.rowWidths.count) * rowHeight / 2 + rowHeight * 0.8
         let misregistered = style.effects.contains(.misreg)
         let reflected = style.effects.contains(.reflect)
+        let papered = style.effects.contains(.ransom)
         for glyph in laid.glyphs {
             let personality = personalities[glyph.index]
             guard let transform = glyphTransform(glyph, personality: personality, entry: entry, time: time, size: size, em: em, style: style, rowWidth: laid.rowWidths[glyph.row]) else { continue }
@@ -185,11 +200,15 @@ enum ComposedStyle {
                 rotation: CGFloat(personality.rotation) + baseRotation + transform.rotation,
                 scaleX: transform.scale * transform.scaleX, scaleY: transform.scale * transform.scaleY, opacity: alpha, color: .fg
             )
-            var random = SplitMix64(seed: lineSeed &+ UInt64(glyph.index) &* 7919)
+            let glyphSeed = lineSeed &+ UInt64(glyph.index) &* 7919
+            var random = SplitMix64(seed: glyphSeed)
             if transform.specks > 0 {
                 specks += speckParticles(around: center, em: fontSize, strength: transform.specks, alpha: alpha, random: &random)
             }
-            emit(base, glyphWidth: glyph.width, center: center, transform: transform, misregistered: misregistered, reflected: reflected, random: &random, into: &frame)
+            emit(
+                base, glyphWidth: glyph.width, center: center, transform: transform, misregistered: misregistered, reflected: reflected,
+                paper: papered ? paperScrap(seed: glyphSeed, width: advance) : nil, random: &random, into: &frame
+            )
         }
     }
 
@@ -214,7 +233,7 @@ enum ComposedStyle {
     /// 依效果把一個字放進繪製指令：殘影（只畫副本、不畫本體）、負片（色塊＋底色字）、影印錯位（黑影＋白光＋本體）或本體
     private static func emit(
         _ base: GlyphDraw, glyphWidth: CGFloat, center: CGPoint, transform: GlyphTransform, misregistered: Bool, reflected: Bool,
-        random: inout SplitMix64, into frame: inout FramePlan
+        paper: PaperScrap?, random: inout SplitMix64, into frame: inout FramePlan
     ) {
         let alpha = base.opacity
         if transform.ghost > 0 {
@@ -231,6 +250,14 @@ enum ComposedStyle {
                 size: CGSize(width: glyphWidth + 0.16 * base.fontSize, height: 1.2 * base.fontSize), rotation: base.rotation, color: .fg, opacity: alpha
             ))
             frame.glyphs.append(base.shifted(dx: 0, dy: 0, opacity: alpha, color: .bg))
+        } else if let paper {
+            // 勒索信：紙片墊在字後，字用與紙相反的黑或白；不再疊錯位與倒影（原型 ransom 提前 return）
+            frame.boxes.append(GlyphBox(
+                center: CGPoint(x: center.x + sin(base.rotation) * paperLift * base.fontSize, y: center.y - cos(base.rotation) * paperLift * base.fontSize),
+                size: CGSize(width: paper.width * paperSize.width, height: base.fontSize * paperSize.height),
+                rotation: base.rotation + paper.tilt, color: paper.color, opacity: alpha
+            ))
+            frame.glyphs.append(base.shifted(dx: 0, dy: 0, opacity: alpha, color: paper.ink))
         } else {
             if misregistered {
                 frame.ghosts.append(base.shifted(dx: 2.5, dy: 2.5, opacity: alpha * 0.6, color: .black))
@@ -316,6 +343,33 @@ enum ComposedStyle {
             let since = time - word.start
             return since >= 0 && since < window ? max(strongest, 1 - since / window) : strongest
         }
+    }
+
+    /// 勒索信的一張紙：紙色、額外的歪斜角、字寬
+    private struct PaperScrap {
+        let color: ColorSlot
+        /// 字色：與紙相反的黑或白
+        let ink: ColorSlot
+        let tilt: CGFloat
+        let width: CGFloat
+    }
+
+    /// 紙色與歪斜只依這個字的種子，不隨幀變
+    private static func paperScrap(seed: UInt64, width: CGFloat) -> PaperScrap {
+        var random = SplitMix64(seed: seed ^ 0x7061_7065)
+        let stock = paperStock[min(Int(random.unit() * Double(paperStock.count)), paperStock.count - 1)]
+        return PaperScrap(color: stock.paper, ink: stock.ink, tilt: CGFloat((random.unit() - 0.5) * paperTilt), width: width)
+    }
+
+    /// 行首的速度線：24 道 1 點高的橫線，長度是畫布寬的 10–50%
+    private static func speedLines(size: CGSize, time: Double, color: RGB, fade: Double) -> LayerDraw {
+        var random = SplitMix64(seed: UInt64(max(time * 30, 0)) &+ 5)
+        let lines = (0..<speedLineCount).map { _ in
+            let y = CGFloat(random.unit()) * size.height
+            let length = size.width * CGFloat(0.1 + random.unit() * 0.4)
+            return CGRect(x: CGFloat(random.unit()) * size.width, y: y, width: length, height: 1)
+        }
+        return .rects(lines, color, opacity: speedLineAlpha * fade)
     }
 
     /// 詞首 70 ms 內整屏抖（原型 html:1009-1010）；以 1/60 s 為一格取亂數

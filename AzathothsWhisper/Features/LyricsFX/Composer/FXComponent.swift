@@ -9,14 +9,16 @@ enum FXSlot: String, CaseIterable, Sendable {
 enum BackdropKind: String, Sendable {
     case void, film, snow, ash, crimsonFog, shafts
     case ampGlow, embers, halftone, haze, paper, prism, smokeHaze, spot, stars, sunset, tapeLeak
+    /// B2 批 2（龐克系）。flat＝只有配色的底色，什麼都不畫
+    case flat, xerox, gig, checker, bokeh, skyGrad
 
     /// 這個背景要配暗底還是亮底的配色（nil＝都可以）；組合器在背景之後抽配色時先濾成相容者（B2 計劃 §7.3）。
     /// sunset、shafts 會把整面塗成淺色／深色漸層，等於自帶底色（T3 對比測試抓到：配錯邊時字幾乎看不見）
     var tone: BackdropTone? {
         switch self {
-        case .ampGlow, .spot, .smokeHaze, .prism, .stars, .shafts: .dark
+        case .ampGlow, .spot, .smokeHaze, .prism, .stars, .shafts, .gig, .bokeh: .dark
         case .halftone, .sunset: .light
-        case .void, .film, .snow, .ash, .crimsonFog, .embers, .haze, .paper, .tapeLeak: nil
+        case .void, .film, .snow, .ash, .crimsonFog, .embers, .haze, .paper, .tapeLeak, .flat, .xerox, .checker, .skyGrad: nil
         }
     }
 }
@@ -32,6 +34,8 @@ enum BackdropTone: Sendable {
 enum FXEffect: String, Sendable {
     case none, shake, misreg, breathe
     case glow, neonstroke, reflect, thump, bob, wobble, flicker
+    /// B2 批 2：speedlines＝行首的速度線；ransom＝每個字墊一張歪斜的色紙（勒索信；不叫 paper，那是報紙背景的 id）；jitter／tilt 是停留時的小動作
+    case speedlines, ransom, jitter, tilt
 }
 
 struct EnterSpec: Sendable {

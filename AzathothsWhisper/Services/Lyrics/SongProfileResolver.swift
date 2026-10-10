@@ -12,6 +12,8 @@ enum FXTag: String, CaseIterable, Sendable {
     case punk, punk77 = "77punk", poppunk, skatepunk, rock, indie, pop
     /// B2 批 1（rock 系）：既有的 `rock` 是原型替龐克團做的，硬搖滾／英倫等另立標籤（B2 計劃 §7.3）
     case hardrock, classicrock, glam, psych, britpop, arena
+    /// B2 批 2（龐克系）：旋律硬核、ska、power pop、抒情流行搖滾
+    case melodichc, ska, powerpop, poprock
 }
 
 /// 歌曲目標值
@@ -50,7 +52,7 @@ enum SongProfileResolver {
         var keys: [String] { ([name] + aliases).map(SongProfileResolver.normalizedArtist) }
     }
 
-    static let bandTable: [BandEntry] = batchOne + batchTwo
+    static let bandTable: [BandEntry] = batchOne + batchTwo + batchThree
 
     /// B1：抄自原型的 28 團
     static let batchOne: [BandEntry] = bandTargets.map { BandEntry(name: $0.0, profile: $0.1) }
@@ -67,6 +69,18 @@ enum SongProfileResolver {
         BandEntry(name: "Blur", profile: SongProfile(axes: [.raw: 0.35, .theatrical: 0.35, .cold: 0.25, .aggression: 0.25, .speed: 0.55, .elegance: 0.35, .decay: 0.2, .bright: 0.7, .bounce: 0.65, .warm: 0.5], tags: [.britpop, .indie])),
         BandEntry(name: "The Killers", profile: SongProfile(axes: [.raw: 0.15, .theatrical: 0.7, .cold: 0.3, .aggression: 0.3, .speed: 0.6, .elegance: 0.5, .decay: 0.1, .bright: 0.75, .bounce: 0.5, .warm: 0.5], tags: [.arena])),
         BandEntry(name: "Coldplay", aliases: ["Coldplay X BTS", "Coldplay X Selena Gomez", "Coldplay X We Are KING X Jacob Collier"], profile: SongProfile(axes: [.raw: 0.05, .theatrical: 0.55, .cold: 0.3, .aggression: 0.05, .speed: 0.3, .elegance: 0.75, .decay: 0.05, .bright: 0.8, .bounce: 0.25, .warm: 0.65], tags: [.arena])),
+    ]
+
+    /// B2 批 2（表內第三段；`batchOne`＝B1、`batchTwo`＝B2 批 1）：使用者 2026-10-09 看原型探針後簽字（P14）；
+    /// 值與 `Tests/Fixtures/LyricsFX/b2-batch2-signed.json` 一致（`B2BatchTwoSignedFixtureTests` 把關）。曲庫裡這七團沒有別的寫法
+    static let batchThree: [BandEntry] = [
+        BandEntry(name: "Fall Out Boy", profile: SongProfile(axes: [.raw: 0.2, .theatrical: 0.7, .cold: 0.2, .aggression: 0.4, .speed: 0.75, .elegance: 0.35, .decay: 0.1, .bright: 0.8, .bounce: 0.7, .warm: 0.5], tags: [.poppunk, .poprock, .arena])),
+        BandEntry(name: "Rise Against", profile: SongProfile(axes: [.raw: 0.5, .theatrical: 0.3, .cold: 0.3, .aggression: 0.75, .speed: 0.9, .elegance: 0.15, .decay: 0.3, .bright: 0.4, .bounce: 0.2, .warm: 0.3], tags: [.melodichc, .punk, .skatepunk])),
+        BandEntry(name: "NOFX", profile: SongProfile(axes: [.raw: 0.6, .theatrical: 0.2, .cold: 0.1, .aggression: 0.5, .speed: 0.95, .elegance: 0.05, .decay: 0.3, .bright: 0.6, .bounce: 0.55, .warm: 0.5], tags: [.skatepunk, .punk])),
+        BandEntry(name: "The Interrupters", profile: SongProfile(axes: [.raw: 0.4, .theatrical: 0.3, .cold: 0.1, .aggression: 0.4, .speed: 0.8, .elegance: 0.1, .decay: 0.2, .bright: 0.7, .bounce: 0.9, .warm: 0.6], tags: [.ska, .punk])),
+        BandEntry(name: "Mayday Parade", profile: SongProfile(axes: [.raw: 0.15, .theatrical: 0.55, .cold: 0.2, .aggression: 0.25, .speed: 0.55, .elegance: 0.5, .decay: 0.1, .bright: 0.6, .bounce: 0.35, .warm: 0.65], tags: [.poprock, .poppunk])),
+        BandEntry(name: "Good Charlotte", profile: SongProfile(axes: [.raw: 0.3, .theatrical: 0.4, .cold: 0.15, .aggression: 0.45, .speed: 0.75, .elegance: 0.15, .decay: 0.2, .bright: 0.65, .bounce: 0.6, .warm: 0.5], tags: [.poppunk, .skatepunk])),
+        BandEntry(name: "Weezer", profile: SongProfile(axes: [.raw: 0.35, .theatrical: 0.2, .cold: 0.25, .aggression: 0.3, .speed: 0.55, .elegance: 0.3, .decay: 0.1, .bright: 0.7, .bounce: 0.5, .warm: 0.5], tags: [.powerpop, .indie])),
     ]
 
     /// 正規化後撞鍵的名字（跨正式名與別名）；表要維持空集合（`ArtistOverrideTableTests`）

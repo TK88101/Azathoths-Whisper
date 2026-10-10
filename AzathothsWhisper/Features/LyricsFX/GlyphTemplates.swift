@@ -60,6 +60,7 @@ enum FXEasing {
 enum EnterTemplate: String, CaseIterable, Sendable {
     case fadeUp, grow, slam, condense, negative, fling, slant, swoop, orbit, smoke, rise
     case stamp, pop, fallIn, slide
+    case tumble
 
     func transform(progress p: Double, context c: GlyphContext) -> GlyphTransform {
         let em = Double(c.em)
@@ -118,6 +119,10 @@ enum EnterTemplate: String, CaseIterable, Sendable {
         case .slide:
             let u = 1 - FXEasing.outCubic(p)
             return GlyphTransform(dx: CGFloat(cos(c.angle) * Double(c.radius) * u), dy: CGFloat(sin(c.angle) * Double(c.radius) * u), alpha: min(1, p * 2))
+        case .tumble:
+            // 從上方翻一整圈落下
+            let u = CGFloat(1 - FXEasing.outCubic(p))
+            return GlyphTransform(dx: u * c.dir * c.em, dy: -u * c.height * 0.7, rotation: u * c.dir * 2 * .pi, alpha: min(1, p * 3))
         }
     }
 }
@@ -126,6 +131,7 @@ enum EnterTemplate: String, CaseIterable, Sendable {
 enum HoldTemplate: String, CaseIterable, Sendable {
     case still, twitch, drift, float, breathe
     case bob, wobble, flicker
+    case jitter, tilt
 
     func transform(time t: Double, context c: GlyphContext) -> GlyphTransform {
         let em = Double(c.em)
@@ -148,6 +154,12 @@ enum HoldTemplate: String, CaseIterable, Sendable {
             return GlyphTransform(rotation: CGFloat(sin(t * 1.7 + c.phase) * 0.06))
         case .flicker:
             return GlyphTransform(alpha: 0.8 + 0.2 * sin(t * 3.1 + c.phase) * sin(t * 7.3 + c.phase))
+        case .jitter:
+            // 影印抖動：約 1 點的高頻微顫（原型 jitter，TONE.raw 0.6 推得振幅 1.2／0.8）
+            return GlyphTransform(dx: CGFloat(sin(t * 62.8 + c.phase) * 1.2), dy: CGFloat(cos(t * 55 + c.phase) * 0.8))
+        case .tilt:
+            // 字字微傾：固定角度，方向依字而定，不隨時間動
+            return GlyphTransform(rotation: c.phase > .pi ? 0.05 : -0.05)
         }
     }
 }
@@ -156,6 +168,7 @@ enum HoldTemplate: String, CaseIterable, Sendable {
 enum ExitTemplate: String, CaseIterable, Sendable {
     case cut, scatter, fade, dissolve
     case fall, shrink, up, slideOut
+    case tumbleOut
 
     func transform(progress x: Double, context c: GlyphContext) -> GlyphTransform {
         switch self {
@@ -172,6 +185,8 @@ enum ExitTemplate: String, CaseIterable, Sendable {
         case .slideOut:
             let k = FXEasing.inCubic(x) * Double(c.radius)
             return GlyphTransform(dx: CGFloat(cos(c.angle) * k), dy: CGFloat(sin(c.angle) * k), alpha: 1 - x)
+        case .tumbleOut:
+            return GlyphTransform(dy: CGFloat(FXEasing.inCubic(x)) * c.height * 0.6, rotation: c.dir * CGFloat(x) * 4, alpha: 1 - x * 0.3)
         }
     }
 }

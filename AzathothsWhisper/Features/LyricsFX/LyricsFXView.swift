@@ -107,9 +107,13 @@ enum LyricsFXCanvas {
             fill.opacity = opacity
             fill.fill(Path(bounds), with: .color(color.color))
         case .radialGlow(let center, let radius, let stops):
-            context.fill(Path(bounds), with: .radialGradient(
-                gradient(stops),
-                center: CGPoint(x: center.x * bounds.width, y: center.y * bounds.height), startRadius: 0, endRadius: radius * bounds.width))
+            let origin = CGPoint(x: center.x * bounds.width, y: center.y * bounds.height), reach = radius * bounds.width
+            // 最外圈透明時，圓外整片都是透明——只填圓的外接方框，畫面相同（失焦光斑一幀 14 個小光圈，不再各填滿全畫布）
+            let area = stops.last.map { $0.opacity == 0 && $0.location <= 1 } == true
+                ? bounds.intersection(CGRect(x: origin.x - reach, y: origin.y - reach, width: reach * 2, height: reach * 2))
+                : bounds
+            guard !area.isEmpty else { return }
+            context.fill(Path(area), with: .radialGradient(gradient(stops), center: origin, startRadius: 0, endRadius: reach))
         case .lightShafts(let xs, let width, let color, let opacity):
             for x in xs {
                 let left = x * bounds.width, right = left + width * bounds.width
@@ -157,6 +161,12 @@ enum LyricsFXCanvas {
         case .hairlines(let spacing, let color, let opacity):
             let path = CGMutablePath()
             for y in stride(from: CGFloat(0), to: bounds.height, by: max(spacing, 1)) { path.addRect(CGRect(x: 0, y: y, width: bounds.width, height: 1)) }
+            var layer = context
+            layer.opacity = opacity
+            layer.fill(Path(path), with: .color(color.color))
+        case .rects(let rects, let color, let opacity):
+            let path = CGMutablePath()
+            path.addRects(rects)
             var layer = context
             layer.opacity = opacity
             layer.fill(Path(path), with: .color(color.color))

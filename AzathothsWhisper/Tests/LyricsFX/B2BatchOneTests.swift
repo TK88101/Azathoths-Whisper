@@ -6,54 +6,20 @@ import Testing
 
 // B2 計劃 T5、T4：批 1（rock 系 9 團）的簽字對照、背景與配色的亮暗相容、新效果。歌詞為編造句
 
-private struct SignedFile: Decodable {
-    struct Band: Decodable {
-        let name: String
-        let aliases: [String]
-        let tags: [String]
-        let axes: [String: Double]
-        let candidates: [String: [String]]
-    }
-
-    let bands: [Band]
-}
-
-private func signedBands() throws -> [SignedFile.Band] {
-    let url = try GoldenFixtures.fixturesRoot().appendingPathComponent("LyricsFX/b2-batch1-signed.json")
-    return try JSONDecoder().decode(SignedFile.self, from: Data(contentsOf: url)).bands
-}
-
-private func profile(of band: SignedFile.Band) -> SongProfile {
-    SongProfile(
-        axes: Dictionary(uniqueKeysWithValues: band.axes.compactMap { key, value in FXAxis(rawValue: key).map { ($0, value) } }),
-        tags: Set(band.tags.compactMap(FXTag.init(rawValue:)))
-    )
-}
-
 @Suite("B2 batch 1 signed fixture")
 struct B2SignedFixtureTests {
     @Test func everySignedBandAndAliasResolvesToItsSignedProfile() throws {
-        let bands = try signedBands()
-        #expect(bands.count == 9)
-        for band in bands {
-            #expect(band.tags.allSatisfy { FXTag(rawValue: $0) != nil }, "\(band.name) 有 app 不認得的標籤")
-            for name in [band.name] + band.aliases {
-                #expect(SongProfileResolver.resolve(artist: name, genre: nil) == .profile(profile(of: band)), "\(name)")
-            }
-        }
+        let file = try SignedBatchFile.load(batch: 1)
+        #expect(file.bands.count == 9)
+        SignedBatchChecks.everyBandAndAliasResolvesToItsSignedProfile(file)
     }
 
     @Test func everySignedBandIsInTheSecondBatch() throws {
-        #expect(Set(SongProfileResolver.batchTwo.map(\.name)) == Set(try signedBands().map(\.name)))
+        #expect(Set(SongProfileResolver.batchTwo.map(\.name)) == Set(try SignedBatchFile.load(batch: 1).bands.map(\.name)))
     }
 
     @Test func theAppOffersExactlyTheSignedCandidatesInEverySlot() throws {
-        for band in try signedBands() {
-            for slot in FXSlot.allCases {
-                let app = Set(LyricsFXCatalog.components(in: slot).filter { Composer.fit($0, profile(of: band)) > 0 }.map(\.id))
-                #expect(app == Set(band.candidates[slot.rawValue] ?? []), "\(band.name) \(slot)：多 \(app.subtracting(band.candidates[slot.rawValue] ?? [])) 少 \(Set(band.candidates[slot.rawValue] ?? []).subtracting(app))")
-            }
-        }
+        SignedBatchChecks.theAppOffersExactlyTheSignedCandidatesInEverySlot(try SignedBatchFile.load(batch: 1))
     }
 }
 
@@ -65,9 +31,9 @@ struct BackdropPaletteToneTests {
     }
 
     @Test func aBackdropThatNeedsADarkOrLightPaletteNeverGetsTheOtherKind() throws {
-        for band in try signedBands() {
+        for band in try SignedBatchFile.load(batch: 1).bands {
             for seed in UInt64(1)...200 {
-                guard case .composed(let recipe) = Composer.compose(profile: profile(of: band), seed: seed),
+                guard case .composed(let recipe) = Composer.compose(profile: band.profile, seed: seed),
                       case .backdrop(let backdrop)? = LyricsFXCatalog.component(recipe.backdrop)?.payload,
                       let tone = backdrop.tone, let palette = LyricsFXCatalog.palette(recipe.palette) else { continue }
                 #expect(tone.accepts(palette), "\(band.name) seed \(seed)：\(recipe.backdrop)＋\(recipe.palette)")

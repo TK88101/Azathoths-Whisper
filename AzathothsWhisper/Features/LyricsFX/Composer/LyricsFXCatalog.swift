@@ -1,7 +1,9 @@
 import Foundation
 
-/// 元件目錄（B1：黑金屬＋交響子集，B1 計劃 §3.8；B2 批 1：rock 系 9 團用到的 59 個，B2 計劃 §7.3）。向量、標籤、req／forbid **原樣抄自原型 `composer.js`**（行號見各列註解），不改值。
-/// 移出 B1 的元件與理由見計劃 §3.8
+/// 元件目錄（B1：黑金屬＋交響子集，B1 計劃 §3.8；B2 批 1：rock 系 9 團用到的 59 個，B2 計劃 §7.3；B2 批 2：龐克系 39 個，批 2 計劃 §9.3）。
+/// 向量與 req／forbid **原樣取自原型 `composer.js`**，不改值。標籤：B1 與批 1 是整份照抄；**批 2 起只收「該批專屬」的標籤**
+/// （＝該批各團的標籤扣掉其他團也有的），原型上其餘的標籤等它們的團進批次時再補——整份照抄會讓還沒簽字的團跟著變（批 2 計劃 F5）。
+/// 移出 B1 的元件與理由見 B1 計劃 §3.8
 enum LyricsFXCatalog {
     static let all: [FXComponent] = fonts + backdrops + enters + exits + effects + palettes
 
@@ -51,9 +53,9 @@ enum LyricsFXCatalog {
              forbid: [.raw: 0.5], .font(FontFace(id: "Abril", family: "Abril Fatface", weight: nil))),
         make(.font, "AlfaSlab", [.aggression: 0.6, .warm: 0.6, .raw: 0.5, .bounce: 0.4], [.hardrock, .classicrock],
              .font(FontFace(id: "AlfaSlab", family: "Alfa Slab One", weight: nil, uppercase: true))),
-        make(.font, "Anton", [.aggression: 0.7, .speed: 0.6, .raw: 0.3, .bounce: 0.3], [.hardrock, .hardcore, .nu, .death, .thrash, .punk, .skatepunk, .bigbeat, .rock],
+        make(.font, "Anton", [.aggression: 0.7, .speed: 0.6, .raw: 0.3, .bounce: 0.3], [.hardrock, .hardcore, .nu, .death, .thrash, .punk, .skatepunk, .bigbeat, .rock, .melodichc, .ska],
              .font(FontFace(id: "Anton", family: "Anton", weight: nil, uppercase: true))),
-        make(.font, "Archivo", [.raw: 0.45, .aggression: 0.4, .bright: 0.5, .warm: 0.5], [.britpop, .indie],
+        make(.font, "Archivo", [.raw: 0.45, .aggression: 0.4, .bright: 0.5, .warm: 0.5], [.britpop, .indie, .powerpop],
              .font(FontFace(id: "Archivo", family: "Archivo Black", weight: nil))),
         make(.font, "Bebas", [.aggression: 0.45, .speed: 0.5, .bright: 0.5, .raw: 0.3, .theatrical: 0.4], [.hardrock, .britpop, .arena],
              .font(FontFace(id: "Bebas", family: "Bebas Neue", weight: nil, uppercase: true))),
@@ -63,7 +65,7 @@ enum LyricsFXCatalog {
              .font(FontFace(id: "Elite", family: "Special Elite", weight: nil, uppercase: true))),
         make(.font, "Grotesk", [.cold: 0.4, .elegance: 0.5, .bright: 0.3, .speed: 0.3, .bounce: 0], [.idm, .ambient, .house, .indie],
              .font(FontFace(id: "Grotesk", family: "Space Grotesk", weight: .regular))),
-        make(.font, "Oswald", [.aggression: 0.5, .speed: 0.6, .raw: 0.35, .bounce: 0.3], [.hardrock, .britpop, .arena, .punk, .poppunk, .skatepunk, .hardcore, .rock, .bigbeat],
+        make(.font, "Oswald", [.aggression: 0.5, .speed: 0.6, .raw: 0.35, .bounce: 0.3], [.hardrock, .britpop, .arena, .punk, .poppunk, .skatepunk, .hardcore, .rock, .bigbeat, .melodichc, .ska],
              .font(FontFace(id: "Oswald", family: "Oswald", weight: .bold, uppercase: true))),
         make(.font, "PlayfairIt", [.elegance: 0.8, .theatrical: 0.6, .warm: 0.5, .speed: 0.3], [.glam, .classicrock, .psych, .arena],
              forbid: [.aggression: 0.5], .font(FontFace(id: "PlayfairIt", family: "Playfair Display", weight: .bold, italic: true))),
@@ -71,6 +73,21 @@ enum LyricsFXCatalog {
              .font(FontFace(id: "Righteous", family: "Righteous", weight: nil, uppercase: true))),
         make(.font, "Syncopate", [.cold: 0.6, .elegance: 0.7, .speed: 0.1, .theatrical: 0.6], [.psych, .arena],
              forbid: [.aggression: 0.5], .font(FontFace(id: "Syncopate", family: "Syncopate", weight: .bold, uppercase: true))),
+        // B2 批 2（龐克系；原型 composer.js 的 B2 批 2 段）。標籤只收本批專屬的，其餘等它們的團進批次再補
+        make(.font, "Bangers", [.bounce: 0.75, .bright: 0.7, .speed: 0.7, .aggression: 0.45], [.poppunk, .skatepunk, .ska],
+             .font(FontFace(id: "Bangers", family: "Bangers", weight: nil, uppercase: true))),
+        make(.font, "Dela", [.bounce: 0.6, .bright: 0.6, .aggression: 0.4, .speed: 0.6], [.poppunk],
+             .font(FontFace(id: "Dela", family: "Dela Gothic One", weight: nil, uppercase: true))),
+        make(.font, "Gochi", [.warm: 0.7, .elegance: 0.45, .bounce: 0.35, .raw: 0.25, .theatrical: 0.5], [.poprock],
+             forbid: [.aggression: 0.5], .font(FontFace(id: "Gochi", family: "Gochi Hand", weight: nil))),
+        make(.font, "Lilita", [.bounce: 0.65, .bright: 0.75, .warm: 0.6, .aggression: 0.35], [.poprock, .poppunk, .ska],
+             .font(FontFace(id: "Lilita", family: "Lilita One", weight: nil))),
+        make(.font, "Marker", [.raw: 0.65, .bounce: 0.5, .speed: 0.7, .warm: 0.4, .aggression: 0.5], [.punk, .skatepunk, .melodichc],
+             .font(FontFace(id: "Marker", family: "Permanent Marker", weight: nil, uppercase: true))),
+        make(.font, "Rubik", [.bright: 0.7, .bounce: 0.45, .warm: 0.5, .raw: 0.25, .aggression: 0.3], [.powerpop, .poprock],
+             .font(FontFace(id: "Rubik", family: "Rubik", weight: .bold))),
+        make(.font, "SairaStencil", [.aggression: 0.75, .raw: 0.4, .speed: 0.8, .cold: 0.3], [.melodichc],
+             .font(FontFace(id: "SairaStencil", family: "Saira Stencil One", weight: nil, uppercase: true))),
     ]
 
     // composer.js:36-40,43
@@ -102,10 +119,23 @@ enum LyricsFXCatalog {
              .backdrop(.spot)),
         make(.backdrop, "stars", [.elegance: 0.75, .bright: 0.5, .cold: 0.35, .speed: 0.2, .theatrical: 0.5], [.arena, .psych],
              forbid: [.aggression: 0.5], .backdrop(.stars)),
-        make(.backdrop, "sunset", [.warm: 0.9, .bright: 0.7, .bounce: 0.4, .elegance: 0.3], [.poppunk, .skatepunk, .pop, .indie, .rock],
+        make(.backdrop, "sunset", [.warm: 0.9, .bright: 0.7, .bounce: 0.4, .elegance: 0.3], [.poppunk, .skatepunk, .pop, .indie, .rock, .poprock, .powerpop],
              .backdrop(.sunset)),
         make(.backdrop, "tapeLeak", [.warm: 0.75, .raw: 0.45, .bright: 0.5, .decay: 0.3], [.britpop, .classicrock, .hardrock, .indie],
              .backdrop(.tapeLeak)),
+        // B2 批 2（龐克系；原型 composer.js 的 B2 批 2 段）。標籤只收本批專屬的，其餘等它們的團進批次再補
+        make(.backdrop, "bokeh", [.elegance: 0.5, .theatrical: 0.55, .warm: 0.6, .bright: 0.5, .speed: 0.4], [.poprock],
+             forbid: [.aggression: 0.6], .backdrop(.bokeh)),
+        make(.backdrop, "checker", [.bounce: 0.9, .bright: 0.6, .speed: 0.7], [.ska],
+             .backdrop(.checker)),
+        make(.backdrop, "flat", [.bright: 0.8, .bounce: 0.7, .warm: 0.5, .raw: 0.2], [.ska, .powerpop, .poprock, .poppunk, .skatepunk],
+             .backdrop(.flat)),
+        make(.backdrop, "gig", [.aggression: 0.7, .raw: 0.5, .warm: 0.4, .speed: 0.7, .theatrical: 0.35], [.melodichc, .punk, .skatepunk, .ska],
+             .backdrop(.gig)),
+        make(.backdrop, "skyGrad", [.bright: 0.7, .raw: 0.2, .bounce: 0.45, .warm: 0.45], [.powerpop, .poprock],
+             forbid: [.aggression: 0.6], .backdrop(.skyGrad)),
+        make(.backdrop, "xerox", [.raw: 0.7, .aggression: 0.55, .decay: 0.4, .speed: 0.6], [.punk, .skatepunk, .melodichc],
+             .backdrop(.xerox)),
     ]
 
     // composer.js:55,57-61,64。淡入型（condense、smoke、rise）的時長依 P12 縮短 40%（使用者 2026-10-06：「漸入漸出稍長，字發虛」）
@@ -127,13 +157,13 @@ enum LyricsFXCatalog {
         // B2 批 1（使用者 2026-10-07 簽字；由原型 composer.js 產生，不手抄）
         make(.enter, "bloom", [.elegance: 0.75, .speed: 0.15, .theatrical: 0.6], [.psych, .arena, .classicrock],
              forbid: [.aggression: 0.5], .enter(EnterSpec(weights: [(.grow, 3), (.fadeUp, 2)], duration: 0.6...1.2))),
-        make(.enter, "fadeUp", [.elegance: 0.5, .bounce: 0.1, .speed: 0.3], [.britpop, .arena, .psych, .classicrock, .indie, .ambient, .rock, .punk, .idm],
+        make(.enter, "fadeUp", [.elegance: 0.5, .bounce: 0.1, .speed: 0.3], [.britpop, .arena, .psych, .classicrock, .indie, .ambient, .rock, .punk, .idm, .poprock, .powerpop],
              .enter(EnterSpec(weights: [(.fadeUp, 4), (.grow, 1)], duration: 0.3...0.6))),
-        make(.enter, "hop", [.bounce: 0.65, .bright: 0.7, .warm: 0.6, .speed: 0.5], [.britpop, .classicrock, .pop],
+        make(.enter, "hop", [.bounce: 0.65, .bright: 0.7, .warm: 0.6, .speed: 0.5], [.britpop, .classicrock, .pop, .ska, .poprock, .powerpop, .poppunk],
              forbid: [.aggression: 0.5, .theatrical: 0.8], .enter(EnterSpec(weights: [(.pop, 3), (.fallIn, 2), (.fadeUp, 1)], duration: 0.18...0.4))),
         make(.enter, "kick", [.aggression: 0.6, .bounce: 0.5, .speed: 0.65, .warm: 0.4], [.hardrock],
              .enter(EnterSpec(weights: [(.stamp, 3), (.pop, 2), (.slide, 1)], duration: 0.12...0.28))),
-        make(.enter, "slide", [.aggression: 0.6, .speed: 0.7, .bounce: 0.2], [.hardrock, .heavy, .thrash, .nu, .hardcore, .punk, .skatepunk, .rock, .bigbeat],
+        make(.enter, "slide", [.aggression: 0.6, .speed: 0.7, .bounce: 0.2], [.hardrock, .heavy, .thrash, .nu, .hardcore, .punk, .skatepunk, .rock, .bigbeat, .melodichc, .ska],
              .enter(EnterSpec(weights: [(.slide, 4), (.stamp, 1)], duration: 0.15...0.35))),
         make(.enter, "stamp", [.aggression: 0.7, .speed: 0.8, .raw: 0.3], [.hardrock, .hardcore, .nu, .heavy, .thrash],
              .enter(EnterSpec(weights: [(.stamp, 4), (.pop, 1)], duration: 0.1...0.25))),
@@ -141,6 +171,17 @@ enum LyricsFXCatalog {
              .enter(EnterSpec(weights: [(.slant, 3), (.swoop, 2), (.stamp, 1)], duration: 0.2...0.4))),
         make(.enter, "swagger", [.raw: 0.5, .aggression: 0.4, .speed: 0.45, .warm: 0.5], [.britpop, .hardrock, .indie],
              .enter(EnterSpec(weights: [(.slide, 3), (.fadeUp, 2)], duration: 0.3...0.55))),
+        // B2 批 2（龐克系；原型 composer.js 的 B2 批 2 段）。標籤只收本批專屬的，其餘等它們的團進批次再補
+        make(.enter, "ease", [.elegance: 0.4, .bounce: 0.35, .speed: 0.5, .warm: 0.5], [.poprock, .powerpop],
+             .enter(EnterSpec(weights: [(.fadeUp, 3), (.pop, 1)], duration: 0.25...0.5))),
+        make(.enter, "pop", [.bounce: 0.9, .bright: 0.6, .speed: 0.6, .aggression: 0.2], [.ska, .poprock, .powerpop, .poppunk],
+             forbid: [.raw: 0.7], .enter(EnterSpec(weights: [(.pop, 4), (.fallIn, 2)], duration: 0.18...0.4))),
+        make(.enter, "punch", [.aggression: 0.75, .speed: 0.9, .raw: 0.4], [.melodichc, .skatepunk],
+             .enter(EnterSpec(weights: [(.stamp, 3), (.slide, 2)], duration: 0.08...0.2))),
+        make(.enter, "skank", [.bounce: 0.9, .speed: 0.75, .bright: 0.6], [.ska],
+             .enter(EnterSpec(weights: [(.pop, 2), (.slide, 2), (.fallIn, 1)], duration: 0.14...0.3))),
+        make(.enter, "tumble", [.bounce: 0.6, .aggression: 0.6, .speed: 0.8, .raw: 0.5], [.ska, .punk, .punk77, .skatepunk],
+             .enter(EnterSpec(weights: [(.tumble, 3), (.stamp, 2), (.fling, 1)], duration: 0.12...0.3))),
     ]
 
     // composer.js:73-75,77
@@ -161,20 +202,29 @@ enum LyricsFXCatalog {
              .exit(ExitSpec(weights: [(.fall, 3), (.shrink, 1)], duration: 0.5))),
         make(.exit, "floatAway", [.elegance: 0.7, .speed: 0.1, .cold: 0.4], [.psych, .arena],
              forbid: [.aggression: 0.5], .exit(ExitSpec(weights: [(.up, 2), (.scatter, 1)], duration: 1))),
-        make(.exit, "slideOut", [.speed: 0.7, .aggression: 0.4], [.hardrock, .britpop, .rock, .punk, .techno, .electro, .house],
+        make(.exit, "slideOut", [.speed: 0.7, .aggression: 0.4], [.hardrock, .britpop, .rock, .punk, .techno, .electro, .house, .melodichc, .skatepunk],
              .exit(ExitSpec(weights: [(.slideOut, 1)], duration: 0.4))),
-        make(.exit, "up", [.elegance: 0.4, .bounce: 0.2, .speed: 0.4], [.britpop, .arena, .classicrock, .pop, .indie, .rock, .house, .idm, .poppunk],
+        make(.exit, "up", [.elegance: 0.4, .bounce: 0.2, .speed: 0.4], [.britpop, .arena, .classicrock, .pop, .indie, .rock, .house, .idm, .poppunk, .ska, .poprock, .powerpop],
              .exit(ExitSpec(weights: [(.up, 1)], duration: 0.5))),
+        // B2 批 2（龐克系；原型 composer.js 的 B2 批 2 段）。標籤只收本批專屬的，其餘等它們的團進批次再補
+        make(.exit, "drift", [.elegance: 0.5, .speed: 0.35, .warm: 0.5], [.poprock, .powerpop],
+             forbid: [.aggression: 0.6], .exit(ExitSpec(weights: [(.up, 2), (.fade, 1)], duration: 0.7))),
+        make(.exit, "rip", [.aggression: 0.65, .speed: 0.9, .raw: 0.5], [.melodichc, .skatepunk, .punk],
+             .exit(ExitSpec(weights: [(.slideOut, 3), (.fall, 1)], duration: 0.25))),
+        make(.exit, "snapOut", [.bounce: 0.65, .speed: 0.7, .bright: 0.6], [.poppunk, .ska, .powerpop, .poprock],
+             .exit(ExitSpec(weights: [(.shrink, 3), (.up, 1)], duration: 0.3))),
+        make(.exit, "tumbleOut", [.bounce: 0.7, .speed: 0.7, .aggression: 0.4], [.ska, .punk, .poppunk, .skatepunk, .punk77],
+             .exit(ExitSpec(weights: [(.tumbleOut, 3), (.fall, 1)], duration: 0.5))),
     ]
 
     // composer.js:87,88,92,101
     static let effects: [FXComponent] = [
-        make(.fx, "shake", [.aggression: 0.9, .speed: 0.7], [.black, .death, .hardcore, .thrash, .nu], .fx(.shake)),
+        make(.fx, "shake", [.aggression: 0.9, .speed: 0.7], [.black, .death, .hardcore, .thrash, .nu, .melodichc], .fx(.shake)),
         make(.fx, "misreg", [.raw: 0.9, .decay: 0.5], [.black, .hardcore], .fx(.misreg)),
         make(.fx, "breathe", [.elegance: 0.6, .theatrical: 0.5, .speed: 0.2], [.psych, .arena, .symphonic, .gothic, .doom, .power],
              forbid: [.aggression: 0.65], .fx(.breathe)),
         // B2 批 1（使用者 2026-10-07 簽字；由原型 composer.js 產生，不手抄）
-        make(.fx, "bob", [.bounce: 0.6, .warm: 0.6, .bright: 0.6], [.britpop, .classicrock, .pop],
+        make(.fx, "bob", [.bounce: 0.6, .warm: 0.6, .bright: 0.6], [.britpop, .classicrock, .pop, .poppunk, .ska, .powerpop, .poprock],
              forbid: [.aggression: 0.5, .theatrical: 0.8], .fx(.bob)),
         make(.fx, "flicker", [.warm: 0.6, .decay: 0.4, .raw: 0.5, .theatrical: 0.5], [.hardrock, .psych],
              .fx(.flicker)),
@@ -184,11 +234,22 @@ enum LyricsFXCatalog {
              .fx(.neonstroke)),
         make(.fx, "reflect", [.elegance: 0.6, .theatrical: 0.5], [.psych, .glam, .gothic, .doom, .symphonic],
              .fx(.reflect)),
-        make(.fx, "thump", [.aggression: 0.6, .speed: 0.6, .bounce: 0.6], [.hardrock, .arena, .bigbeat, .techno, .hardcore, .house],
+        make(.fx, "thump", [.aggression: 0.6, .speed: 0.6, .bounce: 0.6], [.hardrock, .arena, .bigbeat, .techno, .hardcore, .house, .poppunk, .melodichc],
              .fx(.thump)),
-        make(.fx, "wobble", [.raw: 0.5, .aggression: 0.5, .bounce: 0.4], [.hardrock, .britpop],
+        make(.fx, "wobble", [.raw: 0.5, .aggression: 0.5, .bounce: 0.4], [.hardrock, .britpop, .punk, .skatepunk, .ska],
              .fx(.wobble)),
         make(.fx, "none", [:], [], .fx(.none)),
+        // B2 批 2（龐克系；原型 composer.js 的 B2 批 2 段）。標籤只收本批專屬的，其餘等它們的團進批次再補
+        make(.fx, "jitter", [.raw: 0.7, .speed: 0.75, .aggression: 0.55], [.punk, .skatepunk, .melodichc, .punk77],
+             .fx(.jitter)),
+        make(.fx, "ransom", [.raw: 0.8, .decay: 0.5, .bounce: 0.5, .warm: 0.2], [.punk77],
+             forbid: [.elegance: 0.6], .fx(.ransom)),
+        make(.fx, "ransomPop", [.bounce: 0.6, .bright: 0.65, .raw: 0.35, .speed: 0.85, .aggression: 0.45], [.poppunk],
+             forbid: [.theatrical: 0.4], .fx(.ransom)),
+        make(.fx, "speedlines", [.speed: 0.9, .aggression: 0.5, .bounce: 0.4], [.melodichc, .skatepunk, .poppunk],
+             .fx(.speedlines)),
+        make(.fx, "tilt", [.bounce: 0.6, .bright: 0.55, .raw: 0.35], [.ska, .poppunk, .skatepunk, .powerpop],
+             .fx(.tilt)),
     ]
 
     // composer.js:104-107,110,113
@@ -237,5 +298,30 @@ enum LyricsFXCatalog {
              .palette(FXPalette(bg: RGB(hex: 0x0B0A1E), fg: RGB(hex: 0xFFF4E0), acc: RGB(hex: 0xFF4D6D), dim: RGB(hex: 0x3B3A6B)))),
         make(.palette, "whiskey", [.warm: 0.8, .raw: 0.6, .decay: 0.45, .theatrical: 0.5], [.hardrock, .classicrock],
              .palette(FXPalette(bg: RGB(hex: 0x120C07), fg: RGB(hex: 0xE9C27A), acc: RGB(hex: 0xF4EBDD), dim: RGB(hex: 0x6A5236)))),
+        // B2 批 2（龐克系；原型 composer.js 的 B2 批 2 段）。標籤只收本批專屬的，其餘等它們的團進批次再補
+        make(.palette, "chalk", [.bright: 0.75, .raw: 0.3, .bounce: 0.45, .cold: 0.25], [.powerpop],
+             .palette(FXPalette(bg: RGB(hex: 0xEEF3F2), fg: RGB(hex: 0x1E2B33), acc: RGB(hex: 0x0B7A50), dim: RGB(hex: 0x9AA9AE)))),
+        make(.palette, "daydream", [.warm: 0.7, .bright: 0.75, .bounce: 0.4, .elegance: 0.4], [.poprock],
+             .palette(FXPalette(bg: RGB(hex: 0xF6EFE6), fg: RGB(hex: 0x2B2A3A), acc: RGB(hex: 0xC2334D), dim: RGB(hex: 0xA9A2A8)))),
+        make(.palette, "gigRed", [.aggression: 0.7, .raw: 0.5, .speed: 0.75, .bright: 0.4], [.melodichc, .punk, .skatepunk],
+             .palette(FXPalette(bg: RGB(hex: 0x0C0A0A), fg: RGB(hex: 0xF2EDE4), acc: RGB(hex: 0xE0241B), dim: RGB(hex: 0x5A4B48)))),
+        make(.palette, "mallPink", [.bright: 0.6, .bounce: 0.6, .aggression: 0.45, .speed: 0.7], [.poppunk, .poprock],
+             .palette(FXPalette(bg: RGB(hex: 0x111014), fg: RGB(hex: 0xFFFFFF), acc: RGB(hex: 0xFF3E8A), dim: RGB(hex: 0x54505C)))),
+        make(.palette, "mono", [.aggression: 0.5, .speed: 0.7, .raw: 0.3, .bright: 0.5], [.melodichc, .skatepunk, .ska, .punk],
+             .palette(FXPalette(bg: RGB(hex: 0x000000), fg: RGB(hex: 0xFFFFFF), acc: RGB(hex: 0xB6FF00), dim: RGB(hex: 0x222222)))),
+        make(.palette, "polaroid", [.warm: 0.7, .elegance: 0.5, .theatrical: 0.55, .bright: 0.55], [.poprock],
+             .palette(FXPalette(bg: RGB(hex: 0x17131C), fg: RGB(hex: 0xF6E9D8), acc: RGB(hex: 0xF2A07B), dim: RGB(hex: 0x6B5F73)))),
+        make(.palette, "skateTeal", [.speed: 0.85, .bright: 0.6, .bounce: 0.5, .aggression: 0.45], [.skatepunk],
+             .palette(FXPalette(bg: RGB(hex: 0x071A1C), fg: RGB(hex: 0xEAF7F2), acc: RGB(hex: 0xFF7A1A), dim: RGB(hex: 0x3F5F60)))),
+        make(.palette, "sunsetInk", [.warm: 0.9, .bright: 0.7, .bounce: 0.5], [.poprock, .powerpop, .poppunk, .skatepunk, .rock],
+             .palette(FXPalette(bg: RGB(hex: 0xFFD9A8), fg: RGB(hex: 0x1D2A44), acc: RGB(hex: 0xFF5A36), dim: RGB(hex: 0x9AA0AA)))),
+        make(.palette, "twoTone", [.bounce: 0.85, .bright: 0.6, .speed: 0.75], [.ska],
+             .palette(FXPalette(bg: RGB(hex: 0x0B0B0B), fg: RGB(hex: 0xFFFFFF), acc: RGB(hex: 0xFFD400), dim: RGB(hex: 0x5A5A5A)))),
+        make(.palette, "twoToneLight", [.bounce: 0.9, .bright: 0.8, .warm: 0.5], [.ska],
+             .palette(FXPalette(bg: RGB(hex: 0xF4F1EA), fg: RGB(hex: 0x111111), acc: RGB(hex: 0xD81E1E), dim: RGB(hex: 0x9A968C)))),
+        make(.palette, "weezBlue", [.bright: 0.7, .bounce: 0.5, .raw: 0.3, .cold: 0.25], [.powerpop],
+             .palette(FXPalette(bg: RGB(hex: 0x0A5A8F), fg: RGB(hex: 0xFFFFFF), acc: RGB(hex: 0xFFE14D), dim: RGB(hex: 0x083F66)))),
+        make(.palette, "yellowBlack", [.bright: 0.9, .bounce: 0.8, .aggression: 0.4, .warm: 0.5], [.ska, .poppunk, .skatepunk],
+             .palette(FXPalette(bg: RGB(hex: 0xF5D90A), fg: RGB(hex: 0x111111), acc: RGB(hex: 0xFF2E2E), dim: RGB(hex: 0x6B5A00)))),
     ]
 }

@@ -10,7 +10,7 @@ enum ComposedBackdrop {
     /// 字之下
     static func back(_ backdrop: BackdropKind, palette: FXPalette, size: CGSize, time: Double) -> [LayerDraw] {
         switch backdrop {
-        case .void, .film:
+        case .void, .film, .flat:
             return []
         case .snow:
             return drift(seed: 11, count: 160, color: RGB(hex: 0xC9D1D9), size: 1.3, velocity: (-10, 22), alpha: 0.35, canvas: size, time: time)
@@ -61,6 +61,54 @@ enum ComposedBackdrop {
             return [.hairlines(spacing: 6, color: RGB(hex: 0x000000), opacity: 0.05)]
         case .sunset:
             return [band(CGPoint(x: 0.5, y: 0), CGPoint(x: 0.5, y: 1), 0xFFD9A8, from: 0.9, to: 0.9, endColor: 0xFF9A7A)]
+        // B2 批 2（原型組合模式 draw 的 B2 批 2 段；同樣只用光與質感）
+        case .xerox:
+            return [xeroxStreaks(size: size, color: palette.fg)]
+        case .gig:
+            return [glow(0.5, 1.15, radius: 1.0 * aspect(size), 0xE11E19, 0.34), glow(0.5, -0.2, radius: 0.9 * aspect(size), 0xFFFFFF, 0.07)]
+        case .checker:
+            return [.rects(checkerSquares(size: size), palette.dim, opacity: 0.5)]
+        case .bokeh:
+            return bokeh(size: size, color: palette.acc, time: time)
+        case .skyGrad:
+            return [band(CGPoint(x: 0.5, y: 0), CGPoint(x: 0.5, y: 1), 0xFFFFFF, from: 0.14, to: 0.14, endColor: 0x000000)]
+        }
+    }
+
+    /// 影印的碳粉橫紋：16 道滿寬細條、位置固定（原型每道透明度 0.03–0.07，這裡取中間值一次填）
+    static func xeroxStreaks(size: CGSize, color: RGB) -> LayerDraw {
+        var random = SplitMix64(seed: 7)
+        let streaks = (0..<16).map { _ in
+            let y = CGFloat(random.unit()) * size.height
+            return CGRect(x: 0, y: y, width: size.width, height: 1 + CGFloat(random.unit()) * 3)
+        }
+        return .rects(streaks, color, opacity: 0.05)
+    }
+
+    /// 底緣兩列黑白格：格邊＝畫布高的 5%，兩列錯開
+    static func checkerSquares(size: CGSize) -> [CGRect] {
+        let side = size.height * 0.05
+        guard side > 0 else { return [] }
+        let columns = Int((size.width / side).rounded(.up))
+        return (0..<2).flatMap { row in
+            (0..<columns).filter { column in (column + row).isMultiple(of: 2) }.map { column in
+                CGRect(x: CGFloat(column) * side, y: size.height - CGFloat(row + 1) * side, width: side, height: side)
+            }
+        }
+    }
+
+    /// 失焦光斑：14 個配色強調色的柔光圓，緩慢右移
+    static func bokeh(size: CGSize, color: RGB, time: Double) -> [LayerDraw] {
+        var random = SplitMix64(seed: 41)
+        return (0..<14).map { _ in
+            let start = random.unit(), speed = 3 + random.unit() * 5
+            let y = CGFloat(random.unit()), radius = CGFloat(0.05 + random.unit() * 0.08) * aspect(size)
+            let opacity = 0.07 + random.unit() * 0.07
+            let travelled = size.width > 0 ? time * speed / Double(size.width) : 0
+            let x = CGFloat((start + travelled).truncatingRemainder(dividingBy: 1.1) - 0.05)
+            return .radialGlow(center: CGPoint(x: x, y: y), radius: radius, stops: [
+                GlowStop(location: 0, color: color, opacity: opacity), GlowStop(location: 1, color: RGB(hex: 0x000000), opacity: 0),
+            ])
         }
     }
 
@@ -129,13 +177,15 @@ enum ComposedBackdrop {
             return [.vignette(strength: 0.95), .grain(opacity: 0.42, frame: Int(time * 18), overlay: true)] + filmArtefacts(size: size, time: time)
         case .crimsonFog:
             return [.vignette(strength: 0.95), .grain(opacity: 0.05, frame: grainFrame, overlay: false)]
-        case .void, .snow, .ash, .ampGlow, .spot, .smokeHaze, .prism, .stars:
+        case .void, .snow, .ash, .ampGlow, .spot, .smokeHaze, .prism, .stars, .gig, .bokeh:
             return [.vignette(strength: 0.7), .grain(opacity: 0.05, frame: grainFrame, overlay: false)]
         case .paper:
             return [.grain(opacity: 0.1, frame: grainFrame, overlay: false)]
         case .embers, .haze, .tapeLeak:
             return [.grain(opacity: 0.05, frame: grainFrame, overlay: false)]
-        case .halftone, .sunset:
+        case .xerox:
+            return [.grain(opacity: 0.16, frame: grainFrame, overlay: false)]
+        case .halftone, .sunset, .flat, .checker, .skyGrad:
             return []
         }
     }

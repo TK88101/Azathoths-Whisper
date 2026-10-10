@@ -119,6 +119,15 @@ final class LyricsFXUITests: AppUITestCase {
         waitForRecipe({ ["AlfaSlab", "Bebas", "Oswald", "Anton"].contains($0) }, "AC/DC 應抽到硬搖滾群字型")
     }
 
+    /// B2 批 2：龐克系新進表的團同樣不看曲風——Weezer 曲風寫 Pop，仍得到 power pop 群的字型
+    func testASignedPowerPopBandGetsItsComposedStyleRegardlessOfGenre() {
+        start(.lyricsFX, extra: [
+            Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.artistVariable: "Weezer", LyricsFXPreviewFixture.genreVariable: "Pop",
+        ])
+        waitForStyle("lyricsFX")
+        waitForRecipe({ ["Rubik", "Archivo", "Elite", "Grotesk"].contains($0) }, "Weezer 應抽到 power pop 群字型")
+    }
+
     /// I-18：認不得的曲風 → mono
     func testAnUnknownGenreStaysMono() {
         start(.lyricsFX, extra: [Scenario.raisedStyleVariable: "lyricsFX"])

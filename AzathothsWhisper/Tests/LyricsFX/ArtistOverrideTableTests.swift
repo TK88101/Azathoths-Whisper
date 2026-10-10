@@ -77,7 +77,7 @@ struct ArtistOverrideTableTests {
     }
 
     @Test func bandsAddedFromB2OnHaveAtLeastTwoCandidatesInEverySlot() {
-        for band in SongProfileResolver.batchTwo {
+        for band in SongProfileResolver.batchTwo + SongProfileResolver.batchThree {
             #expect(thinSlots(band.profile).isEmpty, "\(band.name) 有候選不足的槽")
         }
     }

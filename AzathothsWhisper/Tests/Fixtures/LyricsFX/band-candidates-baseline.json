@@ -1,0 +1,3037 @@
+{
+ "bands": [
+  {
+   "eligible": {
+    "backdrop": [
+     "ash",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "negative",
+     "slam"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "Cenobyte",
+     "DarkMetal",
+     "Fraktur",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx": [
+     "misreg",
+     "none",
+     "shake"
+    ],
+    "palette": [
+     "ashGrey",
+     "bloodBlack",
+     "boneBlood",
+     "ice"
+    ]
+   },
+   "name": "Mayhem",
+   "playable": {
+    "backdrop": [
+     "ash",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "negative",
+     "slam"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "Cenobyte",
+     "DarkMetal",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx1": [
+     "misreg",
+     "none",
+     "shake"
+    ],
+    "fx2": [
+     "misreg",
+     "none",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "ash": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "ice"
+     ],
+     "film": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "ice"
+     ],
+     "snow": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "ice"
+     ],
+     "void": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "ice"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ash",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "negative",
+     "slam"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "Cenobyte",
+     "DarkMetal",
+     "Fraktur",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx": [
+     "misreg",
+     "none",
+     "shake"
+    ],
+    "palette": [
+     "ashGrey",
+     "bloodBlack",
+     "boneBlood",
+     "ice"
+    ]
+   },
+   "name": "Immortal",
+   "playable": {
+    "backdrop": [
+     "ash",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "negative",
+     "slam"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "Cenobyte",
+     "DarkMetal",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx1": [
+     "misreg",
+     "none",
+     "shake"
+    ],
+    "fx2": [
+     "misreg",
+     "none",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "ash": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "ice"
+     ],
+     "film": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "ice"
+     ],
+     "snow": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "ice"
+     ],
+     "void": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "ice"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ash",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "negative",
+     "slam"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "Cenobyte",
+     "DarkMetal",
+     "Fraktur",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx": [
+     "misreg",
+     "none",
+     "shake"
+    ],
+    "palette": [
+     "ashGrey",
+     "bloodBlack",
+     "boneBlood",
+     "ice"
+    ]
+   },
+   "name": "Darkthrone",
+   "playable": {
+    "backdrop": [
+     "ash",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "negative",
+     "slam"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "Cenobyte",
+     "DarkMetal",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx1": [
+     "misreg",
+     "none",
+     "shake"
+    ],
+    "fx2": [
+     "misreg",
+     "none",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "ash": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "ice"
+     ],
+     "film": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "ice"
+     ],
+     "snow": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "ice"
+     ],
+     "void": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "ice"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ash",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "negative",
+     "slam",
+     "smoke"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "fade",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "Cenobyte",
+     "CormorantIt",
+     "DarkMetal",
+     "Fraktur",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx": [
+     "breathe",
+     "misreg",
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "palette": [
+     "ashGrey",
+     "bloodBlack",
+     "boneBlood",
+     "crimsonVelvet",
+     "ice"
+    ]
+   },
+   "name": "Burzum",
+   "playable": {
+    "backdrop": [
+     "ash",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "negative",
+     "slam",
+     "smoke"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "fade",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "Cenobyte",
+     "DarkMetal",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx1": [
+     "breathe",
+     "misreg",
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "fx2": [
+     "breathe",
+     "misreg",
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "ash": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "film": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "snow": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "void": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "lash",
+     "negative",
+     "slam",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "fade",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "Cenobyte",
+     "DarkMetal",
+     "Fraktur",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx": [
+     "misreg",
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "palette": [
+     "ashGrey",
+     "bloodBlack",
+     "boneBlood",
+     "crimsonVelvet",
+     "ice"
+    ]
+   },
+   "name": "Emperor",
+   "playable": {
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "lash",
+     "negative",
+     "slam",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "fade",
+     "scatter"
+    ],
+    "font": [
+     "Cenobyte",
+     "DarkMetal",
+     "Fraktur",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx1": [
+     "misreg",
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "fx2": [
+     "misreg",
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "ash": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "crimsonFog": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "film": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "snow": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "void": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "lash",
+     "negative",
+     "slam",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "fade",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "Cenobyte",
+     "DarkMetal",
+     "Fraktur",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx": [
+     "misreg",
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "palette": [
+     "ashGrey",
+     "bloodBlack",
+     "boneBlood",
+     "crimsonVelvet",
+     "ice"
+    ]
+   },
+   "name": "Cradle of Filth",
+   "playable": {
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "lash",
+     "negative",
+     "slam",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "fade",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "DarkMetal",
+     "Fraktur",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx1": [
+     "misreg",
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "fx2": [
+     "misreg",
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "ash": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "crimsonFog": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "film": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "snow": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "void": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "lash",
+     "negative",
+     "slam",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "fade",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "Cenobyte",
+     "DarkMetal",
+     "Fraktur",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx": [
+     "misreg",
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "palette": [
+     "ashGrey",
+     "bloodBlack",
+     "boneBlood",
+     "crimsonVelvet",
+     "ice"
+    ]
+   },
+   "name": "Dimmu Borgir",
+   "playable": {
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "film",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "lash",
+     "negative",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "cut",
+     "dissolve",
+     "fade",
+     "scatter"
+    ],
+    "font": [
+     "Catacombs",
+     "Cenobyte",
+     "Fraktur",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx1": [
+     "misreg",
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "fx2": [
+     "misreg",
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "ash": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "crimsonFog": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "film": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "snow": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "void": [
+      "ashGrey",
+      "bloodBlack",
+      "boneBlood",
+      "crimsonVelvet",
+      "ice"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "embers",
+     "film",
+     "void"
+    ],
+    "enter": [
+     "slam",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "fall"
+    ],
+    "font": [
+     "Anton",
+     "Catacombs",
+     "Grimoire"
+    ],
+    "fx": [
+     "none",
+     "shake"
+    ],
+    "palette": [
+     "ashGrey",
+     "boneBlood"
+    ]
+   },
+   "name": "Arch Enemy",
+   "playable": {
+    "backdrop": [
+     "embers",
+     "film",
+     "void"
+    ],
+    "enter": [
+     "slam",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "fall"
+    ],
+    "font": [
+     "Anton",
+     "Catacombs",
+     "Grimoire"
+    ],
+    "fx1": [
+     "none",
+     "shake"
+    ],
+    "fx2": [
+     "none",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "embers": [
+      "ashGrey",
+      "boneBlood"
+     ],
+     "film": [
+      "ashGrey",
+      "boneBlood"
+     ],
+     "void": [
+      "ashGrey",
+      "boneBlood"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "film",
+     "void"
+    ],
+    "enter": [
+     "slam"
+    ],
+    "exit": [
+     "cut",
+     "fall"
+    ],
+    "font": [
+     "Anton",
+     "Catacombs",
+     "Grimoire"
+    ],
+    "fx": [
+     "none",
+     "shake"
+    ],
+    "palette": [
+     "ashGrey",
+     "boneBlood"
+    ]
+   },
+   "name": "Cannibal Corpse",
+   "playable": {
+    "backdrop": [
+     "film",
+     "void"
+    ],
+    "enter": [
+     "slam"
+    ],
+    "exit": [
+     "cut",
+     "fall"
+    ],
+    "font": [
+     "Anton",
+     "Catacombs",
+     "Grimoire"
+    ],
+    "fx1": [
+     "none",
+     "shake"
+    ],
+    "fx2": [
+     "none",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "film": [
+      "ashGrey",
+      "boneBlood"
+     ],
+     "void": [
+      "ashGrey",
+      "boneBlood"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "film",
+     "void"
+    ],
+    "enter": [
+     "slam",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut"
+    ],
+    "font": [
+     "Anton",
+     "Oswald"
+    ],
+    "fx": [
+     "misreg",
+     "none",
+     "shake",
+     "thump"
+    ],
+    "palette": [
+     "ashGrey"
+    ]
+   },
+   "name": "Hatebreed",
+   "playable": {
+    "backdrop": [
+     "film",
+     "void"
+    ],
+    "enter": [
+     "slam",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut"
+    ],
+    "font": [
+     "Anton",
+     "Oswald"
+    ],
+    "fx1": [
+     "misreg",
+     "none",
+     "shake",
+     "thump"
+    ],
+    "fx2": [
+     "misreg",
+     "none",
+     "shake",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "film": [
+      "ashGrey"
+     ],
+     "void": [
+      "ashGrey"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "embers",
+     "shafts",
+     "void"
+    ],
+    "enter": [
+     "lash",
+     "rise",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "fade",
+     "fall"
+    ],
+    "font": [
+     "Cinzel",
+     "Fraktur",
+     "Mirage"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "palette": [
+     "crimsonVelvet",
+     "goldNavy"
+    ]
+   },
+   "name": "Nightwish",
+   "playable": {
+    "backdrop": [
+     "embers",
+     "shafts",
+     "void"
+    ],
+    "enter": [
+     "lash",
+     "rise",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "fade",
+     "fall"
+    ],
+    "font": [
+     "Cinzel",
+     "Fraktur",
+     "Mirage"
+    ],
+    "fx1": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "fx2": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "paletteByBackdrop": {
+     "embers": [
+      "crimsonVelvet",
+      "goldNavy"
+     ],
+     "shafts": [
+      "crimsonVelvet",
+      "goldNavy"
+     ],
+     "void": [
+      "crimsonVelvet",
+      "goldNavy"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "shafts",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "lash",
+     "rise",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "dissolve",
+     "fade"
+    ],
+    "font": [
+     "Cenobyte",
+     "Cinzel",
+     "CormorantIt",
+     "Fraktur",
+     "Mirage"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "palette": [
+     "bloodBlack",
+     "crimsonVelvet",
+     "ice"
+    ]
+   },
+   "name": "Type O Negative",
+   "playable": {
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "shafts",
+     "snow",
+     "void"
+    ],
+    "enter": [
+     "condense",
+     "lash",
+     "rise",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "dissolve",
+     "fade"
+    ],
+    "font": [
+     "Cenobyte",
+     "Cinzel",
+     "CormorantIt",
+     "Fraktur",
+     "Mirage"
+    ],
+    "fx1": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "fx2": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "paletteByBackdrop": {
+     "ash": [
+      "bloodBlack",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "crimsonFog": [
+      "bloodBlack",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "shafts": [
+      "bloodBlack",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "snow": [
+      "bloodBlack",
+      "crimsonVelvet",
+      "ice"
+     ],
+     "void": [
+      "bloodBlack",
+      "crimsonVelvet",
+      "ice"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "embers",
+     "shafts",
+     "void"
+    ],
+    "enter": [
+     "rise",
+     "slide",
+     "stamp",
+     "swoop"
+    ],
+    "exit": [
+     "fall"
+    ],
+    "font": [
+     "Cinzel",
+     "Grimoire"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "none"
+    ],
+    "palette": [
+     "goldNavy"
+    ]
+   },
+   "name": "Iron Maiden",
+   "playable": {
+    "backdrop": [
+     "embers",
+     "shafts",
+     "void"
+    ],
+    "enter": [
+     "rise",
+     "slide",
+     "stamp",
+     "swoop"
+    ],
+    "exit": [
+     "fall"
+    ],
+    "font": [
+     "Cinzel",
+     "Grimoire"
+    ],
+    "fx1": [
+     "breathe",
+     "glow",
+     "none"
+    ],
+    "fx2": [
+     "breathe",
+     "glow",
+     "none"
+    ],
+    "paletteByBackdrop": {
+     "embers": [
+      "goldNavy"
+     ],
+     "shafts": [
+      "goldNavy"
+     ],
+     "void": [
+      "goldNavy"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "embers",
+     "film",
+     "void"
+    ],
+    "enter": [
+     "slam",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "fall"
+    ],
+    "font": [
+     "Anton",
+     "Catacombs",
+     "Grimoire"
+    ],
+    "fx": [
+     "none",
+     "shake"
+    ],
+    "palette": [
+     "ashGrey",
+     "boneBlood"
+    ]
+   },
+   "name": "Slayer",
+   "playable": {
+    "backdrop": [
+     "embers",
+     "film",
+     "void"
+    ],
+    "enter": [
+     "slam",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "fall"
+    ],
+    "font": [
+     "Anton",
+     "Catacombs",
+     "Grimoire"
+    ],
+    "fx1": [
+     "none",
+     "shake"
+    ],
+    "fx2": [
+     "none",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "embers": [
+      "ashGrey",
+      "boneBlood"
+     ],
+     "film": [
+      "ashGrey",
+      "boneBlood"
+     ],
+     "void": [
+      "ashGrey",
+      "boneBlood"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "void"
+    ],
+    "enter": [],
+    "exit": [],
+    "font": [],
+    "fx": [
+     "none"
+    ],
+    "palette": []
+   },
+   "name": "Rammstein"
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "void"
+    ],
+    "enter": [
+     "slide",
+     "stamp"
+    ],
+    "exit": [],
+    "font": [
+     "Anton"
+    ],
+    "fx": [
+     "none",
+     "shake"
+    ],
+    "palette": []
+   },
+   "name": "Korn"
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "embers",
+     "shafts",
+     "void"
+    ],
+    "enter": [
+     "lash",
+     "rise",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "fade",
+     "fall"
+    ],
+    "font": [
+     "Cinzel",
+     "Fraktur",
+     "Mirage"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "palette": [
+     "boneBlood",
+     "crimsonVelvet",
+     "goldNavy"
+    ]
+   },
+   "name": "Epica",
+   "playable": {
+    "backdrop": [
+     "embers",
+     "shafts",
+     "void"
+    ],
+    "enter": [
+     "lash",
+     "rise",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "fade",
+     "fall"
+    ],
+    "font": [
+     "Cinzel",
+     "Fraktur",
+     "Mirage"
+    ],
+    "fx1": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "fx2": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "paletteByBackdrop": {
+     "embers": [
+      "boneBlood",
+      "crimsonVelvet",
+      "goldNavy"
+     ],
+     "shafts": [
+      "boneBlood",
+      "crimsonVelvet",
+      "goldNavy"
+     ],
+     "void": [
+      "boneBlood",
+      "crimsonVelvet",
+      "goldNavy"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "embers",
+     "film",
+     "void"
+    ],
+    "enter": [
+     "lash",
+     "slam",
+     "slide",
+     "smoke",
+     "stamp",
+     "swoop"
+    ],
+    "exit": [
+     "cut",
+     "fade",
+     "fall"
+    ],
+    "font": [
+     "Anton",
+     "Catacombs",
+     "Fraktur",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx": [
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "palette": [
+     "ashGrey",
+     "boneBlood",
+     "crimsonVelvet"
+    ]
+   },
+   "name": "Fleshgod Apocalypse",
+   "playable": {
+    "backdrop": [
+     "embers",
+     "film",
+     "void"
+    ],
+    "enter": [
+     "lash",
+     "slam",
+     "slide",
+     "stamp",
+     "swoop"
+    ],
+    "exit": [
+     "cut",
+     "fade",
+     "fall"
+    ],
+    "font": [
+     "Anton",
+     "Catacombs",
+     "Fraktur",
+     "Grimoire",
+     "Mirage"
+    ],
+    "fx1": [
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "fx2": [
+     "none",
+     "reflect",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "embers": [
+      "ashGrey",
+      "boneBlood",
+      "crimsonVelvet"
+     ],
+     "film": [
+      "ashGrey",
+      "boneBlood",
+      "crimsonVelvet"
+     ],
+     "void": [
+      "ashGrey",
+      "boneBlood",
+      "crimsonVelvet"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "void"
+    ],
+    "enter": [
+     "slide"
+    ],
+    "exit": [
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Oswald"
+    ],
+    "fx": [
+     "neonstroke",
+     "none",
+     "thump"
+    ],
+    "palette": []
+   },
+   "name": "The Chemical Brothers"
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "haze",
+     "void"
+    ],
+    "enter": [
+     "slide"
+    ],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Grotesk",
+     "Oswald"
+    ],
+    "fx": [
+     "neonstroke",
+     "none",
+     "thump"
+    ],
+    "palette": []
+   },
+   "name": "Fatboy Slim"
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "haze",
+     "void"
+    ],
+    "enter": [],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Grotesk"
+    ],
+    "fx": [
+     "neonstroke",
+     "none",
+     "thump"
+    ],
+    "palette": []
+   },
+   "name": "Daft Punk"
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "haze",
+     "void"
+    ],
+    "enter": [
+     "fadeUp"
+    ],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Grotesk"
+    ],
+    "fx": [
+     "none",
+     "thump"
+    ],
+    "palette": []
+   },
+   "name": "Aphex Twin"
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "paper",
+     "sunset",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide"
+    ],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Oswald"
+    ],
+    "fx": [
+     "none"
+    ],
+    "palette": [
+     "newsprint"
+    ]
+   },
+   "name": "The Offspring",
+   "playable": {
+    "backdrop": [
+     "paper",
+     "sunset",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide"
+    ],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Oswald"
+    ],
+    "fx1": [
+     "none"
+    ],
+    "fx2": [
+     "none"
+    ],
+    "paletteByBackdrop": {
+     "paper": [
+      "newsprint"
+     ],
+     "sunset": [
+      "newsprint"
+     ],
+     "void": [
+      "newsprint"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "paper",
+     "sunset",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide"
+    ],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Oswald"
+    ],
+    "fx": [
+     "none"
+    ],
+    "palette": [
+     "newsprint"
+    ]
+   },
+   "name": "Blink-182",
+   "playable": {
+    "backdrop": [
+     "paper",
+     "sunset",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide"
+    ],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Oswald"
+    ],
+    "fx1": [
+     "none"
+    ],
+    "fx2": [
+     "none"
+    ],
+    "paletteByBackdrop": {
+     "paper": [
+      "newsprint"
+     ],
+     "sunset": [
+      "newsprint"
+     ],
+     "void": [
+      "newsprint"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "paper",
+     "sunset",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide"
+    ],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Oswald"
+    ],
+    "fx": [
+     "none"
+    ],
+    "palette": [
+     "newsprint"
+    ]
+   },
+   "name": "Green Day",
+   "playable": {
+    "backdrop": [
+     "paper",
+     "sunset",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide"
+    ],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Oswald"
+    ],
+    "fx1": [
+     "none"
+    ],
+    "fx2": [
+     "none"
+    ],
+    "paletteByBackdrop": {
+     "paper": [
+      "newsprint"
+     ],
+     "sunset": [
+      "newsprint"
+     ],
+     "void": [
+      "newsprint"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "sunset",
+     "void"
+    ],
+    "enter": [
+     "slide"
+    ],
+    "exit": [
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Oswald"
+    ],
+    "fx": [
+     "none"
+    ],
+    "palette": []
+   },
+   "name": "Sum 41"
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "paper",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide"
+    ],
+    "exit": [
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Oswald"
+    ],
+    "fx": [
+     "none"
+    ],
+    "palette": [
+     "newsprint"
+    ]
+   },
+   "name": "Ramones",
+   "playable": {
+    "backdrop": [
+     "paper",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide"
+    ],
+    "exit": [
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Oswald"
+    ],
+    "fx1": [
+     "none"
+    ],
+    "fx2": [
+     "none"
+    ],
+    "paletteByBackdrop": {
+     "paper": [
+      "newsprint"
+     ],
+     "void": [
+      "newsprint"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "paper",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide"
+    ],
+    "exit": [
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Oswald"
+    ],
+    "fx": [
+     "none"
+    ],
+    "palette": [
+     "newsprint"
+    ]
+   },
+   "name": "Sex Pistols",
+   "playable": {
+    "backdrop": [
+     "paper",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "slide"
+    ],
+    "exit": [
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Oswald"
+    ],
+    "fx1": [
+     "none"
+    ],
+    "fx2": [
+     "none"
+    ],
+    "paletteByBackdrop": {
+     "paper": [
+      "newsprint"
+     ],
+     "void": [
+      "newsprint"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ampGlow",
+     "embers",
+     "smokeHaze",
+     "spot",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "slide",
+     "stamp",
+     "swagger"
+    ],
+    "exit": [
+     "dropOut",
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "AlfaSlab",
+     "Anton",
+     "Bebas",
+     "Oswald"
+    ],
+    "fx": [
+     "flicker",
+     "none",
+     "thump",
+     "wobble"
+    ],
+    "palette": [
+     "ampRed",
+     "hazard",
+     "whiskey"
+    ]
+   },
+   "name": "AC/DC",
+   "playable": {
+    "backdrop": [
+     "ampGlow",
+     "embers",
+     "smokeHaze",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "slide",
+     "stamp",
+     "swagger"
+    ],
+    "exit": [
+     "dropOut",
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "AlfaSlab",
+     "Anton",
+     "Bebas",
+     "Oswald"
+    ],
+    "fx1": [
+     "flicker",
+     "none",
+     "thump",
+     "wobble"
+    ],
+    "fx2": [
+     "flicker",
+     "none",
+     "thump",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "ampGlow": [
+      "ampRed",
+      "hazard",
+      "whiskey"
+     ],
+     "embers": [
+      "ampRed",
+      "hazard",
+      "whiskey"
+     ],
+     "smokeHaze": [
+      "ampRed",
+      "hazard",
+      "whiskey"
+     ],
+     "tapeLeak": [
+      "ampRed",
+      "hazard",
+      "whiskey"
+     ],
+     "void": [
+      "ampRed",
+      "hazard",
+      "whiskey"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ampGlow",
+     "embers",
+     "smokeHaze",
+     "spot",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "slide",
+     "stamp",
+     "strut",
+     "swagger",
+     "swoop"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "AlfaSlab",
+     "Anton",
+     "Bebas",
+     "Oswald",
+     "Righteous"
+    ],
+    "fx": [
+     "flicker",
+     "none",
+     "reflect",
+     "thump",
+     "wobble"
+    ],
+    "palette": [
+     "ampRed",
+     "hazard",
+     "royal",
+     "tuxedo",
+     "whiskey"
+    ]
+   },
+   "name": "Guns N' Roses",
+   "playable": {
+    "backdrop": [
+     "ampGlow",
+     "embers",
+     "smokeHaze",
+     "spot",
+     "tapeLeak"
+    ],
+    "enter": [
+     "kick",
+     "slide",
+     "strut",
+     "swagger",
+     "swoop"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "AlfaSlab",
+     "Anton",
+     "Bebas",
+     "Oswald",
+     "Righteous"
+    ],
+    "fx1": [
+     "flicker",
+     "none",
+     "reflect",
+     "thump",
+     "wobble"
+    ],
+    "fx2": [
+     "flicker",
+     "none",
+     "reflect",
+     "thump",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "ampGlow": [
+      "ampRed",
+      "hazard",
+      "royal",
+      "tuxedo",
+      "whiskey"
+     ],
+     "embers": [
+      "ampRed",
+      "hazard",
+      "royal",
+      "tuxedo",
+      "whiskey"
+     ],
+     "smokeHaze": [
+      "ampRed",
+      "hazard",
+      "royal",
+      "tuxedo",
+      "whiskey"
+     ],
+     "spot": [
+      "ampRed",
+      "hazard",
+      "royal",
+      "tuxedo",
+      "whiskey"
+     ],
+     "tapeLeak": [
+      "ampRed",
+      "hazard",
+      "royal",
+      "tuxedo",
+      "whiskey"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ampGlow",
+     "spot",
+     "stars",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "strut",
+     "swoop"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "fall",
+     "floatAway",
+     "up"
+    ],
+    "font": [
+     "Abril",
+     "AlfaSlab",
+     "Bebas",
+     "Oswald",
+     "PlayfairIt",
+     "Righteous",
+     "Syncopate"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "reflect",
+     "thump"
+    ],
+    "palette": [
+     "cream60",
+     "dusk",
+     "hazard",
+     "royal",
+     "starlight",
+     "tuxedo",
+     "vegas",
+     "whiskey"
+    ]
+   },
+   "name": "Queen",
+   "playable": {
+    "backdrop": [
+     "ampGlow",
+     "spot",
+     "stars",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "strut",
+     "swoop"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "fall",
+     "floatAway",
+     "up"
+    ],
+    "font": [
+     "Abril",
+     "AlfaSlab",
+     "Oswald",
+     "PlayfairIt",
+     "Righteous"
+    ],
+    "fx1": [
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "thump"
+    ],
+    "fx2": [
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "reflect",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "ampGlow": [
+      "hazard",
+      "royal",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ],
+     "spot": [
+      "hazard",
+      "royal",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ],
+     "stars": [
+      "hazard",
+      "royal",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ],
+     "tapeLeak": [
+      "hazard",
+      "royal",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ],
+     "void": [
+      "hazard",
+      "royal",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ampGlow",
+     "halftone",
+     "spot",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "hop",
+     "swagger"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Abril",
+     "AlfaSlab",
+     "Archivo",
+     "Bebas",
+     "Bungee",
+     "Oswald",
+     "PlayfairIt"
+    ],
+    "fx": [
+     "bob",
+     "none",
+     "wobble"
+    ],
+    "palette": [
+     "britRed",
+     "cream60",
+     "mancSky",
+     "parka",
+     "popArt",
+     "tuxedo",
+     "whiskey"
+    ]
+   },
+   "name": "The Beatles",
+   "playable": {
+    "backdrop": [
+     "ampGlow",
+     "halftone",
+     "spot",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "hop",
+     "swagger"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Bungee",
+     "Oswald",
+     "PlayfairIt"
+    ],
+    "fx1": [
+     "bob",
+     "none",
+     "wobble"
+    ],
+    "fx2": [
+     "bob",
+     "none",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "ampGlow": [
+      "parka",
+      "tuxedo",
+      "whiskey"
+     ],
+     "halftone": [
+      "britRed",
+      "cream60",
+      "mancSky",
+      "popArt"
+     ],
+     "spot": [
+      "parka",
+      "tuxedo",
+      "whiskey"
+     ],
+     "tapeLeak": [
+      "britRed",
+      "cream60",
+      "parka",
+      "popArt",
+      "whiskey"
+     ],
+     "void": [
+      "britRed",
+      "cream60",
+      "parka",
+      "popArt",
+      "whiskey"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ampGlow",
+     "haze",
+     "prism",
+     "spot",
+     "stars",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "hop"
+    ],
+    "exit": [
+     "fadeShort",
+     "floatAway",
+     "up"
+    ],
+    "font": [
+     "Abril",
+     "AlfaSlab",
+     "PlayfairIt",
+     "Syncopate"
+    ],
+    "fx": [
+     "bob",
+     "breathe",
+     "flicker",
+     "none",
+     "reflect"
+    ],
+    "palette": [
+     "cream60",
+     "dusk",
+     "prismBlack",
+     "tuxedo",
+     "whiskey"
+    ]
+   },
+   "name": "Pink Floyd",
+   "playable": {
+    "backdrop": [
+     "haze",
+     "prism",
+     "spot",
+     "stars",
+     "tapeLeak"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "hop"
+    ],
+    "exit": [
+     "fadeShort",
+     "floatAway",
+     "up"
+    ],
+    "font": [
+     "Abril",
+     "AlfaSlab",
+     "PlayfairIt",
+     "Syncopate"
+    ],
+    "fx1": [
+     "bob",
+     "breathe",
+     "flicker",
+     "none",
+     "reflect"
+    ],
+    "fx2": [
+     "bob",
+     "breathe",
+     "flicker",
+     "none",
+     "reflect"
+    ],
+    "paletteByBackdrop": {
+     "haze": [
+      "cream60",
+      "dusk",
+      "prismBlack",
+      "tuxedo",
+      "whiskey"
+     ],
+     "prism": [
+      "dusk",
+      "prismBlack",
+      "tuxedo",
+      "whiskey"
+     ],
+     "spot": [
+      "dusk",
+      "prismBlack",
+      "tuxedo",
+      "whiskey"
+     ],
+     "stars": [
+      "dusk",
+      "prismBlack",
+      "tuxedo",
+      "whiskey"
+     ],
+     "tapeLeak": [
+      "cream60",
+      "dusk",
+      "prismBlack",
+      "tuxedo",
+      "whiskey"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "halftone",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "hop",
+     "swagger"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Bungee",
+     "Oswald"
+    ],
+    "fx": [
+     "bob",
+     "none",
+     "wobble"
+    ],
+    "palette": [
+     "britRed",
+     "cream60",
+     "mancSky",
+     "parka",
+     "popArt"
+    ]
+   },
+   "name": "Oasis",
+   "playable": {
+    "backdrop": [
+     "halftone",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "hop",
+     "swagger"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Bungee",
+     "Oswald"
+    ],
+    "fx1": [
+     "bob",
+     "none",
+     "wobble"
+    ],
+    "fx2": [
+     "bob",
+     "none",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "halftone": [
+      "britRed",
+      "cream60",
+      "mancSky",
+      "popArt"
+     ],
+     "tapeLeak": [
+      "britRed",
+      "cream60",
+      "mancSky",
+      "parka",
+      "popArt"
+     ],
+     "void": [
+      "britRed",
+      "cream60",
+      "mancSky",
+      "parka",
+      "popArt"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "halftone",
+     "haze",
+     "paper",
+     "sunset",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "hop",
+     "swagger"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Bungee",
+     "Elite",
+     "Grotesk",
+     "Oswald"
+    ],
+    "fx": [
+     "bob",
+     "none",
+     "wobble"
+    ],
+    "palette": [
+     "britRed",
+     "cream60",
+     "mancSky",
+     "newsprint",
+     "parka",
+     "popArt"
+    ]
+   },
+   "name": "Blur",
+   "playable": {
+    "backdrop": [
+     "halftone",
+     "paper",
+     "sunset",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "hop",
+     "swagger"
+    ],
+    "exit": [
+     "dropOut",
+     "fadeShort",
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Bungee",
+     "Elite",
+     "Oswald"
+    ],
+    "fx1": [
+     "bob",
+     "none",
+     "wobble"
+    ],
+    "fx2": [
+     "bob",
+     "none",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "halftone": [
+      "britRed",
+      "cream60",
+      "mancSky",
+      "newsprint",
+      "popArt"
+     ],
+     "paper": [
+      "britRed",
+      "mancSky",
+      "newsprint",
+      "parka",
+      "popArt"
+     ],
+     "sunset": [
+      "britRed",
+      "cream60",
+      "mancSky",
+      "newsprint",
+      "popArt"
+     ],
+     "tapeLeak": [
+      "britRed",
+      "mancSky",
+      "newsprint",
+      "parka",
+      "popArt"
+     ],
+     "void": [
+      "britRed",
+      "mancSky",
+      "newsprint",
+      "parka",
+      "popArt"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ampGlow",
+     "spot",
+     "stars",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "strut",
+     "swoop"
+    ],
+    "exit": [
+     "fadeShort",
+     "floatAway",
+     "up"
+    ],
+    "font": [
+     "Bebas",
+     "Oswald",
+     "PlayfairIt",
+     "Syncopate"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "thump"
+    ],
+    "palette": [
+     "dusk",
+     "hazard",
+     "starlight",
+     "tuxedo",
+     "vegas"
+    ]
+   },
+   "name": "The Killers",
+   "playable": {
+    "backdrop": [
+     "ampGlow",
+     "spot",
+     "stars",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "strut",
+     "swoop"
+    ],
+    "exit": [
+     "fadeShort",
+     "floatAway",
+     "up"
+    ],
+    "font": [
+     "Bebas",
+     "Oswald",
+     "PlayfairIt",
+     "Syncopate"
+    ],
+    "fx1": [
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "thump"
+    ],
+    "fx2": [
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "ampGlow": [
+      "dusk",
+      "hazard",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ],
+     "spot": [
+      "dusk",
+      "hazard",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ],
+     "stars": [
+      "dusk",
+      "hazard",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ],
+     "void": [
+      "dusk",
+      "hazard",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ampGlow",
+     "spot",
+     "stars",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "strut",
+     "swoop"
+    ],
+    "exit": [
+     "fadeShort",
+     "floatAway",
+     "up"
+    ],
+    "font": [
+     "Bebas",
+     "Oswald",
+     "PlayfairIt",
+     "Syncopate"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "thump"
+    ],
+    "palette": [
+     "dusk",
+     "hazard",
+     "starlight",
+     "tuxedo",
+     "vegas"
+    ]
+   },
+   "name": "Coldplay",
+   "playable": {
+    "backdrop": [
+     "ampGlow",
+     "spot",
+     "stars",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "fadeUp",
+     "strut",
+     "swoop"
+    ],
+    "exit": [
+     "fadeShort",
+     "floatAway",
+     "up"
+    ],
+    "font": [
+     "Bebas",
+     "Oswald",
+     "PlayfairIt",
+     "Syncopate"
+    ],
+    "fx1": [
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "thump"
+    ],
+    "fx2": [
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "ampGlow": [
+      "dusk",
+      "hazard",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ],
+     "spot": [
+      "dusk",
+      "hazard",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ],
+     "stars": [
+      "dusk",
+      "hazard",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ],
+     "void": [
+      "dusk",
+      "hazard",
+      "starlight",
+      "tuxedo",
+      "vegas"
+     ]
+    }
+   }
+  }
+ ],
+ "generatedBy": "ExistingBandCandidatesTests/printTheBaseline()",
+ "schema": 1,
+ "sourceRevision": "be91ed3"
+}
