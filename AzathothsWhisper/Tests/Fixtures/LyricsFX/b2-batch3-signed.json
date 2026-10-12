@@ -1,0 +1,780 @@
+{
+ "signed": "2026-10-11",
+ "probe": "P15",
+ "note": "B2 批 3：使用者看原型探針後簽字的樂團目標值與每槽合格元件（原型 fit>0，不含サビ／關鍵字觸發的效果）。只含樂團名與元件代號，不含曲庫資料。",
+ "bands": [
+  {
+   "name": "Linkin Park",
+   "aliases": [
+    "JAY-Z & LINKIN PARK",
+    "LINKIN PARK & Steve Aoki"
+   ],
+   "tags": [
+    "rapmetal",
+    "cybermetal"
+   ],
+   "axes": {
+    "raw": 0.35,
+    "theatrical": 0.55,
+    "cold": 0.6,
+    "aggression": 0.7,
+    "speed": 0.6,
+    "elegance": 0.35,
+    "decay": 0.3,
+    "bright": 0.3,
+    "bounce": 0.35,
+    "warm": 0.2
+   },
+   "candidates": {
+    "font": [
+     "Anton",
+     "Bangers",
+     "BlackOps",
+     "Grotesk",
+     "Marker",
+     "SpaceMono"
+    ],
+    "backdrop": [
+     "gig",
+     "grid",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "flip",
+     "kick",
+     "slide",
+     "stamp",
+     "type"
+    ],
+    "exit": [
+     "bands",
+     "cut",
+     "dropOut",
+     "scatter",
+     "slideOut"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "rgbsplit",
+     "thump",
+     "wobble"
+    ],
+    "palette": [
+     "acid",
+     "gigRed",
+     "hazard",
+     "hybridGrey",
+     "mono",
+     "prismBlack",
+     "terminal"
+    ]
+   }
+  },
+  {
+   "name": "Slipknot",
+   "aliases": [],
+   "tags": [
+    "horrormetal",
+    "altmetal"
+   ],
+   "axes": {
+    "raw": 0.85,
+    "theatrical": 0.7,
+    "cold": 0.3,
+    "aggression": 0.95,
+    "speed": 0.85,
+    "elegance": 0.05,
+    "decay": 0.8,
+    "bright": 0.05,
+    "bounce": 0.3,
+    "warm": 0.05
+   },
+   "candidates": {
+    "font": [
+     "Anton",
+     "Bebas",
+     "BlackOps",
+     "Elite",
+     "Oswald"
+    ],
+    "backdrop": [
+     "film",
+     "gig",
+     "smokeHaze",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "drop",
+     "slam",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "fall",
+     "slideOut"
+    ],
+    "fx": [
+     "jitter",
+     "misreg",
+     "none",
+     "shake",
+     "thump"
+    ],
+    "palette": [
+     "ampRed",
+     "ashGrey",
+     "bloodBlack",
+     "gigRed",
+     "rust"
+    ]
+   }
+  },
+  {
+   "name": "Stone Sour",
+   "aliases": [],
+   "tags": [
+    "altmetal",
+    "horrormetal"
+   ],
+   "axes": {
+    "raw": 0.6,
+    "theatrical": 0.45,
+    "cold": 0.3,
+    "aggression": 0.75,
+    "speed": 0.6,
+    "elegance": 0.2,
+    "decay": 0.5,
+    "bright": 0.25,
+    "bounce": 0.25,
+    "warm": 0.3
+   },
+   "candidates": {
+    "font": [
+     "Anton",
+     "Bebas",
+     "BlackOps",
+     "Elite",
+     "Oswald"
+    ],
+    "backdrop": [
+     "film",
+     "gig",
+     "smokeHaze",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "drop",
+     "slam",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "fall",
+     "slideOut"
+    ],
+    "fx": [
+     "jitter",
+     "misreg",
+     "none",
+     "shake",
+     "thump"
+    ],
+    "palette": [
+     "ampRed",
+     "ashGrey",
+     "bloodBlack",
+     "gigRed",
+     "rust"
+    ]
+   }
+  },
+  {
+   "name": "Flyleaf",
+   "aliases": [],
+   "tags": [
+    "gothmetal",
+    "altmetal"
+   ],
+   "axes": {
+    "raw": 0.35,
+    "theatrical": 0.6,
+    "cold": 0.35,
+    "aggression": 0.6,
+    "speed": 0.55,
+    "elegance": 0.5,
+    "decay": 0.3,
+    "bright": 0.3,
+    "bounce": 0.15,
+    "warm": 0.35
+   },
+   "candidates": {
+    "font": [
+     "Anton",
+     "Bebas",
+     "Cinzel",
+     "CormorantIt",
+     "Mirage",
+     "Oswald"
+    ],
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "gig",
+     "shafts",
+     "smokeHaze",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "rise",
+     "slide",
+     "smoke",
+     "stamp",
+     "swoop"
+    ],
+    "exit": [
+     "dissolve",
+     "fade",
+     "fall",
+     "slideOut"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect",
+     "shake",
+     "thump"
+    ],
+    "palette": [
+     "ampRed",
+     "bloodBlack",
+     "gigRed",
+     "ice",
+     "prismBlack",
+     "rust"
+    ]
+   }
+  },
+  {
+   "name": "Limp Bizkit",
+   "aliases": [],
+   "tags": [
+    "rapmetal"
+   ],
+   "axes": {
+    "raw": 0.6,
+    "theatrical": 0.4,
+    "cold": 0.15,
+    "aggression": 0.7,
+    "speed": 0.6,
+    "elegance": 0.05,
+    "decay": 0.3,
+    "bright": 0.55,
+    "bounce": 0.85,
+    "warm": 0.45
+   },
+   "candidates": {
+    "font": [
+     "Anton",
+     "Bangers",
+     "Marker"
+    ],
+    "backdrop": [
+     "gig",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "bands",
+     "dropOut",
+     "slideOut"
+    ],
+    "fx": [
+     "none",
+     "thump",
+     "wobble"
+    ],
+    "palette": [
+     "acid",
+     "gigRed",
+     "hazard",
+     "hybridGrey",
+     "mono"
+    ]
+   }
+  },
+  {
+   "name": "P.O.D.",
+   "aliases": [],
+   "tags": [
+    "rapmetal"
+   ],
+   "axes": {
+    "raw": 0.5,
+    "theatrical": 0.45,
+    "cold": 0.15,
+    "aggression": 0.65,
+    "speed": 0.6,
+    "elegance": 0.15,
+    "decay": 0.2,
+    "bright": 0.6,
+    "bounce": 0.7,
+    "warm": 0.65
+   },
+   "candidates": {
+    "font": [
+     "Anton",
+     "Bangers",
+     "Marker"
+    ],
+    "backdrop": [
+     "gig",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "bands",
+     "dropOut",
+     "slideOut"
+    ],
+    "fx": [
+     "none",
+     "thump",
+     "wobble"
+    ],
+    "palette": [
+     "acid",
+     "gigRed",
+     "hazard",
+     "hybridGrey",
+     "mono"
+    ]
+   }
+  },
+  {
+   "name": "Adema",
+   "aliases": [],
+   "tags": [
+    "altmetal"
+   ],
+   "axes": {
+    "raw": 0.5,
+    "theatrical": 0.45,
+    "cold": 0.35,
+    "aggression": 0.7,
+    "speed": 0.55,
+    "elegance": 0.2,
+    "decay": 0.45,
+    "bright": 0.25,
+    "bounce": 0.35,
+    "warm": 0.2
+   },
+   "candidates": {
+    "font": [
+     "Anton",
+     "Bebas",
+     "Oswald"
+    ],
+    "backdrop": [
+     "gig",
+     "smokeHaze",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "fall",
+     "slideOut"
+    ],
+    "fx": [
+     "none",
+     "shake",
+     "thump"
+    ],
+    "palette": [
+     "ampRed",
+     "gigRed",
+     "rust"
+    ]
+   }
+  },
+  {
+   "name": "Evanescence",
+   "aliases": [],
+   "tags": [
+    "gothmetal"
+   ],
+   "axes": {
+    "raw": 0.15,
+    "theatrical": 0.9,
+    "cold": 0.45,
+    "aggression": 0.5,
+    "speed": 0.4,
+    "elegance": 0.8,
+    "decay": 0.4,
+    "bright": 0.15,
+    "bounce": 0.05,
+    "warm": 0.3
+   },
+   "candidates": {
+    "font": [
+     "Cinzel",
+     "CormorantIt",
+     "Mirage"
+    ],
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "shafts",
+     "void"
+    ],
+    "enter": [
+     "rise",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "dissolve",
+     "fade"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "palette": [
+     "bloodBlack",
+     "ice",
+     "prismBlack"
+    ]
+   }
+  },
+  {
+   "name": "Ill Niño",
+   "aliases": [],
+   "tags": [
+    "latinmetal"
+   ],
+   "axes": {
+    "raw": 0.6,
+    "theatrical": 0.5,
+    "cold": 0.1,
+    "aggression": 0.8,
+    "speed": 0.7,
+    "elegance": 0.2,
+    "decay": 0.35,
+    "bright": 0.35,
+    "bounce": 0.5,
+    "warm": 0.7
+   },
+   "candidates": {
+    "font": [
+     "AlfaSlab",
+     "Barrio"
+    ],
+    "backdrop": [
+     "embers",
+     "smokeHaze",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "stamp",
+     "swagger"
+    ],
+    "exit": [
+     "fall",
+     "slideOut"
+    ],
+    "fx": [
+     "flicker",
+     "none",
+     "thump"
+    ],
+    "palette": [
+     "ampRed",
+     "sangre",
+     "whiskey"
+    ]
+   }
+  },
+  {
+   "name": "Static-X",
+   "aliases": [],
+   "tags": [
+    "cybermetal",
+    "altmetal"
+   ],
+   "axes": {
+    "raw": 0.5,
+    "theatrical": 0.45,
+    "cold": 0.75,
+    "aggression": 0.8,
+    "speed": 0.85,
+    "elegance": 0.05,
+    "decay": 0.3,
+    "bright": 0.35,
+    "bounce": 0.5,
+    "warm": 0.05
+   },
+   "candidates": {
+    "font": [
+     "Anton",
+     "Bebas",
+     "BlackOps",
+     "Grotesk",
+     "Oswald",
+     "SpaceMono"
+    ],
+    "backdrop": [
+     "gig",
+     "grid",
+     "scan",
+     "smokeHaze",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "flip",
+     "slide",
+     "stamp",
+     "type"
+    ],
+    "exit": [
+     "bands",
+     "cut",
+     "fall",
+     "scatter",
+     "slideOut"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "rgbsplit",
+     "shake",
+     "thump"
+    ],
+    "palette": [
+     "acid",
+     "ampRed",
+     "gigRed",
+     "hybridGrey",
+     "mono",
+     "prismBlack",
+     "rust",
+     "terminal"
+    ]
+   }
+  }
+ ],
+ "linked": [
+  {
+   "name": "Hatebreed",
+   "decision": "new",
+   "signed": "2026-10-11",
+   "reason": "P15 後使用者：「OK 沒問題了」（探針預設呈現新版）",
+   "eligible": {
+    "font": [
+     "Anton",
+     "BlackOps",
+     "Oswald"
+    ],
+    "backdrop": [
+     "film",
+     "grid",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "slam",
+     "slide",
+     "stamp",
+     "tumble",
+     "type"
+    ],
+    "exit": [
+     "bands",
+     "cut",
+     "slideOut"
+    ],
+    "fx": [
+     "misreg",
+     "none",
+     "rgbsplit",
+     "shake",
+     "thump"
+    ],
+    "palette": [
+     "acid",
+     "ashGrey",
+     "mono"
+    ]
+   },
+   "playable": {
+    "backdrop": [
+     "film",
+     "grid",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "slam",
+     "stamp",
+     "tumble",
+     "type"
+    ],
+    "exit": [
+     "bands",
+     "cut",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "BlackOps",
+     "Oswald"
+    ],
+    "fx1": [
+     "misreg",
+     "none",
+     "rgbsplit",
+     "shake",
+     "thump"
+    ],
+    "fx2": [
+     "misreg",
+     "none",
+     "rgbsplit",
+     "shake",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "film": [
+      "acid",
+      "ashGrey",
+      "mono"
+     ],
+     "grid": [
+      "acid",
+      "ashGrey",
+      "mono"
+     ],
+     "scan": [
+      "acid",
+      "ashGrey",
+      "mono"
+     ],
+     "void": [
+      "acid",
+      "ashGrey",
+      "mono"
+     ]
+    }
+   }
+  },
+  {
+   "name": "Korn",
+   "decision": "new",
+   "signed": "2026-10-11",
+   "reason": "P15 後使用者：「OK 沒問題了」（探針預設呈現新版；B1 起一直是 mono）",
+   "eligible": {
+    "font": [
+     "Anton",
+     "BlackOps"
+    ],
+    "backdrop": [
+     "grid",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "slide",
+     "stamp",
+     "type"
+    ],
+    "exit": [
+     "bands",
+     "slideOut"
+    ],
+    "fx": [
+     "none",
+     "rgbsplit",
+     "shake"
+    ],
+    "palette": [
+     "acid",
+     "mono"
+    ]
+   },
+   "playable": {
+    "backdrop": [
+     "grid",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "slide",
+     "stamp",
+     "type"
+    ],
+    "exit": [
+     "bands",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "BlackOps"
+    ],
+    "fx1": [
+     "none",
+     "rgbsplit",
+     "shake"
+    ],
+    "fx2": [
+     "none",
+     "rgbsplit",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "grid": [
+      "acid",
+      "mono"
+     ],
+     "scan": [
+      "acid",
+      "mono"
+     ],
+     "void": [
+      "acid",
+      "mono"
+     ]
+    }
+   }
+  }
+ ],
+ "unassigned": []
+}

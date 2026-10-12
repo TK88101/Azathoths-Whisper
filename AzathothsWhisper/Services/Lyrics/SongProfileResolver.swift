@@ -14,6 +14,11 @@ enum FXTag: String, CaseIterable, Sendable {
     case hardrock, classicrock, glam, psych, britpop, arena
     /// B2 批 2（龐克系）：旋律硬核、ska、power pop、抒情流行搖滾
     case melodichc, ska, powerpop, poprock
+    /// B2 批 3（Nu-metal）：本批新團的私有子標籤，新團不帶 `nu`／`hardcore`（計劃 §2.4 N1）
+    case altmetal, rapmetal, cybermetal, horrormetal, gothmetal, latinmetal
+
+    /// Nu 系標籤：任何一個都不得與 `industrial` 掛在同一個元件上（P10；B2 批 3 計劃 §2.4 N1）。新立的 Nu 系子標籤要加進來
+    static let nuFamily: Set<FXTag> = [.nu, .altmetal, .rapmetal, .cybermetal, .horrormetal, .gothmetal, .latinmetal]
 }
 
 /// 歌曲目標值
@@ -52,7 +57,7 @@ enum SongProfileResolver {
         var keys: [String] { ([name] + aliases).map(SongProfileResolver.normalizedArtist) }
     }
 
-    static let bandTable: [BandEntry] = batchOne + batchTwo + batchThree
+    static let bandTable: [BandEntry] = batchOne + batchTwo + batchThree + batchFour
 
     /// B1：抄自原型的 28 團
     static let batchOne: [BandEntry] = bandTargets.map { BandEntry(name: $0.0, profile: $0.1) }
@@ -81,6 +86,21 @@ enum SongProfileResolver {
         BandEntry(name: "Mayday Parade", profile: SongProfile(axes: [.raw: 0.15, .theatrical: 0.55, .cold: 0.2, .aggression: 0.25, .speed: 0.55, .elegance: 0.5, .decay: 0.1, .bright: 0.6, .bounce: 0.35, .warm: 0.65], tags: [.poprock, .poppunk])),
         BandEntry(name: "Good Charlotte", profile: SongProfile(axes: [.raw: 0.3, .theatrical: 0.4, .cold: 0.15, .aggression: 0.45, .speed: 0.75, .elegance: 0.15, .decay: 0.2, .bright: 0.65, .bounce: 0.6, .warm: 0.5], tags: [.poppunk, .skatepunk])),
         BandEntry(name: "Weezer", profile: SongProfile(axes: [.raw: 0.35, .theatrical: 0.2, .cold: 0.25, .aggression: 0.3, .speed: 0.55, .elegance: 0.3, .decay: 0.1, .bright: 0.7, .bounce: 0.5, .warm: 0.5], tags: [.powerpop, .indie])),
+    ]
+
+    /// B2 批 3（表內第四段，Nu-metal）：使用者 2026-10-11 看原型探針後簽字（P15）；值與 `Tests/Fixtures/LyricsFX/b2-batch3-signed.json` 一致
+    /// （`B2BatchThreeSignedFixtureTests` 把關）。新團不帶 `nu`／`hardcore`（計劃 §2.4 N1）；Linkin Park 的別名是曲庫裡實際出現的合作曲寫法
+    static let batchFour: [BandEntry] = [
+        BandEntry(name: "Linkin Park", aliases: ["JAY-Z & LINKIN PARK", "LINKIN PARK & Steve Aoki"], profile: SongProfile(axes: [.raw: 0.35, .theatrical: 0.55, .cold: 0.6, .aggression: 0.7, .speed: 0.6, .elegance: 0.35, .decay: 0.3, .bright: 0.3, .bounce: 0.35, .warm: 0.2], tags: [.rapmetal, .cybermetal])),
+        BandEntry(name: "Slipknot", profile: SongProfile(axes: [.raw: 0.85, .theatrical: 0.7, .cold: 0.3, .aggression: 0.95, .speed: 0.85, .elegance: 0.05, .decay: 0.8, .bright: 0.05, .bounce: 0.3, .warm: 0.05], tags: [.horrormetal, .altmetal])),
+        BandEntry(name: "Stone Sour", profile: SongProfile(axes: [.raw: 0.6, .theatrical: 0.45, .cold: 0.3, .aggression: 0.75, .speed: 0.6, .elegance: 0.2, .decay: 0.5, .bright: 0.25, .bounce: 0.25, .warm: 0.3], tags: [.altmetal, .horrormetal])),
+        BandEntry(name: "Flyleaf", profile: SongProfile(axes: [.raw: 0.35, .theatrical: 0.6, .cold: 0.35, .aggression: 0.6, .speed: 0.55, .elegance: 0.5, .decay: 0.3, .bright: 0.3, .bounce: 0.15, .warm: 0.35], tags: [.gothmetal, .altmetal])),
+        BandEntry(name: "Limp Bizkit", profile: SongProfile(axes: [.raw: 0.6, .theatrical: 0.4, .cold: 0.15, .aggression: 0.7, .speed: 0.6, .elegance: 0.05, .decay: 0.3, .bright: 0.55, .bounce: 0.85, .warm: 0.45], tags: [.rapmetal])),
+        BandEntry(name: "P.O.D.", profile: SongProfile(axes: [.raw: 0.5, .theatrical: 0.45, .cold: 0.15, .aggression: 0.65, .speed: 0.6, .elegance: 0.15, .decay: 0.2, .bright: 0.6, .bounce: 0.7, .warm: 0.65], tags: [.rapmetal])),
+        BandEntry(name: "Adema", profile: SongProfile(axes: [.raw: 0.5, .theatrical: 0.45, .cold: 0.35, .aggression: 0.7, .speed: 0.55, .elegance: 0.2, .decay: 0.45, .bright: 0.25, .bounce: 0.35, .warm: 0.2], tags: [.altmetal])),
+        BandEntry(name: "Evanescence", profile: SongProfile(axes: [.raw: 0.15, .theatrical: 0.9, .cold: 0.45, .aggression: 0.5, .speed: 0.4, .elegance: 0.8, .decay: 0.4, .bright: 0.15, .bounce: 0.05, .warm: 0.3], tags: [.gothmetal])),
+        BandEntry(name: "Ill Niño", profile: SongProfile(axes: [.raw: 0.6, .theatrical: 0.5, .cold: 0.1, .aggression: 0.8, .speed: 0.7, .elegance: 0.2, .decay: 0.35, .bright: 0.35, .bounce: 0.5, .warm: 0.7], tags: [.latinmetal])),
+        BandEntry(name: "Static-X", profile: SongProfile(axes: [.raw: 0.5, .theatrical: 0.45, .cold: 0.75, .aggression: 0.8, .speed: 0.85, .elegance: 0.05, .decay: 0.3, .bright: 0.35, .bounce: 0.5, .warm: 0.05], tags: [.cybermetal, .altmetal])),
     ]
 
     /// 正規化後撞鍵的名字（跨正式名與別名）；表要維持空集合（`ArtistOverrideTableTests`）

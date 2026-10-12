@@ -94,9 +94,9 @@ enum CatalogValidator {
             }
             if !slotMatches(component) { problems.append("\(component.id)：payload 與槽位不符") }
         }
-        // P10：工業金屬與 Nu-Metal 不共用任何元件
-        let industrialNu = catalog.filter { $0.tags.contains(.industrial) && $0.tags.contains(.nu) }
-        if !industrialNu.isEmpty { problems.append("industrial 與 nu 共用：\(industrialNu.map(\.id))") }
+        // P10：工業金屬與 Nu-Metal（含 Nu 系子標籤）不共用任何元件
+        let industrialNu = catalog.filter { $0.tags.contains(.industrial) && !$0.tags.isDisjoint(with: FXTag.nuFamily) }
+        if !industrialNu.isEmpty { problems.append("industrial 與 Nu 系共用：\(industrialNu.map(\.id))") }
         let required = FXSlot.allCases.filter { $0 != .fx }
         for slot in required where !catalog.contains(where: { $0.slot == slot }) { problems.append("\(slot)：沒有任何元件") }
         if !catalog.contains(where: { $0.slot == .fx && $0.id == FXEffect.none.rawValue }) && catalog.contains(where: { $0.slot == .fx }) {

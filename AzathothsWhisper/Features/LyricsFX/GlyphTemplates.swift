@@ -61,6 +61,8 @@ enum EnterTemplate: String, CaseIterable, Sendable {
     case fadeUp, grow, slam, condense, negative, fling, slant, swoop, orbit, smoke, rise
     case stamp, pop, fallIn, slide
     case tumble
+    /// B2 批 3（Nu-metal）
+    case drop, type, flip
 
     func transform(progress p: Double, context c: GlyphContext) -> GlyphTransform {
         let em = Double(c.em)
@@ -123,6 +125,14 @@ enum EnterTemplate: String, CaseIterable, Sendable {
             // 從上方翻一整圈落下
             let u = CGFloat(1 - FXEasing.outCubic(p))
             return GlyphTransform(dx: u * c.dir * c.em, dy: -u * c.height * 0.7, rotation: u * c.dir * 2 * .pi, alpha: min(1, p * 3))
+        case .drop:
+            // 自上砸落，最後四分之一壓扁（橫窄縱高）再回原狀
+            let impact = p > 0.75 ? 1 - (p - 0.75) / 0.25 : 0
+            return GlyphTransform(dy: -CGFloat(1 - FXEasing.outCubic(p)) * c.height * 0.9, scaleX: CGFloat(1 - 0.1 * impact), scaleY: CGFloat(1 + 0.18 * impact))
+        case .type:
+            return GlyphTransform(scale: CGFloat(1.08 - 0.08 * FXEasing.outCubic(p)))
+        case .flip:
+            return GlyphTransform(scaleY: CGFloat(max(0.01, FXEasing.outCubic(p))))
         }
     }
 }
@@ -169,6 +179,8 @@ enum ExitTemplate: String, CaseIterable, Sendable {
     case cut, scatter, fade, dissolve
     case fall, shrink, up, slideOut
     case tumbleOut
+    /// B2 批 3：原型組合模式的 paint 不讀 `bands`（只有 circuit 家族會切帶）→ 字原樣停到退場結束才消失
+    case bands
 
     func transform(progress x: Double, context c: GlyphContext) -> GlyphTransform {
         switch self {
@@ -187,6 +199,8 @@ enum ExitTemplate: String, CaseIterable, Sendable {
             return GlyphTransform(dx: CGFloat(cos(c.angle) * k), dy: CGFloat(sin(c.angle) * k), alpha: 1 - x)
         case .tumbleOut:
             return GlyphTransform(dy: CGFloat(FXEasing.inCubic(x)) * c.height * 0.6, rotation: c.dir * CGFloat(x) * 4, alpha: 1 - x * 0.3)
+        case .bands:
+            return .identity
         }
     }
 }

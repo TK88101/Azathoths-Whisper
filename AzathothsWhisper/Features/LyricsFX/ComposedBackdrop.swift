@@ -72,7 +72,24 @@ enum ComposedBackdrop {
             return bokeh(size: size, color: palette.acc, time: time)
         case .skyGrad:
             return [band(CGPoint(x: 0.5, y: 0), CGPoint(x: 0.5, y: 1), 0xFFFFFF, from: 0.14, to: 0.14, endColor: 0x000000)]
+        // B2 批 3（原型 html 組合模式 draw：掃描線、冷光網格）
+        case .scan:
+            return [.hairlines(spacing: 3, color: RGB(hex: 0x000000), opacity: 0.25)]
+        case .grid:
+            return [.rects(gridLines(size: size, time: time), palette.dim, opacity: 0.5)]
         }
+    }
+
+    /// 網格的格距（點）與漂移速度（點／秒）：原型 `gridBG(…, 36, 0.5)`
+    static let gridStep: CGFloat = 36
+    static let gridDrift: CGFloat = 20
+
+    /// 冷光網格：1 點寬的縱橫線，整組沿對角線緩移、每格循環一次
+    static func gridLines(size: CGSize, time: Double) -> [CGRect] {
+        let offset = wrap(CGFloat(time) * gridDrift, gridStep)
+        let columns = stride(from: -offset, to: size.width, by: gridStep).map { CGRect(x: $0, y: 0, width: 1, height: size.height) }
+        let rows = stride(from: -offset, to: size.height, by: gridStep).map { CGRect(x: 0, y: $0, width: size.width, height: 1) }
+        return columns + rows
     }
 
     /// 影印的碳粉橫紋：16 道滿寬細條、位置固定（原型每道透明度 0.03–0.07，這裡取中間值一次填）
@@ -181,7 +198,7 @@ enum ComposedBackdrop {
             return [.vignette(strength: 0.7), .grain(opacity: 0.05, frame: grainFrame, overlay: false)]
         case .paper:
             return [.grain(opacity: 0.1, frame: grainFrame, overlay: false)]
-        case .embers, .haze, .tapeLeak:
+        case .embers, .haze, .tapeLeak, .scan, .grid:
             return [.grain(opacity: 0.05, frame: grainFrame, overlay: false)]
         case .xerox:
             return [.grain(opacity: 0.16, frame: grainFrame, overlay: false)]

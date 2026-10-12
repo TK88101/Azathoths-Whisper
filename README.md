@@ -233,6 +233,7 @@ The app bundles third-party components, whose license texts ship inside the app
 | Grimoire of Death, UnifrakturMaguntia, Cinzel, Cormorant Garamond | SIL Open Font License 1.1 |
 | Abril Fatface, Alfa Slab One, Anton, Archivo Black, Bebas Neue, Bungee, Oswald, Playfair Display, Righteous | SIL Open Font License 1.1 |
 | Bangers, Dela Gothic One, Gochi Hand, Lilita One, Rubik, Saira Stencil One | SIL Open Font License 1.1 |
+| Barrio, Black Ops One, Space Mono | SIL Open Font License 1.1 |
 | Special Elite, Syncopate, Permanent Marker | Apache License 2.0 |
 | Catacombs (ToughCrest Studio) | Freeware for personal and commercial use; redistribution requires crediting ToughCrest Studio |
 | Cenobyte (Chad Savage), Mirage Gothic, Dark Metal | Commercial-use terms not confirmed (Cenobyte: "Freeware"; Mirage Gothic: "All rights reserved" embedded; Dark Metal: no license file). Included at the maintainer's own risk |
