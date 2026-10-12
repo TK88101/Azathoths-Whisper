@@ -54,17 +54,36 @@ struct CoverFlowStripRenderGeometryTests {
     /// 內容用純色矩形而非 `CoverFlowItem`：本測試釘的是 strip 的**幾何接線**，
     /// 卡片自身長相另有其測試；純色也讓 AX 元素邊界乾淨可辨。
     private struct Harness: View {
-        @State private var centerID: Int?
-        private let target: Int?
-
-        init(initialCenter: Int = probeItemCount / 2, target: Int? = nil) {
-            _centerID = State(initialValue: initialCenter)
-            self.target = target
+        /// 中心怎麼來
+        enum Start {
+            /// 正式 app 的路徑（D2）：條帶以空牌組、無中心建立，之後同一次更新放進牌組與中心
+            /// （同 `CoverFlowViewModel.apply`：`deck = …` 後 `reconcileCenter`）
+            case load(center: Int)
+            /// 建立時就帶牌組與中心 `from`，之後運行時改成 `to`（切歌／方向鍵）
+            case recenter(from: Int, to: Int)
         }
+
+        @State private var items: [ProbeCard]
+        @State private var centerID: Int?
+        private let start: Start
+
+        init(_ start: Start) {
+            self.start = start
+            switch start {
+            case .load:
+                _items = State(initialValue: [])
+                _centerID = State(initialValue: nil)
+            case .recenter(let from, _):
+                _items = State(initialValue: Self.allCards)
+                _centerID = State(initialValue: from)
+            }
+        }
+
+        private static let allCards = (0..<probeItemCount).map(ProbeCard.init)
 
         var body: some View {
             CoverFlowStrip(
-                items: (0..<probeItemCount).map(ProbeCard.init),
+                items: items,
                 itemWidth: probeItemWidth,
                 centerID: $centerID
             ) { item in
@@ -77,12 +96,17 @@ struct CoverFlowStripRenderGeometryTests {
             }
             .frame(width: probeViewSize.width, height: probeViewSize.height)
             .background(Color.black)
-            // 運行時變更 centerID——這是產品的主路徑（切歌／載入完成／方向鍵），
-            // 與「初始值」路徑不同：後者不觸發 onChange
+            // 兩種都在運行時變更 centerID——產品的主路徑（載入完成／切歌／方向鍵）。
+            // 不測「建立時就帶中心」的初始值路徑：它不觸發 onChange、停在 #0（缺陷 3），產品自 D2 起不走
             .task {
-                guard let target else { return }
                 try? await Task.sleep(for: .milliseconds(400))
-                centerID = target
+                switch start {
+                case .load(let center):
+                    items = Self.allCards
+                    centerID = center
+                case .recenter(_, let to):
+                    centerID = to
+                }
             }
         }
     }
@@ -148,8 +172,7 @@ struct CoverFlowStripRenderGeometryTests {
     /// 開一個真的上螢幕的視窗。不呼叫 `NSApp.activate(ignoringOtherApps:)`——
     /// 實測不需要，且會搶走使用者的焦點。
     private static func withRenderedStrip<T>(
-        initialCenter: Int = probeItemCount / 2,
-        target: Int? = nil,
+        _ start: Harness.Start,
         _ body: (_ viewportMidX: CGFloat, _ items: [RenderedItem]) async -> T
     ) async -> T {
         let screen = NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
@@ -161,7 +184,7 @@ struct CoverFlowStripRenderGeometryTests {
             contentRect: CGRect(origin: origin, size: probeViewSize),
             styleMask: [.titled], backing: .buffered, defer: false
         )
-        window.contentView = NSHostingView(rootView: Harness(initialCenter: initialCenter, target: target))
+        window.contentView = NSHostingView(rootView: Harness(start))
         window.makeKeyAndOrderFront(nil)
         defer { window.orderOut(nil) }
 
@@ -175,7 +198,7 @@ struct CoverFlowStripRenderGeometryTests {
 
     @Test("視口中心的封面正面朝人，兩側依距離漸次側轉")
     func centerCoverFacesViewerAndSidesTiltAway() async throws {
-        await Self.withRenderedStrip { viewportMidX, items in
+        await Self.withRenderedStrip(.load(center: probeItemCount / 2)) { viewportMidX, items in
             #expect(items.count >= 5, "AX 樹應讀到已渲染的封面；讀到 \(items.count) 個")
             guard items.count >= 5 else { return }
 
@@ -272,7 +295,7 @@ struct CoverFlowStripRenderGeometryTests {
     /// 若本測試綠，該現象就不是佈局缺陷，而是疊放次序造成的視覺假象。
     @Test("首項與末項吸附後同樣正面朝人", arguments: [0, 1, 4, 5, 6, 7, probeItemCount - 1])
     func edgeItemsAlsoReachCenter(initialCenter: Int) async throws {
-        await Self.withRenderedStrip(initialCenter: initialCenter) { viewportMidX, items in
+        await Self.withRenderedStrip(.load(center: initialCenter)) { viewportMidX, items in
             #expect(items.count >= 5, "AX 樹應讀到已渲染的封面；讀到 \(items.count) 個")
             guard items.count >= 5 else { return }
 
@@ -307,7 +330,7 @@ struct CoverFlowStripRenderGeometryTests {
     /// 初始值不觸發 `onChange`，因此不走 `ScrollViewReader.scrollTo`。
     @Test("運行時變更 centerID 後目標項抵達中心", arguments: [1, 4, 8])
     func runtimeCenterChangeReachesTarget(target: Int) async throws {
-        await Self.withRenderedStrip(initialCenter: 0, target: target) { viewportMidX, items in
+        await Self.withRenderedStrip(.recenter(from: 0, to: target)) { viewportMidX, items in
             #expect(items.count >= 5, "AX 樹應讀到已渲染的封面；讀到 \(items.count) 個")
             guard items.count >= 5 else { return }
 
