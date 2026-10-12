@@ -225,6 +225,7 @@ MIT —— [LICENSE](LICENSE) を参照してください。
 | Grimoire of Death, UnifrakturMaguntia, Cinzel, Cormorant Garamond | SIL Open Font License 1.1 |
 | Abril Fatface, Alfa Slab One, Anton, Archivo Black, Bebas Neue, Bungee, Oswald, Playfair Display, Righteous | SIL Open Font License 1.1 |
 | Bangers, Dela Gothic One, Gochi Hand, Lilita One, Rubik, Saira Stencil One | SIL Open Font License 1.1 |
+| Barrio, Black Ops One, Space Mono | SIL Open Font License 1.1 |
 | Special Elite, Syncopate, Permanent Marker | Apache License 2.0 |
 | Catacombs（ToughCrest Studio） | 個人・商用ともに無料。再配布時は ToughCrest Studio のクレジット表記が必要 |
 | Cenobyte（Chad Savage）、Mirage Gothic、Dark Metal | 商用利用条件は未確認（Cenobyte は「Freeware」のみ、Mirage Gothic は「All rights reserved」埋め込み、Dark Metal はライセンスファイルなし）。メンテナーの責任で同梱 |

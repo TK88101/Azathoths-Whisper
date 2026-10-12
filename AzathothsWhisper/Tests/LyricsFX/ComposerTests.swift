@@ -231,6 +231,8 @@ struct CatalogValidatorTests {
         #expect(!CatalogValidator.problems(in: [good, component(.fx, "range", vector: [.aggression: 1.2])]).isEmpty, "值域")
         #expect(!CatalogValidator.problems(in: [good, component(.fx, "self", req: [.aggression: 0.7], forbid: [.aggression: 0.6])]).isEmpty, "自相矛盾")
         #expect(!CatalogValidator.problems(in: [good, good]).isEmpty, "id 重複")
-        #expect(!CatalogValidator.problems(in: [good, component(.fx, "ind", tags: [.industrial]), component(.fx, "nuToo", tags: [.industrial, .nu])]).isEmpty, "industrial 與 nu 共用")
+        for tag in FXTag.nuFamily {
+            #expect(!CatalogValidator.problems(in: [good, component(.fx, "ind", tags: [.industrial]), component(.fx, "nuToo", tags: [.industrial, tag])]).isEmpty, "industrial 與 \(tag) 共用")
+        }
     }
 }

@@ -30,6 +30,8 @@ struct FontFace: Hashable, Sendable {
 enum ColorSlot: Sendable, Hashable, CaseIterable {
     case bg, fg, acc, dim, black, white
     case paperRed, paperYellow
+    /// RGB 分離的紅、藍副本（原型 rgbsplit，固定色）
+    case splitRed, splitBlue
 }
 
 struct RGB: Equatable, Sendable {
@@ -73,6 +75,8 @@ struct FXPalette: Equatable, Sendable {
         case .white: return RGB(hex: 0xFFFFFF)
         case .paperRed: return RGB(hex: 0xC8102E)
         case .paperYellow: return RGB(hex: 0xF5D90A)
+        case .splitRed: return RGB(hex: 0xFF2828)
+        case .splitBlue: return RGB(hex: 0x2850FF)
         }
     }
 }

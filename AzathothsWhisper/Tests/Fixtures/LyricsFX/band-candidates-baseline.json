@@ -1657,65 +1657,121 @@
   {
    "eligible": {
     "backdrop": [
+     "flat",
+     "gig",
      "paper",
      "sunset",
-     "void"
+     "void",
+     "xerox"
     ],
     "enter": [
      "fadeUp",
-     "slide"
+     "punch",
+     "slide",
+     "tumble"
     ],
     "exit": [
+     "rip",
      "slideOut",
+     "tumbleOut",
      "up"
     ],
     "font": [
      "Anton",
+     "Bangers",
      "Elite",
+     "Marker",
      "Oswald"
     ],
     "fx": [
-     "none"
+     "jitter",
+     "none",
+     "speedlines",
+     "tilt",
+     "wobble"
     ],
     "palette": [
-     "newsprint"
+     "gigRed",
+     "mono",
+     "newsprint",
+     "skateTeal",
+     "sunsetInk",
+     "yellowBlack"
     ]
    },
    "name": "The Offspring",
    "playable": {
     "backdrop": [
+     "gig",
      "paper",
      "sunset",
-     "void"
+     "void",
+     "xerox"
     ],
     "enter": [
      "fadeUp",
-     "slide"
+     "punch",
+     "slide",
+     "tumble"
     ],
     "exit": [
+     "rip",
      "slideOut",
+     "tumbleOut",
      "up"
     ],
     "font": [
      "Anton",
+     "Bangers",
      "Elite",
+     "Marker",
      "Oswald"
     ],
     "fx1": [
-     "none"
+     "jitter",
+     "none",
+     "speedlines",
+     "tilt",
+     "wobble"
     ],
     "fx2": [
-     "none"
+     "jitter",
+     "none",
+     "speedlines",
+     "tilt",
+     "wobble"
     ],
     "paletteByBackdrop": {
+     "gig": [
+      "gigRed",
+      "mono",
+      "skateTeal"
+     ],
      "paper": [
-      "newsprint"
+      "gigRed",
+      "mono",
+      "newsprint",
+      "skateTeal",
+      "sunsetInk"
      ],
      "sunset": [
-      "newsprint"
+      "newsprint",
+      "sunsetInk",
+      "yellowBlack"
      ],
      "void": [
-      "newsprint"
+      "gigRed",
+      "mono",
+      "newsprint",
+      "skateTeal",
+      "sunsetInk"
+     ],
+     "xerox": [
+      "gigRed",
+      "mono",
+      "newsprint",
+      "skateTeal",
+      "sunsetInk"
      ]
     }
    }
@@ -1723,65 +1779,134 @@
   {
    "eligible": {
     "backdrop": [
+     "flat",
+     "gig",
      "paper",
      "sunset",
-     "void"
+     "void",
+     "xerox"
     ],
     "enter": [
      "fadeUp",
-     "slide"
+     "hop",
+     "pop",
+     "punch",
+     "slide",
+     "tumble"
     ],
     "exit": [
+     "rip",
      "slideOut",
+     "snapOut",
+     "tumbleOut",
      "up"
     ],
     "font": [
      "Anton",
+     "Bangers",
+     "Dela",
      "Elite",
+     "Lilita",
+     "Marker",
      "Oswald"
     ],
     "fx": [
-     "none"
+     "bob",
+     "jitter",
+     "none",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
     ],
     "palette": [
-     "newsprint"
+     "gigRed",
+     "mallPink",
+     "mono",
+     "newsprint",
+     "skateTeal",
+     "sunsetInk",
+     "yellowBlack"
     ]
    },
    "name": "Blink-182",
    "playable": {
     "backdrop": [
+     "flat",
+     "gig",
      "paper",
      "sunset",
-     "void"
+     "xerox"
     ],
     "enter": [
-     "fadeUp",
-     "slide"
+     "hop",
+     "pop",
+     "punch",
+     "slide",
+     "tumble"
     ],
     "exit": [
+     "rip",
      "slideOut",
+     "snapOut",
+     "tumbleOut",
      "up"
     ],
     "font": [
-     "Anton",
-     "Elite",
+     "Bangers",
+     "Dela",
+     "Lilita",
+     "Marker",
      "Oswald"
     ],
     "fx1": [
-     "none"
+     "bob",
+     "ransomPop",
+     "speedlines",
+     "tilt",
+     "wobble"
     ],
     "fx2": [
-     "none"
+     "bob",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
     ],
     "paletteByBackdrop": {
+     "flat": [
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "gig": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal"
+     ],
      "paper": [
-      "newsprint"
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "sunsetInk",
+      "yellowBlack"
      ],
      "sunset": [
-      "newsprint"
+      "newsprint",
+      "sunsetInk",
+      "yellowBlack"
      ],
-     "void": [
-      "newsprint"
+     "xerox": [
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "sunsetInk",
+      "yellowBlack"
      ]
     }
    }
@@ -1789,65 +1914,128 @@
   {
    "eligible": {
     "backdrop": [
+     "flat",
+     "gig",
      "paper",
      "sunset",
-     "void"
+     "void",
+     "xerox"
     ],
     "enter": [
      "fadeUp",
-     "slide"
+     "pop",
+     "slide",
+     "tumble"
     ],
     "exit": [
+     "rip",
      "slideOut",
+     "snapOut",
+     "tumbleOut",
      "up"
     ],
     "font": [
      "Anton",
+     "Bangers",
+     "Dela",
      "Elite",
+     "Lilita",
+     "Marker",
      "Oswald"
     ],
     "fx": [
-     "none"
+     "jitter",
+     "none",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
     ],
     "palette": [
-     "newsprint"
+     "gigRed",
+     "mallPink",
+     "mono",
+     "newsprint",
+     "sunsetInk",
+     "yellowBlack"
     ]
    },
    "name": "Green Day",
    "playable": {
     "backdrop": [
+     "flat",
+     "gig",
      "paper",
      "sunset",
-     "void"
+     "xerox"
     ],
     "enter": [
      "fadeUp",
-     "slide"
+     "pop",
+     "slide",
+     "tumble"
     ],
     "exit": [
+     "rip",
      "slideOut",
+     "snapOut",
+     "tumbleOut",
      "up"
     ],
     "font": [
-     "Anton",
-     "Elite",
+     "Bangers",
+     "Dela",
+     "Lilita",
+     "Marker",
      "Oswald"
     ],
     "fx1": [
-     "none"
+     "jitter",
+     "ransomPop",
+     "speedlines",
+     "tilt",
+     "wobble"
     ],
     "fx2": [
-     "none"
+     "jitter",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
     ],
     "paletteByBackdrop": {
+     "flat": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "newsprint",
+      "yellowBlack"
+     ],
+     "gig": [
+      "gigRed",
+      "mallPink",
+      "mono"
+     ],
      "paper": [
-      "newsprint"
+      "gigRed",
+      "mallPink",
+      "mono",
+      "newsprint",
+      "yellowBlack"
      ],
      "sunset": [
-      "newsprint"
+      "newsprint",
+      "sunsetInk",
+      "yellowBlack"
      ],
-     "void": [
-      "newsprint"
+     "xerox": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "newsprint",
+      "yellowBlack"
      ]
     }
    }
@@ -1855,80 +2043,220 @@
   {
    "eligible": {
     "backdrop": [
+     "flat",
+     "gig",
      "sunset",
-     "void"
+     "void",
+     "xerox"
     ],
     "enter": [
-     "slide"
+     "pop",
+     "punch",
+     "slide",
+     "tumble"
     ],
     "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
      "up"
     ],
     "font": [
      "Anton",
+     "Bangers",
+     "Dela",
+     "Lilita",
+     "Marker",
      "Oswald"
     ],
     "fx": [
-     "none"
+     "jitter",
+     "none",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
     ],
-    "palette": []
+    "palette": [
+     "gigRed",
+     "mallPink",
+     "mono",
+     "skateTeal",
+     "sunsetInk",
+     "yellowBlack"
+    ]
    },
-   "name": "Sum 41"
+   "name": "Sum 41",
+   "playable": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "pop",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Bangers",
+     "Dela",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "fx1": [
+     "jitter",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt"
+    ],
+    "fx2": [
+     "jitter",
+     "ransomPop",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "flat": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "yellowBlack"
+     ],
+     "gig": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal"
+     ],
+     "sunset": [
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "void": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "yellowBlack"
+     ],
+     "xerox": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "yellowBlack"
+     ]
+    }
+   }
   },
   {
    "eligible": {
     "backdrop": [
+     "gig",
      "paper",
-     "void"
+     "void",
+     "xerox"
     ],
     "enter": [
      "fadeUp",
-     "slide"
+     "slide",
+     "tumble"
     ],
     "exit": [
-     "slideOut"
+     "rip",
+     "slideOut",
+     "tumbleOut"
     ],
     "font": [
      "Anton",
      "Elite",
+     "Marker",
      "Oswald"
     ],
     "fx": [
-     "none"
+     "jitter",
+     "none",
+     "ransom",
+     "wobble"
     ],
     "palette": [
+     "gigRed",
+     "mono",
      "newsprint"
     ]
    },
    "name": "Ramones",
    "playable": {
     "backdrop": [
+     "gig",
      "paper",
-     "void"
+     "void",
+     "xerox"
     ],
     "enter": [
      "fadeUp",
-     "slide"
+     "slide",
+     "tumble"
     ],
     "exit": [
-     "slideOut"
+     "rip",
+     "slideOut",
+     "tumbleOut"
     ],
     "font": [
      "Anton",
      "Elite",
+     "Marker",
      "Oswald"
     ],
     "fx1": [
-     "none"
+     "jitter",
+     "none",
+     "ransom",
+     "wobble"
     ],
     "fx2": [
-     "none"
+     "jitter",
+     "none",
+     "ransom",
+     "wobble"
     ],
     "paletteByBackdrop": {
+     "gig": [
+      "gigRed",
+      "mono"
+     ],
      "paper": [
+      "gigRed",
+      "mono",
       "newsprint"
      ],
      "void": [
+      "gigRed",
+      "mono",
+      "newsprint"
+     ],
+     "xerox": [
+      "gigRed",
+      "mono",
       "newsprint"
      ]
     }
@@ -1937,57 +2265,93 @@
   {
    "eligible": {
     "backdrop": [
+     "gig",
      "paper",
-     "void"
+     "void",
+     "xerox"
     ],
     "enter": [
      "fadeUp",
-     "slide"
+     "slide",
+     "tumble"
     ],
     "exit": [
-     "slideOut"
+     "rip",
+     "slideOut",
+     "tumbleOut"
     ],
     "font": [
      "Anton",
      "Elite",
+     "Marker",
      "Oswald"
     ],
     "fx": [
-     "none"
+     "jitter",
+     "none",
+     "ransom",
+     "wobble"
     ],
     "palette": [
+     "gigRed",
+     "mono",
      "newsprint"
     ]
    },
    "name": "Sex Pistols",
    "playable": {
     "backdrop": [
+     "gig",
      "paper",
-     "void"
+     "void",
+     "xerox"
     ],
     "enter": [
      "fadeUp",
-     "slide"
+     "slide",
+     "tumble"
     ],
     "exit": [
-     "slideOut"
+     "rip",
+     "slideOut",
+     "tumbleOut"
     ],
     "font": [
      "Anton",
      "Elite",
+     "Marker",
      "Oswald"
     ],
     "fx1": [
-     "none"
+     "jitter",
+     "none",
+     "ransom",
+     "wobble"
     ],
     "fx2": [
-     "none"
+     "jitter",
+     "none",
+     "ransom",
+     "wobble"
     ],
     "paletteByBackdrop": {
+     "gig": [
+      "gigRed",
+      "mono"
+     ],
      "paper": [
+      "gigRed",
+      "mono",
       "newsprint"
      ],
      "void": [
+      "gigRed",
+      "mono",
+      "newsprint"
+     ],
+     "xerox": [
+      "gigRed",
+      "mono",
       "newsprint"
      ]
     }
@@ -3029,9 +3393,897 @@
      ]
     }
    }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ampGlow",
+     "bokeh",
+     "flat",
+     "skyGrad",
+     "spot",
+     "stars",
+     "sunset",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "ease",
+     "fadeUp",
+     "hop",
+     "pop",
+     "strut",
+     "swoop"
+    ],
+    "exit": [
+     "drift",
+     "fadeShort",
+     "floatAway",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Bangers",
+     "Bebas",
+     "Dela",
+     "Gochi",
+     "Lilita",
+     "Oswald",
+     "PlayfairIt",
+     "Rubik",
+     "Syncopate"
+    ],
+    "fx": [
+     "bob",
+     "breathe",
+     "glow",
+     "neonstroke",
+     "none",
+     "speedlines",
+     "thump",
+     "tilt"
+    ],
+    "palette": [
+     "daydream",
+     "dusk",
+     "hazard",
+     "mallPink",
+     "polaroid",
+     "starlight",
+     "sunsetInk",
+     "tuxedo",
+     "vegas",
+     "yellowBlack"
+    ]
+   },
+   "name": "Fall Out Boy",
+   "playable": {
+    "backdrop": [
+     "bokeh",
+     "flat",
+     "skyGrad",
+     "spot",
+     "sunset"
+    ],
+    "enter": [
+     "ease",
+     "hop",
+     "pop",
+     "strut",
+     "swoop"
+    ],
+    "exit": [
+     "drift",
+     "fadeShort",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Bangers",
+     "Dela",
+     "Gochi",
+     "Lilita",
+     "Rubik"
+    ],
+    "fx1": [
+     "bob",
+     "neonstroke",
+     "speedlines",
+     "thump",
+     "tilt"
+    ],
+    "fx2": [
+     "bob",
+     "glow",
+     "neonstroke",
+     "speedlines",
+     "thump",
+     "tilt"
+    ],
+    "paletteByBackdrop": {
+     "bokeh": [
+      "hazard",
+      "mallPink",
+      "polaroid",
+      "tuxedo",
+      "vegas"
+     ],
+     "flat": [
+      "daydream",
+      "mallPink",
+      "polaroid",
+      "vegas",
+      "yellowBlack"
+     ],
+     "skyGrad": [
+      "daydream",
+      "mallPink",
+      "polaroid",
+      "vegas",
+      "yellowBlack"
+     ],
+     "spot": [
+      "hazard",
+      "mallPink",
+      "polaroid",
+      "tuxedo",
+      "vegas"
+     ],
+     "sunset": [
+      "daydream",
+      "sunsetInk",
+      "yellowBlack"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "paper",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "tumbleOut"
+    ],
+    "font": [
+     "Anton",
+     "Bangers",
+     "Elite",
+     "Marker",
+     "Oswald",
+     "SairaStencil"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "shake",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mono",
+     "newsprint",
+     "skateTeal",
+     "sunsetInk",
+     "yellowBlack"
+    ]
+   },
+   "name": "Rise Against",
+   "playable": {
+    "backdrop": [
+     "gig",
+     "paper",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "tumbleOut"
+    ],
+    "font": [
+     "Anton",
+     "Elite",
+     "Marker",
+     "Oswald",
+     "SairaStencil"
+    ],
+    "fx1": [
+     "jitter",
+     "shake",
+     "speedlines",
+     "tilt",
+     "wobble"
+    ],
+    "fx2": [
+     "jitter",
+     "shake",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "gig": [
+      "gigRed",
+      "mono",
+      "skateTeal"
+     ],
+     "paper": [
+      "gigRed",
+      "mono",
+      "newsprint",
+      "skateTeal",
+      "sunsetInk"
+     ],
+     "sunset": [
+      "newsprint",
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "void": [
+      "gigRed",
+      "mono",
+      "newsprint",
+      "skateTeal",
+      "sunsetInk"
+     ],
+     "xerox": [
+      "gigRed",
+      "mono",
+      "newsprint",
+      "skateTeal",
+      "sunsetInk"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "paper",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "tumbleOut"
+    ],
+    "font": [
+     "Anton",
+     "Bangers",
+     "Elite",
+     "Marker",
+     "Oswald"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "speedlines",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mono",
+     "newsprint",
+     "skateTeal",
+     "sunsetInk",
+     "yellowBlack"
+    ]
+   },
+   "name": "NOFX",
+   "playable": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "paper",
+     "sunset",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "tumbleOut"
+    ],
+    "font": [
+     "Anton",
+     "Bangers",
+     "Elite",
+     "Marker",
+     "Oswald"
+    ],
+    "fx1": [
+     "jitter",
+     "none",
+     "speedlines",
+     "tilt",
+     "wobble"
+    ],
+    "fx2": [
+     "jitter",
+     "none",
+     "speedlines",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "flat": [
+      "gigRed",
+      "mono",
+      "newsprint",
+      "skateTeal",
+      "yellowBlack"
+     ],
+     "gig": [
+      "gigRed",
+      "mono",
+      "skateTeal"
+     ],
+     "paper": [
+      "gigRed",
+      "mono",
+      "newsprint",
+      "skateTeal",
+      "yellowBlack"
+     ],
+     "sunset": [
+      "newsprint",
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "xerox": [
+      "gigRed",
+      "mono",
+      "newsprint",
+      "skateTeal",
+      "yellowBlack"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "checker",
+     "flat",
+     "gig",
+     "paper",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "fadeUp",
+     "hop",
+     "pop",
+     "skank",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Bangers",
+     "Elite",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "fx": [
+     "bob",
+     "jitter",
+     "none",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mono",
+     "newsprint",
+     "twoTone",
+     "twoToneLight",
+     "yellowBlack"
+    ]
+   },
+   "name": "The Interrupters",
+   "playable": {
+    "backdrop": [
+     "checker",
+     "flat",
+     "gig",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "hop",
+     "pop",
+     "skank",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Bangers",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "fx1": [
+     "bob",
+     "jitter",
+     "none",
+     "tilt",
+     "wobble"
+    ],
+    "fx2": [
+     "bob",
+     "jitter",
+     "none",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "checker": [
+      "gigRed",
+      "mono",
+      "twoTone",
+      "twoToneLight",
+      "yellowBlack"
+     ],
+     "flat": [
+      "gigRed",
+      "mono",
+      "twoTone",
+      "twoToneLight",
+      "yellowBlack"
+     ],
+     "gig": [
+      "gigRed",
+      "mono",
+      "twoTone"
+     ],
+     "void": [
+      "gigRed",
+      "mono",
+      "twoTone",
+      "twoToneLight",
+      "yellowBlack"
+     ],
+     "xerox": [
+      "gigRed",
+      "mono",
+      "twoTone",
+      "twoToneLight",
+      "yellowBlack"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "bokeh",
+     "flat",
+     "skyGrad",
+     "sunset",
+     "void"
+    ],
+    "enter": [
+     "ease",
+     "fadeUp",
+     "hop",
+     "pop"
+    ],
+    "exit": [
+     "drift",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Bangers",
+     "Dela",
+     "Gochi",
+     "Lilita",
+     "Oswald",
+     "Rubik"
+    ],
+    "fx": [
+     "bob",
+     "none",
+     "speedlines",
+     "thump",
+     "tilt"
+    ],
+    "palette": [
+     "daydream",
+     "mallPink",
+     "polaroid",
+     "sunsetInk",
+     "yellowBlack"
+    ]
+   },
+   "name": "Mayday Parade",
+   "playable": {
+    "backdrop": [
+     "bokeh",
+     "flat",
+     "skyGrad",
+     "sunset",
+     "void"
+    ],
+    "enter": [
+     "ease",
+     "fadeUp",
+     "hop",
+     "pop"
+    ],
+    "exit": [
+     "drift",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Dela",
+     "Gochi",
+     "Lilita",
+     "Oswald",
+     "Rubik"
+    ],
+    "fx1": [
+     "bob",
+     "none",
+     "speedlines",
+     "thump",
+     "tilt"
+    ],
+    "fx2": [
+     "bob",
+     "none",
+     "speedlines",
+     "thump",
+     "tilt"
+    ],
+    "paletteByBackdrop": {
+     "bokeh": [
+      "mallPink",
+      "polaroid"
+     ],
+     "flat": [
+      "daydream",
+      "mallPink",
+      "polaroid",
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "skyGrad": [
+      "daydream",
+      "mallPink",
+      "polaroid",
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "sunset": [
+      "daydream",
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "void": [
+      "daydream",
+      "mallPink",
+      "polaroid",
+      "sunsetInk",
+      "yellowBlack"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "hop",
+     "pop",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Bangers",
+     "Dela",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "fx": [
+     "bob",
+     "jitter",
+     "none",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mallPink",
+     "mono",
+     "skateTeal",
+     "sunsetInk",
+     "yellowBlack"
+    ]
+   },
+   "name": "Good Charlotte",
+   "playable": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "sunset",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "hop",
+     "pop",
+     "punch",
+     "slide",
+     "tumble"
+    ],
+    "exit": [
+     "rip",
+     "slideOut",
+     "snapOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Bangers",
+     "Dela",
+     "Lilita",
+     "Marker",
+     "Oswald"
+    ],
+    "fx1": [
+     "bob",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "fx2": [
+     "bob",
+     "jitter",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "flat": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "yellowBlack"
+     ],
+     "gig": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal"
+     ],
+     "sunset": [
+      "sunsetInk",
+      "yellowBlack"
+     ],
+     "void": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "yellowBlack"
+     ],
+     "xerox": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "yellowBlack"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "flat",
+     "haze",
+     "paper",
+     "skyGrad",
+     "sunset",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "ease",
+     "fadeUp",
+     "hop",
+     "pop",
+     "swagger"
+    ],
+    "exit": [
+     "drift",
+     "fadeShort",
+     "snapOut",
+     "up"
+    ],
+    "font": [
+     "Archivo",
+     "Elite",
+     "Grotesk",
+     "Rubik"
+    ],
+    "fx": [
+     "bob",
+     "none",
+     "tilt"
+    ],
+    "palette": [
+     "britRed",
+     "chalk",
+     "newsprint",
+     "parka",
+     "sunsetInk",
+     "weezBlue"
+    ]
+   },
+   "name": "Weezer",
+   "playable": {
+    "backdrop": [
+     "flat",
+     "skyGrad",
+     "sunset",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "ease",
+     "fadeUp",
+     "hop",
+     "pop",
+     "swagger"
+    ],
+    "exit": [
+     "drift",
+     "fadeShort",
+     "snapOut",
+     "up"
+    ],
+    "font": [
+     "Archivo",
+     "Elite",
+     "Grotesk",
+     "Rubik"
+    ],
+    "fx1": [
+     "bob",
+     "none",
+     "tilt"
+    ],
+    "fx2": [
+     "bob",
+     "none",
+     "tilt"
+    ],
+    "paletteByBackdrop": {
+     "flat": [
+      "britRed",
+      "chalk",
+      "newsprint",
+      "parka",
+      "weezBlue"
+     ],
+     "skyGrad": [
+      "britRed",
+      "chalk",
+      "newsprint",
+      "parka",
+      "weezBlue"
+     ],
+     "sunset": [
+      "britRed",
+      "chalk",
+      "newsprint",
+      "sunsetInk"
+     ],
+     "tapeLeak": [
+      "britRed",
+      "chalk",
+      "newsprint",
+      "parka",
+      "weezBlue"
+     ],
+     "void": [
+      "britRed",
+      "chalk",
+      "newsprint",
+      "parka",
+      "weezBlue"
+     ]
+    }
+   }
   }
  ],
  "generatedBy": "ExistingBandCandidatesTests/printTheBaseline()",
  "schema": 1,
- "sourceRevision": "be91ed3"
+ "sourceRevision": "c55b32b"
 }

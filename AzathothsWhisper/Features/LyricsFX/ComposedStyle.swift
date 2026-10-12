@@ -181,6 +181,8 @@ enum ComposedStyle {
         let misregistered = style.effects.contains(.misreg)
         let reflected = style.effects.contains(.reflect)
         let papered = style.effects.contains(.ransom)
+        let split = style.effects.contains(.rgbsplit)
+        let firstGhost = frame.ghosts.count
         for glyph in laid.glyphs {
             let personality = personalities[glyph.index]
             guard let transform = glyphTransform(glyph, personality: personality, entry: entry, time: time, size: size, em: em, style: style, rowWidth: laid.rowWidths[glyph.row]) else { continue }
@@ -207,9 +209,19 @@ enum ComposedStyle {
             }
             emit(
                 base, glyphWidth: glyph.width, center: center, transform: transform, misregistered: misregistered, reflected: reflected,
-                paper: papered ? paperScrap(seed: glyphSeed, width: advance) : nil, random: &random, into: &frame
+                paper: papered ? paperScrap(seed: glyphSeed, width: advance) : nil,
+                split: split ? splitOffset(enterProgress: enterProgress(personality, time: time)) : 0, random: &random, into: &frame
             )
         }
+        if split { groupSplitCopies(from: firstGhost, in: &frame) }
+    }
+
+    /// 紅、藍副本逐字交錯時，繪製端相鄰同色才合成一次填色，會退化成每份副本各填一次；
+    /// 本行的副本改成「其他殘影 → 全部紅 → 全部藍」（副本只稍微重疊，畫面差異可忽略）
+    private static func groupSplitCopies(from start: Int, in frame: inout FramePlan) {
+        let line = frame.ghosts[start...]
+        frame.ghosts.replaceSubrange(start..., with: line.filter { $0.color != .splitRed && $0.color != .splitBlue }
+            + line.filter { $0.color == .splitRed } + line.filter { $0.color == .splitBlue })
     }
 
     /// 進場（進度 0…1）＋落定後的停留＋退場三段合成；還沒出場或已過壽命（彈片硬切）＝nil
@@ -217,7 +229,7 @@ enum ComposedStyle {
         _ glyph: LaidGlyph, personality: GlyphPersonality, entry: VisibleLine, time: Double, size: CGSize, em: CGFloat,
         style: ResolvedStyle, rowWidth: CGFloat
     ) -> GlyphTransform? {
-        let progress = FXEasing.clamp01((time - personality.start) / max(personality.duration, 1e-6))
+        let progress = enterProgress(personality, time: time)
         guard progress > 0 else { return nil }
         if style.enter.expires, time > personality.start + personality.lifetime { return nil }
         let context = GlyphContext(
@@ -230,10 +242,22 @@ enum ComposedStyle {
         return transform
     }
 
+    static func enterProgress(_ personality: GlyphPersonality, time: Double) -> Double {
+        FXEasing.clamp01((time - personality.start) / max(personality.duration, 1e-6))
+    }
+
+    /// RGB 分離：進場前半段左右各偏 6 點、到一半時合攏（原型 rgbsplit，`6*(1-p*2)`）；之後不畫
+    static let splitReach: CGFloat = 6
+    static let splitOpacity = 0.9
+
+    static func splitOffset(enterProgress p: Double) -> CGFloat {
+        p < 0.5 ? splitReach * CGFloat(1 - p * 2) : 0
+    }
+
     /// 依效果把一個字放進繪製指令：殘影（只畫副本、不畫本體）、負片（色塊＋底色字）、影印錯位（黑影＋白光＋本體）或本體
     private static func emit(
         _ base: GlyphDraw, glyphWidth: CGFloat, center: CGPoint, transform: GlyphTransform, misregistered: Bool, reflected: Bool,
-        paper: PaperScrap?, random: inout SplitMix64, into frame: inout FramePlan
+        paper: PaperScrap?, split: CGFloat, random: inout SplitMix64, into frame: inout FramePlan
     ) {
         let alpha = base.opacity
         if transform.ghost > 0 {
@@ -267,6 +291,11 @@ enum ComposedStyle {
                 var mirror = base.shifted(dx: 0, dy: base.fontSize * reflectionOffset, opacity: alpha * reflectionAlpha, color: .fg)
                 mirror.scaleY = -base.scaleY
                 frame.ghosts.append(mirror)
+            }
+            // 原型以 lighter 疊在字上；這裡畫成字下方的兩份半透明副本（沒有加亮混色）
+            if split > 0 {
+                frame.ghosts.append(base.shifted(dx: -split, dy: 0, opacity: alpha * splitOpacity, color: .splitRed))
+                frame.ghosts.append(base.shifted(dx: split, dy: 0, opacity: alpha * splitOpacity, color: .splitBlue))
             }
             frame.glyphs.append(base)
         }

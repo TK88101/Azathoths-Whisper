@@ -128,6 +128,15 @@ final class LyricsFXUITests: AppUITestCase {
         waitForRecipe({ ["Rubik", "Archivo", "Elite", "Grotesk"].contains($0) }, "Weezer 應抽到 power pop 群字型")
     }
 
+    /// B2 批 3：Nu-metal 新進表的團同樣不看曲風——Linkin Park 曲風寫 Hard Rock，仍得到數位 Nu-metal 群的字型
+    func testASignedNuMetalBandGetsItsComposedStyleRegardlessOfGenre() {
+        start(.lyricsFX, extra: [
+            Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.artistVariable: "Linkin Park", LyricsFXPreviewFixture.genreVariable: "Hard Rock",
+        ])
+        waitForStyle("lyricsFX")
+        waitForRecipe({ ["Anton", "BlackOps", "SpaceMono", "Marker", "Grotesk"].contains($0) }, "Linkin Park 應抽到數位 Nu-metal 群字型")
+    }
+
     /// I-18：認不得的曲風 → mono
     func testAnUnknownGenreStaysMono() {
         start(.lyricsFX, extra: [Scenario.raisedStyleVariable: "lyricsFX"])

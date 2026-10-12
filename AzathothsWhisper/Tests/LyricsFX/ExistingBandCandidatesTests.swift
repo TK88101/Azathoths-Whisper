@@ -74,15 +74,16 @@ struct ExistingBandCandidatesTests {
     @Test func theBaselineCoversEveryBandThatWasInTheTableWhenItWasTaken() throws {
         let baseline = try BandCandidatesBaseline.load()
         #expect(baseline.schema == 1)
-        #expect(!baseline.sourceRevision.isEmpty)
-        #expect(Set(baseline.bands.map(\.name)) == Set((SongProfileResolver.batchOne + SongProfileResolver.batchTwo).map(\.name)))
+        // B2 批 3 計劃 §4.3：基線在批 2 合併後的 main（c55b32b）重產
+        #expect(baseline.sourceRevision == "c55b32b")
+        #expect(Set(baseline.bands.map(\.name)) == Set((SongProfileResolver.batchOne + SongProfileResolver.batchTwo + SongProfileResolver.batchThree).map(\.name)))
     }
 
     /// 合格集合或可抽空間與基線不同的既有團，必須正好是各批對照檔裡簽了「新版」或「單色」的連帶團，而且變成的樣子就是簽的那個樣子；
     /// 簽「現狀」的與其他團一樣要零差異
     @Test func existingBandsOnlyChangeWhereTheUserSignedIt() throws {
         let baseline = try BandCandidatesBaseline.load()
-        let linked = Dictionary(uniqueKeysWithValues: try SignedBatchFile.linkedBands(batches: [2]).map { ($0.name, $0) })
+        let linked = Dictionary(uniqueKeysWithValues: try SignedBatchFile.linkedBands(batches: Self.batchesAfterTheBaseline).map { ($0.name, $0) })
         var changed: Set<String> = []
         for before in baseline.bands {
             guard let band = SongProfileResolver.bandTable.first(where: { $0.name == before.name }) else {
@@ -105,9 +106,20 @@ struct ExistingBandCandidatesTests {
         #expect(changed == expected, "簽了要變卻沒變的團：\(expected.subtracting(changed).sorted())")
     }
 
-    /// 批 1 的九團是使用者在真視窗簽過的，後面的批次不得把它們列為連帶
-    @Test func theBandsSignedInBatchOneAreNeverLinked() throws {
-        let linked = Set(try SignedBatchFile.linkedBands(batches: [2]).map(\.name))
-        #expect(linked.isDisjoint(with: SongProfileResolver.batchTwo.map(\.name)))
+    /// 基線之後才簽的批次（基線已含批 2 的結果，B2 批 3 計劃 §4.3）
+    static let batchesAfterTheBaseline = [3]
+
+    /// 批 1、批 2 的新團是使用者在真視窗簽過的，後面的批次不得把它們列為連帶
+    @Test func theBandsSignedInEarlierBatchesAreNeverLinked() throws {
+        let linked = Set(try SignedBatchFile.linkedBands(batches: Self.batchesAfterTheBaseline).map(\.name))
+        #expect(linked.isDisjoint(with: (SongProfileResolver.batchTwo + SongProfileResolver.batchThree).map(\.name)))
+    }
+
+    /// 連帶團必須是基線裡就有的既有團；本批的新團不得冒充連帶（B2 批 3 計劃 §4.3、附錄 A.1 #2）
+    @Test func linkedBandsAreExistingBandsAndNeverThisBatchsNewBands() throws {
+        let baseline = Set(try BandCandidatesBaseline.load().bands.map(\.name))
+        let linked = try SignedBatchFile.linkedBands(batches: Self.batchesAfterTheBaseline).map(\.name)
+        #expect(Set(linked).isSubset(of: baseline), "不在基線的連帶團：\(Set(linked).subtracting(baseline).sorted())")
+        #expect(Set(linked).isDisjoint(with: SongProfileResolver.batchFour.map(\.name)))
     }
 }
