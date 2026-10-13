@@ -137,6 +137,15 @@ final class LyricsFXUITests: AppUITestCase {
         waitForRecipe({ ["Anton", "BlackOps", "SpaceMono", "Marker", "Grotesk"].contains($0) }, "Linkin Park 應抽到數位 Nu-metal 群字型")
     }
 
+    /// B2 批 4：emo 群新進表的團同樣不看曲風——My Chemical Romance 曲風寫 Alternative，仍得到 emo 群的字型
+    func testASignedEmoBandGetsItsComposedStyleRegardlessOfGenre() {
+        start(.lyricsFX, extra: [
+            Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.artistVariable: "My Chemical Romance", LyricsFXPreviewFixture.genreVariable: "Alternative",
+        ])
+        waitForStyle("lyricsFX")
+        waitForRecipe({ ["IMFell", "RockSalt", "CourierPrime", "ShadowsLight"].contains($0) }, "My Chemical Romance 應抽到 emo 群字型")
+    }
+
     /// I-18：認不得的曲風 → mono
     func testAnUnknownGenreStaysMono() {
         start(.lyricsFX, extra: [Scenario.raisedStyleVariable: "lyricsFX"])

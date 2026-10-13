@@ -224,7 +224,8 @@ MIT —— 見 [LICENSE](LICENSE)。
 | Abril Fatface, Alfa Slab One, Anton, Archivo Black, Bebas Neue, Bungee, Oswald, Playfair Display, Righteous | SIL Open Font License 1.1 |
 | Bangers, Dela Gothic One, Gochi Hand, Lilita One, Rubik, Saira Stencil One | SIL Open Font License 1.1 |
 | Barrio, Black Ops One, Space Mono | SIL Open Font License 1.1 |
-| Special Elite, Syncopate, Permanent Marker | Apache License 2.0 |
+| Courier Prime, IM Fell English SC, Shadows Into Light | SIL Open Font License 1.1 |
+| Special Elite, Syncopate, Permanent Marker, Rock Salt | Apache License 2.0 |
 | Catacombs（ToughCrest Studio） | 個人與商業用途免費；再散布須署名 ToughCrest Studio |
 | Cenobyte（Chad Savage）、Mirage Gothic、Dark Metal | 商用條款未確認（Cenobyte 只寫「Freeware」；Mirage Gothic 內嵌「All rights reserved」；Dark Metal 無授權檔）。維護者自行承擔風險收錄 |
 | Material Symbols | Apache License 2.0 |

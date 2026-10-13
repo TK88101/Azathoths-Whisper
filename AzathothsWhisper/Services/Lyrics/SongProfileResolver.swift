@@ -16,9 +16,15 @@ enum FXTag: String, CaseIterable, Sendable {
     case melodichc, ska, powerpop, poprock
     /// B2 批 3（Nu-metal）：本批新團的私有子標籤，新團不帶 `nu`／`hardcore`（計劃 §2.4 N1）
     case altmetal, rapmetal, cybermetal, horrormetal, gothmetal, latinmetal
+    /// B2 批 4（emo 群）：**本批私有**標籤（計劃 §2.2 E1）。`posthardcore`、`emopop` 看起來像一般曲風名，但不是公共曲風標籤——
+    /// 日後的團要重用，得重走連帶預檢、簽字與基線流程
+    case emo, posthardcore, indieemo, emopop
 
     /// Nu 系標籤：任何一個都不得與 `industrial` 掛在同一個元件上（P10；B2 批 3 計劃 §2.4 N1）。新立的 Nu 系子標籤要加進來
     static let nuFamily: Set<FXTag> = [.nu, .altmetal, .rapmetal, .cybermetal, .horrormetal, .gothmetal, .latinmetal]
+
+    /// B2 批 4（emo 群）的私有標籤：本批新團只帶這些、新元件也只帶這些，既有團一個都不帶（B2 批 4 計劃 §2.2 E1）。
+    static let emoFamily: Set<FXTag> = [.emo, .posthardcore, .indieemo, .emopop]
 }
 
 /// 歌曲目標值
@@ -57,7 +63,7 @@ enum SongProfileResolver {
         var keys: [String] { ([name] + aliases).map(SongProfileResolver.normalizedArtist) }
     }
 
-    static let bandTable: [BandEntry] = batchOne + batchTwo + batchThree + batchFour
+    static let bandTable: [BandEntry] = batchOne + batchTwo + batchThree + batchFour + batchFive
 
     /// B1：抄自原型的 28 團
     static let batchOne: [BandEntry] = bandTargets.map { BandEntry(name: $0.0, profile: $0.1) }
@@ -101,6 +107,19 @@ enum SongProfileResolver {
         BandEntry(name: "Evanescence", profile: SongProfile(axes: [.raw: 0.15, .theatrical: 0.9, .cold: 0.45, .aggression: 0.5, .speed: 0.4, .elegance: 0.8, .decay: 0.4, .bright: 0.15, .bounce: 0.05, .warm: 0.3], tags: [.gothmetal])),
         BandEntry(name: "Ill Niño", profile: SongProfile(axes: [.raw: 0.6, .theatrical: 0.5, .cold: 0.1, .aggression: 0.8, .speed: 0.7, .elegance: 0.2, .decay: 0.35, .bright: 0.35, .bounce: 0.5, .warm: 0.7], tags: [.latinmetal])),
         BandEntry(name: "Static-X", profile: SongProfile(axes: [.raw: 0.5, .theatrical: 0.45, .cold: 0.75, .aggression: 0.8, .speed: 0.85, .elegance: 0.05, .decay: 0.3, .bright: 0.35, .bounce: 0.5, .warm: 0.05], tags: [.cybermetal, .altmetal])),
+    ]
+
+    /// B2 批 4（表內第五段，emo 群）：使用者 2026-10-13 看原型探針後簽字（P16）；值與 `Tests/Fixtures/LyricsFX/b2-batch4-signed.json` 一致
+    /// （`B2BatchFourSignedFixtureTests` 把關）。只帶 `FXTag.emoFamily` 的標籤；
+    /// 合作寫法 `The Used & My Chemical Romance` 使用者沒指定歸屬，不列別名
+    static let batchFive: [BandEntry] = [
+        BandEntry(name: "The Used", profile: SongProfile(axes: [.raw: 0.65, .theatrical: 0.6, .cold: 0.3, .aggression: 0.7, .speed: 0.65, .elegance: 0.2, .decay: 0.55, .bright: 0.25, .bounce: 0.25, .warm: 0.3], tags: [.emo, .posthardcore])),
+        BandEntry(name: "My Chemical Romance", profile: SongProfile(axes: [.raw: 0.4, .theatrical: 0.9, .cold: 0.3, .aggression: 0.6, .speed: 0.65, .elegance: 0.5, .decay: 0.5, .bright: 0.3, .bounce: 0.35, .warm: 0.3], tags: [.emo])),
+        BandEntry(name: "Death Cab for Cutie", profile: SongProfile(axes: [.raw: 0.2, .theatrical: 0.3, .cold: 0.5, .aggression: 0.1, .speed: 0.3, .elegance: 0.65, .decay: 0.2, .bright: 0.5, .bounce: 0.15, .warm: 0.45], tags: [.indieemo])),
+        BandEntry(name: "A Day to Remember", profile: SongProfile(axes: [.raw: 0.5, .theatrical: 0.35, .cold: 0.15, .aggression: 0.7, .speed: 0.8, .elegance: 0.1, .decay: 0.2, .bright: 0.55, .bounce: 0.6, .warm: 0.45], tags: [.posthardcore, .emopop])),
+        BandEntry(name: "New Found Glory", profile: SongProfile(axes: [.raw: 0.35, .theatrical: 0.3, .cold: 0.1, .aggression: 0.4, .speed: 0.8, .elegance: 0.15, .decay: 0.1, .bright: 0.75, .bounce: 0.7, .warm: 0.6], tags: [.emopop])),
+        BandEntry(name: "You Me At Six", profile: SongProfile(axes: [.raw: 0.3, .theatrical: 0.45, .cold: 0.25, .aggression: 0.4, .speed: 0.6, .elegance: 0.35, .decay: 0.15, .bright: 0.55, .bounce: 0.4, .warm: 0.45], tags: [.emopop])),
+        BandEntry(name: "The Story So Far", profile: SongProfile(axes: [.raw: 0.6, .theatrical: 0.2, .cold: 0.2, .aggression: 0.6, .speed: 0.85, .elegance: 0.05, .decay: 0.25, .bright: 0.5, .bounce: 0.45, .warm: 0.4], tags: [.emopop])),
     ]
 
     /// 正規化後撞鍵的名字（跨正式名與別名）；表要維持空集合（`ArtistOverrideTableTests`）

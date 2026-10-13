@@ -63,7 +63,9 @@ struct LyricsFXProbeRenderTests {
                      "OFL-AbrilFatface", "OFL-AlfaSlabOne", "OFL-Anton", "OFL-ArchivoBlack", "OFL-BebasNeue", "OFL-Bungee", "LICENSE-SpecialElite",
                      "OFL-Oswald", "OFL-PlayfairDisplay", "OFL-Righteous", "LICENSE-Syncopate",
                      // B2 批 2
-                     "OFL-Bangers", "LICENSE-PermanentMarker", "OFL-SairaStencilOne", "OFL-Rubik", "OFL-LilitaOne", "OFL-GochiHand", "OFL-DelaGothicOne"] {
+                     "OFL-Bangers", "LICENSE-PermanentMarker", "OFL-SairaStencilOne", "OFL-Rubik", "OFL-LilitaOne", "OFL-GochiHand", "OFL-DelaGothicOne",
+                     // B2 批 3、批 4
+                     "OFL-Barrio", "OFL-BlackOpsOne", "OFL-SpaceMono", "LICENSE-RockSalt", "OFL-IMFellEnglishSC", "OFL-CourierPrime", "OFL-ShadowsIntoLight"] {
             #expect(Bundle.main.url(forResource: name, withExtension: "txt") != nil, "\(name)")
         }
     }

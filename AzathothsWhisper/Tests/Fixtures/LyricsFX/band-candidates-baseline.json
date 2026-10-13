@@ -939,66 +939,100 @@
    "eligible": {
     "backdrop": [
      "film",
+     "grid",
+     "scan",
      "void"
     ],
     "enter": [
+     "drop",
      "slam",
      "slide",
-     "stamp"
+     "stamp",
+     "tumble",
+     "type"
     ],
     "exit": [
-     "cut"
+     "bands",
+     "cut",
+     "slideOut"
     ],
     "font": [
      "Anton",
+     "BlackOps",
      "Oswald"
     ],
     "fx": [
      "misreg",
      "none",
+     "rgbsplit",
      "shake",
      "thump"
     ],
     "palette": [
-     "ashGrey"
+     "acid",
+     "ashGrey",
+     "mono"
     ]
    },
    "name": "Hatebreed",
    "playable": {
     "backdrop": [
      "film",
+     "grid",
+     "scan",
      "void"
     ],
     "enter": [
+     "drop",
      "slam",
-     "slide",
-     "stamp"
+     "stamp",
+     "tumble",
+     "type"
     ],
     "exit": [
-     "cut"
+     "bands",
+     "cut",
+     "slideOut"
     ],
     "font": [
      "Anton",
+     "BlackOps",
      "Oswald"
     ],
     "fx1": [
      "misreg",
      "none",
+     "rgbsplit",
      "shake",
      "thump"
     ],
     "fx2": [
      "misreg",
      "none",
+     "rgbsplit",
      "shake",
      "thump"
     ],
     "paletteByBackdrop": {
      "film": [
-      "ashGrey"
+      "acid",
+      "ashGrey",
+      "mono"
+     ],
+     "grid": [
+      "acid",
+      "ashGrey",
+      "mono"
+     ],
+     "scan": [
+      "acid",
+      "ashGrey",
+      "mono"
      ],
      "void": [
-      "ashGrey"
+      "acid",
+      "ashGrey",
+      "mono"
      ]
     }
    }
@@ -1358,23 +1392,80 @@
   {
    "eligible": {
     "backdrop": [
+     "grid",
+     "scan",
      "void"
     ],
     "enter": [
+     "drop",
      "slide",
-     "stamp"
+     "stamp",
+     "type"
     ],
-    "exit": [],
+    "exit": [
+     "bands",
+     "slideOut"
+    ],
     "font": [
-     "Anton"
+     "Anton",
+     "BlackOps"
     ],
     "fx": [
      "none",
+     "rgbsplit",
      "shake"
     ],
-    "palette": []
+    "palette": [
+     "acid",
+     "mono"
+    ]
    },
-   "name": "Korn"
+   "name": "Korn",
+   "playable": {
+    "backdrop": [
+     "grid",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "slide",
+     "stamp",
+     "type"
+    ],
+    "exit": [
+     "bands",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "BlackOps"
+    ],
+    "fx1": [
+     "none",
+     "rgbsplit",
+     "shake"
+    ],
+    "fx2": [
+     "none",
+     "rgbsplit",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "grid": [
+      "acid",
+      "mono"
+     ],
+     "scan": [
+      "acid",
+      "mono"
+     ],
+     "void": [
+      "acid",
+      "mono"
+     ]
+    }
+   }
   },
   {
    "eligible": {
@@ -4281,9 +4372,1077 @@
      ]
     }
    }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "gig",
+     "grid",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "flip",
+     "kick",
+     "slide",
+     "stamp",
+     "type"
+    ],
+    "exit": [
+     "bands",
+     "cut",
+     "dropOut",
+     "scatter",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bangers",
+     "BlackOps",
+     "Grotesk",
+     "Marker",
+     "SpaceMono"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "rgbsplit",
+     "thump",
+     "wobble"
+    ],
+    "palette": [
+     "acid",
+     "gigRed",
+     "hazard",
+     "hybridGrey",
+     "mono",
+     "prismBlack",
+     "terminal"
+    ]
+   },
+   "name": "Linkin Park",
+   "playable": {
+    "backdrop": [
+     "gig",
+     "grid",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "flip",
+     "kick",
+     "slide",
+     "stamp",
+     "type"
+    ],
+    "exit": [
+     "bands",
+     "cut",
+     "dropOut",
+     "scatter",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "BlackOps",
+     "Grotesk",
+     "Marker",
+     "SpaceMono"
+    ],
+    "fx1": [
+     "jitter",
+     "none",
+     "rgbsplit",
+     "thump",
+     "wobble"
+    ],
+    "fx2": [
+     "jitter",
+     "none",
+     "rgbsplit",
+     "thump",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "gig": [
+      "acid",
+      "gigRed",
+      "hybridGrey",
+      "mono",
+      "terminal"
+     ],
+     "grid": [
+      "acid",
+      "gigRed",
+      "hybridGrey",
+      "mono",
+      "terminal"
+     ],
+     "scan": [
+      "acid",
+      "gigRed",
+      "hybridGrey",
+      "mono",
+      "terminal"
+     ],
+     "void": [
+      "acid",
+      "gigRed",
+      "hybridGrey",
+      "mono",
+      "terminal"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "film",
+     "gig",
+     "smokeHaze",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "drop",
+     "slam",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bebas",
+     "BlackOps",
+     "Elite",
+     "Oswald"
+    ],
+    "fx": [
+     "jitter",
+     "misreg",
+     "none",
+     "shake",
+     "thump"
+    ],
+    "palette": [
+     "ampRed",
+     "ashGrey",
+     "bloodBlack",
+     "gigRed",
+     "rust"
+    ]
+   },
+   "name": "Slipknot",
+   "playable": {
+    "backdrop": [
+     "film",
+     "gig",
+     "smokeHaze",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "drop",
+     "slam",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bebas",
+     "BlackOps",
+     "Elite",
+     "Oswald"
+    ],
+    "fx1": [
+     "jitter",
+     "misreg",
+     "none",
+     "shake",
+     "thump"
+    ],
+    "fx2": [
+     "jitter",
+     "misreg",
+     "none",
+     "shake",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "film": [
+      "ampRed",
+      "ashGrey",
+      "bloodBlack",
+      "gigRed",
+      "rust"
+     ],
+     "gig": [
+      "ampRed",
+      "ashGrey",
+      "bloodBlack",
+      "gigRed",
+      "rust"
+     ],
+     "smokeHaze": [
+      "ampRed",
+      "ashGrey",
+      "bloodBlack",
+      "gigRed",
+      "rust"
+     ],
+     "void": [
+      "ampRed",
+      "ashGrey",
+      "bloodBlack",
+      "gigRed",
+      "rust"
+     ],
+     "xerox": [
+      "ampRed",
+      "ashGrey",
+      "bloodBlack",
+      "gigRed",
+      "rust"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "film",
+     "gig",
+     "smokeHaze",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "drop",
+     "slam",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bebas",
+     "BlackOps",
+     "Elite",
+     "Oswald"
+    ],
+    "fx": [
+     "jitter",
+     "misreg",
+     "none",
+     "shake",
+     "thump"
+    ],
+    "palette": [
+     "ampRed",
+     "ashGrey",
+     "bloodBlack",
+     "gigRed",
+     "rust"
+    ]
+   },
+   "name": "Stone Sour",
+   "playable": {
+    "backdrop": [
+     "film",
+     "gig",
+     "smokeHaze",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "drop",
+     "slam",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bebas",
+     "BlackOps",
+     "Elite",
+     "Oswald"
+    ],
+    "fx1": [
+     "jitter",
+     "misreg",
+     "none",
+     "shake",
+     "thump"
+    ],
+    "fx2": [
+     "jitter",
+     "misreg",
+     "none",
+     "shake",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "film": [
+      "ampRed",
+      "ashGrey",
+      "bloodBlack",
+      "gigRed",
+      "rust"
+     ],
+     "gig": [
+      "ampRed",
+      "ashGrey",
+      "bloodBlack",
+      "gigRed",
+      "rust"
+     ],
+     "smokeHaze": [
+      "ampRed",
+      "ashGrey",
+      "bloodBlack",
+      "gigRed",
+      "rust"
+     ],
+     "void": [
+      "ampRed",
+      "ashGrey",
+      "bloodBlack",
+      "gigRed",
+      "rust"
+     ],
+     "xerox": [
+      "ampRed",
+      "ashGrey",
+      "bloodBlack",
+      "gigRed",
+      "rust"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "gig",
+     "shafts",
+     "smokeHaze",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "rise",
+     "slide",
+     "smoke",
+     "stamp",
+     "swoop"
+    ],
+    "exit": [
+     "dissolve",
+     "fade",
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bebas",
+     "Cinzel",
+     "CormorantIt",
+     "Mirage",
+     "Oswald"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect",
+     "shake",
+     "thump"
+    ],
+    "palette": [
+     "ampRed",
+     "bloodBlack",
+     "gigRed",
+     "ice",
+     "prismBlack",
+     "rust"
+    ]
+   },
+   "name": "Flyleaf",
+   "playable": {
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "gig",
+     "shafts",
+     "smokeHaze"
+    ],
+    "enter": [
+     "drop",
+     "slide",
+     "smoke",
+     "stamp",
+     "swoop"
+    ],
+    "exit": [
+     "dissolve",
+     "fade",
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bebas",
+     "Cinzel",
+     "Mirage",
+     "Oswald"
+    ],
+    "fx1": [
+     "breathe",
+     "glow",
+     "reflect",
+     "shake",
+     "thump"
+    ],
+    "fx2": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect",
+     "shake",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "ash": [
+      "ampRed",
+      "bloodBlack",
+      "gigRed",
+      "prismBlack",
+      "rust"
+     ],
+     "crimsonFog": [
+      "ampRed",
+      "bloodBlack",
+      "gigRed",
+      "prismBlack",
+      "rust"
+     ],
+     "gig": [
+      "ampRed",
+      "bloodBlack",
+      "gigRed",
+      "prismBlack",
+      "rust"
+     ],
+     "shafts": [
+      "ampRed",
+      "bloodBlack",
+      "gigRed",
+      "prismBlack",
+      "rust"
+     ],
+     "smokeHaze": [
+      "ampRed",
+      "bloodBlack",
+      "gigRed",
+      "prismBlack",
+      "rust"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "gig",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "bands",
+     "dropOut",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bangers",
+     "Marker"
+    ],
+    "fx": [
+     "none",
+     "thump",
+     "wobble"
+    ],
+    "palette": [
+     "acid",
+     "gigRed",
+     "hazard",
+     "hybridGrey",
+     "mono"
+    ]
+   },
+   "name": "Limp Bizkit",
+   "playable": {
+    "backdrop": [
+     "gig",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "bands",
+     "dropOut",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bangers",
+     "Marker"
+    ],
+    "fx1": [
+     "none",
+     "thump",
+     "wobble"
+    ],
+    "fx2": [
+     "none",
+     "thump",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "gig": [
+      "acid",
+      "gigRed",
+      "hazard",
+      "hybridGrey",
+      "mono"
+     ],
+     "scan": [
+      "acid",
+      "gigRed",
+      "hazard",
+      "hybridGrey",
+      "mono"
+     ],
+     "void": [
+      "acid",
+      "gigRed",
+      "hazard",
+      "hybridGrey",
+      "mono"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "gig",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "bands",
+     "dropOut",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bangers",
+     "Marker"
+    ],
+    "fx": [
+     "none",
+     "thump",
+     "wobble"
+    ],
+    "palette": [
+     "acid",
+     "gigRed",
+     "hazard",
+     "hybridGrey",
+     "mono"
+    ]
+   },
+   "name": "P.O.D.",
+   "playable": {
+    "backdrop": [
+     "gig",
+     "scan",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "bands",
+     "dropOut",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bangers",
+     "Marker"
+    ],
+    "fx1": [
+     "none",
+     "thump",
+     "wobble"
+    ],
+    "fx2": [
+     "none",
+     "thump",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "gig": [
+      "acid",
+      "gigRed",
+      "hazard",
+      "hybridGrey",
+      "mono"
+     ],
+     "scan": [
+      "acid",
+      "gigRed",
+      "hazard",
+      "hybridGrey",
+      "mono"
+     ],
+     "void": [
+      "acid",
+      "gigRed",
+      "hazard",
+      "hybridGrey",
+      "mono"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "gig",
+     "smokeHaze",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bebas",
+     "Oswald"
+    ],
+    "fx": [
+     "none",
+     "shake",
+     "thump"
+    ],
+    "palette": [
+     "ampRed",
+     "gigRed",
+     "rust"
+    ]
+   },
+   "name": "Adema",
+   "playable": {
+    "backdrop": [
+     "gig",
+     "smokeHaze",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bebas",
+     "Oswald"
+    ],
+    "fx1": [
+     "none",
+     "shake",
+     "thump"
+    ],
+    "fx2": [
+     "none",
+     "shake",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "gig": [
+      "ampRed",
+      "gigRed",
+      "rust"
+     ],
+     "smokeHaze": [
+      "ampRed",
+      "gigRed",
+      "rust"
+     ],
+     "void": [
+      "ampRed",
+      "gigRed",
+      "rust"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "shafts",
+     "void"
+    ],
+    "enter": [
+     "rise",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "dissolve",
+     "fade"
+    ],
+    "font": [
+     "Cinzel",
+     "CormorantIt",
+     "Mirage"
+    ],
+    "fx": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "palette": [
+     "bloodBlack",
+     "ice",
+     "prismBlack"
+    ]
+   },
+   "name": "Evanescence",
+   "playable": {
+    "backdrop": [
+     "ash",
+     "crimsonFog",
+     "shafts",
+     "void"
+    ],
+    "enter": [
+     "rise",
+     "smoke",
+     "swoop"
+    ],
+    "exit": [
+     "dissolve",
+     "fade"
+    ],
+    "font": [
+     "Cinzel",
+     "CormorantIt",
+     "Mirage"
+    ],
+    "fx1": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "fx2": [
+     "breathe",
+     "glow",
+     "none",
+     "reflect"
+    ],
+    "paletteByBackdrop": {
+     "ash": [
+      "bloodBlack",
+      "ice",
+      "prismBlack"
+     ],
+     "crimsonFog": [
+      "bloodBlack",
+      "ice",
+      "prismBlack"
+     ],
+     "shafts": [
+      "bloodBlack",
+      "ice",
+      "prismBlack"
+     ],
+     "void": [
+      "bloodBlack",
+      "ice",
+      "prismBlack"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "embers",
+     "smokeHaze",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "stamp",
+     "swagger"
+    ],
+    "exit": [
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "AlfaSlab",
+     "Barrio"
+    ],
+    "fx": [
+     "flicker",
+     "none",
+     "thump"
+    ],
+    "palette": [
+     "ampRed",
+     "sangre",
+     "whiskey"
+    ]
+   },
+   "name": "Ill Niño",
+   "playable": {
+    "backdrop": [
+     "embers",
+     "smokeHaze",
+     "void"
+    ],
+    "enter": [
+     "kick",
+     "stamp",
+     "swagger"
+    ],
+    "exit": [
+     "fall",
+     "slideOut"
+    ],
+    "font": [
+     "AlfaSlab",
+     "Barrio"
+    ],
+    "fx1": [
+     "flicker",
+     "none",
+     "thump"
+    ],
+    "fx2": [
+     "flicker",
+     "none",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "embers": [
+      "ampRed",
+      "sangre",
+      "whiskey"
+     ],
+     "smokeHaze": [
+      "ampRed",
+      "sangre",
+      "whiskey"
+     ],
+     "void": [
+      "ampRed",
+      "sangre",
+      "whiskey"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "gig",
+     "grid",
+     "scan",
+     "smokeHaze",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "flip",
+     "slide",
+     "stamp",
+     "type"
+    ],
+    "exit": [
+     "bands",
+     "cut",
+     "fall",
+     "scatter",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bebas",
+     "BlackOps",
+     "Grotesk",
+     "Oswald",
+     "SpaceMono"
+    ],
+    "fx": [
+     "jitter",
+     "none",
+     "rgbsplit",
+     "shake",
+     "thump"
+    ],
+    "palette": [
+     "acid",
+     "ampRed",
+     "gigRed",
+     "hybridGrey",
+     "mono",
+     "prismBlack",
+     "rust",
+     "terminal"
+    ]
+   },
+   "name": "Static-X",
+   "playable": {
+    "backdrop": [
+     "gig",
+     "grid",
+     "scan",
+     "smokeHaze",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "flip",
+     "slide",
+     "stamp",
+     "type"
+    ],
+    "exit": [
+     "bands",
+     "cut",
+     "fall",
+     "scatter",
+     "slideOut"
+    ],
+    "font": [
+     "Anton",
+     "Bebas",
+     "BlackOps",
+     "Oswald",
+     "SpaceMono"
+    ],
+    "fx1": [
+     "jitter",
+     "none",
+     "rgbsplit",
+     "shake",
+     "thump"
+    ],
+    "fx2": [
+     "jitter",
+     "none",
+     "rgbsplit",
+     "shake",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "gig": [
+      "acid",
+      "gigRed",
+      "hybridGrey",
+      "mono",
+      "terminal"
+     ],
+     "grid": [
+      "acid",
+      "gigRed",
+      "hybridGrey",
+      "mono",
+      "terminal"
+     ],
+     "scan": [
+      "acid",
+      "gigRed",
+      "hybridGrey",
+      "mono",
+      "terminal"
+     ],
+     "smokeHaze": [
+      "acid",
+      "gigRed",
+      "hybridGrey",
+      "mono",
+      "terminal"
+     ],
+     "void": [
+      "acid",
+      "gigRed",
+      "hybridGrey",
+      "mono",
+      "terminal"
+     ]
+    }
+   }
   }
  ],
  "generatedBy": "ExistingBandCandidatesTests/printTheBaseline()",
  "schema": 1,
- "sourceRevision": "c55b32b"
+ "sourceRevision": "c6e0a53"
 }

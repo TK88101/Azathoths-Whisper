@@ -170,6 +170,15 @@ enum LyricsFXCanvas {
             var layer = context
             layer.opacity = opacity
             layer.fill(Path(path), with: .color(color.color))
+        case .streaks(let streaks, let color, let opacity):
+            let path = CGMutablePath()
+            for streak in streaks {
+                path.move(to: streak.from)
+                path.addLine(to: streak.to)
+            }
+            var lines = context
+            lines.opacity = opacity
+            lines.stroke(Path(path), with: .color(color.color), lineWidth: 1)
         }
     }
 }
