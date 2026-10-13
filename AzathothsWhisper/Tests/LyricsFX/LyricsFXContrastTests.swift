@@ -122,7 +122,7 @@ struct LyricsFXContrastTests {
 
     /// B2 批 2 起的團：抽得到的每組（背景, 配色）都亮暗相容——也就是沒有一組是靠回退抽到的
     @Test func batchThreeNeverFallsBackToAnIncompatiblePalette() {
-        for band in SongProfileResolver.batchThree + SongProfileResolver.batchFour {
+        for band in SongProfileResolver.batchThree + SongProfileResolver.batchFour + SongProfileResolver.batchFive {
             for (backdrop, palettes) in PlayableSpace.of(band.profile)?.paletteByBackdrop ?? [:] {
                 guard case .backdrop(let kind)? = LyricsFXCatalog.component(backdrop)?.payload, let tone = kind.tone else { continue }
                 for palette in palettes {

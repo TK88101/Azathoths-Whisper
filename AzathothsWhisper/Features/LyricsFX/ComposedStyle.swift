@@ -182,6 +182,8 @@ enum ComposedStyle {
         let reflected = style.effects.contains(.reflect)
         let papered = style.effects.contains(.ransom)
         let split = style.effects.contains(.rgbsplit)
+        let weeping = style.effects.contains(.weep)
+        var weeps: [GlyphDraw] = []
         let firstGhost = frame.ghosts.count
         for glyph in laid.glyphs {
             let personality = personalities[glyph.index]
@@ -210,10 +212,35 @@ enum ComposedStyle {
             emit(
                 base, glyphWidth: glyph.width, center: center, transform: transform, misregistered: misregistered, reflected: reflected,
                 paper: papered ? paperScrap(seed: glyphSeed, width: advance) : nil,
-                split: split ? splitOffset(enterProgress: enterProgress(personality, time: time)) : 0, random: &random, into: &frame
+                split: split ? splitOffset(enterProgress: enterProgress(personality, time: time)) : 0,
+                weep: weeping ? weepAmount(age: time - personality.start) : 0, weeps: &weeps, random: &random, into: &frame
             )
         }
         if split { groupSplitCopies(from: firstGhost, in: &frame) }
+        frame.ghosts += groupedByOpacityLevel(weeps)
+    }
+
+    /// 繪製端相鄰同色、同量化透明度才合成一次填色。暈開的副本同色但每字透明度可能不同（燭火閃爍讓每個字各自明滅），
+    /// 照量化階排在一起，一行最多填「階數」次（副本很淡又只稍微重疊，重排後畫面差異可忽略）
+    static func groupedByOpacityLevel(_ copies: [GlyphDraw]) -> [GlyphDraw] {
+        let levels = Dictionary(grouping: copies) { LyricsFXCanvas.opacityLevel($0.opacity) }
+        return levels.keys.sorted(by: >).flatMap { levels[$0] ?? [] }
+    }
+
+    /// 往下暈開（原型 weep）：字出現 0.25 秒後開始，再 1.6 秒拉到最開；三份副本各往下 0.1 字級、越下面越淡
+    static let weepCopies = 3
+    static let weepStep: CGFloat = 0.1
+    static let weepAlpha = 0.18
+    static let weepDelay = 0.25
+    static let weepSpan = 1.6
+
+    static func weepAmount(age: Double) -> Double {
+        FXEasing.clamp01((age - weepDelay) / weepSpan)
+    }
+
+    /// 第 `level` 份副本相對本體的透明度：越下面越淡（0.135、0.09、0.045）
+    static func weepOpacity(level: Int) -> Double {
+        weepAlpha * (1 - Double(level) / Double(weepCopies + 1))
     }
 
     /// 紅、藍副本逐字交錯時，繪製端相鄰同色才合成一次填色，會退化成每份副本各填一次；
@@ -257,7 +284,7 @@ enum ComposedStyle {
     /// 依效果把一個字放進繪製指令：殘影（只畫副本、不畫本體）、負片（色塊＋底色字）、影印錯位（黑影＋白光＋本體）或本體
     private static func emit(
         _ base: GlyphDraw, glyphWidth: CGFloat, center: CGPoint, transform: GlyphTransform, misregistered: Bool, reflected: Bool,
-        paper: PaperScrap?, split: CGFloat, random: inout SplitMix64, into frame: inout FramePlan
+        paper: PaperScrap?, split: CGFloat, weep: Double, weeps: inout [GlyphDraw], random: inout SplitMix64, into frame: inout FramePlan
     ) {
         let alpha = base.opacity
         if transform.ghost > 0 {
@@ -296,6 +323,11 @@ enum ComposedStyle {
             if split > 0 {
                 frame.ghosts.append(base.shifted(dx: -split, dy: 0, opacity: alpha * splitOpacity, color: .splitRed))
                 frame.ghosts.append(base.shifted(dx: split, dy: 0, opacity: alpha * splitOpacity, color: .splitBlue))
+            }
+            if weep > 0 {
+                for level in 1...weepCopies {
+                    weeps.append(base.shifted(dx: 0, dy: base.fontSize * weepStep * CGFloat(level) * CGFloat(weep), opacity: alpha * weepOpacity(level: level), color: .fg))
+                }
             }
             frame.glyphs.append(base)
         }

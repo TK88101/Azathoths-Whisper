@@ -77,6 +77,26 @@ enum ComposedBackdrop {
             return [.hairlines(spacing: 3, color: RGB(hex: 0x000000), opacity: 0.25)]
         case .grid:
             return [.rects(gridLines(size: size, time: time), palette.dim, opacity: 0.5)]
+        // B2 批 4（原型 html 組合模式 draw：雨絲、藍調時刻；只用光與質感）
+        case .rain:
+            return [.streaks(rainStreaks(size: size, time: time), palette.dim, opacity: 0.3)]
+        case .bluehour:
+            return [band(CGPoint(x: 0.5, y: 0.3), CGPoint(x: 0.5, y: 1), 0x3C6EAA, from: 0, to: 0.34), glow(0.22, 0.2, radius: 0.7 * aspect(size), 0xFFD6A0, 0.08)]
+        }
+    }
+
+    static let rainCount = 70
+
+    /// 雨絲：70 條細線各以每秒 260–480 點落下，長度＝畫布高的 4–9%，往左下斜（橫移＝長度的 18%）；越低越偏左，落出底緣後從頂端再來
+    static func rainStreaks(size: CGSize, time: Double) -> [Streak] {
+        var random = SplitMix64(seed: 19)
+        return (0..<rainCount).map { _ in
+            let speed = CGFloat(260 + random.unit() * 220)
+            let startX = CGFloat(random.unit()) * size.width * 1.15, startY = CGFloat(random.unit()) * size.height
+            let length = size.height * CGFloat(0.04 + random.unit() * 0.05)
+            let y = wrap(startY + CGFloat(time) * speed, size.height + length) - length
+            let x = startX - (size.height > 0 ? y / size.height : 0) * size.width * 0.12
+            return Streak(from: CGPoint(x: x, y: y), to: CGPoint(x: x - length * 0.18, y: y + length))
         }
     }
 
@@ -194,7 +214,7 @@ enum ComposedBackdrop {
             return [.vignette(strength: 0.95), .grain(opacity: 0.42, frame: Int(time * 18), overlay: true)] + filmArtefacts(size: size, time: time)
         case .crimsonFog:
             return [.vignette(strength: 0.95), .grain(opacity: 0.05, frame: grainFrame, overlay: false)]
-        case .void, .snow, .ash, .ampGlow, .spot, .smokeHaze, .prism, .stars, .gig, .bokeh:
+        case .void, .snow, .ash, .ampGlow, .spot, .smokeHaze, .prism, .stars, .gig, .bokeh, .rain, .bluehour:
             return [.vignette(strength: 0.7), .grain(opacity: 0.05, frame: grainFrame, overlay: false)]
         case .paper:
             return [.grain(opacity: 0.1, frame: grainFrame, overlay: false)]
