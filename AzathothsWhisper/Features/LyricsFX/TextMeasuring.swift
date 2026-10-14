@@ -82,8 +82,17 @@ final class CoreTextMeasurer: TextMeasuring {
     }
 
     func ascent(face: FontFace, fontSize: CGFloat) -> CGFloat {
+        metric(CTFontGetAscent, face: face, fontSize: fontSize)
+    }
+
+    func descent(face: FontFace, fontSize: CGFloat) -> CGFloat {
+        metric(CTFontGetDescent, face: face, fontSize: fontSize)
+    }
+
+    /// 在快取字級量字型指標、再按字級比例換算
+    private func metric(_ read: (CTFont) -> CGFloat, face: FontFace, fontSize: CGFloat) -> CGFloat {
         let size = UnitGlyphMetrics.cacheSize(for: fontSize, linear: fonts.scalesLinearly(face))
-        return CTFontGetAscent(fonts.font(face, size: size)) * fontSize / size
+        return read(fonts.font(face, size: size)) * fontSize / size
     }
 
     private func measure(_ text: String, font: CTFont) -> [CGFloat] {

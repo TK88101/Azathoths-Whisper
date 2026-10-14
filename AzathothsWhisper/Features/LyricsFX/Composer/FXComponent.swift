@@ -13,14 +13,14 @@ enum BackdropKind: String, Sendable {
     case flat, xerox, gig, checker, bokeh, skyGrad
     /// B2 批 3（Nu-metal）
     case scan, grid
-    /// B2 批 4（emo 群）：rain＝斜落的雨絲；bluehour＝低處冷藍微光＋左上一點暖光
-    case rain, bluehour
+    /// B2 批 4（emo 群）：bluehour＝低處冷藍微光＋左上一點暖光（雨絲 rain 2026-10-14 使用者在 T7 撤掉）
+    case bluehour
 
     /// 這個背景要配暗底還是亮底的配色（nil＝都可以）；組合器在背景之後抽配色時先濾成相容者（B2 計劃 §7.3）。
     /// sunset、shafts 會把整面塗成淺色／深色漸層，等於自帶底色（T3 對比測試抓到：配錯邊時字幾乎看不見）
     var tone: BackdropTone? {
         switch self {
-        case .ampGlow, .spot, .smokeHaze, .prism, .stars, .shafts, .gig, .bokeh, .rain, .bluehour: .dark
+        case .ampGlow, .spot, .smokeHaze, .prism, .stars, .shafts, .gig, .bokeh, .bluehour: .dark
         case .halftone, .sunset: .light
         case .void, .film, .snow, .ash, .crimsonFog, .embers, .haze, .paper, .tapeLeak, .flat, .xerox, .checker, .skyGrad, .scan, .grid: nil
         }
@@ -42,7 +42,7 @@ enum FXEffect: String, Sendable {
     case speedlines, ransom, jitter, tilt
     /// B2 批 3：進場前半段字的左右各一份紅、藍副本（RGB 分離）
     case rgbsplit
-    /// B2 批 4：字停住後往下拖出三份漸淡的副本（墨水往下暈開）
+    /// B2 批 4：字停住後往下拖出 `ComposedStyle.weepCopies` 份漸淡的副本（墨水往下暈開）
     case weep
 }
 

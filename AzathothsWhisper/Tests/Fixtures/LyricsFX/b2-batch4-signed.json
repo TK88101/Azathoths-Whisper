@@ -35,7 +35,6 @@
     "backdrop": [
      "bluehour",
      "gig",
-     "rain",
      "spot",
      "void",
      "xerox"
@@ -101,7 +100,6 @@
     ],
     "backdrop": [
      "bluehour",
-     "rain",
      "spot",
      "void"
     ],
@@ -159,7 +157,6 @@
      "bluehour",
      "bokeh",
      "haze",
-     "rain",
      "tapeLeak",
      "void"
     ],

@@ -172,8 +172,25 @@
 - 無安全敏感改動（無認證、無網路、無新的執行期檔案寫入；字型是一次性下載進 repo），未派 security-reviewer。
 - 評審後全量：**1236 tests／152 suites，0 issues**（比 T0 多 19 條＝本批新增）；`no_playback_gate.sh` 0；覆蓋率 96.2%；Python 333 條 OK。
 
-### 9.7 使用者在場
-（待做：UI 測試實跑、每幀量測、真視窗目視）
+### 9.7 使用者在場（2026-10-14；只接內建螢幕、ABC 輸入法；全程不碰 Music 播放）
+- 真視窗看完後，使用者提了 4 點要改（Rock Salt 出框、雨絲、暈開太暈、倒影太亂），目視時又提了第 5 點（長句出框）。都在另一份計劃 `docs/plans/2026-10-14-lyrics-fx-b2-batch4-t7-fixes.md` 修好（wip 9a1ec28 與之後的快取），以下是**修正後**的結果。修正前的量測與對照記在那份計劃的 §9。
+- **UI 測試**：`LyricsFXUITests`（11，含新增的 `testASignedEmoBandGetsItsComposedStyleRegardlessOfGenre`）＋`LyricsFlowUITests`（9）**20／20 綠**（244 s）。修正前的第一輪有 2 條紅：跑測試時輸入法被切回拼音（鍵入被改寫成「found彈劾words」，切換時那次點擊也花了 5.6 s）。切回 ABC、跑完前不碰鍵盤後重跑全綠，點擊回到 0.52 s。之後每輪都在開跑前、跑完後各核一次輸入法。
+- **每幀**（-O 量測建置、密集預覽、真視窗前景；每份 6 個 5 秒窗，丟第一個當暖機，取 5 個；雨絲撤掉後，原配方的 rain 換成 bluehour；另加一份 Permanent Marker 長句）：
+  | 配方 | p50 | p95 | 判定（2／3 ms） |
+  |---|---|---|---|
+  | Courier Prime＋藍調時刻＋呼吸＋倒影 | 0.93–1.69 ms | 2.53–2.79 ms | 過 |
+  | Rock Salt＋暈開＋抖動 | 1.95–3.62 ms | 4.94–5.84 ms | 超 |
+  | IM Fell English SC＋暈開＋閃爍 | 2.09–3.49 ms | 5.10–5.99 ms | 超 |
+  | Shadows Into Light＋暈開＋倒影 | 1.36–2.56 ms | 3.50–4.01 ms | 超 |
+  | Permanent Marker 長句（The Used）＋暈開＋抖動 | 1.58–3.49 ms | 4.32–4.65 ms | 超 |
+  - 對照（修正前，同一部機器）：拿掉暈開，或把字型換成 Courier，各降約一半 → 暈開與字型各有份。暈開減成兩份後，p95 約降 10–25%。推測其餘的耗時在手寫／仿古字形節點多，填色比較貴。
+  - Rock Salt 第一次重量時，視窗中途不在最前面（`front=NO`），那一份作廢，只重跑這一份（全程最前面）。
+  - 使用者裁定（2026-10-14；先說明「螢幕每格最多 8.3 ms，6 ms 還在範圍內，但餘裕變少」）：「沒感覺卡，接受現狀吧」→ 照實記錄、不改（同 I-25 Catacombs、批 3 Special Elite 的前例）；字形點陣快取仍列後續。
+- **真視窗目視**（全螢幕；4 份固定配方，再加 7 團各自讓組合器抽）：
+  - Rock Salt＋暈開＋抖動：「對，大小合適了，暈開也不暈了」。
+  - IM Fell＋暈開＋閃爍：「沒問題了」。
+  - Shadows＋暈開＋倒影：倒影 0.08 時說「倒影再淺一些吧」，調到 0.04 後說「這次沒問題了」。
+  - 7 團：The Used 第一次看說「歌詞有超出顯示範圍的問題」（Permanent Marker 長句）→ 加長句自動縮字（/thecure，ACCEPTANCE I-45），修正後說「沒問題了」。My Chemical Romance、Death Cab for Cutie、A Day to Remember、New Found Glory、You Me At Six、The Story So Far：「沒問題」。
 
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（gpt-5.6-terra／medium，2026-10-13；無 P0）

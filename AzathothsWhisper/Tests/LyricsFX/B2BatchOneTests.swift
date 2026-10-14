@@ -65,7 +65,7 @@ struct B2EffectTests {
         let frame = plan(5.5, fx1: "reflect")
         let mirrored = frame.ghosts.filter { $0.scaleY < 0 }
         #expect(mirrored.count == frame.glyphs.count && !mirrored.isEmpty)
-        #expect(mirrored.allSatisfy { $0.opacity <= 0.16 + 1e-9 })
+        #expect(mirrored.allSatisfy { $0.opacity <= ComposedStyle.reflectionAlpha + 1e-9 })
     }
 
     @Test func glowAndNeonStrokeAreFrameLevelSettings() {
