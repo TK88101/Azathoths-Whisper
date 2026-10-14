@@ -149,6 +149,24 @@ struct LongLineFitTests {
         }
     }
 
+    /// 實測（T7 第 3 次每幀）：每幀重新二分搜尋讓 Courier 由過變超 → 同一句、同畫布、同配方只算一次
+    @Test func aShrunkLineIsWorkedOutOnceAndReused() {
+        let line = TimedLine(start: 2, end: 40, text: Self.long + " (cache probe)", isChorus: false)
+        let recipe = Self.recipe(font: "Marker")
+        let first = ComposedStyle.fittedEmRatio(line: line, index: 7, recipe: recipe, size: Self.narrow, measurer: CoreTextMeasurer())
+        #expect(ComposedStyle.cachedFitRatio(line: line, index: 7, recipe: recipe, size: Self.narrow, measurer: CoreTextMeasurer()) == first)
+        #expect(first < 1)
+    }
+
+    /// 量測器不同（測試替身 vs CoreText）字寬就不同：快取不得互相污染
+    @Test func theCacheKeepsMeasurersApart() {
+        let line = TimedLine(start: 2, end: 40, text: Self.long + " (measurer probe)", isChorus: false)
+        let recipe = Self.recipe(font: "Marker")
+        let real = ComposedStyle.fittedEmRatio(line: line, index: 3, recipe: recipe, size: Self.narrow, measurer: CoreTextMeasurer())
+        let fake = ComposedStyle.fittedEmRatio(line: line, index: 3, recipe: recipe, size: Self.narrow, measurer: FixedWidthMeasurer())
+        #expect(real != fake)
+    }
+
     /// 彈片堆的詞錨點按畫布比例散布、不隨 em 走：縮字救不了，照現狀
     @Test func thePileEntranceIsLeftAlone() {
         #expect(Self.ratio(Self.long, font: "Marker", size: Self.narrow, enter: "slam") == 1)

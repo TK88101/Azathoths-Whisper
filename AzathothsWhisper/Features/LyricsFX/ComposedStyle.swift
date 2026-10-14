@@ -392,6 +392,13 @@ enum ComposedStyle {
     // MARK: 長句縮字（T7 修正計劃 §2.6；原型沒有，ACCEPTANCE I-45 ⚠️）
 
     /// 先照原 em 排；主字形放不下才在 [0.5, 1] 倍之間二分搜尋「放得下的最大 em」。彈片堆的詞錨點不隨 em 走，縮了也救不了 → 不縮
+    /// 測試用：快取裡這一句的比例（nil＝沒算過或沒縮）
+    static func cachedFitRatio(line: TimedLine, index: Int, recipe: ComposedRecipe, size: CGSize, measurer: any TextMeasuring) -> CGFloat? {
+        guard let style = ResolvedStyle(recipe) else { return nil }
+        let (_, personalities) = linePersonalities(line: line, index: index, style: style)
+        return FitCache.ratio(for: FitCache.Key(line: line, personalities: personalities, size: size, style: style, measurer: measurer))
+    }
+
     private static func baseEm(size: CGSize, style: ResolvedStyle) -> CGFloat {
         size.height * emRatio * style.face.sizeScale
     }
@@ -401,8 +408,19 @@ enum ComposedStyle {
     ) -> (em: CGFloat, laid: LineLayout) {
         let baseEm = baseEm(size: size, style: style)
         let lay = { (em: CGFloat) in layout(line, personalities: personalities, em: em, maxWidth: size.width * maxWidthRatio, face: style.face, measurer: measurer) }
+        if style.enter.pile { return (baseEm, lay(baseEm)) }
+        let key = FitCache.Key(line: line, personalities: personalities, size: size, style: style, measurer: measurer)
+        if let ratio = FitCache.ratio(for: key) { return (baseEm * ratio, lay(baseEm * ratio)) }
         let full = lay(baseEm)
-        if style.enter.pile || fits(full, em: baseEm, size: size, style: style, measurer: measurer) { return (baseEm, full) }
+        if fits(full, em: baseEm, size: size, style: style, measurer: measurer) { return (baseEm, full) }
+        let (em, laid) = search(lay, baseEm: baseEm, size: size, style: style, measurer: measurer, line: line, index: index)
+        FitCache.store(em / baseEm, for: key)
+        return (em, laid)
+    }
+
+    private static func search(
+        _ lay: (CGFloat) -> LineLayout, baseEm: CGFloat, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring, line: TimedLine, index: Int
+    ) -> (em: CGFloat, laid: LineLayout) {
         var low = baseEm * minimumFitRatio, high = baseEm
         var best = lay(low)
         guard fits(best, em: low, size: size, style: style, measurer: measurer) else {
@@ -549,5 +567,45 @@ private enum FitLog {
         }
         guard isNew else { return }
         log.info("line \(index, privacy: .public) still overflows at minimum fit ratio: \(rows, privacy: .public) rows")
+    }
+}
+
+/// 縮過的句子的比例（T7 第 3 次每幀：每幀重算讓 Courier 由過變超）。放得下的句子不進來，所以一般句只多一次查表。
+/// 鍵＝`fits` 與 `layout` 真正讀的東西：歌詞、各字的大小（性格亂數依配方各槽而變，只記種子不夠）、畫布、字型、變異幅度、量測器型別
+private enum FitCache {
+    struct Key: Hashable {
+        let text: UInt64
+        let sizes: [Double]
+        let width: CGFloat
+        let height: CGFloat
+        let face: FontFace
+        let vary: [Double]
+        let measurer: ObjectIdentifier
+
+        init(line: TimedLine, personalities: [GlyphPersonality], size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring) {
+            let vary = style.personality.vary
+            text = FXHash.fnv1a64(line.text)
+            sizes = personalities.map(\.size)
+            width = size.width
+            height = size.height
+            face = style.face
+            self.vary = [vary.size, vary.dy, vary.rotation, vary.scatter]
+            self.measurer = ObjectIdentifier(type(of: measurer))
+        }
+    }
+
+    /// 拖動視窗會一直產生新尺寸：超過就整個清掉（之後重算一次而已）
+    private static let capacity = 512
+    private static let entries = OSAllocatedUnfairLock(initialState: [Key: CGFloat]())
+
+    static func ratio(for key: Key) -> CGFloat? {
+        entries.withLock { $0[key] }
+    }
+
+    static func store(_ ratio: CGFloat, for key: Key) {
+        entries.withLock { cache in
+            if cache.count >= capacity { cache.removeAll(keepingCapacity: true) }
+            cache[key] = ratio
+        }
     }
 }
