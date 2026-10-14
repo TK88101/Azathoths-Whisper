@@ -4,7 +4,8 @@ import Testing
 
 @testable import AzathothsWhisper
 
-// B2 批 4 計劃 T4：emo 群新增的背景（雨絲、藍調時刻）與效果（往下暈開），移植原型 lyrics-fx-preview.html 的 rain／bluehour／weep。
+// B2 批 4 計劃 T4：emo 群新增的背景（藍調時刻）與效果（往下暈開），移植原型 lyrics-fx-preview.html 的 bluehour／weep。
+// 雨絲（rain）2026-10-14 使用者在 T7 撤掉；暈開同日減為兩份、0.06 字級（docs/plans/2026-10-14-lyrics-fx-b2-batch4-t7-fixes.md）
 // 歌詞為編造句
 
 @Suite("B2 batch 4 effects")
@@ -18,26 +19,6 @@ struct B2BatchFourEffectTests {
     private func plan(_ t: Double, fx1: String = "none", fx2: String = "none", backdrop: String = "void") -> FramePlan {
         let recipe = ComposedRecipe(font: "Anton", backdrop: backdrop, enter: "type", exit: "cut", fx1: fx1, fx2: fx2, palette: "hybridGrey", seed: 3, profile: Self.profile)
         return LyricsFXFrame.plan(timeline: Self.timeline, time: t, size: Self.size, motion: .full, recipe: .composed(recipe), measurer: FixedWidthMeasurer())
-    }
-
-    @Test func rainIsThinSlantedStreaksInTheDimColourFallingUnderAVignette() throws {
-        let palette = try #require(LyricsFXCatalog.palette("hybridGrey"))
-        let still = ComposedBackdrop.back(.rain, palette: palette, size: Self.size, time: 0)
-        guard case .streaks(let streaks, let color, let opacity)? = still.first, still.count == 1 else { Issue.record("雨絲應是一層細線"); return }
-        #expect(color == palette.dim && opacity == 0.3 && streaks.count == ComposedBackdrop.rainCount)
-        for streak in streaks {
-            let length = streak.to.y - streak.from.y
-            // 長度＝畫布高的 4–9%，往左下斜（橫移＝長度的 18%）
-            #expect(length >= Self.size.height * 0.04 - 1e-6 && length <= Self.size.height * 0.09 + 1e-6)
-            #expect(abs((streak.from.x - streak.to.x) - length * 0.18) < 1e-6)
-        }
-        // 往下落：0.1 秒後每一條都在原位下方 26–48 點（每秒 260–480 點；繞回頂端的不算）
-        guard case .streaks(let later, _, _)? = ComposedBackdrop.back(.rain, palette: palette, size: Self.size, time: 0.1).first else { return }
-        let fallen = zip(streaks, later).map { $1.from.y - $0.from.y }.filter { $0 > 0 }
-        #expect(fallen.count >= streaks.count - 12 && fallen.allSatisfy { $0 >= 26 - 1e-6 && $0 <= 48 + 1e-6 })
-        #expect(BackdropKind.rain.tone == .dark)
-        let front = ComposedBackdrop.front(.rain, size: Self.size, time: 0)
-        #expect(front.first == .vignette(strength: 0.7) && front.count == 2)
     }
 
     @Test func blueHourIsACoolGlowRisingFromTheBottomWithAFaintWarmWindow() {
@@ -60,14 +41,14 @@ struct B2BatchFourEffectTests {
         #expect(ComposedStyle.weepAmount(age: 1.85) == 1 && ComposedStyle.weepAmount(age: 30) == 1)
     }
 
-    /// 每個字的正下方拖出三份越來越淡的副本，等距排開；間距隨該字停留的時間從 0 拉到 0.1 字級。剛進場時沒有。
-    /// 字照行長分散出現（最後一個字到行尾前才出來），所以每個字各自驗「三份等距」，另驗有字已經拉到最開
-    @Test func weepTrailsThreeFadingCopiesBelowEachSettledGlyph() {
+    /// 每個字的正下方拖出 `weepCopies` 份越來越淡的副本，等距排開；間距隨該字停留的時間從 0 拉到 `weepStep` 字級。剛進場時沒有。
+    /// 字照行長分散出現（最後一個字到行尾前才出來），所以每個字各自驗「等距」，另驗有字已經拉到最開
+    @Test func weepTrailsFadingCopiesBelowEachSettledGlyph() {
         let settled = plan(29.5, fx1: "weep")
         #expect(!settled.glyphs.isEmpty && settled.ghosts.count == settled.glyphs.count * ComposedStyle.weepCopies)
         var fullyOpen = 0
         for glyph in settled.glyphs {
-            // 折行後上下兩列可能有同字同 x：只取落在這個字下方 0.3 字級內的
+            // 折行後上下兩列可能有同字同 x：只取落在這個字下方暈開範圍內的
             let reach = glyph.fontSize * ComposedStyle.weepStep * CGFloat(ComposedStyle.weepCopies)
             let copies = settled.ghosts
                 .filter { $0.text == glyph.text && abs($0.origin.x - glyph.origin.x) < 1e-6 && $0.origin.y > glyph.origin.y && $0.origin.y <= glyph.origin.y + reach + 1e-6 }
@@ -81,7 +62,7 @@ struct B2BatchFourEffectTests {
                 #expect(abs(copy.opacity - glyph.opacity * ComposedStyle.weepOpacity(level: index + 1)) < 1e-9)
             }
         }
-        #expect(fullyOpen >= settled.glyphs.count / 2, "停滿的字應已拉到 0.1 字級")
+        #expect(fullyOpen >= settled.glyphs.count / 2, "停滿的字應已拉到 weepStep 字級")
         #expect(plan(2.05, fx1: "weep").ghosts.isEmpty)
         #expect(plan(29.5).ghosts.isEmpty)
     }
@@ -124,7 +105,7 @@ struct B2BatchFourContrastTests {
 
     @Test func theTheatricalBandAndTheFastDryBandShareNothingButTheEmptyDefaults() {
         let myChemicalRomance = drawn("My Chemical Romance"), theStorySoFar = drawn("The Story So Far")
-        #expect(myChemicalRomance.isSuperset(of: ["IMFell", "rain", "scrawl", "sink", "wither", "weep", "revenge", "parade"]))
+        #expect(myChemicalRomance.isSuperset(of: ["IMFell", "scrawl", "sink", "wither", "weep", "revenge", "parade"]))
         #expect(theStorySoFar.isSuperset(of: ["Marker", "gig", "punch", "rip", "speedlines", "skateTeal"]))
         #expect(myChemicalRomance.intersection(theStorySoFar).isSubset(of: ["none", "void", "mallPink"]))
     }

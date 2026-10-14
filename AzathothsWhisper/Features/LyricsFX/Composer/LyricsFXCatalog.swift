@@ -101,7 +101,7 @@ enum LyricsFXCatalog {
         make(.font, "IMFell", [.theatrical: 0.85, .decay: 0.6, .elegance: 0.5, .aggression: 0.5], [.emo],
              req: [.theatrical: 0.5], .font(FontFace(id: "IMFell", family: "IM FELL English SC", weight: nil))),
         make(.font, "RockSalt", [.raw: 0.7, .decay: 0.5, .theatrical: 0.55, .aggression: 0.6], [.emo, .posthardcore],
-             .font(FontFace(id: "RockSalt", family: "Rock Salt", weight: nil))),
+             .font(FontFace(id: "RockSalt", family: "Rock Salt", weight: nil, sizeScale: 0.085 / 0.12))),
         make(.font, "ShadowsLight", [.warm: 0.45, .elegance: 0.4, .raw: 0.4, .theatrical: 0.45, .aggression: 0.3], [.indieemo, .emo, .emopop],
              .font(FontFace(id: "ShadowsLight", family: "Shadows Into Light", weight: nil))),
     ]
@@ -160,8 +160,6 @@ enum LyricsFXCatalog {
         // B2 批 4（emo 群；原型 composer.js 的 B2 批 4 段）。標籤只收本批私有的（emo／posthardcore／indieemo／emopop）
         make(.backdrop, "bluehour", [.cold: 0.55, .elegance: 0.6, .bright: 0.4, .speed: 0.15], [.indieemo, .emo],
              .backdrop(.bluehour)),
-        make(.backdrop, "rain", [.cold: 0.6, .theatrical: 0.55, .decay: 0.35, .elegance: 0.4], [.emo, .indieemo],
-             .backdrop(.rain)),
     ]
 
     // composer.js:55,57-61,64。淡入型（condense、smoke、rise）的時長依 P12 縮短 40%（使用者 2026-10-06：「漸入漸出稍長，字發虛」）

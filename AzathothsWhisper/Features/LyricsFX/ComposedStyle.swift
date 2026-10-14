@@ -75,9 +75,10 @@ enum ComposedStyle {
     static let glowRadius: CGFloat = 7.4
     /// 霓虹描邊寬（em 比例）
     static let strokeRatio: CGFloat = 0.06
-    /// 倒影：在字下方 0.95 em、16% 透明度
+    /// 倒影：在字下方 0.95 em、8% 透明度
     static let reflectionOffset: CGFloat = 0.95
-    static let reflectionAlpha = 0.16
+    /// 0.16 → 0.08：使用者 2026-10-14 T7「倒影和下一行的正字重疊……讓這個倒影淡一些」（全域，使用者選 A）
+    static let reflectionAlpha = 0.08
     /// 詞首後多久內整屏抖
     static let shakeWindow = 0.07
     /// 速度線：行首 0.35 s 內 24 道、由 0.35 淡到 0，每 1/30 s 換一組位置（原型 speedLines）
@@ -171,7 +172,7 @@ enum ComposedStyle {
         _ entry: VisibleLine, time: Double, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring,
         into frame: inout FramePlan, specks: inout [(Particle, Double)]
     ) {
-        let em = size.height * emRatio
+        let em = size.height * emRatio * style.face.sizeScale
         var indexMixer = SplitMix64(seed: UInt64(entry.index))
         let lineSeed = FXHash.fnv1a64(entry.line.text) ^ style.seed ^ indexMixer.next()
         let personalities = LinePersonalities.make(line: entry.line, seed: lineSeed, style: style.personality)
@@ -227,9 +228,10 @@ enum ComposedStyle {
         return levels.keys.sorted(by: >).flatMap { levels[$0] ?? [] }
     }
 
-    /// 往下暈開（原型 weep）：字出現 0.25 秒後開始，再 1.6 秒拉到最開；三份副本各往下 0.1 字級、越下面越淡
-    static let weepCopies = 3
-    static let weepStep: CGFloat = 0.1
+    /// 往下暈開（原型 weep）：字出現 0.25 秒後開始，再 1.6 秒拉到最開；兩份副本各往下 0.06 字級、越下面越淡
+    /// 3 份／0.1 → 2 份／0.06：使用者 2026-10-14 T7「層數減少一些，不要暈開那麼大」
+    static let weepCopies = 2
+    static let weepStep: CGFloat = 0.06
     static let weepAlpha = 0.18
     static let weepDelay = 0.25
     static let weepSpan = 1.6
@@ -238,7 +240,7 @@ enum ComposedStyle {
         FXEasing.clamp01((age - weepDelay) / weepSpan)
     }
 
-    /// 第 `level` 份副本相對本體的透明度：越下面越淡（0.135、0.09、0.045）
+    /// 第 `level` 份副本相對本體的透明度：越下面越淡（2 份時 0.12、0.06）
     static func weepOpacity(level: Int) -> Double {
         weepAlpha * (1 - Double(level) / Double(weepCopies + 1))
     }

@@ -19,6 +19,8 @@ struct FontFace: Hashable, Sendable {
     var italic = false
     /// 原型的 `upper`：整行轉大寫顯示
     var uppercase = false
+    /// 字型固有的尺寸補償（與批次無關）：組合畫法每行的 em 乘上它。字面本身就比同字級的其他字大很多的字型才設（原型 composer.js:403）
+    var sizeScale: CGFloat = 1
 
     static let displayRegular = FontFace(id: "display-regular", family: "Space Grotesk", weight: .regular)
     static let displayMedium = FontFace(id: "display-medium", family: "Space Grotesk", weight: .medium)
@@ -114,12 +116,6 @@ struct Particle: Equatable, Sendable {
     let size: CGFloat
 }
 
-/// 一條 1 點寬的斜線（畫布座標）
-struct Streak: Equatable, Sendable {
-    let from: CGPoint
-    let to: CGPoint
-}
-
 /// 徑向光暈的一個色標
 struct GlowStop: Equatable, Sendable {
     let location: CGFloat
@@ -148,8 +144,6 @@ enum LayerDraw: Equatable, Sendable {
     case hairlines(spacing: CGFloat, color: RGB, opacity: Double)
     /// 一批同色的實心矩形（畫布座標）：速度線、影印橫紋、棋盤格
     case rects([CGRect], RGB, opacity: Double)
-    /// 一批同色的 1 點寬斜線：雨絲
-    case streaks([Streak], RGB, opacity: Double)
 }
 
 /// 影印負片時字後的一塊色塊（原型 html:1040）
