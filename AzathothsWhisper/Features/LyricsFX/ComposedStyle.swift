@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import os
 
 /// 組合配方解析成的繪製參數（移植原型 `styleFromRecipe`，html:997-1003）
 struct ResolvedStyle: Sendable {
@@ -57,6 +58,24 @@ enum ComposedStyle {
     static let wordGap: CGFloat = 0.3
     static let maxWidthRatio: CGFloat = 0.86
     static let baseYRatio: CGFloat = 0.5
+    /// 長句縮字（T7 修正計劃 §2.6）：主字形安全區＝歌詞區上下各留 2%；最小縮到 0.5 倍
+    static let fitMargin: CGFloat = 0.02
+    static let minimumFitRatio: CGFloat = 0.5
+
+    /// 二分搜尋次數：6 次＝在 0.5 倍的範圍內細到原 em 的 0.8%
+    static let fitSteps = 6
+    /// 停留小動作的上限（`HoldTemplate`；`LongLineFitTests` 掃全部模板把關兩邊一致）：float 的 0.12 em 位移、twitch 的 0.1 rad、breathe 的 1.04 倍、jitter 的 1 點
+    static let holdReach: CGFloat = 0.12
+    static let holdRotation: CGFloat = 0.1
+    static let holdScale: CGFloat = 1.04
+    static let holdJitter: CGFloat = 1
+
+    /// 測試用：這一句實際用的 em 相對原 em 的比例（1＝沒縮）
+    static func fittedEmRatio(line: TimedLine, index: Int, recipe: ComposedRecipe, size: CGSize, measurer: any TextMeasuring) -> CGFloat {
+        guard let style = ResolvedStyle(recipe) else { return 1 }
+        let (_, personalities) = linePersonalities(line: line, index: index, style: style)
+        return fitted(line, personalities: personalities, size: size, style: style, measurer: measurer, index: index).em / baseEm(size: size, style: style)
+    }
     /// 殘影（原型組合模式 smoke：5 份、alpha×0.25、散佈 0.14 em，不畫本體）
     static let ghostCopies = 5
     static let ghostAlpha = 0.25
@@ -75,10 +94,10 @@ enum ComposedStyle {
     static let glowRadius: CGFloat = 7.4
     /// 霓虹描邊寬（em 比例）
     static let strokeRatio: CGFloat = 0.06
-    /// 倒影：在字下方 0.95 em、8% 透明度
+    /// 倒影：在字下方 0.95 em、4% 透明度
     static let reflectionOffset: CGFloat = 0.95
-    /// 0.16 → 0.08：使用者 2026-10-14 T7「倒影和下一行的正字重疊……讓這個倒影淡一些」（全域，使用者選 A）
-    static let reflectionAlpha = 0.08
+    /// 0.16 → 0.08 → 0.04：使用者 2026-10-14 T7「倒影和下一行的正字重疊……讓這個倒影淡一些」（全域，使用者選 A），看過 0.08 後「再淺一些」
+    static let reflectionAlpha = 0.04
     /// 詞首後多久內整屏抖
     static let shakeWindow = 0.07
     /// 速度線：行首 0.35 s 內 24 道、由 0.35 淡到 0，每 1/30 s 換一組位置（原型 speedLines）
@@ -172,11 +191,8 @@ enum ComposedStyle {
         _ entry: VisibleLine, time: Double, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring,
         into frame: inout FramePlan, specks: inout [(Particle, Double)]
     ) {
-        let em = size.height * emRatio * style.face.sizeScale
-        var indexMixer = SplitMix64(seed: UInt64(entry.index))
-        let lineSeed = FXHash.fnv1a64(entry.line.text) ^ style.seed ^ indexMixer.next()
-        let personalities = LinePersonalities.make(line: entry.line, seed: lineSeed, style: style.personality)
-        let laid = layout(entry.line, personalities: personalities, em: em, maxWidth: size.width * maxWidthRatio, face: style.face, measurer: measurer)
+        let (lineSeed, personalities) = linePersonalities(line: entry.line, index: entry.index, style: style)
+        let (em, laid) = fitted(entry.line, personalities: personalities, size: size, style: style, measurer: measurer, index: entry.index)
         let rowHeight = em * lineHeight
         let baseY = size.height * baseYRatio - CGFloat(laid.rowWidths.count) * rowHeight / 2 + rowHeight * 0.8
         let misregistered = style.effects.contains(.misreg)
@@ -367,6 +383,62 @@ enum ComposedStyle {
         return LineLayout(glyphs: glyphs, rowWidths: rowWidths, words: words)
     }
 
+    private static func linePersonalities(line: TimedLine, index: Int, style: ResolvedStyle) -> (seed: UInt64, [GlyphPersonality]) {
+        var indexMixer = SplitMix64(seed: UInt64(index))
+        let lineSeed = FXHash.fnv1a64(line.text) ^ style.seed ^ indexMixer.next()
+        return (lineSeed, LinePersonalities.make(line: line, seed: lineSeed, style: style.personality))
+    }
+
+    // MARK: 長句縮字（T7 修正計劃 §2.6；原型沒有，ACCEPTANCE I-45 ⚠️）
+
+    /// 先照原 em 排；主字形放不下才在 [0.5, 1] 倍之間二分搜尋「放得下的最大 em」。彈片堆的詞錨點不隨 em 走，縮了也救不了 → 不縮
+    private static func baseEm(size: CGSize, style: ResolvedStyle) -> CGFloat {
+        size.height * emRatio * style.face.sizeScale
+    }
+
+    private static func fitted(
+        _ line: TimedLine, personalities: [GlyphPersonality], size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring, index: Int
+    ) -> (em: CGFloat, laid: LineLayout) {
+        let baseEm = baseEm(size: size, style: style)
+        let lay = { (em: CGFloat) in layout(line, personalities: personalities, em: em, maxWidth: size.width * maxWidthRatio, face: style.face, measurer: measurer) }
+        let full = lay(baseEm)
+        if style.enter.pile || fits(full, em: baseEm, size: size, style: style, measurer: measurer) { return (baseEm, full) }
+        var low = baseEm * minimumFitRatio, high = baseEm
+        var best = lay(low)
+        guard fits(best, em: low, size: size, style: style, measurer: measurer) else {
+            FitLog.once(line: line, index: index, size: size, style: style, rows: best.rowWidths.count)
+            return (low, best)
+        }
+        for _ in 0..<fitSteps {
+            let middle = (low + high) / 2
+            let candidate = lay(middle)
+            if fits(candidate, em: middle, size: size, style: style, measurer: measurer) {
+                (low, best) = (middle, candidate)
+            } else {
+                high = middle
+            }
+        }
+        return (low, best)
+    }
+
+    /// 主字形的保守包絡（只放大不縮小）是否落在上下各留 `fitMargin` 的安全區；淡裝飾（暈開、倒影、錯位、RGB 分離、紙片）不算
+    private static func fits(_ laid: LineLayout, em: CGFloat, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring) -> Bool {
+        let rows = CGFloat(laid.rowWidths.count)
+        let rowHeight = em * lineHeight
+        let firstBaseline = size.height * baseYRatio - rows * rowHeight / 2 + rowHeight * 0.8
+        let lastBaseline = firstBaseline + rowHeight * (rows - 1)
+        let vary = style.personality.vary
+        let largest = em * CGFloat(1 + vary.size * LinePersonalities.rawness) * holdScale
+        // 字寬已含各字的 size 變化；呼吸的放大在旋轉前，一併算進去
+        let widest = laid.glyphs.reduce(0) { max($0, $1.width) } * holdScale
+        let reach = CGFloat(vary.dy + vary.scatter) * em + holdReach * em + holdJitter
+            + widest * 0.5 * sin(CGFloat(vary.rotation) + holdRotation)
+        let top = firstBaseline - measurer.ascent(face: style.face, fontSize: largest) - reach
+        let bottom = lastBaseline + measurer.descent(face: style.face, fontSize: largest) + reach
+        let margin = size.height * fitMargin
+        return top >= margin && bottom <= size.height - margin
+    }
+
     /// 原型 `displayChar`：大寫字型整行轉大寫；否則只有行首字母大寫
     private static func display(_ character: Character, isLineStart: Bool, face: FontFace) -> String {
         face.uppercase || isLineStart ? String(character).uppercased() : String(character)
@@ -450,5 +522,32 @@ extension GlyphDraw {
             text: text, face: face, fontSize: fontSize, origin: CGPoint(x: origin.x + dx, y: origin.y + dy),
             rotation: rotation, scaleX: scaleX, scaleY: scaleY, opacity: opacity, color: color
         )
+    }
+}
+
+/// 縮到下限仍放不下的句子：同一句、同一畫布、同一配方只記一次；只記行號與列數，不記歌詞
+private enum FitLog {
+    private static let log = Logger(subsystem: "com.ibridgezhao.azathothswhisper", category: "lyricsFXFit")
+    private struct Key: Hashable {
+        let text: UInt64
+        let index: Int
+        let face: String
+        let width: Int
+        let height: Int
+        let seed: UInt64
+    }
+
+    /// 拖動視窗會一直產生新尺寸：超過就整個清掉（只影響會不會重記一次）
+    private static let capacity = 256
+    private static let seen = OSAllocatedUnfairLock(initialState: Set<Key>())
+
+    static func once(line: TimedLine, index: Int, size: CGSize, style: ResolvedStyle, rows: Int) {
+        let key = Key(text: FXHash.fnv1a64(line.text), index: index, face: style.face.id, width: Int(size.width), height: Int(size.height), seed: style.seed)
+        let isNew = seen.withLock { seen in
+            if seen.count >= capacity { seen.removeAll(keepingCapacity: true) }
+            return seen.insert(key).inserted
+        }
+        guard isNew else { return }
+        log.info("line \(index, privacy: .public) still overflows at minimum fit ratio: \(rows, privacy: .public) rows")
     }
 }

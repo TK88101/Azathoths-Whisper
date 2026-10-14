@@ -185,11 +185,17 @@ protocol TextMeasuring {
     func advances(of text: String, face: FontFace, fontSize: CGFloat) -> [CGFloat]
     /// 行盒 top 到基線的距離
     func ascent(face: FontFace, fontSize: CGFloat) -> CGFloat
+    /// 基線到行盒底的距離（長句縮字判定用）
+    func descent(face: FontFace, fontSize: CGFloat) -> CGFloat
 }
 
 extension TextMeasuring {
     func ascent(face: FontFace, fontSize: CGFloat) -> CGFloat {
         fontSize * 0.8
+    }
+
+    func descent(face: FontFace, fontSize: CGFloat) -> CGFloat {
+        fontSize * 0.2
     }
 }
 
