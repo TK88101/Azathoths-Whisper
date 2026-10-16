@@ -12,14 +12,11 @@ import Testing
 struct GlyphRasterColdFrameTests {
     static let budget: Duration = .microseconds(8_300)
     static let runs = 10
-    static let profile = SongProfile(axes: [.theatrical: 0.9, .aggression: 0.6], tags: [.emo])
 
-    @Test(arguments: [
-        ["RockSalt", "bluehour", "lurch", "wither", "weep", "jitter", "revenge"],
-        ["Catacombs", "snow", "smoke", "dissolve", "misreg", "shake", "ice"],
-    ])
-    func aFrameAfterTheRasterCacheIsClearedStaysWithinOneRefresh(_ ids: [String]) throws {
-        let recipe = SessionRecipe.composed(ComposedRecipe(font: ids[0], backdrop: ids[1], enter: ids[2], exit: ids[3], fx1: ids[4], fx2: ids[5], palette: ids[6], seed: 7, profile: Self.profile))
+    /// 配方取自畫面一致性測試（同一份表）
+    @Test(arguments: ["rocksalt", "catacombs"])
+    func aFrameAfterTheRasterCacheIsClearedStaysWithinOneRefresh(_ name: String) throws {
+        let recipe = GlyphRasterFidelityTests.recipe(name)
         let timeline = try #require(LyricsTimelineBuilder.build(lyrics: LyricsFXPreviewFixture.denseLyrics, duration: LyricsFXPreviewFixture.duration))
         let measurer = CoreTextMeasurer()
         let paths = GlyphPathCache()
@@ -43,8 +40,8 @@ struct GlyphRasterColdFrameTests {
             if run > 0 { samples.append(elapsed) }
         }
         let worst = try #require(samples.max())
-        let line = "\(ids[0]) cold-frame max \(worst) over \(samples.count) runs, glyphs+ghosts \(glyphCount), misses \(paths.rasters.misses)"
-        try line.write(to: FileManager.default.temporaryDirectory.appendingPathComponent("lyricsfx-coldframe-\(ids[0]).txt"), atomically: true, encoding: .utf8)
+        let line = "\(name) cold-frame max \(worst) over \(samples.count) runs, glyphs+ghosts \(glyphCount), misses \(paths.rasters.misses)"
+        try line.write(to: FileManager.default.temporaryDirectory.appendingPathComponent("lyricsfx-coldframe-\(name).txt"), atomically: true, encoding: .utf8)
         #expect(glyphCount > 100, "量的是密集預覽的整幀")
         #expect(worst <= Self.budget, "\(line)")
     }

@@ -129,7 +129,7 @@ enum LyricsFXCanvas {
         let scale = context.environment.displayScale
         for glyph in glyphs {
             let entry = paths.entry(for: glyph)
-            let raster = paths.rasters.entry(text: glyph.text, face: glyph.face, path: entry, pixelsPerPoint: scale)
+            guard let raster = paths.rasters.entry(text: glyph.text, face: glyph.face, path: entry, pixelsPerPoint: scale) else { continue }
             var single = context
             single.concatenate(transform(for: glyph, entry: entry))
             var image = single.resolve(raster.image)

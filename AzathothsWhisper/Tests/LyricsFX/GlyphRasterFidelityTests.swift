@@ -89,7 +89,10 @@ struct GlyphRasterFidelityTests {
                     let i = (y * width + x) * 4
                     return (Int(a[i]) + Int(a[i + 1]) + Int(a[i + 2])) / 3
                 }
+                let rowBytes = width * 4
                 for y in 0..<height {
+                    // 整列相同就沒有差可算（背景與沒受影響的字都是逐像素相同）；統計結果不變，只省 Debug 下的時間
+                    if memcmp(a.baseAddress! + y * rowBytes, b.baseAddress! + y * rowBytes, rowBytes) == 0 { continue }
                     for x in 0..<width {
                         let i = (y * width + x) * 4
                         var worst = 0

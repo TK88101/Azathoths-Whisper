@@ -8,7 +8,7 @@ import SwiftUI
 final class GlyphRasterCache {
     struct Entry {
         let image: Image
-        let cgImage: CGImage?
+        let cgImage: CGImage
         /// 點陣涵蓋的範圍（外框座標）：外框外擴 1 pt 留抗鋸齒、再取整
         let box: CGRect
         let bytes: Int
@@ -39,11 +39,12 @@ final class GlyphRasterCache {
         clearedThisFrame = false
     }
 
-    func entry(text: String, face: FontFace, path: GlyphPathCache.Entry, pixelsPerPoint: CGFloat) -> Entry {
+    /// 建不出點陣（配置失敗）回 nil：這個字這一幀不畫、也不進快取
+    func entry(text: String, face: FontFace, path: GlyphPathCache.Entry, pixelsPerPoint: CGFloat) -> Entry? {
         let key = Key(text: text, face: face, size: path.size, pixelsPerPoint: pixelsPerPoint)
         if let hit = store[key] { return hit }
         misses += 1
-        let made = Self.rasterize(path.path, pixelsPerPoint: pixelsPerPoint)
+        guard let made = Self.rasterize(path.path, pixelsPerPoint: pixelsPerPoint) else { return nil }
         guard made.bytes <= byteLimit else { return made }
         if bytes + made.bytes > byteLimit {
             guard !clearedThisFrame else { return made }
@@ -60,30 +61,21 @@ final class GlyphRasterCache {
         bytes = 0
     }
 
-    static func rasterize(_ path: CGPath, pixelsPerPoint scale: CGFloat) -> Entry {
+    static func rasterize(_ path: CGPath, pixelsPerPoint scale: CGFloat) -> Entry? {
         let outline = path.boundingBoxOfPath
         let box = (outline.isNull ? .zero : outline).insetBy(dx: -1, dy: -1).integral
         let width = max(1, Int((box.width * scale).rounded(.up))), height = max(1, Int((box.height * scale).rounded(.up)))
         guard let context = CGContext(
             data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
             space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue
-        ) else { return Entry(image: Image(decorative: emptyImage, scale: 1), cgImage: nil, box: .zero, bytes: 0) }
+        ) else { return nil }
         // 外框座標 y 向下（`GlyphPathCache.outline` 已翻過）；點陣第 0 列在上
         context.scaleBy(x: scale, y: -scale)
         context.translateBy(x: -box.minX, y: -box.maxY)
         context.addPath(path)
         context.setFillColor(CGColor(gray: 1, alpha: 1))
         context.fillPath()
-        guard let image = context.makeImage() else {
-            return Entry(image: Image(decorative: emptyImage, scale: 1), cgImage: nil, box: .zero, bytes: 0)
-        }
+        guard let image = context.makeImage() else { return nil }
         return Entry(image: Image(decorative: image, scale: scale).renderingMode(.template), cgImage: image, box: box, bytes: context.bytesPerRow * height)
     }
-
-    /// 建不出點陣時的替代（1×1 透明）：畫了也看不見，不中斷整幀
-    private static let emptyImage: CGImage = {
-        let context = CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 0,
-                                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue)!
-        return context.makeImage()!
-    }()
 }
