@@ -74,6 +74,26 @@
 - **計劃定稿（2026-10-17）**：Codex 三輪，無 P0／P1 開著。使用者已指示自主執行，不另等計劃審閱。
 
 ## 9. 紀錄（實作時回填）
+### 9.0 基線（T0，2026-10-17）
+- 改版前在 main 93dee59 的程式上記下 126 組（7 字型 × 6 句 × 3 畫布）`fittedEmRatio` 的 Double 位元，其中 39 組本來就縮字；寫進 `B2BatchFourLeftoverTests.baseline`。
+
+### 9.1 T1–T3（TDD）
+- 先加介面骨架（`FitReport`、`GlyphDraw.stroke`、`runs(of:stroking:)`，行為不變）→ 新測試 13 條：**11 條斷言紅**（沒縮字、沒斷詞、沒描邊、shifted 掉描邊、Anton＝1…）；2 條先天綠：基線回歸（預期）、grapheme 守門（尚無斷詞時本來就成立，留作回歸防線）。
+- 實作後第一次跑：2 處紅。①的測試資料選錯（40 字元整行大寫 Marker 在 0.5 倍仍太寬，實際走到斷詞）→ 改為寬窄視窗各用 24／13 字元；`aShortLineKeepsItsSizeExactly` 的 Anton 窄視窗案例縮字＝Anton 放大的預期結果 → 移出清單，改成正面斷言「會縮、縮完在安全區內」（`aShortAntonLineShrinksInANarrowWindowAndStaysInside`）。之後相關 4 suites 33 條綠。
+- 全量 1275 條：**只有 `GlyphRasterFidelityTests` 的 thump（唯一用 Anton 的案例）8 斷言紅**；`no_playback_gate.sh` 0；覆蓋率 96.2%；Python 333 OK。wip checkpoint `404df64`。
+
+### 9.2 thump 紅的鑑別（2026-10-17）
+- 超標的只有佔圖比例類門檻（2× over16 0.469% > 0.4%、mean 0.00075 > 0.0007；1× over16 0.792% > 0.75%、over2 2.768% > 2.3%、mean 0.00142 > 0.0013）；邊緣帶外 0、最大差 ≤ 71。
+- 鑑別實驗（Codex 提議；同 seed、thump@4.6，只改 Anton sizeScale，跑完以 `git checkout` 還原）：
+| sizeScale | 2× 墨跡像素 | 2× 差>16 像素 | 2× 差>16／墨跡 | 1× 差>16／墨跡 |
+|---|---|---|---|---|
+| 1.0 | 121,244 | 3,769 | 3.11% | 5.44% |
+| 1.125 | 153,421 | 6,249 | 4.07% | 6.57% |
+| 1.25 | 188,928 | 9,756 | 5.16% | 8.57% |
+  - 墨跡 ∝ 面積（1 : 1.27 : 1.56），差>16 卻是 1 : 1.66 : 2.59 → **換算後仍隨字級惡化，不是單純「字大邊多」**。
+- 根因（推理，Codex 讀碼核對同意）：`GlyphRasterCache` 以 `GlyphPathCache.Entry` 的尺寸（線性字型＝`UnitGlyphMetrics.referenceSize` 100 pt，`TextMeasuring.swift:7-13`）× displayScale 建點陣，繪製時乘 `fontSize / entry.size`，thump 的整屏 zoom 再乘一次 → 有效字級 > 100 pt 就是放大點陣、邊緣變糊。測試畫布 900×560（em 67 pt）幾乎不觸發；實際視窗高約 945 pt：一般字 em 113 pt（放大約 1.13 倍；使用者 2026-10-17 目視 8 份看不出差別），Anton 1.25 倍後 142 pt（約 1.42 倍）。
+- 量測（V3，-O，全程前景）：新版 Linkin Park 組合 p50 0.63–0.80／p95 1.14–1.33 ms、Slipknot 組合 0.86–1.45／2.09–2.22、Anton＋neonstroke 0.65–0.86／1.18–1.34，**全部達標**；舊版（main，Anton 未放大）p95 分別 1.20–1.51／1.67–1.90／1.08–1.27。每幀最多 run 數新舊相同（9／267／54）。原始 log 在本 session scratchpad `v3-new/`、`v3-old/`。
+- 決策辯論（/thecure，Codex 2 輪）：A（只重核 thump 門檻）不成立——換算後是真的變差；Codex 建議 B（撤回 Anton 放大）＋補一個實際視窗尺寸的 V3 案例（不放寬）；E（有效字級超過 100 pt 時改用更高尺寸建點陣）可行但推翻 2026-10-16 計劃 F5 的實測結論，要另立計劃驗證。**等使用者裁定**；在此之前不進 /simcodex（閘門：代碼測試未全綠）。
 
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（Codex，2026-10-17）
