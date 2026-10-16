@@ -1,0 +1,81 @@
+import CoreGraphics
+import SwiftUI
+
+/// 字形點陣快取（計劃 2026-10-16 §2.2）：外框在 `GlyphPathCache.Entry` 的座標下、以螢幕像素密度光柵化成只有 alpha 的遮罩，
+/// 畫時當 template 圖上色、套同一個 `transform(for:)`——基線與旋轉軸由構造保證和合併外框的畫法一致。
+/// 不按動畫縮放分檔：實測分檔與固定高解析度都比「點陣＝螢幕像素」更偏離向量畫法（計劃 §1 F5）。
+/// 只在主執行緒用（同 `GlyphPathCache`）
+final class GlyphRasterCache {
+    struct Entry {
+        let image: Image
+        let cgImage: CGImage
+        /// 點陣涵蓋的範圍（外框座標）：外框外擴 1 pt 留抗鋸齒、再取整
+        let box: CGRect
+        let bytes: Int
+    }
+
+    private struct Key: Hashable {
+        let text: String
+        let face: FontFace
+        let size: CGFloat
+        let pixelsPerPoint: CGFloat
+    }
+
+    static let defaultByteLimit = 16 * 1024 * 1024
+
+    let byteLimit: Int
+    private(set) var bytes = 0
+    /// 累計建圖次數（DEBUG 量測摘要用）
+    private(set) var misses = 0
+    private var store: [Key: Entry] = [:]
+    private var clearedThisFrame = false
+
+    init(byteLimit: Int = GlyphRasterCache.defaultByteLimit) {
+        self.byteLimit = byteLimit
+    }
+
+    /// 每幀開頭呼叫：每幀最多整批清空一次，同幀再超額的點陣只畫不存（計劃 §2.2）
+    func beginFrame() {
+        clearedThisFrame = false
+    }
+
+    /// 建不出點陣（配置失敗）回 nil：這個字這一幀不畫、也不進快取
+    func entry(text: String, face: FontFace, path: GlyphPathCache.Entry, pixelsPerPoint: CGFloat) -> Entry? {
+        let key = Key(text: text, face: face, size: path.size, pixelsPerPoint: pixelsPerPoint)
+        if let hit = store[key] { return hit }
+        misses += 1
+        guard let made = Self.rasterize(path.path, pixelsPerPoint: pixelsPerPoint) else { return nil }
+        guard made.bytes <= byteLimit else { return made }
+        if bytes + made.bytes > byteLimit {
+            guard !clearedThisFrame else { return made }
+            removeAll()
+            clearedThisFrame = true
+        }
+        store[key] = made
+        bytes += made.bytes
+        return made
+    }
+
+    func removeAll() {
+        store.removeAll(keepingCapacity: true)
+        bytes = 0
+    }
+
+    static func rasterize(_ path: CGPath, pixelsPerPoint scale: CGFloat) -> Entry? {
+        let outline = path.boundingBoxOfPath
+        let box = (outline.isNull ? .zero : outline).insetBy(dx: -1, dy: -1).integral
+        let width = max(1, Int((box.width * scale).rounded(.up))), height = max(1, Int((box.height * scale).rounded(.up)))
+        guard let context = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue
+        ) else { return nil }
+        // 外框座標 y 向下（`GlyphPathCache.outline` 已翻過）；點陣第 0 列在上
+        context.scaleBy(x: scale, y: -scale)
+        context.translateBy(x: -box.minX, y: -box.maxY)
+        context.addPath(path)
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fillPath()
+        guard let image = context.makeImage() else { return nil }
+        return Entry(image: Image(decorative: image, scale: scale).renderingMode(.template), cgImage: image, box: box, bytes: context.bytesPerRow * height)
+    }
+}

@@ -1,9 +1,27 @@
 import SwiftUI
 
 /// 把 `FramePlan` 畫進 Canvas（View 與離屏渲染共用，A2 計劃 §3.6）。
-/// 逐字取外框路徑；painter order 上**連續、同鍵**（色槽, 量化透明度）的字併成一條 Path、一次 fill（B1 計劃 §3.2）。
+/// painter order 上**連續、同鍵**（色槽, 量化透明度）的字是一個 run（B1 計劃 §3.2）；run 內逐字貼快取的點陣（計劃 2026-10-16），描邊仍併成一條外框。
 /// 不跨 run 合併：否則 A(0.2)、B(0.5)、A(0.2) 的第三個 A 會跑到 B 底下（計劃評審 R1-1）
 enum LyricsFXCanvas {
+    /// 字形怎麼畫（計劃 2026-10-16 §2.3）：`.raster` 是正式畫法；`.vectorReference`＝改版前的合併外框畫法，只給畫面一致性測試比對
+    enum GlyphRendering {
+        case raster
+        case vectorReference
+    }
+
+    /// 一個 run 的畫法：描邊要路徑 → 合併外框；半透明且多字 → 群組圖層裡逐字貼點陣（整層一次套透明度，疊色語義同合併外框）；其餘逐字貼點陣
+    enum GlyphRunStrategy: Equatable {
+        case vectorMerged
+        case rasterGrouped
+        case rasterDirect
+    }
+
+    static func glyphRunStrategy(level: Int, count: Int, stroke: CGFloat) -> GlyphRunStrategy {
+        if stroke > 0 { return .vectorMerged }
+        return level < opacityLevels && count > 1 ? .rasterGrouped : .rasterDirect
+    }
+
     /// 透明度量化的階數：0.05 一階（mono 的 1 與 0.55 恰在階上；誤差 ≤ 1/40）
     static let opacityLevels = 20
 
@@ -51,7 +69,8 @@ enum LyricsFXCanvas {
             .concatenating(CGAffineTransform(translationX: glyph.origin.x + pivot.x, y: glyph.origin.y + pivot.y))
     }
 
-    static func draw(_ plan: FramePlan, in context: GraphicsContext, size: CGSize, paths: GlyphPathCache) {
+    static func draw(_ plan: FramePlan, in context: GraphicsContext, size: CGSize, paths: GlyphPathCache, rendering: GlyphRendering = .raster) {
+        paths.rasters.beginFrame()
         let palette = plan.palette
         let bounds = CGRect(origin: .zero, size: size)
         context.fill(Path(bounds), with: .color(palette.bg.color))
@@ -63,32 +82,59 @@ enum LyricsFXCanvas {
             shaken.translateBy(x: -bounds.midX, y: -bounds.midY)
         }
         for layer in plan.back { draw(layer, in: shaken, bounds: bounds) }
-        fill(plan.ghosts, in: shaken, palette: palette, paths: paths)
+        fill(plan.ghosts, in: shaken, palette: palette, paths: paths, rendering: rendering)
         for box in plan.boxes { draw(box, in: shaken, palette: palette) }
         if plan.glow > 0 {
             // 濾鏡套在整層的合成結果上，只做一次模糊（不是每個透明度 run 各做一次）
             shaken.drawLayer { lit in
                 lit.addFilter(.shadow(color: palette.acc.color, radius: plan.glow))
-                fill(plan.glyphs, in: lit, palette: palette, paths: paths, stroke: plan.stroke)
+                fill(plan.glyphs, in: lit, palette: palette, paths: paths, stroke: plan.stroke, rendering: rendering)
             }
         } else {
-            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, stroke: plan.stroke)
+            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, stroke: plan.stroke, rendering: rendering)
         }
         for layer in plan.front { draw(layer, in: context, bounds: bounds) }
     }
 
-    private static func fill(_ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, stroke: CGFloat = 0) {
+    private static func fill(
+        _ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, stroke: CGFloat = 0, rendering: GlyphRendering
+    ) {
         for run in runs(of: glyphs) {
-            let path = CGMutablePath()
-            for glyph in glyphs[run.range] where opacityLevel(glyph.opacity) > 0 {
-                let entry = paths.entry(for: glyph)
-                path.addPath(entry.path, transform: transform(for: glyph, entry: entry))
-            }
+            let members = glyphs[run.range].filter { opacityLevel($0.opacity) > 0 }
             var layer = context
             layer.opacity = opacity(ofLevel: run.level)
-            let shape = Path(path)
-            if stroke > 0 { layer.stroke(shape, with: .color(palette.acc.color), lineWidth: stroke) }
-            layer.fill(shape, with: .color(palette[run.color].color))
+            let color = palette[run.color].color
+            let strategy = rendering == .vectorReference ? .vectorMerged : glyphRunStrategy(level: run.level, count: members.count, stroke: stroke)
+            switch strategy {
+            case .vectorMerged:
+                let path = CGMutablePath()
+                for glyph in members {
+                    let entry = paths.entry(for: glyph)
+                    path.addPath(entry.path, transform: transform(for: glyph, entry: entry))
+                }
+                let shape = Path(path)
+                if stroke > 0 { layer.stroke(shape, with: .color(palette.acc.color), lineWidth: stroke) }
+                layer.fill(shape, with: .color(color))
+            case .rasterGrouped:
+                // 圖層裡逐字全不透明，合成時整層一次套 run 的透明度——疊字處不會比合併外框更深
+                layer.drawLayer { group in stamp(members, in: group, color: color, paths: paths) }
+            case .rasterDirect:
+                stamp(members, in: layer, color: color, paths: paths)
+            }
+        }
+    }
+
+    /// 逐字貼點陣：點陣與外框在同一個座標系，套同一個 `transform(for:)`
+    private static func stamp(_ glyphs: [GlyphDraw], in context: GraphicsContext, color: Color, paths: GlyphPathCache) {
+        let scale = context.environment.displayScale
+        for glyph in glyphs {
+            let entry = paths.entry(for: glyph)
+            guard let raster = paths.rasters.entry(text: glyph.text, face: glyph.face, path: entry, pixelsPerPoint: scale) else { continue }
+            var single = context
+            single.concatenate(transform(for: glyph, entry: entry))
+            var image = single.resolve(raster.image)
+            image.shading = .color(color)
+            single.draw(image, in: raster.box)
         }
     }
 
@@ -227,7 +273,7 @@ struct LyricsFXView: View {
             LyricsFXCanvas.draw(plan, in: context, size: size, paths: glyphPaths)
             #if DEBUG
             let elapsed = ContinuousClock.now - started
-            MainActor.assumeIsolated { LyricsFXFrameMeter.shared.record(elapsed, plan: plan) }
+            MainActor.assumeIsolated { LyricsFXFrameMeter.shared.record(elapsed, plan: plan, rasters: glyphPaths.rasters) }
             #endif
         }
         .accessibilityHidden(true)

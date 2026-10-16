@@ -34,6 +34,7 @@
 		156D29F451CD333678FA3430 /* ArtworkDiskCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05EFB5F1B46342FF23FBAAB7 /* ArtworkDiskCache.swift */; };
 		15BEBA37FD4FC48D58894E0D /* LICENSE-PermanentMarker.txt in Resources */ = {isa = PBXBuildFile; fileRef = A0D0638F61B9A58601FFE7C0 /* LICENSE-PermanentMarker.txt */; };
 		16FBD7EDEABE6E49B37816EB /* SpaceGrotesk-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2D73EEC1E7143A8AD5C82C3D /* SpaceGrotesk-Variable.ttf */; };
+		17C79DE6A8458CC78A37FCEA /* GlyphRasterFidelityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56882674866B1BE63373C32 /* GlyphRasterFidelityTests.swift */; };
 		193B259FC4EBFB36BEC757FB /* DeckFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA67BEAF9D31D2A090F57BF1 /* DeckFixtures.swift */; };
 		19781A7D083B10BF6421185B /* CoverFlowViewModelSlideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09930CC7EB1CC3C06927852E /* CoverFlowViewModelSlideTests.swift */; };
 		19D490A3DD871AFCD493D7B0 /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = B46629C50C54617D6DD25525 /* SwiftSoup */; };
@@ -51,6 +52,7 @@
 		22A1A85C9B2D9C08B0BF99B5 /* GlyphTemplatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CEAE1416634122A9C99B5D1 /* GlyphTemplatesTests.swift */; };
 		22BD9FA9F585CD7AE14D7E78 /* LICENSE-SpecialElite.txt in Resources */ = {isa = PBXBuildFile; fileRef = 68646A2247A1EF8AF70D14F1 /* LICENSE-SpecialElite.txt */; };
 		23FA0EF695E375037162A64E /* LyricsFXContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 231B06C336417CDDB8A3473B /* LyricsFXContrastTests.swift */; };
+		248BE96A2BB1BE62AD3DF3DC /* GlyphRasterColdFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2E25807D641BDC1218627A /* GlyphRasterColdFrameTests.swift */; };
 		24B823DFA2C9FC857FCFC6A9 /* CoverFlowEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2345109021DC911316C04F6D /* CoverFlowEvidence.swift */; };
 		25068C45C1CE38223F5F441C /* SkeletonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25431933360E8D07C0B8F6FE /* SkeletonTests.swift */; };
 		25FD08B129FA8A04E76298F4 /* LyricsTimelineEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57CAF90D5C3F05ECB3EC5A94 /* LyricsTimelineEstimator.swift */; };
@@ -231,6 +233,7 @@
 		969B8BEA463BD4DC6BBEE9BB /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A06FFFF68DDDA84F9BA9586 /* RootView.swift */; };
 		96E2C083B0E2F2E510E90E30 /* CoverFlowGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E34A7ABCF8572F080A284F5 /* CoverFlowGeometry.swift */; };
 		9827C486F21B911696CA3CF7 /* NowPlayingMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06DE8A4294B84E7982E9E707 /* NowPlayingMonitor.swift */; };
+		997553933D34AE05B83EA30A /* GlyphRasterCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06CB060F12ADEFAE2EAB1455 /* GlyphRasterCache.swift */; };
 		99E16E44694C154CE25E48D8 /* NowPlayingMonitorSingleFlightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3F857BF8A08E1AAA64C7BCB /* NowPlayingMonitorSingleFlightTests.swift */; };
 		9A4DFBEFA1E71CCA76BC3C32 /* ArtworkDiskCacheMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D9B70558842B1D8691D434B /* ArtworkDiskCacheMetadata.swift */; };
 		9A722E6D19EAA5362C60E94D /* StatusText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE2FCE97811541BCD7404F8 /* StatusText.swift */; };
@@ -305,6 +308,7 @@
 		CFDA814DBFF000EE40A6D364 /* OFL-CourierPrime.txt in Resources */ = {isa = PBXBuildFile; fileRef = 4666AFB8F6A00DF5018247BC /* OFL-CourierPrime.txt */; };
 		CFF28072AB5FF2AA21842958 /* CoverFlowItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99BCAD66C666943E40ACDE33 /* CoverFlowItem.swift */; };
 		D04FEC70E669CB4B6514BBEA /* ArtworkServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08B38C59EC0043F3B2F28534 /* ArtworkServiceTests.swift */; };
+		D06C8B0A786C8F284DF08A1E /* GlyphRasterCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B54740AC596D19789B195534 /* GlyphRasterCacheTests.swift */; };
 		D0A34A2E48782416BF49A00E /* BatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CEC1FC89375AD3B0B22D36 /* BatchView.swift */; };
 		D15EC7FC6AB0214BD1188A6E /* ArtistOverrideTableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BAC56B67E5628F456F97080 /* ArtistOverrideTableTests.swift */; };
 		D1DA94416F7880B7FDFA2FA8 /* LyricsFXViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01EC2F1785F4C74CF923149F /* LyricsFXViewModel.swift */; };
@@ -404,6 +408,7 @@
 		05739D4D6E071A9E043D5BDC /* LyricsFXFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFXFrameTests.swift; sourceTree = "<group>"; };
 		05EAF030272D7D1C00571A9C /* GlyphTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlyphTemplates.swift; sourceTree = "<group>"; };
 		05EFB5F1B46342FF23FBAAB7 /* ArtworkDiskCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkDiskCache.swift; sourceTree = "<group>"; };
+		06CB060F12ADEFAE2EAB1455 /* GlyphRasterCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlyphRasterCache.swift; sourceTree = "<group>"; };
 		06DE8A4294B84E7982E9E707 /* NowPlayingMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingMonitor.swift; sourceTree = "<group>"; };
 		0791CAC2D67F248D7BEA25DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		07FF4F8EED6B27129509004D /* MirageGothic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = MirageGothic.ttf; sourceTree = "<group>"; };
@@ -654,6 +659,7 @@
 		B0F9592625EF979488828038 /* MusicSelectorAllowListTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicSelectorAllowListTests.swift; sourceTree = "<group>"; };
 		B149103B8364067636426A75 /* GoldenFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldenFixtures.swift; sourceTree = "<group>"; };
 		B365659C3B0729C5AC923DD1 /* LyricsSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsSourceTests.swift; sourceTree = "<group>"; };
+		B54740AC596D19789B195534 /* GlyphRasterCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlyphRasterCacheTests.swift; sourceTree = "<group>"; };
 		B63316E0E9EC5919C8A81020 /* CardDetailsReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailsReader.swift; sourceTree = "<group>"; };
 		B6B794679D82C0620843A609 /* README-Cenobyte.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "README-Cenobyte.txt"; sourceTree = "<group>"; };
 		B78573E331D1F199AA5E0E64 /* FXNonceSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXNonceSource.swift; sourceTree = "<group>"; };
@@ -741,12 +747,14 @@
 		F517C76FBFFEDC9A2CE58C7C /* LyricsNotifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsNotifierTests.swift; sourceTree = "<group>"; };
 		F5418D2D8A314CF129F314D4 /* FXSeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXSeed.swift; sourceTree = "<group>"; };
 		F546D6D63C7C8797F26EAC65 /* MusicReadContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicReadContractTests.swift; sourceTree = "<group>"; };
+		F56882674866B1BE63373C32 /* GlyphRasterFidelityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlyphRasterFidelityTests.swift; sourceTree = "<group>"; };
 		F87D5BD014C5EE9BDE3BE6AF /* BusyLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusyLedger.swift; sourceTree = "<group>"; };
 		F88E1A081770623476A3A22E /* HistorySnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistorySnapshotTests.swift; sourceTree = "<group>"; };
 		F90A5DFCD794FAE0271D0628 /* CoverFlowSlidePlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowSlidePlan.swift; sourceTree = "<group>"; };
 		FA377424FC3A57050E9BB282 /* Cenobyte.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Cenobyte.ttf; sourceTree = "<group>"; };
 		FAA4B29822CA9BCCFEA5A207 /* EditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorViewModel.swift; sourceTree = "<group>"; };
 		FB6D70C54D210955CEBEDDAB /* ComposedBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposedBackdrop.swift; sourceTree = "<group>"; };
+		FC2E25807D641BDC1218627A /* GlyphRasterColdFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlyphRasterColdFrameTests.swift; sourceTree = "<group>"; };
 		FCFFF746CB6D2D71CD8EA866 /* MaterialSymbolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialSymbolTests.swift; sourceTree = "<group>"; };
 		FD35F164D8DBC688441330AD /* DarkLyricsSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkLyricsSource.swift; sourceTree = "<group>"; };
 		FEB551EC20007F996B5645A8 /* LyricsFXPreviewRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFXPreviewRenderTests.swift; sourceTree = "<group>"; };
@@ -900,6 +908,9 @@
 				5D3A73FC73765D5D878495E8 /* ExistingBandCandidatesTests.swift */,
 				45487409C0F7EE37DC916AF1 /* FXSeedTests.swift */,
 				27D162E3C0D5CE321C92B8A6 /* GenreStyleResolverTests.swift */,
+				B54740AC596D19789B195534 /* GlyphRasterCacheTests.swift */,
+				FC2E25807D641BDC1218627A /* GlyphRasterColdFrameTests.swift */,
+				F56882674866B1BE63373C32 /* GlyphRasterFidelityTests.swift */,
 				6CEAE1416634122A9C99B5D1 /* GlyphTemplatesTests.swift */,
 				FFC514BECABCF777B7D4A41D /* LiveLyricsFXMeasurementTests.swift */,
 				7B77B51D5EBCF1BADC6A14DC /* LRCAlignmentTests.swift */,
@@ -1308,6 +1319,7 @@
 				F08EF0C25148474176ACF6BA /* ComposedStyle.swift */,
 				F5418D2D8A314CF129F314D4 /* FXSeed.swift */,
 				0CC94BFC473EF47824CA3ADA /* GlyphPersonality.swift */,
+				06CB060F12ADEFAE2EAB1455 /* GlyphRasterCache.swift */,
 				05EAF030272D7D1C00571A9C /* GlyphTemplates.swift */,
 				51EDBEDD0E4C8E435B93B461 /* LyricsFXFrame.swift */,
 				9B9284CC6AFD33874117156F /* LyricsFXFrameMeter.swift */,
@@ -1693,6 +1705,9 @@
 				037862148C210FA8F1074CA3 /* GatedPollClockTests.swift in Sources */,
 				3F8EE9AF0BDA0A7D152B5AAB /* GeniusParserTests.swift in Sources */,
 				D35EF0FB576751DF5D54F14A /* GenreStyleResolverTests.swift in Sources */,
+				D06C8B0A786C8F284DF08A1E /* GlyphRasterCacheTests.swift in Sources */,
+				248BE96A2BB1BE62AD3DF3DC /* GlyphRasterColdFrameTests.swift in Sources */,
+				17C79DE6A8458CC78A37FCEA /* GlyphRasterFidelityTests.swift in Sources */,
 				22A1A85C9B2D9C08B0BF99B5 /* GlyphTemplatesTests.swift in Sources */,
 				E73E267B07EF724C7EAA730A /* GoldenFixtures.swift in Sources */,
 				38C60FF3184D2F651A2FF23F /* HTTPClientTests.swift in Sources */,
@@ -1834,6 +1849,7 @@
 				EC0CB41D352A96323833A261 /* GeniusSource.swift in Sources */,
 				CE3793162E853085529FC128 /* GenreStyleResolver.swift in Sources */,
 				417BF0B45C08F5D59250C77D /* GlyphPersonality.swift in Sources */,
+				997553933D34AE05B83EA30A /* GlyphRasterCache.swift in Sources */,
 				F4A90A048982A26FAF21CE39 /* GlyphTemplates.swift in Sources */,
 				0C184008ADCCB6EB8711BF52 /* HTMLText.swift in Sources */,
 				2EF03340DB55ACB9FE68BB01 /* HTTPClient.swift in Sources */,
