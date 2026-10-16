@@ -19,7 +19,7 @@ struct FontFace: Hashable, Sendable {
     var italic = false
     /// 原型的 `upper`：整行轉大寫顯示
     var uppercase = false
-    /// 字型固有的尺寸補償（與批次無關）：組合畫法每行的 em 乘上它。字面本身就比同字級的其他字大很多的字型才設（原型 composer.js:403）
+    /// 字型固有的尺寸補償（與批次無關）：組合畫法每行的 em 乘上它。字面比同字級的其他字明顯大或小的字型才設（原型 composer.js:401：Rock Salt 0.085、Anton 0.15，預設 0.12；Butcherman 不在 app 目錄）
     var sizeScale: CGFloat = 1
 
     static let displayRegular = FontFace(id: "display-regular", family: "Space Grotesk", weight: .regular)
@@ -95,8 +95,10 @@ struct GlyphDraw: Equatable, Sendable {
     var scaleY: CGFloat = 1
     let opacity: Double
     let color: ColorSlot
+    /// 霓虹描邊寬（點；配色 acc 色，先描後填）。0＝不描；殘影層即使帶著也不畫（`LyricsFXCanvas.runs(of:stroking:)`）
+    var stroke: CGFloat = 0
 
-    init(text: String, face: FontFace, fontSize: CGFloat, origin: CGPoint, rotation: CGFloat = 0, scaleX: CGFloat = 1, scaleY: CGFloat = 1, opacity: Double, color: ColorSlot) {
+    init(text: String, face: FontFace, fontSize: CGFloat, origin: CGPoint, rotation: CGFloat = 0, scaleX: CGFloat = 1, scaleY: CGFloat = 1, opacity: Double, color: ColorSlot, stroke: CGFloat = 0) {
         self.text = text
         self.face = face
         self.fontSize = fontSize
@@ -106,6 +108,7 @@ struct GlyphDraw: Equatable, Sendable {
         self.scaleY = scaleY
         self.opacity = opacity
         self.color = color
+        self.stroke = stroke
     }
 }
 
@@ -175,8 +178,6 @@ struct FramePlan: Equatable, Sendable {
     var zoom: CGFloat = 1
     /// 字的光暈半徑（點；配色 acc 色）。0＝無
     var glow: CGFloat = 0
-    /// 字的描邊寬（點；配色 acc 色，先描後填）。0＝無
-    var stroke: CGFloat = 0
 }
 
 /// 字寬量測：回傳 `text` 每個 grapheme 起點的 x 位移，末項＝總寬（共 `text.count + 1` 項）。

@@ -68,10 +68,13 @@ struct B2EffectTests {
         #expect(mirrored.allSatisfy { $0.opacity <= ComposedStyle.reflectionAlpha + 1e-9 })
     }
 
-    @Test func glowAndNeonStrokeAreFrameLevelSettings() {
-        #expect(plan(5.5, fx1: "glow").glow > 0 && plan(5.5, fx1: "glow").stroke == 0)
-        #expect(plan(5.5, fx1: "neonstroke").stroke > 0 && plan(5.5, fx1: "neonstroke").glow > 0)
-        #expect(plan(5.5, fx1: "none").glow == 0 && plan(5.5, fx1: "none").stroke == 0)
+    /// 光暈是整幀設定；描邊寬跟著每一句的 em 存在主字上（批 4 遺留計劃 §2.2）
+    @Test func glowIsFrameLevelAndNeonStrokeRidesOnTheMainGlyphs() {
+        func stroked(_ frame: FramePlan) -> Bool { !frame.glyphs.isEmpty && frame.glyphs.allSatisfy { $0.stroke > 0 } }
+        func unstroked(_ frame: FramePlan) -> Bool { frame.glyphs.allSatisfy { $0.stroke == 0 } }
+        #expect(plan(5.5, fx1: "glow").glow > 0 && unstroked(plan(5.5, fx1: "glow")))
+        #expect(stroked(plan(5.5, fx1: "neonstroke")) && plan(5.5, fx1: "neonstroke").glow > 0)
+        #expect(plan(5.5, fx1: "none").glow == 0 && unstroked(plan(5.5, fx1: "none")))
     }
 
     @Test(arguments: [("bob", HoldTemplate.bob), ("wobble", .wobble), ("flicker", .flicker)])

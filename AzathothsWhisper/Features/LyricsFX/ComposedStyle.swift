@@ -70,6 +70,25 @@ enum ComposedStyle {
     static let holdScale: CGFloat = 1.04
     static let holdJitter: CGFloat = 1
 
+    /// 測試用：這一句的縮字結果（em、比例、是否斷詞、各列寬、每個字所屬的詞與列）
+    struct FitReport {
+        let em: CGFloat
+        let ratio: CGFloat
+        let breaksLongWords: Bool
+        let rowWidths: [CGFloat]
+        let glyphs: [(text: String, wordIndex: Int, row: Int)]
+    }
+
+    static func fitReport(line: TimedLine, index: Int, recipe: ComposedRecipe, size: CGSize, measurer: any TextMeasuring) -> FitReport? {
+        guard let style = ResolvedStyle(recipe) else { return nil }
+        let (_, personalities) = linePersonalities(line: line, index: index, style: style)
+        let fit = fitted(line, personalities: personalities, size: size, style: style, measurer: measurer, index: index)
+        return FitReport(
+            em: fit.em, ratio: fit.em / baseEm(size: size, style: style), breaksLongWords: fit.breaksLongWords, rowWidths: fit.laid.rowWidths,
+            glyphs: fit.laid.glyphs.map { ($0.character, $0.wordIndex, $0.row) }
+        )
+    }
+
     /// 測試用：這一句實際用的 em 相對原 em 的比例（1＝沒縮）
     static func fittedEmRatio(line: TimedLine, index: Int, recipe: ComposedRecipe, size: CGSize, measurer: any TextMeasuring) -> CGFloat {
         guard let style = ResolvedStyle(recipe) else { return 1 }
@@ -164,7 +183,6 @@ enum ComposedStyle {
             frame.back.append(speedLines(size: size, time: time, color: style.palette.fg, fade: 1 - (time - current.line.start) / speedLineWindow))
         }
         if style.effects.contains(.glow) || style.effects.contains(.neonstroke) { frame.glow = glowRadius }
-        if style.effects.contains(.neonstroke) { frame.stroke = size.height * emRatio * strokeRatio }
         return frame
     }
 
@@ -192,7 +210,10 @@ enum ComposedStyle {
         into frame: inout FramePlan, specks: inout [(Particle, Double)]
     ) {
         let (lineSeed, personalities) = linePersonalities(line: entry.line, index: entry.index, style: style)
-        let (em, laid) = fitted(entry.line, personalities: personalities, size: size, style: style, measurer: measurer, index: entry.index)
+        let fit = fitted(entry.line, personalities: personalities, size: size, style: style, measurer: measurer, index: entry.index)
+        let (em, laid) = (fit.em, fit.laid)
+        // 霓虹描邊寬跟著這一句實際的 em（含字型字級與縮字；原型 `st.em × 0.06`）。原型另隨逐字縮放，app 在畫布座標描邊、不隨（既有差異）
+        let stroke = style.effects.contains(.neonstroke) ? em * strokeRatio : 0
         let rowHeight = em * lineHeight
         let baseY = size.height * baseYRatio - CGFloat(laid.rowWidths.count) * rowHeight / 2 + rowHeight * 0.8
         let misregistered = style.effects.contains(.misreg)
@@ -219,7 +240,7 @@ enum ComposedStyle {
                 text: glyph.character, face: style.face, fontSize: fontSize,
                 origin: CGPoint(x: center.x - advance / 2, y: center.y - measurer.ascent(face: style.face, fontSize: fontSize)),
                 rotation: CGFloat(personality.rotation) + baseRotation + transform.rotation,
-                scaleX: transform.scale * transform.scaleX, scaleY: transform.scale * transform.scaleY, opacity: alpha, color: .fg
+                scaleX: transform.scale * transform.scaleX, scaleY: transform.scale * transform.scaleY, opacity: alpha, color: .fg, stroke: stroke
             )
             let glyphSeed = lineSeed &+ UInt64(glyph.index) &* 7919
             var random = SplitMix64(seed: glyphSeed)
@@ -351,9 +372,11 @@ enum ComposedStyle {
         }
     }
 
-    /// 以詞為單位貪婪折行（原型 `layout`）：字寬依個性字級量、每字加 spacing、詞間 0.3 em
+    /// 以詞為單位貪婪折行（原型 `layout`）：字寬依個性字級量、每字加 spacing、詞間 0.3 em。
+    /// `breakLongWords`：比折行寬還寬的詞按字（Swift `Character`＝extended grapheme cluster）斷到多列，仍是同一個詞（同 wordIndex、同時間）——只在縮到下限仍放不下時用
     private static func layout(
-        _ line: TimedLine, personalities: [GlyphPersonality], em: CGFloat, maxWidth: CGFloat, face: FontFace, measurer: any TextMeasuring
+        _ line: TimedLine, personalities: [GlyphPersonality], em: CGFloat, maxWidth: CGFloat, face: FontFace, measurer: any TextMeasuring,
+        breakLongWords: Bool = false
     ) -> LineLayout {
         var glyphs: [LaidGlyph] = []
         var rowWidths: [CGFloat] = [0]
@@ -374,7 +397,12 @@ enum ComposedStyle {
             }
             if rowWidths[row] > 0 { rowWidths[row] += wordGap * em }
             words.append((rowWidths[row], wordWidth))
+            let breaks = breakLongWords && wordWidth > maxWidth
             for (character, width) in zip(characters, widths) {
+                if breaks, rowWidths[row] > 0, rowWidths[row] + width > maxWidth {
+                    rowWidths.append(0)
+                    row += 1
+                }
                 glyphs.append(LaidGlyph(character: character, wordIndex: wordIndex, index: index, x: rowWidths[row], width: width, row: row))
                 rowWidths[row] += width
                 index += 1
@@ -396,50 +424,74 @@ enum ComposedStyle {
     static func cachedFitRatio(line: TimedLine, index: Int, recipe: ComposedRecipe, size: CGSize, measurer: any TextMeasuring) -> CGFloat? {
         guard let style = ResolvedStyle(recipe) else { return nil }
         let (_, personalities) = linePersonalities(line: line, index: index, style: style)
-        return FitCache.ratio(for: FitCache.Key(line: line, personalities: personalities, size: size, style: style, measurer: measurer))
+        return FitCache.result(for: FitCache.Key(line: line, personalities: personalities, size: size, style: style, measurer: measurer))?.ratio
     }
 
     private static func baseEm(size: CGSize, style: ResolvedStyle) -> CGFloat {
         size.height * emRatio * style.face.sizeScale
     }
 
-    private static func fitted(
-        _ line: TimedLine, personalities: [GlyphPersonality], size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring, index: Int
-    ) -> (em: CGFloat, laid: LineLayout) {
-        let baseEm = baseEm(size: size, style: style)
-        let lay = { (em: CGFloat) in layout(line, personalities: personalities, em: em, maxWidth: size.width * maxWidthRatio, face: style.face, measurer: measurer) }
-        if style.enter.pile { return (baseEm, lay(baseEm)) }
-        let key = FitCache.Key(line: line, personalities: personalities, size: size, style: style, measurer: measurer)
-        if let ratio = FitCache.ratio(for: key) { return (baseEm * ratio, lay(baseEm * ratio)) }
-        let full = lay(baseEm)
-        if fits(full, em: baseEm, size: size, style: style, measurer: measurer) { return (baseEm, full) }
-        let (em, laid) = search(lay, baseEm: baseEm, size: size, style: style, measurer: measurer, line: line, index: index)
-        FitCache.store(em / baseEm, for: key)
-        return (em, laid)
+    /// 一句的縮字結果：用的 em、排好的版面、有沒有斷開超寬的詞
+    private struct Fitted {
+        let em: CGFloat
+        let laid: LineLayout
+        let breaksLongWords: Bool
     }
 
+    private static func fitted(
+        _ line: TimedLine, personalities: [GlyphPersonality], size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring, index: Int
+    ) -> Fitted {
+        let baseEm = baseEm(size: size, style: style)
+        let lay = { (em: CGFloat, breaks: Bool) in
+            layout(line, personalities: personalities, em: em, maxWidth: size.width * maxWidthRatio, face: style.face, measurer: measurer, breakLongWords: breaks)
+        }
+        if style.enter.pile { return Fitted(em: baseEm, laid: lay(baseEm, false), breaksLongWords: false) }
+        let key = FitCache.Key(line: line, personalities: personalities, size: size, style: style, measurer: measurer)
+        if let result = FitCache.result(for: key) {
+            let em = baseEm * result.ratio
+            return Fitted(em: em, laid: lay(em, result.breaksLongWords), breaksLongWords: result.breaksLongWords)
+        }
+        let full = lay(baseEm, false)
+        if fits(full, em: baseEm, size: size, style: style, measurer: measurer) { return Fitted(em: baseEm, laid: full, breaksLongWords: false) }
+        let fit = search(lay, baseEm: baseEm, size: size, style: style, measurer: measurer, line: line, index: index)
+        FitCache.store(FitCache.Result(ratio: fit.em / baseEm, breaksLongWords: fit.breaksLongWords), for: key)
+        return fit
+    }
+
+    /// 回傳的 em 一律是實際跑過 `fits` 且通過的候選（或下限）：字寬對 em 只是近似線性時，最壞是比最大可行值略小，不會放不下
     private static func search(
-        _ lay: (CGFloat) -> LineLayout, baseEm: CGFloat, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring, line: TimedLine, index: Int
-    ) -> (em: CGFloat, laid: LineLayout) {
+        _ lay: (CGFloat, Bool) -> LineLayout, baseEm: CGFloat, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring, line: TimedLine, index: Int
+    ) -> Fitted {
         var low = baseEm * minimumFitRatio, high = baseEm
-        var best = lay(low)
+        var best = lay(low, false)
         guard fits(best, em: low, size: size, style: style, measurer: measurer) else {
-            FitLog.once(line: line, index: index, size: size, style: style, rows: best.rowWidths.count)
-            return (low, best)
+            // 下限仍放不下：若是超寬的詞擋住（水平），在下限把它斷開再判一次；仍不行就照畫、記一次
+            let breaks = !rowsFitWidth(best, size: size)
+            if breaks { best = lay(low, true) }
+            if !fits(best, em: low, size: size, style: style, measurer: measurer) {
+                FitLog.once(line: line, index: index, size: size, style: style, rows: best.rowWidths.count, breaksLongWords: breaks)
+            }
+            return Fitted(em: low, laid: best, breaksLongWords: breaks)
         }
         for _ in 0..<fitSteps {
             let middle = (low + high) / 2
-            let candidate = lay(middle)
+            let candidate = lay(middle, false)
             if fits(candidate, em: middle, size: size, style: style, measurer: measurer) {
                 (low, best) = (middle, candidate)
             } else {
                 high = middle
             }
         }
-        return (low, best)
+        return Fitted(em: low, laid: best, breaksLongWords: false)
     }
 
-    /// 主字形的保守包絡（只放大不縮小）是否落在上下各留 `fitMargin` 的安全區；淡裝飾（暈開、倒影、錯位、RGB 分離、紙片）不算
+    /// 水平（批 4 遺留計劃 §2.1 契約 A）：每列排版寬 ≤ 折行寬。多詞列由折行保證，所以只有比折行寬還寬的單一詞會讓它失敗
+    private static func rowsFitWidth(_ laid: LineLayout, size: CGSize) -> Bool {
+        let maxWidth = size.width * maxWidthRatio
+        return laid.rowWidths.allSatisfy { $0 <= maxWidth }
+    }
+
+    /// 主字形的保守包絡（只放大不縮小）是否落在上下各留 `fitMargin` 的安全區、且每列不比折行寬還寬；淡裝飾（暈開、倒影、錯位、RGB 分離、紙片）不算
     private static func fits(_ laid: LineLayout, em: CGFloat, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring) -> Bool {
         let rows = CGFloat(laid.rowWidths.count)
         let rowHeight = em * lineHeight
@@ -454,7 +506,7 @@ enum ComposedStyle {
         let top = firstBaseline - measurer.ascent(face: style.face, fontSize: largest) - reach
         let bottom = lastBaseline + measurer.descent(face: style.face, fontSize: largest) + reach
         let margin = size.height * fitMargin
-        return top >= margin && bottom <= size.height - margin
+        return top >= margin && bottom <= size.height - margin && rowsFitWidth(laid, size: size)
     }
 
     /// 原型 `displayChar`：大寫字型整行轉大寫；否則只有行首字母大寫
@@ -538,7 +590,7 @@ extension GlyphDraw {
     func shifted(dx: CGFloat, dy: CGFloat, opacity: Double, color: ColorSlot) -> GlyphDraw {
         GlyphDraw(
             text: text, face: face, fontSize: fontSize, origin: CGPoint(x: origin.x + dx, y: origin.y + dy),
-            rotation: rotation, scaleX: scaleX, scaleY: scaleY, opacity: opacity, color: color
+            rotation: rotation, scaleX: scaleX, scaleY: scaleY, opacity: opacity, color: color, stroke: stroke
         )
     }
 }
@@ -559,20 +611,28 @@ private enum FitLog {
     private static let capacity = 256
     private static let seen = OSAllocatedUnfairLock(initialState: Set<Key>())
 
-    static func once(line: TimedLine, index: Int, size: CGSize, style: ResolvedStyle, rows: Int) {
+    static func once(line: TimedLine, index: Int, size: CGSize, style: ResolvedStyle, rows: Int, breaksLongWords: Bool) {
         let key = Key(text: FXHash.fnv1a64(line.text), index: index, face: style.face.id, width: Int(size.width), height: Int(size.height), seed: style.seed)
         let isNew = seen.withLock { seen in
             if seen.count >= capacity { seen.removeAll(keepingCapacity: true) }
             return seen.insert(key).inserted
         }
         guard isNew else { return }
-        log.info("line \(index, privacy: .public) still overflows at minimum fit ratio: \(rows, privacy: .public) rows")
+        log.info("line \(index, privacy: .public) still overflows at minimum fit ratio: \(rows, privacy: .public) rows, broken words: \(breaksLongWords, privacy: .public)")
     }
 }
 
 /// 縮過的句子的比例（T7 第 3 次每幀：每幀重算讓 Courier 由過變超）。放得下的句子不進來，所以一般句只多一次查表。
-/// 鍵＝`fits` 與 `layout` 真正讀的東西：歌詞、各字的大小（性格亂數依配方各槽而變，只記種子不夠）、畫布、字型、變異幅度、量測器型別
+/// 鍵＝`fits` 與 `layout` 真正讀的東西：歌詞、各字的大小（性格亂數依配方各槽而變，只記種子不夠）、畫布、字型、變異幅度、量測器型別。
+/// 不變條件：`TimedLine` 唯一的 init 由 `TimedWord.split(text)` 產生詞界，所以歌詞雜湊就決定了詞界（日後若加外部詞界的 init，鍵要加詞界）；
+/// app 的量測器只有 `CoreTextMeasurer` 一種，型別即可區分
 private enum FitCache {
+    /// 完整的縮字決策：比例＋有沒有在下限斷開超寬的詞
+    struct Result: Equatable {
+        let ratio: CGFloat
+        let breaksLongWords: Bool
+    }
+
     struct Key: Hashable {
         let text: UInt64
         let sizes: [Double]
@@ -596,16 +656,16 @@ private enum FitCache {
 
     /// 拖動視窗會一直產生新尺寸：超過就整個清掉（之後重算一次而已）
     private static let capacity = 512
-    private static let entries = OSAllocatedUnfairLock(initialState: [Key: CGFloat]())
+    private static let entries = OSAllocatedUnfairLock(initialState: [Key: Result]())
 
-    static func ratio(for key: Key) -> CGFloat? {
+    static func result(for key: Key) -> Result? {
         entries.withLock { $0[key] }
     }
 
-    static func store(_ ratio: CGFloat, for key: Key) {
+    static func store(_ result: Result, for key: Key) {
         entries.withLock { cache in
             if cache.count >= capacity { cache.removeAll(keepingCapacity: true) }
-            cache[key] = ratio
+            cache[key] = result
         }
     }
 }
