@@ -126,7 +126,7 @@ Grimoire 15／23、Anton 20／36、**Courier 45／76**、Shadows 47／88、Cinze
   - `pixelsPerPoint`：＝`displayScale`。
 - 光柵化：`CGContext(width: ceil(box.w×s), height: ceil(box.h×s), alphaOnly)`，`scaleBy(s, −s)`，`translateBy(−box.minX, −box.maxY)`，然後填外框。
 - 貼回：`context.concatenate(transform(for: glyph, entry:))` 之後 `draw(resolved, in: box)`。外框和點陣都在同一個 `Entry` 座標系，因此基線、旋轉軸、縮放軸**由構造保證**和現行畫法相同。
-- 不變式測試：`box` 經 `transform(for:)` 映射後的矩形，要包含外框經同一 transform 映射後的 bounding box，四邊差 ≤ 1 pt×縮放。
+- 不變式測試：`box` 包含外框的 bounding box，四邊間距在 [1, 2) pt（外擴 1 pt 再取整；§9.1）。貼回時用同一個 transform，所以映射後的包含關係也成立。
 - 鍵：`(text, face, entry.size, pixelsPerPoint)`。不分檔（F5：分檔、固定高解析度都比較差）。動畫中的縮放與 `plan.zoom` 照現行做法由 transform 處理，代價是暫態的重取樣；已有 thump、進場的案例納入 V3。
 - `pixelsPerPoint` 取自 `GraphicsContext.environment.displayScale`（F5 已核：離屏的 `ImageRenderer.scale` 也會反映）。
 - 容量：以位元組計，上限 **16 MB**。F5：9 份配方 × 6 個時刻累積 278 筆＝5.8 MB（2×）。插入新 entry 前，若加上它會超過上限，就先整批清空（和 `GlyphPathCache` 同一做法）。若單一 entry 本身就超過上限，**只畫這一次、不進快取**，並計入 DEBUG 診斷（R2 #6）。**每幀最多清空一次**（/thecure 整體確認）：同一幀內已經清空過，之後再缺的點陣只畫這一次、不進快取，下一幀才恢復存入。這樣不會在同一幀裡反覆清空、重建，畫面也仍全是點陣，不混入向量，群組透明度的語義不變。清空後第一幀的成本由 V1b 把關。
@@ -242,6 +242,60 @@ Grimoire 15／23、Anton 20／36、**Courier 45／76**、Shadows 47／88、Cinze
 - 退路：使用者目視看得出差別、且修兩輪仍看得出來 → 停手，交使用者決定是否改採 vecl（§6）。改採時，V2 不適用，本計劃要另修。
 
 ## 9. 紀錄（實作時回填）
+### 9.0 T0（2026-10-16）
+- 刪掉 spike worktree（`git worktree remove --force`）、`dd-spike/`、`dd-spike-test/`。刪之前唯讀核對過：worktree 只有 spike 改動；兩個 DerivedData 的 WorkspacePath 都指向 spike。
+- **偏離計劃**：`dd.BDBz/`（main bef930f 的 -O 基線建置）**保留**，因為 V2 的交錯對照與 §6 的新舊目視都還要用它，收官時再刪。另外兩個 worktree（`agent-a7c9…`、`ipad-port`）不是這次建立的，不動。
+- 分支：`wip/lyrics-fx-raster-cache`（從 main bef930f 開出）。
+
+### 9.1 T1 快取（TDD）
+- 先寫可編譯的空殼（回傳空的 Entry），新測試 8 條跑出**斷言紅**：box 不含外框、外擴不在 [1,2)、沒有 cgImage、misses 不增加…。
+- 實作後 8 條綠。第一次跑時是測試碼的編譯錯（`CGContext` 的 space 不接受 nil，改成 DeviceGray），不是實作問題。
+- 不變式的寫法：外擴 1 pt 再 `integral`，所以四邊的實際間距在 [1, 2) pt。計劃 §2.2 原寫「四邊差 ≤ 1 pt×縮放」，以測試為準（筆誤級修正）。
+
+### 9.2 T2 繪製（TDD）
+- 第一版 `.raster`＝逐字向量填、不包群組圖層。V3 跑出**斷言紅**：rocksalt、marker、catacombs…，主要是「邊緣帶外」與平均差超標（半透明重疊處變深），正是門檻要擋的情況。
+- 換成完整實作後，V3 10 份參數化＋霓虹描邊 1 條、策略 3 條，全綠。V3 在 Debug 下 56 s，沒有超過 120 s 時限，不需要 vDSP。
+- **逐案實測最差**（每份取 6 個時刻中的最差值）：
+| scale | 配方 | 平均差 | 差 > 2/255 | 差 > 16/255 | 最大差 | 邊緣帶外差 > 16 | 邊緣帶外最大差 |
+|---|---|---|---|---|---|---|---|
+| 2× | mono | 0.00064 | 1.098% | 0.379% | 88 | 0 | 0 |
+| 2× | catacombs | 0.00054 | 1.394% | 0.245% | 76 | 0 | 0 |
+| 2× | elite | 0.00030 | 0.716% | 0.120% | 76 | 0.0002% | 30 |
+| 2× | glow | 0.00052 | 1.110% | 0.018% | 79 | 0.0001% | 18 |
+| 2× | 其餘 6 份 | ≤ 0.00038 | ≤ 0.879% | ≤ 0.179% | ≤ 75 | 0 | 0 |
+| 1× | mono | 0.00127 | 2.070% | 0.706% | 86 | 0 | 0 |
+| 1× | catacombs | 0.00087 | 2.234% | 0.421% | 74 | 0 | 0 |
+| 1× | 其餘 8 份（含 glow 0.051%） | ≤ 0.00068 | ≤ 1.717% | ≤ 0.312% | ≤ 82 | 0 | 0 |
+- glow 原本沒有 spike 數據，實測在門檻內。霓虹描邊逐像素相同。逐案數據與差異熱圖在測試暫存目錄 `$TMPDIR/lyricsfx-fidelity/`。
+- 量測器摘要多了 `rasterMisses`、`rasterBytes` 兩個欄位，計時區間不變。
+- 全量單元測試：**1261 tests／157 suites 綠**（skip `overlappingLoadSuspendsPollingUntilLastCompletes()`，完整名稱帶括號）。比基線 1249 多 13 條（8＋2＋3），減去 skip 的 1 條。`no_playback_gate.sh` 0；`coverage_gate.sh` Services+Infra 96.2%；Scripts Python 333 OK。
+- wip checkpoint `7d2f553`。
+
+### 9.3 T3 量測（-O 量測建置 `dd-wip-O`，2026-10-16）
+- **V1 每幀**（7 份全程前景，每份丟第 1 窗、取 5 窗，逐窗判定）：
+| 配方 | p50 | p95 | 判定 | 改版前 p95（F1） |
+|---|---|---|---|---|
+| Rock Salt＋暈開＋抖動 | 0.82–1.04 ms | 1.22–1.69 ms | 達標 | 4.99–5.80 |
+| IM Fell＋暈開＋閃爍 | 0.91–1.47 | 2.03–2.35 | 達標 | 5.28–5.86 |
+| Shadows＋暈開＋倒影 | 1.05–1.58 | 2.24–2.44 | 達標 | 3.61–4.00 |
+| Marker 長句＋暈開＋抖動 | 0.92–1.28 | 1.89–2.08 | 達標 | 4.34–4.73 |
+| Courier＋呼吸＋倒影 | 0.79–1.19 | 1.60–1.73 | 達標 | 2.29–2.62 |
+| Catacombs（I-25） | 1.26–1.60 | 1.98–2.37 | 達標 | 4.51–5.83 |
+| Special Elite（批 3） | 0.64–0.90 | 1.18–1.30 | 達標 | 3.68–4.15 |
+  - 最差的 p95 是 2.44 ms，約佔一格（8.3 ms）的 30%。改版前最差約 70%。
+- **V1b**：
+  - 首窗（冷啟動，不丟）的 max 是 3.7–6.1 ms，都在一格內；首窗建圖 19–20 次；快取實際用量 0.21–0.53 MB。
+  - `GlyphRasterColdFrameTests`（-O、`AZW_PERF=1`；dense 第 4 秒的整幀，每次先清空點陣，取 10 次的最大值）：Catacombs **1.90 ms**（字＋副本 147 個）、Rock Salt **1.43 ms**（129 個），上限 8.3 ms，達標。
+  - 限制（照實記錄）：dense 預覽只有兩句英文，同一幀重複的字母多，一幀實際要建的點陣只有十幾張。若是一整幀都是不同 CJK 字的歌，要建的張數會更多，這裡沒有量。
+- **V2 主執行緒總量**（Time Profiler 15 s，基線＝main bef930f 的 -O 建置；交錯 2 輪；錄製期間每 0.25 s 核對前景，8 輪全部 ok）：
+| 配方 | 基線 round1／round2 | 新版 round1／round2 | 平均比 |
+|---|---|---|---|
+| Rock Salt | 5006／5180 | 3922／3683 | **0.747**（−25.3%） |
+| Catacombs | 5086／5481 | 3847／3997 | **0.742**（−25.8%） |
+  - 門檻 ≤ 0.85，達標。trace 原檔在 scratchpad `v2/`。
+
+### 9.4 T4 文件
+- ACCEPTANCE：I-44 改 ✅（附重量數據，原記錄保留）；I-40 補上 Special Elite 已達標；I-25 補上 Catacombs 最重組合每幀已達標（長句換行與整幀 xctrace 未重量，維持原記錄）；新增 I-46（⏳，等使用者目視）。
 
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（gpt-5.6-terra／medium，2026-10-16；4 個 P0）

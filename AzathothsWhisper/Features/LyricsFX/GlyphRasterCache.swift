@@ -47,13 +47,17 @@ final class GlyphRasterCache {
         guard made.bytes <= byteLimit else { return made }
         if bytes + made.bytes > byteLimit {
             guard !clearedThisFrame else { return made }
-            store.removeAll(keepingCapacity: true)
-            bytes = 0
+            removeAll()
             clearedThisFrame = true
         }
         store[key] = made
         bytes += made.bytes
         return made
+    }
+
+    func removeAll() {
+        store.removeAll(keepingCapacity: true)
+        bytes = 0
     }
 
     static func rasterize(_ path: CGPath, pixelsPerPoint scale: CGFloat) -> Entry {
