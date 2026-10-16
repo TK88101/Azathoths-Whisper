@@ -297,6 +297,18 @@ Grimoire 15／23、Anton 20／36、**Courier 45／76**、Shadows 47／88、Cinze
 ### 9.4 T4 文件
 - ACCEPTANCE：I-44 改 ✅（附重量數據，原記錄保留）；I-40 補上 Special Elite 已達標；I-25 補上 Catacombs 最重組合每幀已達標（長句換行與整幀 xctrace 未重量，維持原記錄）；新增 I-46（⏳，等使用者目視）。
 
+### 9.5 Phase 3 評審（/simcodex，2026-10-16；R2 提前結束）
+| 輪 | 來源 | 採納並修 | 駁回／延後（理由） |
+|---|---|---|---|
+| R1 | simplify：簡化 | 點陣建立失敗的空圖 fallback 寫了兩份而且沒有作用（box 是 0，本來就畫不出東西）→ `rasterize`／`entry` 改回 nil，`stamp` 跳過；`cgImage` 改非 optional。刪掉恆真測試 `theGlyphPathCacheOwnsOneRasterCache` | `Entry.cgImage` 只有測試在讀、`entry` 參數可改吃 `GlyphDraw`、測試 tuple 可精簡：P2 |
+| R1 | simplify：重用 | 冷快取測試重抄了配方表與 profile → 改用 `GlyphRasterFidelityTests.recipe(name)` | 讀像素、離屏出圖的輔助函式抽到 Tests/Support 共用：要動 diff 範圍外的既有測試檔，而且各檔各自一份是既有風格，P2 |
+| R1 | simplify：效率 | 像素比對先逐列 `memcmp`，相同的列跳過（統計結果不變）→ Debug 56 s → 20 s | 熱路徑的小優化（每個 run 多配置一個陣列、每字多一次字典查詢、逐字 `resolve`、displayScale 每 run 取一次）：估計合計 50–120 µs，不影響達標，P2 |
+| R1 | simplify：高度 | — | 「刪掉每幀最多清空一次」：**駁回**，這是計劃評審（/thecure 整體確認）定下的規格；`rendering` 併進 `glyphRunStrategy`、量測器只依賴數字而非快取型別：P2 |
+| R1 | codex review（--base main） | 無（「No discrete regression or blocking issue」） | — |
+| R2 | 自評（只看 R1 的修正，約 60 行）＋codex review --uncommitted | 無。Codex 對程式碼的結論是「internally consistent」 | Codex P1「未追蹤的 `.claude/worktrees` 不要 commit」：與本次改動無關，本來就逐檔 add、不加 `.claude/`；要不要寫進 `.gitignore` 屬於改設定，留給使用者 |
+- 無安全敏感改動（無認證、網路、正式碼的檔案寫入；只有測試寫暫存目錄），未派 security-reviewer。
+- 評審後全量：**1261 tests／158 suites 綠**；`no_playback_gate.sh` 0；覆蓋率 96.2%；Python 333 OK；-O 冷快取首幀 Catacombs 1.86 ms、Rock Salt 1.34 ms。wip `bbd2a6c`。
+
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（gpt-5.6-terra／medium，2026-10-16；4 個 P0）
 | # | Codex 意見 | 裁決 | 證據／落點 |
