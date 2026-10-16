@@ -309,6 +309,23 @@ Grimoire 15／23、Anton 20／36、**Courier 45／76**、Shadows 47／88、Cinze
 - 無安全敏感改動（無認證、網路、正式碼的檔案寫入；只有測試寫暫存目錄），未派 security-reviewer。
 - 評審後全量：**1261 tests／158 suites 綠**；`no_playback_gate.sh` 0；覆蓋率 96.2%；Python 333 OK；-O 冷快取首幀 Catacombs 1.86 ms、Rock Salt 1.34 ms。wip `bbd2a6c`。
 
+### 9.6 T6 使用者在場（2026-10-17）
+- **#1 UI 測試**：先 `build-for-testing`，使用者就位後才 `test-without-building`（`-only-testing` LyricsFXUITests、LyricsFlowUITests）。**20／20 綠**（LyricsFX 11、LyricsFlow 9；242.5 s）。開跑前、跑完後都唯讀核過輸入法＝ABC。結果包在本 session 的 scratchpad `ui1.xcresult`。
+- **#2 新舊並排目視**：內建螢幕、全螢幕（以 System Events 設 PID 所屬視窗的 `AXFullScreen`，沒有送任何按鍵）、密集預覽、同一段預覽歌詞從 0 秒開始；每份先舊（`dd.BDBz`＝main bef930f -O，執行檔內 `GlyphRasterCache` 符號 0 個）後新（`dd-wip-O`＝wip -O，建於 bbd2a6c 之後，符號 169 個），各 25 秒，16 次都核過視窗在最前面。
+| 配方 | 使用者回答 |
+|---|---|
+| Rock Salt＋暈開＋抖動 | 看不出差別（兩次都有全螢幕） |
+| IM Fell＋暈開＋閃爍 | 看不出差別 |
+| Shadows＋暈開＋倒影 | 看不出差別 |
+| Marker 長句＋暈開＋抖動 | 看不出差別 |
+| Catacombs（I-25） | 看不出差別 |
+| Special Elite（批 3） | 看不出差別 |
+| Courier＋呼吸＋倒影 | 看不出差別 |
+| mono（預設曲風 Pop，未指定樂團） | 看不出差別 |
+  - 不需要回 T2 修，§8 的 vecl 退路不啟用。
+- 全程沒有碰 Music 播放（替身 `LyricsFlowUITestMusic`）。
+- ACCEPTANCE I-46 改 ✅（2026-10-17）。外接 1× 螢幕真視窗仍未驗，維持 §6／§7 R3 的發版風險。
+
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（gpt-5.6-terra／medium，2026-10-16；4 個 P0）
 | # | Codex 意見 | 裁決 | 證據／落點 |
