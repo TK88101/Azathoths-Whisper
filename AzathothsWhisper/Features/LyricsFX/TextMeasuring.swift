@@ -130,6 +130,8 @@ final class GlyphPathCache {
     private static let capacity = 4000
     private var store: [Key: Entry] = [:]
     private let fonts = FaceFonts()
+    /// 由外框光柵化的點陣（計劃 2026-10-16 §2.2）：和外框快取同生命週期，繪製端不必另外持有
+    let rasters = GlyphRasterCache()
 
     func entry(for glyph: GlyphDraw) -> Entry {
         let size = UnitGlyphMetrics.cacheSize(for: glyph.fontSize, linear: fonts.scalesLinearly(glyph.face))
