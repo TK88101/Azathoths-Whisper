@@ -216,6 +216,11 @@
 - 無安全敏感改動（無認證、網路、檔案寫入、使用者資料），未派 security-reviewer。
 - R1 後相關 5 suites 20 條綠（含 V3 全螢幕）。**T8 全量**：**1281 條／159 suites 綠**（skip `overlappingLoadSuspendsPollingUntilLastCompletes()`）；`no_playback_gate.sh` 0；`coverage_gate.sh <全量 xcresult>` Services+Infra 96.2%；Scripts Python 333 OK。
 
+### 9.8 T9 使用者在場（2026-10-17）
+- UI 測試：跑前輸入法是繁體拼音，請使用者切成 ABC（未用模擬按鍵）；`LyricsFXUITests`＋`LyricsFlowUITests` **20／20 綠**（248 s）；跑後仍為 ABC。
+- 目視（全螢幕，舊＝main deddbde -O、新＝wip -O，各 25 秒，皆前景）：Catacombs、Marker、Elite、Courier 四份，使用者每份皆答「看不出差別 沒有問題」。Anton 未改（仍走向量），不看。
+- ACCEPTANCE I-46 補上在場結果。
+
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（Codex，2026-10-17）
 | # | 嚴重度／位置 | 處置 | 理由／修改 |
