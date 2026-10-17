@@ -141,7 +141,7 @@ enum LyricsFXCanvas {
             let tier = GlyphRasterCache.Tier(placement: placement, deviceScale: deviceScale)
             guard let raster = paths.rasters.entry(text: glyph.text, face: glyph.face, path: entry, tier: tier) else { continue }
             var single = context
-            single.concatenate(raster.toPixels.inverted().concatenating(placement))
+            single.concatenate(raster.fromPixels.concatenating(placement))
             var image = single.resolve(raster.image)
             image.shading = .color(color)
             single.draw(image, in: CGRect(x: 0, y: 0, width: raster.cgImage.width, height: raster.cgImage.height))
@@ -281,11 +281,14 @@ struct LyricsFXView: View {
             #endif
             let plan = LyricsFXFrame.plan(timeline: timeline, time: time, size: size, motion: motion, recipe: recipe, measurer: measurer)
             #if DEBUG
-            LyricsFXCanvas.draw(plan, in: context, size: size, paths: glyphPaths, rendering: LyricsFXFrameMeter.rendering)
+            let rendering = LyricsFXFrameMeter.rendering
+            #else
+            let rendering = LyricsFXCanvas.GlyphRendering.raster
+            #endif
+            LyricsFXCanvas.draw(plan, in: context, size: size, paths: glyphPaths, rendering: rendering)
+            #if DEBUG
             let elapsed = ContinuousClock.now - started
             MainActor.assumeIsolated { LyricsFXFrameMeter.shared.record(elapsed, plan: plan, canvas: size, rasters: glyphPaths.rasters) }
-            #else
-            LyricsFXCanvas.draw(plan, in: context, size: size, paths: glyphPaths)
             #endif
         }
         .accessibilityHidden(true)

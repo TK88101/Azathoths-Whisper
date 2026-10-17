@@ -69,7 +69,7 @@ struct LyricsFXPreviewArtifactTests {
     }
 
     /// 升起層在預設視窗下的畫布：寬 1200、高 800 − 標題列與 footer（約 150）
-    static let canvas = CGSize(width: 1200, height: 650)
+    nonisolated static let canvas = CGSize(width: 1200, height: 650)
 
     @Test func theFixtureIsAnEmbeddedLRCTimeline() throws {
         let timeline = try #require(Self.timeline)

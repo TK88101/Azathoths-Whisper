@@ -12,6 +12,8 @@ final class GlyphRasterCache {
         let cgImage: CGImage
         /// 外框座標 → 點陣像素（y 向下、原點在點陣左上）
         let toPixels: CGAffineTransform
+        /// 上式的反矩陣，貼圖時用（建圖時算一次，不必每幀每字求逆）
+        let fromPixels: CGAffineTransform
         let bytes: Int
     }
 
@@ -19,17 +21,6 @@ final class GlyphRasterCache {
     struct Tier: Hashable {
         let x: Int
         let y: Int
-
-        /// placement＝外框座標 → 畫布點；deviceScale＝畫布點 → 螢幕像素（displayScale × 整屏縮放）
-        init(placement: CGAffineTransform, deviceScale: CGFloat) {
-            x = GlyphRasterCache.tier(pixelsPerUnit: hypot(placement.a, placement.b) * deviceScale)
-            y = GlyphRasterCache.tier(pixelsPerUnit: hypot(placement.c, placement.d) * deviceScale)
-        }
-
-        init(x: Int, y: Int) {
-            self.x = x
-            self.y = y
-        }
     }
 
     private struct Key: Hashable {
@@ -62,12 +53,14 @@ final class GlyphRasterCache {
 
     /// 相鄰兩檔的解析度比：檔位 n 的點陣是每個外框單位 `tierRatio^n` 像素
     private static let tierRatio = maximumOversample / minimumOversample
+    /// 每幀每字都要算檔位，log 的除數先算好
+    private static let inverseLogTierRatio = 1 / log(tierRatio)
     /// 字縮到幾乎看不見時的下限，免得 log 發散
     private static let smallestPixelsPerUnit: CGFloat = 1e-3
 
     /// 螢幕上每個外框單位需要 `pixelsPerUnit` 像素時的檔位：取點陣 ≥ 1.6 倍螢幕像素的最小一檔
     static func tier(pixelsPerUnit: CGFloat) -> Int {
-        Int((log(minimumOversample * max(pixelsPerUnit, smallestPixelsPerUnit)) / log(tierRatio)).rounded(.up))
+        Int((log(minimumOversample * max(pixelsPerUnit, smallestPixelsPerUnit)) * inverseLogTierRatio).rounded(.up))
     }
 
     /// 檔位對應的點陣解析度（每個外框單位幾像素）
@@ -117,10 +110,11 @@ final class GlyphRasterCache {
     static func rasterize(_ path: CGPath, scaleX: CGFloat, scaleY: CGFloat) -> Entry? {
         let outline = path.boundingBoxOfPath
         guard !outline.isNull else { return nil }
-        let scaled = outline.applying(CGAffineTransform(scaleX: scaleX, y: scaleY))
+        let scaling = CGAffineTransform(scaleX: scaleX, y: scaleY)
+        let scaled = outline.applying(scaling)
         let originX = floor(scaled.minX) - 2, originY = floor(scaled.minY) - 2
-        let width = max(1, Int(ceil(scaled.maxX - originX) + 2)), height = max(1, Int(ceil(scaled.maxY - originY) + 2))
-        let toPixels = CGAffineTransform(scaleX: scaleX, y: scaleY).concatenating(CGAffineTransform(translationX: -originX, y: -originY))
+        let width = Int(ceil(scaled.maxX - originX) + 2), height = Int(ceil(scaled.maxY - originY) + 2)
+        let toPixels = scaling.concatenating(CGAffineTransform(translationX: -originX, y: -originY))
         guard let context = CGContext(
             data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
             space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue
@@ -133,6 +127,17 @@ final class GlyphRasterCache {
         context.setFillColor(CGColor(gray: 1, alpha: 1))
         context.fillPath()
         guard let image = context.makeImage() else { return nil }
-        return Entry(image: Image(decorative: image, scale: 1).renderingMode(.template), cgImage: image, toPixels: toPixels, bytes: context.bytesPerRow * height)
+        return Entry(image: Image(decorative: image, scale: 1).renderingMode(.template), cgImage: image, toPixels: toPixels, fromPixels: toPixels.inverted(), bytes: context.bytesPerRow * height)
+    }
+}
+
+extension GlyphRasterCache.Tier {
+    /// placement＝外框座標 → 畫布點；deviceScale＝畫布點 → 螢幕像素（displayScale × 整屏縮放）。
+    /// 旋轉不改兩軸的長度；兩軸等長（絕大多數的字）時只算一次檔位
+    init(placement: CGAffineTransform, deviceScale: CGFloat) {
+        let scaleX = hypot(placement.a, placement.b) * deviceScale
+        let scaleY = hypot(placement.c, placement.d) * deviceScale
+        let tierX = GlyphRasterCache.tier(pixelsPerUnit: scaleX)
+        self.init(x: tierX, y: scaleX == scaleY ? tierX : GlyphRasterCache.tier(pixelsPerUnit: scaleY))
     }
 }

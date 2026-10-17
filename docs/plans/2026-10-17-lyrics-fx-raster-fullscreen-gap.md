@@ -207,6 +207,15 @@
   - V2（ABBA／BAAB／ABBA 3 輪，全前景，xctrace 未掛）：Rock Salt 點陣 3668／3862／3905 對向量 4409／4471／4682 → 平均 **0.843**（達標、餘裕 0.007；第 2 輪單輪 0.864）；Catacombs 3889／3813／3960 對 4949／5250／4849 → **0.775**。
 - ACCEPTANCE：I-46 缺口註記改為「已補」並附數據（使用者目視待補）；I-47 改寫 Anton 走向量的原因與範圍變更。
 
+### 9.7 T7 /simcodex 與 T8 全量回歸（2026-10-17；R2 提前結束）
+| 輪 | 來源 | 採納並修 | 延後 P2（理由） |
+|---|---|---|---|
+| R1 | simplify 4 角度 | 效率 P1：檔位計算的 `1/log(比值)` 預先算好、兩軸等長時只算一次檔位；點陣的反矩陣 `fromPixels` 建圖時算一次（原本每幀每字求逆）。順手的 P2：建圖縮放矩陣只建一次、`Tier` 用自動生成的建構式、DEBUG 只呼叫一次 `draw`、冷首幀測試改引用 `nonisolated` 共用尺寸常數、向量基線的環境變數名集中到 `LyricsFXPreviewFixture`、測試魔術數字改推導並驗反矩陣 | ①`zoom` 改由 `context.transform` 推（`GraphicsContext.transform` 語義未實測，不在本輪冒險）；②`.rasterIgnoringOptOut` 改由測試覆寫 `face.rasterizes`（測試專用畫法進了正式 enum）；③空外框回 nil 與配置失敗同義（查無會到達的路徑）；④逐出改單次最小值掃描／逐到 90%（每次超限約 10–50 µs，相對建圖可忽略）；⑤外框與點陣兩次雜湊合併（較大重構） |
+| R1 | codex review --base main | 無（「No discrete correctness, performance, or maintainability regressions」） | — |
+| R2 | 自評（R1 的 42 行）＋codex review --uncommitted | 無（行為等價改寫；Codex：「No discrete correctness issues」） | — |
+- 無安全敏感改動（無認證、網路、檔案寫入、使用者資料），未派 security-reviewer。
+- R1 後相關 5 suites 20 條綠（含 V3 全螢幕）。**T8 全量**：**1281 條／159 suites 綠**（skip `overlappingLoadSuspendsPollingUntilLastCompletes()`）；`no_playback_gate.sh` 0；`coverage_gate.sh <全量 xcresult>` Services+Infra 96.2%；Scripts Python 333 OK。
+
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（Codex，2026-10-17）
 | # | 嚴重度／位置 | 處置 | 理由／修改 |

@@ -14,8 +14,7 @@ struct GlyphRasterColdFrameTests {
     static let runs = 10
 
     /// 配方取自畫面一致性測試（同一份表）；畫布加實際全螢幕（計劃 2026-10-17 全螢幕缺口：點陣按螢幕像素分檔，全螢幕的點陣較大）
-    /// 畫布：預覽預設（`LyricsFXPreviewArtifactTests.canvas`）與實際全螢幕（`GlyphRasterFidelityTests.fullscreen`）——兩者是 MainActor 常數，參數列不能直接引用
-    @Test(arguments: ["rocksalt", "catacombs", "marker"], [CGSize(width: 1200, height: 650), CGSize(width: 1728, height: 945)])
+    @Test(arguments: ["rocksalt", "catacombs", "marker"], [LyricsFXPreviewArtifactTests.canvas, GlyphRasterFidelityTests.fullscreen])
     func aFrameAfterTheRasterCacheIsClearedStaysWithinOneRefresh(_ name: String, canvas: CGSize) throws {
         let recipe = GlyphRasterFidelityTests.recipe(name)
         let timeline = try #require(LyricsTimelineBuilder.build(lyrics: LyricsFXPreviewFixture.denseLyrics, duration: LyricsFXPreviewFixture.duration))

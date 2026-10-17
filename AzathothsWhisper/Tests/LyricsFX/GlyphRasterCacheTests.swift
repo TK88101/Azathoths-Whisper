@@ -11,6 +11,7 @@ import Testing
 struct GlyphRasterCacheTests {
     static let face = FontFace(id: "Catacombs", family: "Catacombs", weight: nil, uppercase: true)
     /// 113 pt 字（外框 100 pt）在 2× 螢幕上：每個外框單位約 2.27 像素
+    static let screenPixelsPerUnit: CGFloat = 1.134 * 2
     static let tier = GlyphRasterCache.Tier(placement: CGAffineTransform(scaleX: 1.134, y: 1.134), deviceScale: 2)
 
     /// 測試裡的字都建得出點陣
@@ -60,11 +61,15 @@ struct GlyphRasterCacheTests {
         let path = Self.pathEntry()
         let raster = try Self.raster(GlyphRasterCache(), "A")
         let scale = GlyphRasterCache.pixelsPerUnit(tier: Self.tier.x)
-        #expect(scale / 2.268 >= GlyphRasterCache.minimumOversample - 1e-9, "113 pt × 2× 時點陣是螢幕像素的 1.6 倍以上")
+        #expect(scale / Self.screenPixelsPerUnit >= GlyphRasterCache.minimumOversample - 1e-9, "113 pt × 2× 時點陣是螢幕像素的 1.6 倍以上")
         let inPixels = path.path.boundingBoxOfPath.applying(raster.toPixels)
         #expect(inPixels.minX >= 1 && inPixels.minY >= 1, "四周留抗鋸齒的邊")
         #expect(inPixels.maxX <= CGFloat(raster.cgImage.width) - 1 && inPixels.maxY <= CGFloat(raster.cgImage.height) - 1)
         #expect(abs(raster.toPixels.a - scale) < 1e-9 && abs(raster.toPixels.d - scale) < 1e-9)
+        let roundTrip = raster.toPixels.concatenating(raster.fromPixels)
+        for (value, expected) in [(roundTrip.a, 1), (roundTrip.b, 0), (roundTrip.c, 0), (roundTrip.d, 1), (roundTrip.tx, 0), (roundTrip.ty, 0)] as [(CGFloat, CGFloat)] {
+            #expect(abs(value - expected) < 1e-9, "貼圖用的反矩陣要能還原外框座標")
+        }
         #expect(raster.bytes == raster.cgImage.bytesPerRow * raster.cgImage.height)
     }
 
@@ -102,7 +107,7 @@ struct GlyphRasterCacheTests {
 
     @Test func aDifferentTierIsADifferentBitmap() throws {
         let cache = GlyphRasterCache()
-        let small = try Self.raster(cache, "A", tier: GlyphRasterCache.Tier(x: Self.tier.x, y: Self.tier.y)).cgImage
+        let small = try Self.raster(cache, "A").cgImage
         let large = try Self.raster(cache, "A", tier: GlyphRasterCache.Tier(x: Self.tier.x + 4, y: Self.tier.y)).cgImage
         #expect(cache.misses == 2)
         #expect(large.width > small.width)

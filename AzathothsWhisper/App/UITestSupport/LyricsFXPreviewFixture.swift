@@ -18,6 +18,8 @@ enum LyricsFXPreviewFixture {
     static let nonceVariable = "AZW_LYRICSFX_PREVIEW_NONCE"
     /// 直接指定七個元件 id（font,backdrop,enter,exit,fx1,fx2,palette）：效能量測用最重的組合（B1 計劃 T10）
     static let recipeVariable = "AZW_LYRICSFX_PREVIEW_RECIPE"
+    /// "1"＝全部畫合併外框（量主執行緒總量時的向量基線，計劃 2026-10-17 全螢幕缺口 §3.3 V2）
+    static let vectorReferenceVariable = "AZW_LYRICSFX_VECTOR_REFERENCE"
     static let duration: Double = 60
 
     /// 12 個時間點：含兩段空檔（間奏）、一行長句、一行 CJK

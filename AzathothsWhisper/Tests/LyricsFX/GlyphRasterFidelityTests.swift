@@ -24,7 +24,7 @@ struct GlyphRasterFidelityTests {
 
     static let size = CGSize(width: 900, height: 560)
     /// 實際全螢幕（內建螢幕 1728×945 pt；一般字 em≈113 pt、Anton≈142 pt）——計劃 2026-10-17 全螢幕缺口 §3.1
-    static let fullscreen = CGSize(width: 1728, height: 945)
+    nonisolated static let fullscreen = CGSize(width: 1728, height: 945)
     static let times: [Double] = [2.4, 4.6, 5.7, 9.3, 20.5, 24.0]
     static let limits: [CGFloat: Limits] = [
         2: Limits(mean: 0.0007, over2: 0.015, over16: 0.004, maxDiff: 96),

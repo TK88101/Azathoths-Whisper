@@ -60,9 +60,9 @@ final class LyricsFXFrameMeter {
     /// 上一窗結束時的累計建圖次數（點陣快取，計劃 2026-10-16 §2.2）
     private var lastRasterMisses = 0
 
-    /// 量主執行緒總量時的向量基線：`AZW_LYRICSFX_VECTOR_REFERENCE=1` 讓同一個二進位全部畫合併外框（計劃 2026-10-17 全螢幕缺口 §3.3 V2）
+    /// 量主執行緒總量時的向量基線：同一個二進位全部畫合併外框（計劃 2026-10-17 全螢幕缺口 §3.3 V2）
     static let rendering: LyricsFXCanvas.GlyphRendering =
-        ProcessInfo.processInfo.environment["AZW_LYRICSFX_VECTOR_REFERENCE"] == "1" ? .vectorReference : .raster
+        ProcessInfo.processInfo.environment[LyricsFXPreviewFixture.vectorReferenceVariable] == "1" ? .vectorReference : .raster
 
     func record(_ elapsed: Duration, plan: FramePlan, canvas: CGSize, rasters: GlyphRasterCache) {
         samples.record(micros: Int(elapsed.inSeconds * 1_000_000), glyphs: plan.glyphs.count)
