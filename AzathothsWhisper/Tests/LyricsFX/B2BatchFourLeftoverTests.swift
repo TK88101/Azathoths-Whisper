@@ -321,3 +321,4 @@ struct B2BatchFourLeftoverTests {
         #expect(LyricsFXCanvas.glyphRunStrategy(level: level, count: count, stroke: 0, rasterizes: true) != .vectorMerged)
     }
 }
+
