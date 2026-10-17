@@ -304,4 +304,20 @@ struct B2BatchFourLeftoverTests {
         let frame = Self.plan(LongLineFitTests.long, font: "Anton", size: Self.narrow, fx1: "neonstroke", fx2: "none")
         #expect(!frame.glyphs.isEmpty && frame.glyphs.allSatisfy { $0.stroke == report.em * ComposedStyle.strokeRatio })
     }
+
+    /// Anton 放大後點陣偏離向量超出 I-46 門檻（計劃 §9.2–9.3）：研究出尺寸策略前，Anton 的字一律走合併外框
+    @Test func antonIsDrawnAsOutlinesWhileOtherFontsKeepTheRasterCache() {
+        guard case .font(let anton)? = LyricsFXCatalog.component("Anton")?.payload else { Issue.record("Anton 不是字型"); return }
+        #expect(!anton.rasterizes)
+        for id in ["Marker", "RockSalt", "Bebas", "CourierPrime", "Catacombs", "IMFell"] {
+            guard case .font(let face)? = LyricsFXCatalog.component(id)?.payload else { Issue.record("\(id) 不是字型"); continue }
+            #expect(face.rasterizes, "\(id)")
+        }
+    }
+
+    @Test(arguments: [(20, 1), (20, 5), (10, 1), (10, 5)])
+    func aRunWithAnOutlineOnlyGlyphIsDrawnAsTheMergedOutline(level: Int, count: Int) {
+        #expect(LyricsFXCanvas.glyphRunStrategy(level: level, count: count, stroke: 0, rasterizes: false) == .vectorMerged)
+        #expect(LyricsFXCanvas.glyphRunStrategy(level: level, count: count, stroke: 0, rasterizes: true) != .vectorMerged)
+    }
 }

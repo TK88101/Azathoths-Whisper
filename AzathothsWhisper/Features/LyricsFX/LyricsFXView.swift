@@ -10,15 +10,15 @@ enum LyricsFXCanvas {
         case vectorReference
     }
 
-    /// 一個 run 的畫法：描邊要路徑 → 合併外框；半透明且多字 → 群組圖層裡逐字貼點陣（整層一次套透明度，疊色語義同合併外框）；其餘逐字貼點陣
+    /// 一個 run 的畫法：描邊要路徑、或有不走點陣的字型（`FontFace.rasterizes`）→ 合併外框；半透明且多字 → 群組圖層裡逐字貼點陣（整層一次套透明度，疊色語義同合併外框）；其餘逐字貼點陣
     enum GlyphRunStrategy: Equatable {
         case vectorMerged
         case rasterGrouped
         case rasterDirect
     }
 
-    static func glyphRunStrategy(level: Int, count: Int, stroke: CGFloat) -> GlyphRunStrategy {
-        if stroke > 0 { return .vectorMerged }
+    static func glyphRunStrategy(level: Int, count: Int, stroke: CGFloat, rasterizes: Bool = true) -> GlyphRunStrategy {
+        if stroke > 0 || !rasterizes { return .vectorMerged }
         return level < opacityLevels && count > 1 ? .rasterGrouped : .rasterDirect
     }
 
@@ -106,7 +106,9 @@ enum LyricsFXCanvas {
             var layer = context
             layer.opacity = opacity(ofLevel: run.level)
             let color = palette[run.color].color
-            let strategy = rendering == .vectorReference ? .vectorMerged : glyphRunStrategy(level: run.level, count: members.count, stroke: run.stroke)
+            let strategy = rendering == .vectorReference ? .vectorMerged : glyphRunStrategy(
+                level: run.level, count: members.count, stroke: run.stroke, rasterizes: members.allSatisfy(\.face.rasterizes)
+            )
             switch strategy {
             case .vectorMerged:
                 let path = CGMutablePath()

@@ -21,6 +21,8 @@ struct FontFace: Hashable, Sendable {
     var uppercase = false
     /// 字型固有的尺寸補償（與批次無關）：組合畫法每行的 em 乘上它。字面比同字級的其他字明顯大或小的字型才設（原型 composer.js:401：Rock Salt 0.085、Anton 0.15，預設 0.12；Butcherman 不在 app 目錄）
     var sizeScale: CGFloat = 1
+    /// false＝不走點陣快取、一律畫合併外框（批 4 遺留計劃 §2.3：Anton 放大後點陣偏離向量超出 I-46 門檻，研究出尺寸策略前暫走向量）
+    var rasterizes = true
 
     static let displayRegular = FontFace(id: "display-regular", family: "Space Grotesk", weight: .regular)
     static let displayMedium = FontFace(id: "display-medium", family: "Space Grotesk", weight: .medium)
