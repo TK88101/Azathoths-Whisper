@@ -10,15 +10,15 @@ enum LyricsFXCanvas {
         case vectorReference
     }
 
-    /// 一個 run 的畫法：描邊要路徑 → 合併外框；半透明且多字 → 群組圖層裡逐字貼點陣（整層一次套透明度，疊色語義同合併外框）；其餘逐字貼點陣
+    /// 一個 run 的畫法：描邊要路徑、或有不走點陣的字型（`FontFace.rasterizes`）→ 合併外框；半透明且多字 → 群組圖層裡逐字貼點陣（整層一次套透明度，疊色語義同合併外框）；其餘逐字貼點陣
     enum GlyphRunStrategy: Equatable {
         case vectorMerged
         case rasterGrouped
         case rasterDirect
     }
 
-    static func glyphRunStrategy(level: Int, count: Int, stroke: CGFloat) -> GlyphRunStrategy {
-        if stroke > 0 { return .vectorMerged }
+    static func glyphRunStrategy(level: Int, count: Int, stroke: CGFloat, rasterizes: Bool = true) -> GlyphRunStrategy {
+        if stroke > 0 || !rasterizes { return .vectorMerged }
         return level < opacityLevels && count > 1 ? .rasterGrouped : .rasterDirect
     }
 
@@ -29,6 +29,7 @@ enum LyricsFXCanvas {
         let color: ColorSlot
         let level: Int
         let range: Range<Int>
+        var stroke: CGFloat = 0
     }
 
     static func opacityLevel(_ opacity: Double) -> Int {
@@ -40,15 +41,16 @@ enum LyricsFXCanvas {
     }
 
     /// 連續同鍵的字切成一段；量化後為 0 的字不畫、也不打斷前後
-    static func runs(of glyphs: [GlyphDraw]) -> [Run] {
+    static func runs(of glyphs: [GlyphDraw], stroking: Bool = false) -> [Run] {
         var runs: [Run] = []
         for (index, glyph) in glyphs.enumerated() {
             let level = opacityLevel(glyph.opacity)
             guard level > 0 else { continue }
-            if let last = runs.last, last.color == glyph.color, last.level == level {
-                runs[runs.count - 1] = Run(color: last.color, level: level, range: last.range.lowerBound..<(index + 1))
+            let stroke = stroking ? glyph.stroke : 0
+            if let last = runs.last, last.color == glyph.color, last.level == level, last.stroke == stroke {
+                runs[runs.count - 1] = Run(color: last.color, level: level, range: last.range.lowerBound..<(index + 1), stroke: stroke)
             } else {
-                runs.append(Run(color: glyph.color, level: level, range: index..<(index + 1)))
+                runs.append(Run(color: glyph.color, level: level, range: index..<(index + 1), stroke: stroke))
             }
         }
         return runs
@@ -88,23 +90,25 @@ enum LyricsFXCanvas {
             // 濾鏡套在整層的合成結果上，只做一次模糊（不是每個透明度 run 各做一次）
             shaken.drawLayer { lit in
                 lit.addFilter(.shadow(color: palette.acc.color, radius: plan.glow))
-                fill(plan.glyphs, in: lit, palette: palette, paths: paths, stroke: plan.stroke, rendering: rendering)
+                fill(plan.glyphs, in: lit, palette: palette, paths: paths, stroking: true, rendering: rendering)
             }
         } else {
-            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, stroke: plan.stroke, rendering: rendering)
+            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, stroking: true, rendering: rendering)
         }
         for layer in plan.front { draw(layer, in: context, bounds: bounds) }
     }
 
     private static func fill(
-        _ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, stroke: CGFloat = 0, rendering: GlyphRendering
+        _ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, stroking: Bool = false, rendering: GlyphRendering
     ) {
-        for run in runs(of: glyphs) {
+        for run in runs(of: glyphs, stroking: stroking) {
             let members = glyphs[run.range].filter { opacityLevel($0.opacity) > 0 }
             var layer = context
             layer.opacity = opacity(ofLevel: run.level)
             let color = palette[run.color].color
-            let strategy = rendering == .vectorReference ? .vectorMerged : glyphRunStrategy(level: run.level, count: members.count, stroke: stroke)
+            let strategy = rendering == .vectorReference ? .vectorMerged : glyphRunStrategy(
+                level: run.level, count: members.count, stroke: run.stroke, rasterizes: members.allSatisfy(\.face.rasterizes)
+            )
             switch strategy {
             case .vectorMerged:
                 let path = CGMutablePath()
@@ -113,7 +117,7 @@ enum LyricsFXCanvas {
                     path.addPath(entry.path, transform: transform(for: glyph, entry: entry))
                 }
                 let shape = Path(path)
-                if stroke > 0 { layer.stroke(shape, with: .color(palette.acc.color), lineWidth: stroke) }
+                if run.stroke > 0 { layer.stroke(shape, with: .color(palette.acc.color), lineWidth: run.stroke) }
                 layer.fill(shape, with: .color(color))
             case .rasterGrouped:
                 // 圖層裡逐字全不透明，合成時整層一次套 run 的透明度——疊字處不會比合併外框更深

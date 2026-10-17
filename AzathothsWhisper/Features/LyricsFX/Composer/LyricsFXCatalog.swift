@@ -54,7 +54,7 @@ enum LyricsFXCatalog {
         make(.font, "AlfaSlab", [.aggression: 0.6, .warm: 0.6, .raw: 0.5, .bounce: 0.4], [.hardrock, .classicrock, .latinmetal],
              .font(FontFace(id: "AlfaSlab", family: "Alfa Slab One", weight: nil, uppercase: true))),
         make(.font, "Anton", [.aggression: 0.7, .speed: 0.6, .raw: 0.3, .bounce: 0.3], [.hardrock, .hardcore, .nu, .death, .thrash, .punk, .skatepunk, .bigbeat, .rock, .melodichc, .ska, .rapmetal, .altmetal, .posthardcore],
-             .font(FontFace(id: "Anton", family: "Anton", weight: nil, uppercase: true))),
+             .font(FontFace(id: "Anton", family: "Anton", weight: nil, uppercase: true, sizeScale: 0.15 / 0.12, rasterizes: false))),
         make(.font, "Archivo", [.raw: 0.45, .aggression: 0.4, .bright: 0.5, .warm: 0.5], [.britpop, .indie, .powerpop, .emopop],
              .font(FontFace(id: "Archivo", family: "Archivo Black", weight: nil))),
         make(.font, "Bebas", [.aggression: 0.45, .speed: 0.5, .bright: 0.5, .raw: 0.3, .theatrical: 0.4], [.hardrock, .britpop, .arena, .altmetal, .emopop],
