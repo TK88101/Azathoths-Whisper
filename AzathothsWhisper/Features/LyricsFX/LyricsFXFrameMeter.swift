@@ -60,7 +60,11 @@ final class LyricsFXFrameMeter {
     /// 上一窗結束時的累計建圖次數（點陣快取，計劃 2026-10-16 §2.2）
     private var lastRasterMisses = 0
 
-    func record(_ elapsed: Duration, plan: FramePlan, rasters: GlyphRasterCache) {
+    /// 量主執行緒總量時的向量基線：`AZW_LYRICSFX_VECTOR_REFERENCE=1` 讓同一個二進位全部畫合併外框（計劃 2026-10-17 全螢幕缺口 §3.3 V2）
+    static let rendering: LyricsFXCanvas.GlyphRendering =
+        ProcessInfo.processInfo.environment["AZW_LYRICSFX_VECTOR_REFERENCE"] == "1" ? .vectorReference : .raster
+
+    func record(_ elapsed: Duration, plan: FramePlan, canvas: CGSize, rasters: GlyphRasterCache) {
         samples.record(micros: Int(elapsed.inSeconds * 1_000_000), glyphs: plan.glyphs.count)
         let particles = ComposedStyle.particleCount(plan.back)
         let fills = LyricsFXCanvas.runs(of: plan.ghosts).count + LyricsFXCanvas.runs(of: plan.glyphs, stroking: true).count
@@ -71,7 +75,7 @@ final class LyricsFXFrameMeter {
         let rasterMisses = rasters.misses - lastRasterMisses
         lastRasterMisses = rasters.misses
         Self.log.info(
-            "frames \(summary.frames, privacy: .public) p50 \(summary.p50, privacy: .public)us p95 \(summary.p95, privacy: .public)us max \(summary.max, privacy: .public)us glyphs \(summary.minGlyphs, privacy: .public)-\(summary.maxGlyphs, privacy: .public) ghosts \(self.peak.ghosts, privacy: .public) particles \(self.peak.particles, privacy: .public) fills \(self.peak.fills, privacy: .public) rasterMisses \(rasterMisses, privacy: .public) rasterBytes \(rasters.bytes, privacy: .public)"
+            "frames \(summary.frames, privacy: .public) p50 \(summary.p50, privacy: .public)us p95 \(summary.p95, privacy: .public)us max \(summary.max, privacy: .public)us glyphs \(summary.minGlyphs, privacy: .public)-\(summary.maxGlyphs, privacy: .public) ghosts \(self.peak.ghosts, privacy: .public) particles \(self.peak.particles, privacy: .public) fills \(self.peak.fills, privacy: .public) rasterMisses \(rasterMisses, privacy: .public) rasterBytes \(rasters.bytes, privacy: .public) canvas \(Int(canvas.width), privacy: .public)x\(Int(canvas.height), privacy: .public)"
         )
         peak = (0, 0, 0)
     }

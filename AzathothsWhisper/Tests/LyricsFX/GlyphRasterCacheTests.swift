@@ -4,15 +4,18 @@ import Testing
 
 @testable import AzathothsWhisper
 
-// 字形點陣快取（docs/plans/2026-10-16-lyrics-fx-glyph-raster-cache.md §2.2、T1）
+// 字形點陣快取（docs/plans/2026-10-16-lyrics-fx-glyph-raster-cache.md §2.2、T1；
+// 尺寸分檔與 LRU：docs/plans/2026-10-17-lyrics-fx-raster-fullscreen-gap.md §9.5、T5）
 @MainActor
 @Suite("Glyph raster cache")
 struct GlyphRasterCacheTests {
     static let face = FontFace(id: "Catacombs", family: "Catacombs", weight: nil, uppercase: true)
+    /// 113 pt 字（外框 100 pt）在 2× 螢幕上：每個外框單位約 2.27 像素
+    static let tier = GlyphRasterCache.Tier(placement: CGAffineTransform(scaleX: 1.134, y: 1.134), deviceScale: 2)
 
     /// 測試裡的字都建得出點陣
-    static func raster(_ cache: GlyphRasterCache, _ text: String, scale: CGFloat = 2) throws -> GlyphRasterCache.Entry {
-        try #require(cache.entry(text: text, face: face, path: pathEntry(text), pixelsPerPoint: scale))
+    static func raster(_ cache: GlyphRasterCache, _ text: String, tier: GlyphRasterCache.Tier = tier) throws -> GlyphRasterCache.Entry {
+        try #require(cache.entry(text: text, face: face, path: pathEntry(text), tier: tier))
     }
 
     static func pathEntry(_ text: String = "A", face: FontFace = face) -> GlyphPathCache.Entry {
@@ -30,18 +33,39 @@ struct GlyphRasterCacheTests {
         return data
     }
 
-    @Test func theBoxCoversTheOutlineWithASmallMarginAndTheBitmapMatchesItsPixelSize() throws {
+    @Test(arguments: [0.05, 0.4, 1, 1.6, 2, 2.27, 2.84, 3.7, 8, 20] as [CGFloat])
+    func theBitmapIsAlwaysOneSixToOneEightySevenTimesTheScreenPixels(_ pixelsPerUnit: CGFloat) {
+        let source = GlyphRasterCache.pixelsPerUnit(tier: GlyphRasterCache.tier(pixelsPerUnit: pixelsPerUnit))
+        let oversample = source / pixelsPerUnit
+        #expect(oversample >= GlyphRasterCache.minimumOversample - 1e-9, "\(pixelsPerUnit) → \(source)")
+        #expect(oversample < GlyphRasterCache.maximumOversample + 1e-9, "\(pixelsPerUnit) → \(source)")
+    }
+
+    @Test func theTierFollowsTheScreenScaleOfEachAxisButNotPositionOrRotation() {
+        let base = GlyphRasterCache.Tier(placement: CGAffineTransform(scaleX: 1.134, y: 1.134), deviceScale: 2)
+        let moved = GlyphRasterCache.Tier(placement: CGAffineTransform(scaleX: 1.134, y: 1.134).translatedBy(x: 0.37, y: -12.5), deviceScale: 2)
+        let rotated = GlyphRasterCache.Tier(placement: CGAffineTransform(scaleX: 1.134, y: 1.134).concatenating(CGAffineTransform(rotationAngle: 0.3)), deviceScale: 2)
+        let mirrored = GlyphRasterCache.Tier(placement: CGAffineTransform(scaleX: -1.134, y: 1.134), deviceScale: 2)
+        #expect(moved == base)
+        #expect(rotated == base)
+        #expect(mirrored == base)
+        let squashed = GlyphRasterCache.Tier(placement: CGAffineTransform(scaleX: 1.134, y: 0.3), deviceScale: 2)
+        #expect(squashed.x == base.x)
+        #expect(squashed.y < base.y)
+        let zoomed = GlyphRasterCache.Tier(placement: CGAffineTransform(scaleX: 1.134, y: 1.134), deviceScale: 2 * 1.5)
+        #expect(zoomed.x > base.x)
+    }
+
+    @Test func theBitmapCoversTheOutlineAtTheTierResolutionWithAMargin() throws {
         let path = Self.pathEntry()
         let raster = try Self.raster(GlyphRasterCache(), "A")
-        let bounds = path.path.boundingBoxOfPath
-        #expect(raster.box.contains(bounds))
-        for gap in [bounds.minX - raster.box.minX, bounds.minY - raster.box.minY, raster.box.maxX - bounds.maxX, raster.box.maxY - bounds.maxY] {
-            #expect(gap >= 1 && gap < 2, "外擴 1 pt 再取整：\(gap)")
-        }
-        let image = raster.cgImage
-        #expect(image.width == Int((raster.box.width * 2).rounded(.up)))
-        #expect(image.height == Int((raster.box.height * 2).rounded(.up)))
-        #expect(raster.bytes == image.bytesPerRow * image.height)
+        let scale = GlyphRasterCache.pixelsPerUnit(tier: Self.tier.x)
+        #expect(scale / 2.268 >= GlyphRasterCache.minimumOversample - 1e-9, "113 pt × 2× 時點陣是螢幕像素的 1.6 倍以上")
+        let inPixels = path.path.boundingBoxOfPath.applying(raster.toPixels)
+        #expect(inPixels.minX >= 1 && inPixels.minY >= 1, "四周留抗鋸齒的邊")
+        #expect(inPixels.maxX <= CGFloat(raster.cgImage.width) - 1 && inPixels.maxY <= CGFloat(raster.cgImage.height) - 1)
+        #expect(abs(raster.toPixels.a - scale) < 1e-9 && abs(raster.toPixels.d - scale) < 1e-9)
+        #expect(raster.bytes == raster.cgImage.bytesPerRow * raster.cgImage.height)
     }
 
     @Test func theMaskIsTheSameCoverageAsFillingTheOutlineDirectly() throws {
@@ -54,8 +78,9 @@ struct GlyphRasterCacheTests {
         rgba.withUnsafeMutableBytes { buffer in
             let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                                     space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-            context.scaleBy(x: 2, y: -2)
-            context.translateBy(x: -raster.box.minX, y: -raster.box.maxY)
+            context.translateBy(x: 0, y: CGFloat(height))
+            context.scaleBy(x: 1, y: -1)
+            context.concatenate(raster.toPixels)
             context.addPath(path.path)
             context.setFillColor(CGColor(gray: 1, alpha: 1))
             context.fillPath()
@@ -66,7 +91,7 @@ struct GlyphRasterCacheTests {
         #expect(mask == reference)
     }
 
-    @Test func theSameGlyphAtTheSameScaleIsRasterizedOnce() throws {
+    @Test func theSameGlyphInTheSameTierIsRasterizedOnce() throws {
         let cache = GlyphRasterCache()
         let first = try Self.raster(cache, "A")
         _ = try Self.raster(cache, "A")
@@ -75,47 +100,67 @@ struct GlyphRasterCacheTests {
         #expect(first.bytes > 0)
     }
 
-    @Test func aDifferentDisplayScaleIsADifferentBitmap() throws {
+    @Test func aDifferentTierIsADifferentBitmap() throws {
         let cache = GlyphRasterCache()
-        let double = try Self.raster(cache, "A", scale: 2).cgImage
-        let single = try Self.raster(cache, "A", scale: 1).cgImage
+        let small = try Self.raster(cache, "A", tier: GlyphRasterCache.Tier(x: Self.tier.x, y: Self.tier.y)).cgImage
+        let large = try Self.raster(cache, "A", tier: GlyphRasterCache.Tier(x: Self.tier.x + 4, y: Self.tier.y)).cgImage
         #expect(cache.misses == 2)
-        #expect(double.width == single.width * 2)
+        #expect(large.width > small.width)
+        #expect(large.height == small.height)
     }
 
-    @Test func goingOverTheByteLimitClearsTheCacheOnce() throws {
-        let probe = try Self.raster(GlyphRasterCache(), "A")
-        // 容量放得下約 2 張 "A" 大小的點陣
+    @Test func goingOverTheLimitEvictsTheLeastRecentlyUsedBitmapsOnly() throws {
+        let probe = try Self.raster(GlyphRasterCache(), "O")
+        // 容量放得下約 2 張同大小的點陣
         let cache = GlyphRasterCache(byteLimit: probe.bytes * 2 + probe.bytes / 2)
         cache.beginFrame()
-        for letter in ["A", "B"] { _ = try Self.raster(cache, letter) }
-        let full = cache.bytes
-        _ = try Self.raster(cache, "C")
-        #expect(cache.bytes < full, "第三張放不下 → 先清空再存")
+        _ = try Self.raster(cache, "O")
+        cache.beginFrame()
+        _ = try Self.raster(cache, "Q")
+        cache.beginFrame()
+        _ = try Self.raster(cache, "Q")  // Q 比 O 新
+        _ = try Self.raster(cache, "C")  // 放不下 → 逐出最久沒用的 O
         #expect(cache.bytes <= cache.byteLimit)
-        // 清空後 A 已不在快取 → 再取一次算 miss
         let misses = cache.misses
-        _ = try Self.raster(cache, "A")
-        #expect(cache.misses == misses + 1)
+        _ = try Self.raster(cache, "Q")
+        #expect(cache.misses == misses, "Q 還在")
+        _ = try Self.raster(cache, "C")
+        #expect(cache.misses == misses, "C 已存入")
+        cache.beginFrame()
+        _ = try Self.raster(cache, "O")
+        #expect(cache.misses == misses + 1, "O 被逐出")
     }
 
-    @Test func aSecondOverflowInTheSameFrameDrawsWithoutCachingUntilTheNextFrame() throws {
-        let probe = try Self.raster(GlyphRasterCache(), "A")
+    @Test func bitmapsUsedInThisFrameAreNeverEvictedSoTheNewOneIsDrawnWithoutCaching() throws {
+        let probe = try Self.raster(GlyphRasterCache(), "O")
         let cache = GlyphRasterCache(byteLimit: probe.bytes + probe.bytes / 2)
         cache.beginFrame()
-        _ = try Self.raster(cache, "A")
-        _ = try Self.raster(cache, "B")  // 第一次超額：清空、存 B
-        let afterFirstClear = cache.bytes
-        _ = try Self.raster(cache, "C")  // 同幀第二次超額：只畫不存
-        #expect(cache.bytes == afterFirstClear, "同一幀不再清空")
+        _ = try Self.raster(cache, "O")
+        _ = try Self.raster(cache, "Q")  // 同一幀：O 正在用，不逐出 → Q 只畫不存
         let misses = cache.misses
-        _ = try Self.raster(cache, "C")
-        #expect(cache.misses == misses + 1, "C 沒進快取")
+        _ = try Self.raster(cache, "O")
+        #expect(cache.misses == misses, "O 還在")
+        _ = try Self.raster(cache, "Q")
+        #expect(cache.misses == misses + 1, "Q 沒進快取")
         cache.beginFrame()
-        _ = try Self.raster(cache, "C")  // 下一幀：可以再清空並存入
+        _ = try Self.raster(cache, "Q")  // 下一幀：O 已是上一幀的，可逐出
         let stored = cache.misses
-        _ = try Self.raster(cache, "C")
-        #expect(cache.misses == stored, "下一幀 C 已存入")
+        _ = try Self.raster(cache, "Q")
+        #expect(cache.misses == stored, "下一幀 Q 已存入")
+        #expect(cache.bytes <= cache.byteLimit)
+    }
+
+    @Test func theByteCountStaysWithinTheLimitAcrossEvictionsAndClearing() throws {
+        let probe = try Self.raster(GlyphRasterCache(), "O")
+        let cache = GlyphRasterCache(byteLimit: probe.bytes * 3)
+        for (frame, letter) in ["O", "Q", "C", "G", "D"].enumerated() {
+            cache.beginFrame()
+            _ = try Self.raster(cache, letter)
+            #expect(cache.bytes <= cache.byteLimit, "第 \(frame) 幀")
+        }
+        #expect(cache.bytes > probe.bytes, "逐出只逐必要的量，不整批清空")
+        cache.removeAll()
+        #expect(cache.bytes == 0)
     }
 
     @Test func aSingleBitmapLargerThanTheLimitIsDrawnButNeverCached() throws {

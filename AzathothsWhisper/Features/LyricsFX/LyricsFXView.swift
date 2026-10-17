@@ -86,22 +86,22 @@ enum LyricsFXCanvas {
             shaken.translateBy(x: -bounds.midX, y: -bounds.midY)
         }
         for layer in plan.back { draw(layer, in: shaken, bounds: bounds) }
-        fill(plan.ghosts, in: shaken, palette: palette, paths: paths, rendering: rendering)
+        fill(plan.ghosts, in: shaken, palette: palette, paths: paths, zoom: plan.zoom, rendering: rendering)
         for box in plan.boxes { draw(box, in: shaken, palette: palette) }
         if plan.glow > 0 {
             // 濾鏡套在整層的合成結果上，只做一次模糊（不是每個透明度 run 各做一次）
             shaken.drawLayer { lit in
                 lit.addFilter(.shadow(color: palette.acc.color, radius: plan.glow))
-                fill(plan.glyphs, in: lit, palette: palette, paths: paths, stroking: true, rendering: rendering)
+                fill(plan.glyphs, in: lit, palette: palette, paths: paths, zoom: plan.zoom, stroking: true, rendering: rendering)
             }
         } else {
-            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, stroking: true, rendering: rendering)
+            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, zoom: plan.zoom, stroking: true, rendering: rendering)
         }
         for layer in plan.front { draw(layer, in: context, bounds: bounds) }
     }
 
     private static func fill(
-        _ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, stroking: Bool = false, rendering: GlyphRendering
+        _ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, zoom: CGFloat, stroking: Bool = false, rendering: GlyphRendering
     ) {
         for run in runs(of: glyphs, stroking: stroking) {
             let members = glyphs[run.range].filter { opacityLevel($0.opacity) > 0 }
@@ -124,24 +124,27 @@ enum LyricsFXCanvas {
                 layer.fill(shape, with: .color(color))
             case .rasterGrouped:
                 // 圖層裡逐字全不透明，合成時整層一次套 run 的透明度——疊字處不會比合併外框更深
-                layer.drawLayer { group in stamp(members, in: group, color: color, paths: paths) }
+                layer.drawLayer { group in stamp(members, in: group, color: color, paths: paths, zoom: zoom) }
             case .rasterDirect:
-                stamp(members, in: layer, color: color, paths: paths)
+                stamp(members, in: layer, color: color, paths: paths, zoom: zoom)
             }
         }
     }
 
-    /// 逐字貼點陣：點陣與外框在同一個座標系，套同一個 `transform(for:)`
-    private static func stamp(_ glyphs: [GlyphDraw], in context: GraphicsContext, color: Color, paths: GlyphPathCache) {
-        let scale = context.environment.displayScale
+    /// 逐字貼點陣：點陣像素 → 外框座標 → 畫布，後半段和合併外框共用同一個 `transform(for:)`。
+    /// 檔位依字在螢幕上的縮放（displayScale × 整屏縮放 × 字級與逐字縮放）決定（計劃 2026-10-17 全螢幕缺口 §9.5）
+    private static func stamp(_ glyphs: [GlyphDraw], in context: GraphicsContext, color: Color, paths: GlyphPathCache, zoom: CGFloat) {
+        let deviceScale = context.environment.displayScale * zoom
         for glyph in glyphs {
             let entry = paths.entry(for: glyph)
-            guard let raster = paths.rasters.entry(text: glyph.text, face: glyph.face, path: entry, pixelsPerPoint: scale) else { continue }
+            let placement = transform(for: glyph, entry: entry)
+            let tier = GlyphRasterCache.Tier(placement: placement, deviceScale: deviceScale)
+            guard let raster = paths.rasters.entry(text: glyph.text, face: glyph.face, path: entry, tier: tier) else { continue }
             var single = context
-            single.concatenate(transform(for: glyph, entry: entry))
+            single.concatenate(raster.toPixels.inverted().concatenating(placement))
             var image = single.resolve(raster.image)
             image.shading = .color(color)
-            single.draw(image, in: raster.box)
+            single.draw(image, in: CGRect(x: 0, y: 0, width: raster.cgImage.width, height: raster.cgImage.height))
         }
     }
 
@@ -277,10 +280,12 @@ struct LyricsFXView: View {
             let started = ContinuousClock.now
             #endif
             let plan = LyricsFXFrame.plan(timeline: timeline, time: time, size: size, motion: motion, recipe: recipe, measurer: measurer)
-            LyricsFXCanvas.draw(plan, in: context, size: size, paths: glyphPaths)
             #if DEBUG
+            LyricsFXCanvas.draw(plan, in: context, size: size, paths: glyphPaths, rendering: LyricsFXFrameMeter.rendering)
             let elapsed = ContinuousClock.now - started
-            MainActor.assumeIsolated { LyricsFXFrameMeter.shared.record(elapsed, plan: plan, rasters: glyphPaths.rasters) }
+            MainActor.assumeIsolated { LyricsFXFrameMeter.shared.record(elapsed, plan: plan, canvas: size, rasters: glyphPaths.rasters) }
+            #else
+            LyricsFXCanvas.draw(plan, in: context, size: size, paths: glyphPaths)
             #endif
         }
         .accessibilityHidden(true)

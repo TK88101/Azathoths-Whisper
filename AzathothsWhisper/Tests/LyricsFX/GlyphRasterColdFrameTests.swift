@@ -13,9 +13,9 @@ struct GlyphRasterColdFrameTests {
     static let budget: Duration = .microseconds(8_300)
     static let runs = 10
 
-    /// 配方取自畫面一致性測試（同一份表）
-    @Test(arguments: ["rocksalt", "catacombs"])
-    func aFrameAfterTheRasterCacheIsClearedStaysWithinOneRefresh(_ name: String) throws {
+    /// 配方取自畫面一致性測試（同一份表）；畫布加實際全螢幕（計劃 2026-10-17 全螢幕缺口：點陣按螢幕像素分檔，全螢幕的點陣較大）
+    @Test(arguments: ["rocksalt", "catacombs", "marker"], [LyricsFXPreviewArtifactTests.canvas, GlyphRasterFidelityTests.fullscreen])
+    func aFrameAfterTheRasterCacheIsClearedStaysWithinOneRefresh(_ name: String, canvas: CGSize) throws {
         let recipe = GlyphRasterFidelityTests.recipe(name)
         let timeline = try #require(LyricsTimelineBuilder.build(lyrics: LyricsFXPreviewFixture.denseLyrics, duration: LyricsFXPreviewFixture.duration))
         let measurer = CoreTextMeasurer()
@@ -33,15 +33,15 @@ struct GlyphRasterColdFrameTests {
                 elapsed = ContinuousClock.now - started
                 glyphCount = plan.glyphs.count + plan.ghosts.count
             }
-            .frame(width: LyricsFXPreviewArtifactTests.canvas.width, height: LyricsFXPreviewArtifactTests.canvas.height)
+            .frame(width: canvas.width, height: canvas.height)
             let renderer = ImageRenderer(content: view)
             renderer.scale = 2
             _ = renderer.cgImage
             if run > 0 { samples.append(elapsed) }
         }
         let worst = try #require(samples.max())
-        let line = "\(name) cold-frame max \(worst) over \(samples.count) runs, glyphs+ghosts \(glyphCount), misses \(paths.rasters.misses)"
-        try line.write(to: FileManager.default.temporaryDirectory.appendingPathComponent("lyricsfx-coldframe-\(name).txt"), atomically: true, encoding: .utf8)
+        let line = "\(name) \(Int(canvas.width))x\(Int(canvas.height)) cold-frame max \(worst) over \(samples.count) runs, glyphs+ghosts \(glyphCount), misses \(paths.rasters.misses)"
+        try line.write(to: FileManager.default.temporaryDirectory.appendingPathComponent("lyricsfx-coldframe-\(name)-\(Int(canvas.width)).txt"), atomically: true, encoding: .utf8)
         #expect(glyphCount > 100, "量的是密集預覽的整幀")
         #expect(worst <= Self.budget, "\(line)")
     }
