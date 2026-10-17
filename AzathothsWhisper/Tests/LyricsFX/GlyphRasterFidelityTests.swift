@@ -23,6 +23,8 @@ struct GlyphRasterFidelityTests {
     }
 
     static let size = CGSize(width: 900, height: 560)
+    /// 實際全螢幕（內建螢幕 1728×945 pt；一般字 em≈113 pt、Anton≈142 pt）——計劃 2026-10-17 全螢幕缺口 §3.1
+    static let fullscreen = CGSize(width: 1728, height: 945)
     static let times: [Double] = [2.4, 4.6, 5.7, 9.3, 20.5, 24.0]
     static let limits: [CGFloat: Limits] = [
         2: Limits(mean: 0.0007, over2: 0.015, over16: 0.004, maxDiff: 96),
@@ -46,6 +48,9 @@ struct GlyphRasterFidelityTests {
         "thump": ["Anton", "void", "fadeUp", "sink", "thump", "jitter", "revenge"],
         "glow": ["Cinzel", "shafts", "smoke", "fade", "breathe", "glow", "goldNavy"],
         "neonstroke": ["Bungee", "void", "fadeUp", "sink", "neonstroke", "none", "revenge"],
+        // Anton 的每幀量測配方（批 4 遺留 §9.2）：大字＋旋轉＋整屏縮放、半透明副本多字
+        "antonlp": ["Anton", "scan", "stamp", "scatter", "rgbsplit", "thump", "acid"],
+        "antonsk": ["Anton", "smokeHaze", "drop", "fall", "misreg", "shake", "ampRed"],
         "mono": [],
     ]
 
@@ -54,7 +59,7 @@ struct GlyphRasterFidelityTests {
         return .composed(ComposedRecipe(font: ids[0], backdrop: ids[1], enter: ids[2], exit: ids[3], fx1: ids[4], fx2: ids[5], palette: ids[6], seed: 7, profile: profile))
     }
 
-    static func image(_ recipe: SessionRecipe, time: Double, scale: CGFloat, rendering: LyricsFXCanvas.GlyphRendering) -> CGImage? {
+    static func image(_ recipe: SessionRecipe, time: Double, scale: CGFloat, rendering: LyricsFXCanvas.GlyphRendering, size: CGSize = size) -> CGImage? {
         let measurer = CoreTextMeasurer()
         let paths = GlyphPathCache()
         let timeline = LyricsTimelineBuilder.build(lyrics: LyricsFXPreviewFixture.lyrics, duration: LyricsFXPreviewFixture.duration)
@@ -148,35 +153,77 @@ struct GlyphRasterFidelityTests {
         if let image { try PreviewImageWriter.png(image, to: directory.appendingPathComponent("\(name)-heat.png")) }
     }
 
-    @Test(arguments: ["rocksalt", "imfell", "courier", "shadows", "marker", "catacombs", "elite", "thump", "glow", "mono"])
-    func theRasterDrawingLooksLikeTheMergedOutlineDrawing(_ name: String) throws {
+    /// 一份配方 × 6 個時刻 × 一種 scale：judged＝照門檻判，否則只記錄；回傳逐案報告，最差一案輸出熱圖
+    static func check(_ name: String, size: CGSize, scale: CGFloat, rendering: LyricsFXCanvas.GlyphRendering, judged: Bool, prefix: String = "") throws -> [String] {
         let recipe = Self.recipe(name)
+        let limits = try #require(Self.limits[scale])
         var report: [String] = []
-        for scale in [CGFloat(2), 1] {
-            let limits = try #require(Self.limits[scale])
-            var worst: (stats: Stats, time: Double, a: [UInt8], b: [UInt8], ra: CGImage?, rb: CGImage?) = (Stats(), 0, [], [], nil, nil)
-            for time in Self.times {
-                let reference = try #require(Self.image(recipe, time: time, scale: scale, rendering: .vectorReference))
-                let candidate = try #require(Self.image(recipe, time: time, scale: scale, rendering: .raster))
-                let a = Self.pixels(reference), b = Self.pixels(candidate)
-                let stats = Self.compare(a, b, width: reference.width, height: reference.height)
-                let label = "\(name)@\(time) \(Int(scale))x"
+        var worst: (stats: Stats, time: Double, a: [UInt8], b: [UInt8], ra: CGImage?, rb: CGImage?) = (Stats(), 0, [], [], nil, nil)
+        for time in Self.times {
+            let reference = try #require(Self.image(recipe, time: time, scale: scale, rendering: .vectorReference, size: size))
+            let candidate = try #require(Self.image(recipe, time: time, scale: scale, rendering: rendering, size: size))
+            let a = Self.pixels(reference), b = Self.pixels(candidate)
+            let stats = Self.compare(a, b, width: reference.width, height: reference.height)
+            let label = "\(prefix)\(name)@\(time) \(Int(scale))x"
+            if judged {
                 #expect(stats.mean <= limits.mean, "\(label) 平均差 \(stats.mean)")
                 #expect(stats.over2 <= limits.over2, "\(label) 差>2 占比 \(stats.over2)")
                 #expect(stats.over16 <= limits.over16, "\(label) 差>16 占比 \(stats.over16)")
                 #expect(stats.maxDiff <= limits.maxDiff, "\(label) 最大差 \(stats.maxDiff)")
                 #expect(stats.outsideEdge <= Self.outsideEdgeShare, "\(label) 邊緣帶外差>16 占比 \(stats.outsideEdge)")
                 #expect(stats.outsideEdgeMax <= Self.outsideEdgeMax, "\(label) 邊緣帶外最大差 \(stats.outsideEdgeMax)")
-                report.append(String(format: "%@ mean=%.5f over2=%.3f%% over16=%.3f%% max=%d outside=%.4f%% outsideMax=%d",
-                                     label, stats.mean, stats.over2 * 100, stats.over16 * 100, stats.maxDiff, stats.outsideEdge * 100, stats.outsideEdgeMax))
-                if stats.over16 >= worst.stats.over16 { worst = (stats, time, a, b, reference, candidate) }
             }
-            if let ra = worst.ra, let rb = worst.rb {
-                try Self.writeDiagnostics(name: "\(name)-\(worst.time)-\(Int(scale))x", reference: ra, candidate: rb, a: worst.a, b: worst.b)
-            }
+            report.append(String(format: "%@%@ mean=%.5f over2=%.3f%% over16=%.3f%% max=%d outside=%.4f%% outsideMax=%d",
+                                 label, judged ? "" : " (記錄)", stats.mean, stats.over2 * 100, stats.over16 * 100, stats.maxDiff, stats.outsideEdge * 100, stats.outsideEdgeMax))
+            if stats.over16 >= worst.stats.over16 { worst = (stats, time, a, b, reference, candidate) }
         }
+        if let ra = worst.ra, let rb = worst.rb {
+            try Self.writeDiagnostics(name: "\(prefix)\(name)-\(worst.time)-\(Int(scale))x", reference: ra, candidate: rb, a: worst.a, b: worst.b)
+        }
+        return report
+    }
+
+    static func writeReport(_ lines: [String], name: String) throws {
         try FileManager.default.createDirectory(at: Self.directory, withIntermediateDirectories: true)
-        try report.joined(separator: "\n").write(to: Self.directory.appendingPathComponent("\(name).txt"), atomically: true, encoding: .utf8)
+        try lines.joined(separator: "\n").write(to: Self.directory.appendingPathComponent("\(name).txt"), atomically: true, encoding: .utf8)
+    }
+
+    /// 這份配方在 6 個時刻實際用到的變換（確認案例涵蓋大字、旋轉、整屏縮放、半透明多字）
+    static func transformSummary(_ name: String, size: CGSize) -> String {
+        let measurer = CoreTextMeasurer()
+        let timeline = LyricsTimelineBuilder.build(lyrics: LyricsFXPreviewFixture.lyrics, duration: LyricsFXPreviewFixture.duration)
+        var rotation: CGFloat = 0, minScale = CGFloat.infinity, maxScale: CGFloat = 0, zoom: CGFloat = 1, effective: CGFloat = 0, grouped = 0
+        for time in Self.times {
+            let plan = LyricsFXFrame.plan(timeline: timeline, time: time, size: size, motion: .full, recipe: Self.recipe(name), measurer: measurer)
+            zoom = max(zoom, plan.zoom)
+            for glyph in plan.glyphs + plan.ghosts {
+                rotation = max(rotation, abs(glyph.rotation))
+                minScale = min(minScale, glyph.scaleX, glyph.scaleY)
+                maxScale = max(maxScale, glyph.scaleX, glyph.scaleY)
+                effective = max(effective, glyph.fontSize * max(glyph.scaleX, glyph.scaleY) * plan.zoom)
+            }
+            grouped += LyricsFXCanvas.runs(of: plan.ghosts).filter { $0.level < LyricsFXCanvas.opacityLevels && $0.range.count > 1 }.count
+            grouped += LyricsFXCanvas.runs(of: plan.glyphs, stroking: true).filter { $0.level < LyricsFXCanvas.opacityLevels && $0.range.count > 1 }.count
+        }
+        return String(format: "%@ 變換：max|rot|=%.3f scale=%.3f…%.3f zoom≤%.3f 最大有效字級=%.1f pt 半透明多字 run=%d", name, rotation, minScale, maxScale, zoom, effective, grouped)
+    }
+
+    @Test(arguments: ["rocksalt", "imfell", "courier", "shadows", "marker", "catacombs", "elite", "thump", "glow", "mono"])
+    func theRasterDrawingLooksLikeTheMergedOutlineDrawing(_ name: String) throws {
+        var report: [String] = []
+        for scale in [CGFloat(2), 1] {
+            report += try Self.check(name, size: Self.size, scale: scale, rendering: .raster, judged: true)
+        }
+        try Self.writeReport(report, name: name)
+    }
+
+    /// 實際全螢幕字級（計劃 2026-10-17 全螢幕缺口 §3.1）：Anton 也強制走點陣；2× 照同一組門檻判（內建螢幕是 2×），1× 只記錄（這個尺寸的 1× 不會出現）
+    @Test(arguments: ["rocksalt", "imfell", "courier", "shadows", "marker", "catacombs", "elite", "glow", "mono", "thump", "antonlp", "antonsk"])
+    func theRasterDrawingHoldsAtTheRealFullScreenSize(_ name: String) throws {
+        var report = [Self.transformSummary(name, size: Self.fullscreen)]
+        report += try Self.check(name, size: Self.fullscreen, scale: 2, rendering: .rasterIgnoringOptOut, judged: true, prefix: "full-")
+        report += try Self.check(name, size: Self.fullscreen, scale: 1, rendering: .rasterIgnoringOptOut, judged: false, prefix: "full-")
+        try Self.writeReport(report, name: "full-\(name)")
     }
 
     /// 霓虹描邊走合併外框（描邊要路徑）→ 和參考畫法同一條路，必須逐像素相同
