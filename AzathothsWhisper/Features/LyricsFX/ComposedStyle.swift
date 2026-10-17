@@ -91,9 +91,7 @@ enum ComposedStyle {
 
     /// 測試用：這一句實際用的 em 相對原 em 的比例（1＝沒縮）
     static func fittedEmRatio(line: TimedLine, index: Int, recipe: ComposedRecipe, size: CGSize, measurer: any TextMeasuring) -> CGFloat {
-        guard let style = ResolvedStyle(recipe) else { return 1 }
-        let (_, personalities) = linePersonalities(line: line, index: index, style: style)
-        return fitted(line, personalities: personalities, size: size, style: style, measurer: measurer, index: index).em / baseEm(size: size, style: style)
+        fitReport(line: line, index: index, recipe: recipe, size: size, measurer: measurer)?.ratio ?? 1
     }
     /// 殘影（原型組合模式 smoke：5 份、alpha×0.25、散佈 0.14 em，不畫本體）
     static let ghostCopies = 5

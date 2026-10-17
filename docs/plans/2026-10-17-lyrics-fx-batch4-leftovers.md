@@ -104,6 +104,15 @@
 - V1（-O，向量旁路後，全程前景）：Linkin Park 組合 p50 0.67–0.88／p95 1.30–1.64 ms、Slipknot 組合 0.87–1.39／1.87–2.03、Anton＋neonstroke 0.67–0.94／1.21–1.36，**全部達標**；每幀最多 run 數 10／267／54。log：本 session scratchpad `v3-vec/`。
 - ACCEPTANCE：I-45 擴寫（①②）、I-46 加覆蓋缺口註記、新增 I-47（Anton 字級 ⚠️＋暫走向量）。
 
+### 9.4 Phase 3 評審（/simcodex，2026-10-17；R2 提前結束）
+| 輪 | 來源 | 採納並修 | 延後 P2（理由） |
+|---|---|---|---|
+| R1 | simplify 4 角度（重用／簡化／效率／修正深度） | `fittedEmRatio` 改為 `fitReport(...)?.ratio ?? 1`（三個角度都指出開頭重複） | ①`shifted` 複製 stroke、再靠 `stroking:` 旗標在殘影層遮掉——兩個角度建議改成 `shifted(stroke:)` 預設 0、殘影天生不描邊（行為等價，留待下次）；②`rasterizes` 每 run 掃一次、可放進 Run 鍵（每幀約 10–30 µs；同配方只有一種字型，不會混 run）；③`breaksLongWords` 可由 em 推導、不必存進快取；④`size.width × maxWidthRatio` 三處 → 單一 `wrapWidth`；⑤測試：`inkSpanX` 與 `inkSpan` 重複、`fontFace(id)` 輔助、兩條描邊測試可參數化、`if font != "Anton"` 改由字型資料推導 |
+| R1 | codex review --base main | 無（「No discrete regressions」） | — |
+| R2 | 自評（只看 R1 的 3 行）＋codex review --uncommitted | 無（等價：`fitReport` 只在配方解不出時回 nil，照舊回 1） | — |
+- 無安全敏感改動（無認證、網路、檔案寫入），未派 security-reviewer。
+- 評審後全量：**1277 條／159 suites 綠**；`no_playback_gate.sh` 0；覆蓋率 96.2%。
+
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（Codex，2026-10-17）
 | # | 嚴重度／位置 | 處置 | 理由／修改 |
