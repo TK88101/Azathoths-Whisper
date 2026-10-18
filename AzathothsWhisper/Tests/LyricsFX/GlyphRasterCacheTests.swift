@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import AzathothsWhisper
@@ -174,4 +175,51 @@ struct GlyphRasterCacheTests {
         _ = try Self.raster(cache, "A")
         #expect(cache.bytes == 0)
     }
+
+    // MARK: 遺留收尾 ②c、②d（docs/plans/2026-10-18-lyrics-fx-leftover-cleanup.md §2.2）
+
+    /// 以正式繪製路徑離屏畫 `frames` 幀，共用同一個外框／點陣快取
+    static func draw(_ plan: FramePlan, frames: Int, paths: GlyphPathCache) {
+        for _ in 0..<frames {
+            let renderer = ImageRenderer(content: Canvas { context, size in
+                LyricsFXCanvas.draw(plan, in: context, size: size, paths: paths)
+            }.frame(width: 300, height: 200))
+            renderer.scale = 2
+            _ = renderer.cgImage
+        }
+    }
+
+    /// 零寬空白排版時不會被濾掉（不是 White_Space），外框為空：直接跳過，不每幀重試建點陣
+    @Test func aGlyphWithoutAnOutlineIsSkippedInsteadOfRetriedEveryFrame() {
+        #expect(!Character("\u{200B}").isWhitespace)
+        let paths = GlyphPathCache()
+        let empty = GlyphDraw(text: "\u{200B}", face: Self.face, fontSize: 80, origin: CGPoint(x: 20, y: 20), opacity: 1, color: .fg)
+        let letter = GlyphDraw(text: "A", face: Self.face, fontSize: 80, origin: CGPoint(x: 120, y: 20), opacity: 1, color: .fg)
+        #expect(paths.entry(for: empty).isEmpty)
+        #expect(!paths.entry(for: letter).isEmpty)
+        var plan = FramePlan(palette: .mono)
+        plan.glyphs = [empty, letter]
+        Self.draw(plan, frames: 3, paths: paths)
+        #expect(paths.rasters.misses == 1, "只有 A 建過一次點陣")
+    }
+
+    /// 同一幀用過的並列最舊者：先建的先出（建立序號決勝，可重現）
+    @Test func amongBitmapsLastUsedInTheSameFrameTheEarliestBuiltIsEvictedFirst() throws {
+        let probe = try Self.raster(GlyphRasterCache(), "O")
+        for _ in 0..<8 {
+            let cache = GlyphRasterCache(byteLimit: probe.bytes * 2 + probe.bytes / 2)
+            cache.beginFrame()
+            _ = try Self.raster(cache, "O")
+            _ = try Self.raster(cache, "Q")
+            cache.beginFrame()
+            _ = try Self.raster(cache, "C")  // 放不下 → 逐出 O、Q 中先建的 O
+            let misses = cache.misses
+            _ = try Self.raster(cache, "Q")
+            #expect(cache.misses == misses, "Q 還在")
+            cache.beginFrame()
+            _ = try Self.raster(cache, "O")
+            #expect(cache.misses == misses + 1, "O 被逐出")
+        }
+    }
+
 }

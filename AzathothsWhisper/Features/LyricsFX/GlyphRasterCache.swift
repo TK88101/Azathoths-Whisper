@@ -33,6 +33,8 @@ final class GlyphRasterCache {
     private struct Slot {
         let entry: Entry
         var lastUsedFrame: Int
+        /// 建立序號：同一幀用過的並列最舊者，先建的先出（可重現）
+        let serial: Int
     }
 
     /// 點陣比螢幕需要的像素多出的倍數區間（spike 3a：[1.6, 1.87) 讓 V3 全案達標）
@@ -46,6 +48,7 @@ final class GlyphRasterCache {
     private(set) var misses = 0
     private var store: [Key: Slot] = [:]
     private var frame = 0
+    private var nextSerial = 0
 
     init(byteLimit: Int = GlyphRasterCache.defaultByteLimit) {
         self.byteLimit = byteLimit
@@ -73,7 +76,7 @@ final class GlyphRasterCache {
         frame += 1
     }
 
-    /// 建不出點陣（配置失敗）回 nil：這個字這一幀不畫、也不進快取
+    /// 建不出點陣（配置失敗）回 nil：這個字這一幀不畫、也不進快取。沒有外框的字由呼叫端先擋掉（`GlyphPathCache.Entry.isEmpty`）
     func entry(text: String, face: FontFace, path: GlyphPathCache.Entry, tier: Tier) -> Entry? {
         let key = Key(text: text, face: face, size: path.size, tier: tier)
         if let index = store.index(forKey: key) {
@@ -86,19 +89,28 @@ final class GlyphRasterCache {
         if bytes + made.bytes > byteLimit { evict(toFit: made.bytes) }
         // 本幀用到的都不能逐出、還是放不下 → 這一張只畫不存，下一幀再試
         guard bytes + made.bytes <= byteLimit else { return made }
-        store[key] = Slot(entry: made, lastUsedFrame: frame)
+        store[key] = Slot(entry: made, lastUsedFrame: frame, serial: nextSerial)
+        nextSerial += 1
         bytes += made.bytes
         return made
     }
 
-    /// 由最久沒用的開始逐出，只逐到放得下為止；本幀用過的不逐出（整批清空會讓那一幀重建全部點陣，實測掉兩格，計劃 §9.5 3b）
+    /// 由最久沒用的開始逐出，只逐到放得下為止；本幀用過的不逐出（整批清空會讓那一幀重建全部點陣，實測掉兩格，計劃 §9.5 3b）。
+    /// 每逐一張線性找一次最舊者，不全表排序：滿載時一張新點陣通常只擠掉一兩張（遺留收尾計劃 §2.2 ②d）
     private func evict(toFit incoming: Int) {
-        let candidates = store.filter { $0.value.lastUsedFrame < frame }.sorted { $0.value.lastUsedFrame < $1.value.lastUsedFrame }
-        for (key, slot) in candidates {
-            guard bytes + incoming > byteLimit else { return }
-            store[key] = nil
-            bytes -= slot.entry.bytes
+        while bytes + incoming > byteLimit, let oldest = oldestEvictable() {
+            bytes -= store.removeValue(forKey: oldest)?.entry.bytes ?? 0
         }
+    }
+
+    /// 本幀沒用過的項目裡，(上次使用的幀, 建立序號) 最小者
+    private func oldestEvictable() -> Key? {
+        var oldest: (key: Key, frame: Int, serial: Int)?
+        for (key, slot) in store where slot.lastUsedFrame < frame {
+            if let current = oldest, (current.frame, current.serial) <= (slot.lastUsedFrame, slot.serial) { continue }
+            oldest = (key, slot.lastUsedFrame, slot.serial)
+        }
+        return oldest?.key
     }
 
     func removeAll() {

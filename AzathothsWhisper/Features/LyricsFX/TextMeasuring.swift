@@ -119,6 +119,8 @@ final class GlyphPathCache {
         let size: CGFloat
         /// 外框中心（快取字級下），旋轉與縮放的軸
         let center: CGPoint
+        /// 沒有外框（例如零寬空白 U+200B：不是 `isWhitespace`，排版不會濾掉）：畫不出東西，不必建點陣
+        let isEmpty: Bool
     }
 
     private struct Key: Hashable {
@@ -140,7 +142,7 @@ final class GlyphPathCache {
         if store.count >= Self.capacity { store.removeAll(keepingCapacity: true) }
         let path = Self.outline(glyph.text, font: fonts.font(glyph.face, size: size))
         let bounds = path.boundingBoxOfPath
-        let entry = Entry(path: path, size: size, center: CGPoint(x: bounds.midX, y: bounds.midY))
+        let entry = Entry(path: path, size: size, center: CGPoint(x: bounds.midX, y: bounds.midY), isEmpty: bounds.isNull)
         store[key] = entry
         return entry
     }
