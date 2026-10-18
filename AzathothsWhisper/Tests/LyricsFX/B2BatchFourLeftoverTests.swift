@@ -314,6 +314,48 @@ struct B2BatchFourLeftoverTests {
         #expect(LyricsFXCanvas.runs(of: glyphs, stroking: false).map(\.stroke) == [0])
     }
 
+    // MARK: 遺留收尾 ① Cenobyte 字距（docs/plans/2026-10-18-lyrics-fx-leftover-cleanup.md §2.1）
+
+    @Test func cenobyteUsesThePrototypesWiderSpacingAndOtherFontsKeepTheDefault() {
+        guard case .font(let cenobyte)? = LyricsFXCatalog.component("Cenobyte")?.payload else { Issue.record("Cenobyte 不是字型"); return }
+        #expect(cenobyte.spacing == 0.2)
+        for component in LyricsFXCatalog.fonts where component.id != "Cenobyte" {
+            guard case .font(let face) = component.payload else { continue }
+            #expect(face.spacing == ComposedStyle.spacing, "\(component.id)")
+        }
+    }
+
+    /// 每字排版寬＝字本身的寬＋字距 × 該句 em；畫字以字本身的寬置中（字距只在排版讀一次）
+    @Test(arguments: [("Cenobyte", 0.2), ("Marker", 0.08)])
+    func eachGlyphIsLaidOutWithItsFontsSpacing(font: String, spacing: CGFloat) throws {
+        let measurer = CoreTextMeasurer()
+        let report = try #require(ComposedStyle.fitReport(
+            line: Self.line(LongLineFitTests.short), index: 0, recipe: LongLineFitTests.recipe(font: font), size: Self.wide, measurer: measurer))
+        guard case .font(let face)? = LyricsFXCatalog.component(font)?.payload else { Issue.record("\(font) 不是字型"); return }
+        #expect(!report.metrics.isEmpty)
+        for (glyph, metric) in zip(report.glyphs, report.metrics) {
+            let measured = measurer.advances(of: glyph.text, face: face, fontSize: metric.fontSize).last ?? 0
+            #expect(abs(metric.width - measured - spacing * report.em) < 1e-9, "\(font) \(glyph.text) 排版寬")
+            #expect(abs(metric.advance - measured) < 1e-9, "\(font) \(glyph.text) 字寬")
+        }
+    }
+
+    /// 真實 Cenobyte 長句（R1 #10）：字距變寬後仍守 I-45——每列 ≤ 折行寬、主字墨跡在安全區內、整行大寫
+    @Test(arguments: [CGSize(width: 1728, height: 945), CGSize(width: 900, height: 945)])
+    func aLongCenobyteLineStillFitsWithTheWiderSpacing(size: CGSize) throws {
+        let text = LongLineFitTests.long
+        let report = try #require(Self.report(text, font: "Cenobyte", size: size))
+        #expect(report.rowWidths.allSatisfy { $0 <= Self.maxWidth(size) }, "列寬 \(report.rowWidths)")
+        #expect(report.glyphs.allSatisfy { $0.text == $0.text.uppercased() })
+        let marginY = size.height * ComposedStyle.fitMargin, marginX = size.width * ComposedStyle.fitMargin
+        for t in [30.0, 33.3, 37.7] {
+            let frame = Self.plan(text, font: "Cenobyte", size: size, t: t)
+            let x = Self.inkSpanX(frame), y = B2BatchFourT7FixTests.inkSpan(frame)
+            #expect(!frame.glyphs.isEmpty && x.left >= marginX && x.right <= size.width - marginX, "t=\(t) 左右 \(x)")
+            #expect(y.top >= marginY && y.bottom <= size.height - marginY, "t=\(t) 上下 \(y)")
+        }
+    }
+
     // MARK: ③ Anton 字級
 
     @Test func antonIsDrawnAtThePrototypesLargerSize() throws {

@@ -53,7 +53,7 @@ struct ResolvedStyle: Sendable {
 enum ComposedStyle {
     static let emRatio: CGFloat = 0.12
     static let lineHeight: CGFloat = 1.2
-    /// 每字右側多留的間距（em 比例）
+    /// 每字右側多留的間距（em 比例）的預設值；字型可覆寫（`FontFace.spacing`）
     static let spacing: CGFloat = 0.08
     static let wordGap: CGFloat = 0.3
     static let maxWidthRatio: CGFloat = 0.86
@@ -77,6 +77,8 @@ enum ComposedStyle {
         let breaksLongWords: Bool
         let rowWidths: [CGFloat]
         let glyphs: [(text: String, wordIndex: Int, row: Int)]
+        /// 每字的排版寬（含字距）、字本身的寬、字級
+        let metrics: [(width: CGFloat, advance: CGFloat, fontSize: CGFloat)]
     }
 
     static func fitReport(line: TimedLine, index: Int, recipe: ComposedRecipe, size: CGSize, measurer: any TextMeasuring) -> FitReport? {
@@ -85,7 +87,8 @@ enum ComposedStyle {
         let fit = fitted(line, personalities: personalities, size: size, style: style, measurer: measurer, index: index)
         return FitReport(
             em: fit.em, ratio: fit.em / baseEm(size: size, style: style), breaksLongWords: fit.breaksLongWords, rowWidths: fit.laid.rowWidths,
-            glyphs: fit.laid.glyphs.map { ($0.character, $0.wordIndex, $0.row) }
+            glyphs: fit.laid.glyphs.map { ($0.character, $0.wordIndex, $0.row) },
+            metrics: fit.laid.glyphs.map { ($0.width, $0.advance, fit.em * CGFloat(personalities[$0.index].size)) }
         )
     }
 
@@ -193,6 +196,8 @@ enum ComposedStyle {
         /// 列內 x（左緣）與寬（含 spacing）
         let x: CGFloat
         let width: CGFloat
+        /// 字本身的寬（不含 spacing）：畫字時以它置中，字距只在排版這一處讀
+        let advance: CGFloat
         let row: Int
     }
 
@@ -233,7 +238,7 @@ enum ComposedStyle {
                 y: anchor.y + CGFloat(personality.dy) * em + transform.dy + CGFloat(personality.scatterY) * em
             )
             let alpha = FXEasing.clamp01(transform.alpha * (entry.trail ?? 1))
-            let advance = glyph.width - spacing * em
+            let advance = glyph.advance
             let base = GlyphDraw(
                 text: glyph.character, face: style.face, fontSize: fontSize,
                 origin: CGPoint(x: center.x - advance / 2, y: center.y - measurer.ascent(face: style.face, fontSize: fontSize)),
@@ -370,7 +375,7 @@ enum ComposedStyle {
         }
     }
 
-    /// 以詞為單位貪婪折行（原型 `layout`）：字寬依個性字級量、每字加 spacing、詞間 0.3 em。
+    /// 以詞為單位貪婪折行（原型 `layout`）：字寬依個性字級量、每字加該字型的 spacing、詞間 0.3 em。
     /// `breakLongWords`：比折行寬還寬的詞按字（Swift `Character`＝extended grapheme cluster）斷到多列，仍是同一個詞（同 wordIndex、同時間）——只在縮到下限仍放不下時用
     private static func layout(
         _ line: TimedLine, personalities: [GlyphPersonality], em: CGFloat, maxWidth: CGFloat, face: FontFace, measurer: any TextMeasuring,
@@ -379,6 +384,7 @@ enum ComposedStyle {
         var glyphs: [LaidGlyph] = []
         var rowWidths: [CGFloat] = [0]
         var words: [(x: CGFloat, width: CGFloat)] = []
+        let spacing = face.spacing
         var index = 0
         for (wordIndex, word) in line.words.enumerated() {
             let characters = word.text.filter { !$0.isWhitespace }.enumerated().map { offset, character in
@@ -401,7 +407,7 @@ enum ComposedStyle {
                     rowWidths.append(0)
                     row += 1
                 }
-                glyphs.append(LaidGlyph(character: character, wordIndex: wordIndex, index: index, x: rowWidths[row], width: width, row: row))
+                glyphs.append(LaidGlyph(character: character, wordIndex: wordIndex, index: index, x: rowWidths[row], width: width, advance: width - spacing * em, row: row))
                 rowWidths[row] += width
                 index += 1
             }

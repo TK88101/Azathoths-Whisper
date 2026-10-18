@@ -117,6 +117,15 @@
 - T10：UI 測試授權（Automation Mode、輔助使用）、輸入法 ABC、Cenobyte 目視。
 
 ## 9. 紀錄（實作時回填）
+### 9.0 T0 基線（2026-10-18）
+- 測試端加每張影像 RGBA 的 SHA-256 輸出（`GlyphRasterFidelityTests.digest`／`writeHashes`）、4 份 neonstroke＋殘影組合（只記雜湊）、③c 7 案完整 FitReport 雜湊基線（`B2BatchFourLeftoverTests.fitBaseline`；冷算與命中兩次一致）。正式碼未動。
+- Fidelity 全綠（1 分 50 秒）：27 檔、636 張影像雜湊。**同碼重跑雜湊逐檔相同**（渲染可重現，雜湊比對可用來判等價）。基線與 MANIFEST（HEAD 79bb4e4、對 284e2d1 的 diff 只含 Tests/ 與 docs/、測試檔 sha256、倍率與尺寸）存本 session scratchpad `fid-base/`。checkpoint 464026f。
+
+### 9.1 T1–T2 ① Cenobyte 字距（2026-10-18）
+- 設計細化：`LaidGlyph` 加 `advance`（排版時算 `width − spacing × em`，與改前畫字端同一算式、同一 em → 其他字型逐位元相同），畫字改讀它；字距只在 `layout` 讀 `face.spacing` 一次（取代計劃原寫的「兩處都改讀 face.spacing」，消除兩處不一致的可能）。`FitReport` 加 `metrics`（排版寬、字寬、字級）供測試。
+- 紅燈：骨架後新測試 **31 斷言紅**（目錄字距 1、Cenobyte 30 字的排版寬各少 0.12 em）；真實 Cenobyte 長句守 I-45 的測試先天綠（留作回歸防線）。
+- 綠燈：相關 5 suites 62 條綠（含 126 組縮字基線、③c 雜湊基線不變）。
+- ACCEPTANCE 新增 I-48 ⚠️（單測 ✅、目視待 T10）。
 
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（Codex，2026-10-18）
