@@ -302,16 +302,29 @@ struct B2BatchFourLeftoverTests {
         #expect(!frame.glyphs.isEmpty && frame.glyphs.allSatisfy { $0.stroke > 0 }, "\(enter)＋\(fx2)")
     }
 
-    @Test func shiftedKeepsTheStroke() {
+    /// 副本預設不描邊（殘影天生不描）；主字經 shifted 換色時明確帶上描邊（遺留收尾計劃 §2.3 ③a）
+    @Test func shiftedDropsTheStrokeUnlessItIsPassedOn() {
         let glyph = GlyphDraw(text: "A", face: .displayMedium, fontSize: 40, origin: .zero, opacity: 1, color: .fg, stroke: 2.5)
-        #expect(glyph.shifted(dx: 3, dy: 4, opacity: 0.5, color: .bg).stroke == 2.5)
+        #expect(glyph.shifted(dx: 3, dy: 4, opacity: 0.5, color: .bg).stroke == 0)
+        #expect(glyph.shifted(dx: 3, dy: 4, opacity: 0.5, color: .bg, stroke: glyph.stroke).stroke == 2.5)
     }
 
-    @Test func ghostsAreNeverStrokedAndDifferentStrokesSplitRuns() {
+    /// 霓虹描邊與各種殘影並存：殘影一律不帶描邊，主字都帶
+    /// 掃整句（每 0.05 s）：有殘影的每一幀，殘影都不帶描邊、主字都帶（RGB 分離只在進場前半段有副本，所以不挑單一時刻）
+    @Test(arguments: ["misreg", "reflect", "weep", "rgbsplit"])
+    func ghostsCarryNoStrokeAlongsideNeonStroke(fx2: String) {
+        let frames = stride(from: 2.0, to: 40.0, by: 0.05).map { Self.plan(LongLineFitTests.short, font: "Bebas", size: Self.wide, t: $0, fx1: "neonstroke", fx2: fx2) }
+            .filter { !$0.ghosts.isEmpty }
+        #expect(!frames.isEmpty, "\(fx2) 要有殘影")
+        #expect(frames.allSatisfy { $0.ghosts.allSatisfy { $0.stroke == 0 } }, "\(fx2)")
+        #expect(frames.allSatisfy { $0.glyphs.allSatisfy { $0.stroke > 0 } }, "\(fx2)")
+    }
+
+    @Test func differentStrokesSplitRunsAndUnstrokedCopiesStayUnstroked() {
         func glyph(_ stroke: CGFloat) -> GlyphDraw { GlyphDraw(text: "A", face: .displayMedium, fontSize: 40, origin: .zero, opacity: 1, color: .fg, stroke: stroke) }
         let glyphs = [glyph(4), glyph(4), glyph(3)]
-        #expect(LyricsFXCanvas.runs(of: glyphs, stroking: true).map(\.stroke) == [4, 3])
-        #expect(LyricsFXCanvas.runs(of: glyphs, stroking: false).map(\.stroke) == [0])
+        #expect(LyricsFXCanvas.runs(of: glyphs).map(\.stroke) == [4, 3])
+        #expect(LyricsFXCanvas.runs(of: glyphs.map { $0.shifted(dx: 1, dy: 1, opacity: 1, color: .fg) }).map(\.stroke) == [0])
     }
 
     // MARK: 遺留收尾 ① Cenobyte 字距（docs/plans/2026-10-18-lyrics-fx-leftover-cleanup.md §2.1）

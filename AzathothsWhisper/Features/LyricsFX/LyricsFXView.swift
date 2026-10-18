@@ -41,12 +41,12 @@ enum LyricsFXCanvas {
     }
 
     /// 連續同鍵的字切成一段；量化後為 0 的字不畫、也不打斷前後
-    static func runs(of glyphs: [GlyphDraw], stroking: Bool = false) -> [Run] {
+    static func runs(of glyphs: [GlyphDraw]) -> [Run] {
         var runs: [Run] = []
         for (index, glyph) in glyphs.enumerated() {
             let level = opacityLevel(glyph.opacity)
             guard level > 0 else { continue }
-            let stroke = stroking ? glyph.stroke : 0
+            let stroke = glyph.stroke
             if let last = runs.last, last.color == glyph.color, last.level == level, last.stroke == stroke {
                 runs[runs.count - 1] = Run(color: last.color, level: level, range: last.range.lowerBound..<(index + 1), stroke: stroke)
             } else {
@@ -90,18 +90,18 @@ enum LyricsFXCanvas {
             // 濾鏡套在整層的合成結果上，只做一次模糊（不是每個透明度 run 各做一次）
             shaken.drawLayer { lit in
                 lit.addFilter(.shadow(color: palette.acc.color, radius: plan.glow))
-                fill(plan.glyphs, in: lit, palette: palette, paths: paths, stroking: true, rendering: rendering)
+                fill(plan.glyphs, in: lit, palette: palette, paths: paths, rendering: rendering)
             }
         } else {
-            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, stroking: true, rendering: rendering)
+            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, rendering: rendering)
         }
         for layer in plan.front { draw(layer, in: context, bounds: bounds) }
     }
 
     private static func fill(
-        _ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, stroking: Bool = false, rendering: GlyphRendering
+        _ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, rendering: GlyphRendering
     ) {
-        for run in runs(of: glyphs, stroking: stroking) {
+        for run in runs(of: glyphs) {
             let members = glyphs[run.range].filter { opacityLevel($0.opacity) > 0 }
             var layer = context
             layer.opacity = opacity(ofLevel: run.level)

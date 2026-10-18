@@ -342,7 +342,7 @@ enum ComposedStyle {
                 center: CGPoint(x: center.x + offset.x, y: center.y + offset.y),
                 size: CGSize(width: glyphWidth + 0.16 * base.fontSize, height: 1.2 * base.fontSize), rotation: base.rotation, color: .fg, opacity: alpha
             ))
-            frame.glyphs.append(base.shifted(dx: 0, dy: 0, opacity: alpha, color: .bg))
+            frame.glyphs.append(base.shifted(dx: 0, dy: 0, opacity: alpha, color: .bg, stroke: base.stroke))
         } else if let paper {
             // 勒索信：紙片墊在字後，字用與紙相反的黑或白；不再疊錯位與倒影（原型 ransom 提前 return）
             frame.boxes.append(GlyphBox(
@@ -350,7 +350,7 @@ enum ComposedStyle {
                 size: CGSize(width: paper.width * paperSize.width, height: base.fontSize * paperSize.height),
                 rotation: base.rotation + paper.tilt, color: paper.color, opacity: alpha
             ))
-            frame.glyphs.append(base.shifted(dx: 0, dy: 0, opacity: alpha, color: paper.ink))
+            frame.glyphs.append(base.shifted(dx: 0, dy: 0, opacity: alpha, color: paper.ink, stroke: base.stroke))
         } else {
             if misregistered {
                 frame.ghosts.append(base.shifted(dx: 2.5, dy: 2.5, opacity: alpha * 0.6, color: .black))
@@ -591,7 +591,8 @@ enum ComposedStyle {
 }
 
 extension GlyphDraw {
-    func shifted(dx: CGFloat, dy: CGFloat, opacity: Double, color: ColorSlot) -> GlyphDraw {
+    /// 位移、換色、換透明度的副本。描邊預設 0（殘影天生不描）；主字換色時明確傳 `stroke: base.stroke`
+    func shifted(dx: CGFloat, dy: CGFloat, opacity: Double, color: ColorSlot, stroke: CGFloat = 0) -> GlyphDraw {
         GlyphDraw(
             text: text, face: face, fontSize: fontSize, origin: CGPoint(x: origin.x + dx, y: origin.y + dy),
             rotation: rotation, scaleX: scaleX, scaleY: scaleY, opacity: opacity, color: color, stroke: stroke

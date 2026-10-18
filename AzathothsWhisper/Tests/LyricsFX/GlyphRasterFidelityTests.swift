@@ -237,7 +237,7 @@ struct GlyphRasterFidelityTests {
                 effective = max(effective, glyph.fontSize * max(glyph.scaleX, glyph.scaleY) * plan.zoom)
             }
             grouped += LyricsFXCanvas.runs(of: plan.ghosts).filter { $0.level < LyricsFXCanvas.opacityLevels && $0.range.count > 1 }.count
-            grouped += LyricsFXCanvas.runs(of: plan.glyphs, stroking: true).filter { $0.level < LyricsFXCanvas.opacityLevels && $0.range.count > 1 }.count
+            grouped += LyricsFXCanvas.runs(of: plan.glyphs).filter { $0.level < LyricsFXCanvas.opacityLevels && $0.range.count > 1 }.count
         }
         return String(format: "%@ 變換：max|rot|=%.3f scale=%.3f…%.3f zoom≤%.3f 最大有效字級=%.1f pt 半透明多字 run=%d", name, rotation, minScale, maxScale, zoom, effective, grouped)
     }

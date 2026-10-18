@@ -99,7 +99,7 @@ struct GlyphDraw: Equatable, Sendable {
     var scaleY: CGFloat = 1
     let opacity: Double
     let color: ColorSlot
-    /// 霓虹描邊寬（點；配色 acc 色，先描後填）。0＝不描；殘影層即使帶著也不畫（`LyricsFXCanvas.runs(of:stroking:)`）
+    /// 霓虹描邊寬（點；配色 acc 色，先描後填）。0＝不描；殘影由 `shifted` 產生、預設就是 0
     var stroke: CGFloat = 0
 
     init(text: String, face: FontFace, fontSize: CGFloat, origin: CGPoint, rotation: CGFloat = 0, scaleX: CGFloat = 1, scaleY: CGFloat = 1, opacity: Double, color: ColorSlot, stroke: CGFloat = 0) {
