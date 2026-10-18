@@ -1,4 +1,5 @@
 import CoreGraphics
+import CryptoKit
 import Foundation
 import Testing
 
@@ -234,6 +235,44 @@ struct B2BatchFourLeftoverTests {
             for pass in 0..<2 {
                 let ratio = ComposedStyle.fittedEmRatio(line: line, index: 0, recipe: recipe, size: size, measurer: CoreTextMeasurer())
                 #expect(Double(ratio).bitPattern == entry.bits, "\(entry.font) 第 \(entry.line) 句 \(size) 第 \(pass) 次：\(ratio)")
+            }
+        }
+    }
+
+    /// ③c 的等價基線（遺留收尾計劃 R1 #5）：完整縮字結果（em、列寬、每字的詞與列、有無斷詞）的雜湊，改版前在 main 284e2d1 記下。
+    /// 每案算兩次（第二次走快取命中），兩次都必須等於基線
+    static let fitCases: [(name: String, text: String, size: CGSize)] = [
+        ("short-wide", LongLineFitTests.short, LongLineFitTests.wide),
+        ("long-narrow", LongLineFitTests.long, LongLineFitTests.narrow),
+        ("extreme-narrow", LongLineFitTests.extreme, LongLineFitTests.narrow),
+        ("oversized-narrow", "Paper harborlightsd tonight", LongLineFitTests.narrow),
+        ("enormous-narrow", "Gulls " + String(repeating: "lanternsoverthewater", count: 6) + " bells", LongLineFitTests.narrow),
+        ("graphemes-narrow", "Boats " + String(repeating: "\u{1F469}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{1F1EF}\u{1F1F5}e\u{0301}", count: 12)
+            + "https://example.com/harbor/lights?boat=paper&tide=slow#pier", LongLineFitTests.narrow),
+        ("brokeoverflow-short", String(repeating: "saltalongtheropeandthebells", count: 12), CGSize(width: 900, height: 300)),
+    ]
+    static let fitBaseline: [String: String] = [
+        "short-wide": "c1cf64d936601c436bbe79587a15195a87808b96cd7601ed204381cb3ddae8eb",
+        "long-narrow": "066e15db9026ae4d933f3dd2ed5e84c3dc2058b9afc8b7ed0fd3416a9bfaae47",
+        "extreme-narrow": "70b50a9d5f2cd1f69cfda68c1915182eef12af5b7ed1a7de4c1f93763195c150",
+        "oversized-narrow": "bb8a88ae2982533bc3a078fa57eef2a6305f13f92a365efdcee0e1a413dc0f86",
+        "enormous-narrow": "9192771f9fde02ad3be6e6c3b6610a1fcd45fc1b257414012d3655406ab0fbb7",
+        "graphemes-narrow": "01928056c389abb1f4a1818940a04b477e21a9f070f8578770520816ad925340",
+        "brokeoverflow-short": "f9962317058a50438d4b220e9fb1f9523452dee208e59310dc16815302308542",
+    ]
+
+    static func fitDigest(_ report: ComposedStyle.FitReport) -> String {
+        let rows = report.rowWidths.map { String(Double($0).bitPattern, radix: 16) }.joined(separator: ",")
+        let glyphs = report.glyphs.map { "\($0.text)|\($0.wordIndex)|\($0.row)" }.joined(separator: ";")
+        let canonical = "em=\(String(Double(report.em).bitPattern, radix: 16)) ratio=\(String(Double(report.ratio).bitPattern, radix: 16)) broke=\(report.breaksLongWords) rows=\(rows) glyphs=\(glyphs)"
+        return SHA256.hash(data: Data(canonical.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    @Test func coldAndCachedFitsMatchTheBaselineFieldByField() throws {
+        for fitCase in Self.fitCases {
+            for pass in 0..<2 {
+                let report = try #require(Self.report(fitCase.text, size: fitCase.size))
+                #expect(Self.fitDigest(report) == Self.fitBaseline[fitCase.name], "\(fitCase.name) 第 \(pass) 次：\(Self.fitDigest(report))")
             }
         }
     }
