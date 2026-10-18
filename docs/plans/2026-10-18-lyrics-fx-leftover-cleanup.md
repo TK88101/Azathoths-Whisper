@@ -170,6 +170,13 @@
 - 照實：Catacombs 三輪 Δ 同為小幅正值，平均 +0.017 貼近容差 0.02；畫字樣本 R 臂對照 981／新版 1014、V 臂 2045／2089（3 輪平均）。依登記規則達標 → 不二分。
 - 對照 Rock Salt V2 0.759（上個計劃 T6 為 0.843）：本次同協定配對量測，跨 session 的絕對值不可直接比。
 
+### 9.7 T6 ③a–③e（2026-10-18）
+- ③a：`shifted(…, stroke: CGFloat = 0)`，negative／ransom 主字明傳 `base.stroke`；刪 `runs(of:stroking:)` 旗標（View、Meter、Fidelity 摘要三處呼叫端）。紅燈 5 斷言（`shifted` 預設、misreg／reflect／weep／rgbsplit 四種殘影帶描邊）→ 綠。測試資料修正一次：rgbsplit 只在進場前半段有副本，原取 t=20 沒有殘影 → 改為掃整句每 0.05 s、檢查所有有殘影的幀（較單一時刻更嚴）。checkpoint 40f43f8。
+- ③b：`Run.rasterizes` 進分段鍵、`fill` 讀 `run.rasterizes`。紅燈 3 斷言 → 綠。checkpoint b3aac15。
+- ③c：`FitCache` 只存比例；`LineLayout.brokeWords` 由排版記錄；`search` 下限直接以斷詞排（斷了詞或放不下即停在下限，與改前的分支逐案等價）；命中時 `ratio <= minimumFitRatio` 才斷詞排。無紅燈（等價重構）；把關：7 案完整 FitReport 雜湊（冷算＋命中）、126 組基線、① 斷詞測試全綠。checkpoint 3c48d40。
+- ③d：`ComposedStyle.wrapWidth(_:)`（算式不變），正式碼 2 處＋測試 1 處改用。
+- ③e：`inkSpan`／`inkSpanX` → `B2BatchFourT7FixTests.inkBox(_:) -> CGRect`；`fontFace(_:)` 取代 8 處 `guard case .font`；兩條縮字描邊測試參數化為 `aShrunkLineStrokesWithItsShrunkEm(font:)`（Anton 多驗「縮後描邊 < 未縮描邊」）；`if font != "Anton"` 改為 `sizeScale <= 1`。對照：測試名單只少被併入的那條；`#expect`／`#require` 63→64、24→25，無刪減。相關 3 suites 34 條綠。
+
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（Codex，2026-10-18）
 | # | 嚴重度／位置 | 處置 | 理由／修改 |

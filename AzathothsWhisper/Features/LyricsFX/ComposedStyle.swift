@@ -57,6 +57,8 @@ enum ComposedStyle {
     static let spacing: CGFloat = 0.08
     static let wordGap: CGFloat = 0.3
     static let maxWidthRatio: CGFloat = 0.86
+    /// 折行寬：每列排版寬的上限（批 4 遺留計劃 §2.1 契約 A）
+    static func wrapWidth(_ size: CGSize) -> CGFloat { size.width * maxWidthRatio }
     static let baseYRatio: CGFloat = 0.5
     /// 長句縮字（T7 修正計劃 §2.6）：主字形安全區＝歌詞區上下各留 2%；最小縮到 0.5 倍
     static let fitMargin: CGFloat = 0.02
@@ -451,7 +453,7 @@ enum ComposedStyle {
     ) -> Fitted {
         let baseEm = baseEm(size: size, style: style)
         let lay = { (em: CGFloat, breaks: Bool) in
-            layout(line, personalities: personalities, em: em, maxWidth: size.width * maxWidthRatio, face: style.face, measurer: measurer, breakLongWords: breaks)
+            layout(line, personalities: personalities, em: em, maxWidth: wrapWidth(size), face: style.face, measurer: measurer, breakLongWords: breaks)
         }
         if style.enter.pile { return Fitted(em: baseEm, laid: lay(baseEm, false)) }
         let key = FitCache.Key(line: line, personalities: personalities, size: size, style: style, measurer: measurer)
@@ -496,7 +498,7 @@ enum ComposedStyle {
 
     /// 水平（批 4 遺留計劃 §2.1 契約 A）：每列排版寬 ≤ 折行寬。多詞列由折行保證，所以只有比折行寬還寬的單一詞會讓它失敗
     private static func rowsFitWidth(_ laid: LineLayout, size: CGSize) -> Bool {
-        let maxWidth = size.width * maxWidthRatio
+        let maxWidth = wrapWidth(size)
         return laid.rowWidths.allSatisfy { $0 <= maxWidth }
     }
 
