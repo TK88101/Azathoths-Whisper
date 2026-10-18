@@ -19,6 +19,10 @@ enum LyricsFXCatalog {
         if case .palette(let palette)? = component(id)?.payload { palette } else { nil }
     }
 
+    static func font(_ id: String) -> FontFace? {
+        if case .font(let face)? = component(id)?.payload { face } else { nil }
+    }
+
     private static let byID: [String: FXComponent] = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
     private static func make(

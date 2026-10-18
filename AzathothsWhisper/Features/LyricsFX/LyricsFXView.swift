@@ -141,8 +141,6 @@ enum LyricsFXCanvas {
         let deviceScale = deviceScale(of: context)
         for glyph in glyphs {
             let entry = paths.entry(for: glyph)
-            // 沒有外框就沒有東西可畫：不建點陣（否則每幀重試）
-            guard !entry.isEmpty else { continue }
             let placement = transform(for: glyph, entry: entry)
             let tier = GlyphRasterCache.Tier(placement: placement, deviceScale: deviceScale)
             guard let raster = paths.rasters.entry(path: entry, tier: tier) else { continue }

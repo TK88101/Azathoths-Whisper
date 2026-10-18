@@ -14,7 +14,7 @@ struct ResolvedStyle: Sendable {
     let seed: UInt64
 
     init?(_ recipe: ComposedRecipe) {
-        guard case .font(let face)? = LyricsFXCatalog.component(recipe.font)?.payload,
+        guard let face = LyricsFXCatalog.font(recipe.font),
               case .backdrop(let backdrop)? = LyricsFXCatalog.component(recipe.backdrop)?.payload,
               case .enter(let enter)? = LyricsFXCatalog.component(recipe.enter)?.payload,
               case .exit(let exit)? = LyricsFXCatalog.component(recipe.exit)?.payload,
@@ -88,7 +88,7 @@ enum ComposedStyle {
         let (_, personalities) = linePersonalities(line: line, index: index, style: style)
         let fit = fitted(line, personalities: personalities, size: size, style: style, measurer: measurer, index: index)
         return FitReport(
-            em: fit.em, ratio: fit.em / baseEm(size: size, style: style), breaksLongWords: fit.breaksLongWords, rowWidths: fit.laid.rowWidths,
+            em: fit.em, ratio: fit.em / baseEm(size: size, style: style), breaksLongWords: fit.laid.brokeWords, rowWidths: fit.laid.rowWidths,
             glyphs: fit.laid.glyphs.map { ($0.character, $0.wordIndex, $0.row) },
             metrics: fit.laid.glyphs.map { ($0.width, $0.advance, fit.em * CGFloat(personalities[$0.index].size)) }
         )
@@ -445,7 +445,6 @@ enum ComposedStyle {
     private struct Fitted {
         let em: CGFloat
         let laid: LineLayout
-        var breaksLongWords: Bool { laid.brokeWords }
     }
 
     private static func fitted(
@@ -458,9 +457,9 @@ enum ComposedStyle {
         if style.enter.pile { return Fitted(em: baseEm, laid: lay(baseEm, false)) }
         let key = FitCache.Key(line: line, personalities: personalities, size: size, style: style, measurer: measurer)
         if let ratio = FitCache.ratio(for: key) {
-            // 只在下限才可能斷詞（`search`）；沒有超寬詞時斷詞排版與不斷完全相同，斷沒斷由排版結果記錄
+            // 快取裡只有 `search` 的結果：停在下限（可能斷詞）、或每列都放得下（沒有超寬詞，斷詞排版與不斷完全相同）→ 一律以斷詞排，不必拿比例比下限
             let em = baseEm * ratio
-            return Fitted(em: em, laid: lay(em, ratio <= minimumFitRatio))
+            return Fitted(em: em, laid: lay(em, true))
         }
         let full = lay(baseEm, false)
         if fits(full, em: baseEm, size: size, style: style, measurer: measurer) { return Fitted(em: baseEm, laid: full) }
@@ -496,13 +495,7 @@ enum ComposedStyle {
         return Fitted(em: low, laid: best)
     }
 
-    /// 水平（批 4 遺留計劃 §2.1 契約 A）：每列排版寬 ≤ 折行寬。多詞列由折行保證，所以只有比折行寬還寬的單一詞會讓它失敗
-    private static func rowsFitWidth(_ laid: LineLayout, size: CGSize) -> Bool {
-        let maxWidth = wrapWidth(size)
-        return laid.rowWidths.allSatisfy { $0 <= maxWidth }
-    }
-
-    /// 主字形的保守包絡（只放大不縮小）是否落在上下各留 `fitMargin` 的安全區、且每列不比折行寬還寬；淡裝飾（暈開、倒影、錯位、RGB 分離、紙片）不算
+    /// 主字形的保守包絡（只放大不縮小）是否落在上下各留 `fitMargin` 的安全區、且每列不比折行寬還寬（批 4 遺留計劃 §2.1 契約 A：多詞列由折行保證，只有比折行寬還寬的單一詞會讓它失敗）；淡裝飾（暈開、倒影、錯位、RGB 分離、紙片）不算
     private static func fits(_ laid: LineLayout, em: CGFloat, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring) -> Bool {
         let rows = CGFloat(laid.rowWidths.count)
         let rowHeight = em * lineHeight
@@ -517,7 +510,7 @@ enum ComposedStyle {
         let top = firstBaseline - measurer.ascent(face: style.face, fontSize: largest) - reach
         let bottom = lastBaseline + measurer.descent(face: style.face, fontSize: largest) + reach
         let margin = size.height * fitMargin
-        return top >= margin && bottom <= size.height - margin && rowsFitWidth(laid, size: size)
+        return top >= margin && bottom <= size.height - margin && laid.rowWidths.allSatisfy { $0 <= wrapWidth(size) }
     }
 
     /// 原型 `displayChar`：大寫字型整行轉大寫；否則只有行首字母大寫

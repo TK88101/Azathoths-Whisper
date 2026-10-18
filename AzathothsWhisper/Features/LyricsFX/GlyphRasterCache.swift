@@ -74,8 +74,9 @@ final class GlyphRasterCache {
         frame += 1
     }
 
-    /// 建不出點陣（配置失敗）回 nil：這個字這一幀不畫、也不進快取。沒有外框的字由呼叫端先擋掉（`GlyphPathCache.Entry.isEmpty`）
+    /// 畫不出點陣回 nil，這個字這一幀不畫：沒有外框（零寬字元等）→ 不建圖、不計 miss（否則每幀重試）；配置失敗 → 不進快取
     func entry(path: GlyphPathCache.Entry, tier: Tier) -> Entry? {
+        guard !path.isEmpty else { return nil }
         let key = Key(glyph: path.key, tier: tier)
         if let index = store.index(forKey: key) {
             store.values[index].lastUsedFrame = frame

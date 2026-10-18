@@ -304,7 +304,7 @@ extension GlyphDraw {
 struct GlyphRunStrategyTests {
     /// 強制點陣只動 `rasterizes`：把它改回原值後必須與原字完全相同（`GlyphDraw` 日後加欄位而 `withFace` 漏抄時轉紅；遺留收尾計劃 R1 #9）
     @Test @MainActor func forcingRasterChangesNothingButTheRasterizesFlag() throws {
-        guard case .font(let anton)? = LyricsFXCatalog.component("Anton")?.payload else { Issue.record("Anton 不是字型"); return }
+        let anton = try #require(LyricsFXCatalog.font("Anton"))
         let glyph = GlyphDraw(text: "Q", face: anton, fontSize: 87.5, origin: CGPoint(x: 3.25, y: -7.5), rotation: 0.21, scaleX: 1.07, scaleY: -0.93,
                               opacity: 0.62, color: .splitBlue, stroke: 1.75)
         let forced = GlyphRasterFidelityTests.forcingRaster(glyph)

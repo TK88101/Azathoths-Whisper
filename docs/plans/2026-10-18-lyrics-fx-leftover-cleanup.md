@@ -182,6 +182,15 @@
 - **每幀 V1**（全螢幕 1728×941、全程前景；捨第一個 5 s 視窗（含啟動），其餘 7 窗；log `v1-t7/`）：Rock Salt p50 0.91–1.25／p95 1.77–2.27 ms、IM Fell 1.00–1.38／1.85–2.27、Courier 0.79–1.08／1.58–1.93、Shadows 1.07–1.72／2.26–2.77、Marker 1.02–1.48／2.49–2.69、Catacombs 1.14–1.59／2.14–2.33、Elite 0.86–1.03／1.81–2.06、**Cenobyte（Mayhem 可抽的最重組合 snow／condense／dissolve／misreg／shake／ice）1.02–1.62／1.73–2.37**；單幀最慢 6.2 ms（Elite，< 一格 8.3 ms）。**全部達標**（p50 ≤ 2、p95 ≤ 3）。
 - **V2.1 中止（未得結果）**：第 2 跑失焦、第 3 跑約束更新超標皆作廢；第 4 跑前 fail-closed 守衛偵測到「仍有 app 在跑」而中止——查證為**另一個 Claude session（569cdfd0）同時在本機跑 Azathoth's Whisper 的 UI 測試**（12:18 另起實例，`-ApplePersistenceIgnoreState`）。失焦即其搶前景所致。V2 需獨佔機器 → 等使用者協調後補跑；不動該 session 的行程。V1 期間是否有並行負載未能排除，但並行只會使數字變差，「達標」結論不受影響。
 
+### 9.9 T8 /simcodex（2026-10-18；R2 提前結束）
+- 前置：發現 40f43f8（③a checkpoint）以 `git add AzathothsWhisper` 誤加「 2／ 3.xcodeproj」舊副本 8 檔 → 8be1741 以 `update-index --force-remove` 取消追蹤（磁碟不動）。歷史中仍有，合 main 時要整理。
+| 輪 | 來源 | 採納並修 | 駁回／延後（理由） |
+|---|---|---|---|
+| R1 | simplify 4 角度（Sonnet；0 個 P1，23 條 P2） | ①空外框判斷搬進 `GlyphRasterCache.entry`（nil 被定義處、不計 miss；②c 的根本位置）；②快取命中一律斷詞排（快取只有 `search` 結果：停下限或每列放得下→斷不斷相同；免浮點比例比下限）；③刪 `Fitted.breaksLongWords`；④內聯 `rowsFitWidth`；⑤測試 `maxWidth` 別名改用 `wrapWidth`；⑥`fitDigest` 共用 `digest`；⑦`LyricsFXCatalog.font(_:)`（與 `palette(_:)` 並列），正式碼與測試共用、刪測試端 `fontFace` | `GlyphDraw.face` 改 var（為測試改正式型別、違反不可變慣例；R1 #9 已辯）；advance 改由量測值直出（會使畫字 origin 差 1 ulp，破壞像素逐張相同）；contract test 改走真 draw（真 draw 的縮放已由 V3 雜湊與 thump 案例把關，契約測試的目的是框架語義本身）；`GlyphKey` 退回普通 Hashable（②e 即本項目標，已辯）；FontFace 雜湊整體優化（diff 外、既有）；neon 殘影組合改斷言點陣＝向量（誤判：殘影走點陣，不會逐像素相同）；FitReport 基線合併後刪除（收官時交使用者）；`removeAll` 僅測試用、測試 helper 合併、`FitReport.metrics`、預設字距常數歸屬（P2 延後） |
+| R1 | codex review --base 284e2d1 | — | **P1 駁回（誤判）**：稱元組 `<=` 不能編譯——Swift 標準庫自 SE-0015 起為元素皆 Comparable、≤ 6 元的元組提供比較運算子；該碼已編譯、決勝測試已綠 |
+| R2 | 自評（R1 的 27＋／39− 行）＋codex review --uncommitted | 無（「behavior-preserving cleanup … No actionable regressions」） | — |
+- 驗證：相關 8 suites 82 條綠。無安全敏感改動（無認證、網路、檔案寫入、使用者資料），未派 security-reviewer。
+
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（Codex，2026-10-18）
 | # | 嚴重度／位置 | 處置 | 理由／修改 |

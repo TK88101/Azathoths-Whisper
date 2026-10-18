@@ -1,5 +1,4 @@
 import CoreGraphics
-import CryptoKit
 import Foundation
 import Testing
 
@@ -31,7 +30,6 @@ struct B2BatchFourLeftoverTests {
                                   recipe: .composed(LongLineFitTests.recipe(font: font, enter: enter, fx1: fx1, fx2: fx2)), measurer: CoreTextMeasurer())
     }
 
-    static func maxWidth(_ size: CGSize) -> CGFloat { ComposedStyle.wrapWidth(size) }
 
     // MARK: ① 超寬單字
 
@@ -41,7 +39,7 @@ struct B2BatchFourLeftoverTests {
         let report = try #require(Self.report(text, size: size))
         #expect(report.ratio < 1)
         #expect(!report.breaksLongWords)
-        #expect(report.rowWidths.allSatisfy { $0 <= Self.maxWidth(size) }, "列寬 \(report.rowWidths)／上限 \(Self.maxWidth(size))")
+        #expect(report.rowWidths.allSatisfy { $0 <= ComposedStyle.wrapWidth(size) }, "列寬 \(report.rowWidths)／上限 \(ComposedStyle.wrapWidth(size))")
         let margin = size.height * ComposedStyle.fitMargin
         for t in [30.0, 33.3, 37.7] {
             let frame = Self.plan(text, size: size, t: t)
@@ -55,7 +53,7 @@ struct B2BatchFourLeftoverTests {
         let report = try #require(Self.report(Self.enormous, size: Self.narrow))
         #expect(report.ratio == ComposedStyle.minimumFitRatio)
         #expect(report.breaksLongWords)
-        #expect(report.rowWidths.allSatisfy { $0 <= Self.maxWidth(Self.narrow) }, "列寬 \(report.rowWidths)")
+        #expect(report.rowWidths.allSatisfy { $0 <= ComposedStyle.wrapWidth(Self.narrow) }, "列寬 \(report.rowWidths)")
         let broken = report.glyphs.filter { $0.wordIndex == 1 }
         #expect(broken.count == 120)
         #expect(Set(broken.map(\.row)).count >= 2)
@@ -252,7 +250,7 @@ struct B2BatchFourLeftoverTests {
         let rows = report.rowWidths.map { String(Double($0).bitPattern, radix: 16) }.joined(separator: ",")
         let glyphs = report.glyphs.map { "\($0.text)|\($0.wordIndex)|\($0.row)" }.joined(separator: ";")
         let canonical = "em=\(String(Double(report.em).bitPattern, radix: 16)) ratio=\(String(Double(report.ratio).bitPattern, radix: 16)) broke=\(report.breaksLongWords) rows=\(rows) glyphs=\(glyphs)"
-        return SHA256.hash(data: Data(canonical.utf8)).map { String(format: "%02x", $0) }.joined()
+        return GlyphRasterFidelityTests.digest(Array(canonical.utf8))
     }
 
     @Test func coldAndCachedFitsMatchTheBaselineFieldByField() throws {
@@ -282,7 +280,7 @@ struct B2BatchFourLeftoverTests {
         #expect(report.ratio < 1)
         let frame = Self.plan(LongLineFitTests.long, font: font, size: size, fx1: "neonstroke", fx2: "none")
         #expect(!frame.glyphs.isEmpty && frame.glyphs.allSatisfy { $0.stroke == report.em * ComposedStyle.strokeRatio })
-        let unshrunkEm = size.height * ComposedStyle.emRatio * (try #require(B2BatchFourT7FixTests.fontFace(font))).sizeScale
+        let unshrunkEm = size.height * ComposedStyle.emRatio * (try #require(LyricsFXCatalog.font(font))).sizeScale
         #expect(report.em * ComposedStyle.strokeRatio < unshrunkEm * ComposedStyle.strokeRatio)
     }
 
@@ -320,7 +318,7 @@ struct B2BatchFourLeftoverTests {
     // MARK: 遺留收尾 ① Cenobyte 字距（docs/plans/2026-10-18-lyrics-fx-leftover-cleanup.md §2.1）
 
     @Test func cenobyteUsesThePrototypesWiderSpacingAndOtherFontsKeepTheDefault() {
-        #expect(B2BatchFourT7FixTests.fontFace("Cenobyte")?.spacing == 0.2)
+        #expect(LyricsFXCatalog.font("Cenobyte")?.spacing == 0.2)
         for component in LyricsFXCatalog.fonts where component.id != "Cenobyte" {
             guard case .font(let face) = component.payload else { continue }
             #expect(face.spacing == ComposedStyle.spacing, "\(component.id)")
@@ -333,7 +331,7 @@ struct B2BatchFourLeftoverTests {
         let measurer = CoreTextMeasurer()
         let report = try #require(ComposedStyle.fitReport(
             line: Self.line(LongLineFitTests.short), index: 0, recipe: LongLineFitTests.recipe(font: font), size: Self.wide, measurer: measurer))
-        let face = try #require(B2BatchFourT7FixTests.fontFace(font))
+        let face = try #require(LyricsFXCatalog.font(font))
         #expect(!report.metrics.isEmpty)
         for (glyph, metric) in zip(report.glyphs, report.metrics) {
             let measured = measurer.advances(of: glyph.text, face: face, fontSize: metric.fontSize).last ?? 0
@@ -347,7 +345,7 @@ struct B2BatchFourLeftoverTests {
     func aLongCenobyteLineStillFitsWithTheWiderSpacing(size: CGSize) throws {
         let text = LongLineFitTests.long
         let report = try #require(Self.report(text, font: "Cenobyte", size: size))
-        #expect(report.rowWidths.allSatisfy { $0 <= Self.maxWidth(size) }, "列寬 \(report.rowWidths)")
+        #expect(report.rowWidths.allSatisfy { $0 <= ComposedStyle.wrapWidth(size) }, "列寬 \(report.rowWidths)")
         #expect(report.glyphs.allSatisfy { $0.text == $0.text.uppercased() })
         let marginY = size.height * ComposedStyle.fitMargin, marginX = size.width * ComposedStyle.fitMargin
         for t in [30.0, 33.3, 37.7] {
@@ -361,7 +359,7 @@ struct B2BatchFourLeftoverTests {
     // MARK: ③ Anton 字級
 
     @Test func antonIsDrawnAtThePrototypesLargerSize() throws {
-        let anton = try #require(B2BatchFourT7FixTests.fontFace("Anton"))
+        let anton = try #require(LyricsFXCatalog.font("Anton"))
         #expect(abs(anton.sizeScale - 0.15 / 0.12) < 1e-9)
     }
 
@@ -383,15 +381,15 @@ struct B2BatchFourLeftoverTests {
 
     /// Anton 放大後點陣偏離向量超出 I-46 門檻（計劃 §9.2–9.3）：研究出尺寸策略前，Anton 的字一律走合併外框
     @Test func antonIsDrawnAsOutlinesWhileOtherFontsKeepTheRasterCache() throws {
-        #expect(try #require(B2BatchFourT7FixTests.fontFace("Anton")).rasterizes == false)
+        #expect(try #require(LyricsFXCatalog.font("Anton")).rasterizes == false)
         for id in ["Marker", "RockSalt", "Bebas", "CourierPrime", "Catacombs", "IMFell"] {
-            #expect(try #require(B2BatchFourT7FixTests.fontFace(id), "\(id) 不是字型").rasterizes, "\(id)")
+            #expect(try #require(LyricsFXCatalog.font(id), "\(id) 不是字型").rasterizes, "\(id)")
         }
     }
 
     /// 走不走點陣是 run 的鍵（遺留收尾計劃 §2.3 ③b）：相鄰的字型一換就切段，同字型不多切
     @Test func whetherARunIsRasterizedIsPartOfItsKey() throws {
-        let anton = try #require(B2BatchFourT7FixTests.fontFace("Anton")), marker = try #require(B2BatchFourT7FixTests.fontFace("Marker"))
+        let anton = try #require(LyricsFXCatalog.font("Anton")), marker = try #require(LyricsFXCatalog.font("Marker"))
         func glyph(_ face: FontFace) -> GlyphDraw { GlyphDraw(text: "A", face: face, fontSize: 40, origin: .zero, opacity: 1, color: .fg) }
         let runs = LyricsFXCanvas.runs(of: [glyph(marker), glyph(marker), glyph(anton), glyph(marker)])
         #expect(runs.map(\.rasterizes) == [true, false, true])

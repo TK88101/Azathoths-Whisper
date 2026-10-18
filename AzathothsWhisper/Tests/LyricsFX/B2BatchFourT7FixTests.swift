@@ -29,18 +29,12 @@ struct B2BatchFourT7FixTests {
         }
     }
 
-    /// 目錄裡的字型
-    static func fontFace(_ id: String) -> FontFace? {
-        guard case .font(let face)? = LyricsFXCatalog.component(id)?.payload else { return nil }
-        return face
-    }
-
     /// Anton 的 0.15 倍由批 4 遺留計劃 §2.3 補上（`B2BatchFourLeftoverTests`），這裡只看沒有補償的字型
     @Test func rockSaltIsDrawnAtThePrototypesSmallerSizeAndOtherFontsAreNot() throws {
-        let face = try #require(Self.fontFace("RockSalt"))
+        let face = try #require(LyricsFXCatalog.font("RockSalt"))
         #expect(abs(face.sizeScale - 0.085 / 0.12) < 1e-9)
         for id in ["IMFell", "ShadowsLight", "CourierPrime", "Bebas", "Marker"] {
-            let other = try #require(Self.fontFace(id), "\(id) 不是字型")
+            let other = try #require(LyricsFXCatalog.font(id), "\(id) 不是字型")
             #expect(other.sizeScale == 1, "\(id)")
         }
     }
@@ -112,7 +106,7 @@ struct LongLineFitTests {
     func aShortLineKeepsItsSizeExactly(font: String) throws {
         #expect(Self.ratio(Self.short, font: font, size: Self.wide) == 1)
         // 字面放大的字型（sizeScale > 1，目前只有 Anton）在窄視窗會縮，由字型資料推導、不寫死字型名
-        if try #require(B2BatchFourT7FixTests.fontFace(font)).sizeScale <= 1 { #expect(Self.ratio(Self.short, font: font, size: Self.narrow) == 1) }
+        if try #require(LyricsFXCatalog.font(font)).sizeScale <= 1 { #expect(Self.ratio(Self.short, font: font, size: Self.narrow) == 1) }
     }
 
     /// 使用者 T7：The Used（Permanent Marker、整行大寫）「歌詞有超出顯示範圍的問題」
