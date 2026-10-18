@@ -409,6 +409,17 @@ struct B2BatchFourLeftoverTests {
         }
     }
 
+    /// 走不走點陣是 run 的鍵（遺留收尾計劃 §2.3 ③b）：相鄰的字型一換就切段，同字型不多切
+    @Test func whetherARunIsRasterizedIsPartOfItsKey() throws {
+        guard case .font(let anton)? = LyricsFXCatalog.component("Anton")?.payload,
+              case .font(let marker)? = LyricsFXCatalog.component("Marker")?.payload else { Issue.record("字型不在目錄"); return }
+        func glyph(_ face: FontFace) -> GlyphDraw { GlyphDraw(text: "A", face: face, fontSize: 40, origin: .zero, opacity: 1, color: .fg) }
+        let runs = LyricsFXCanvas.runs(of: [glyph(marker), glyph(marker), glyph(anton), glyph(marker)])
+        #expect(runs.map(\.rasterizes) == [true, false, true])
+        #expect(runs.map(\.range) == [0..<2, 2..<3, 3..<4])
+        #expect(LyricsFXCanvas.runs(of: [glyph(anton), glyph(anton)]).map(\.rasterizes) == [false])
+    }
+
     @Test(arguments: [(20, 1), (20, 5), (10, 1), (10, 5)])
     func aRunWithAnOutlineOnlyGlyphIsDrawnAsTheMergedOutline(level: Int, count: Int) {
         #expect(LyricsFXCanvas.glyphRunStrategy(level: level, count: count, stroke: 0, rasterizes: false) == .vectorMerged)

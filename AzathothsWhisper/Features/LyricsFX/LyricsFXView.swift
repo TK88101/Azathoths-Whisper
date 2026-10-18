@@ -30,6 +30,7 @@ enum LyricsFXCanvas {
         let level: Int
         let range: Range<Int>
         var stroke: CGFloat = 0
+        var rasterizes = true
     }
 
     static func opacityLevel(_ opacity: Double) -> Int {
@@ -40,17 +41,17 @@ enum LyricsFXCanvas {
         Double(level) / Double(opacityLevels)
     }
 
-    /// 連續同鍵的字切成一段；量化後為 0 的字不畫、也不打斷前後
+    /// 連續同鍵（色槽、量化透明度、描邊寬、走不走點陣）的字切成一段；量化後為 0 的字不畫、也不打斷前後
     static func runs(of glyphs: [GlyphDraw]) -> [Run] {
         var runs: [Run] = []
         for (index, glyph) in glyphs.enumerated() {
             let level = opacityLevel(glyph.opacity)
             guard level > 0 else { continue }
-            let stroke = glyph.stroke
-            if let last = runs.last, last.color == glyph.color, last.level == level, last.stroke == stroke {
-                runs[runs.count - 1] = Run(color: last.color, level: level, range: last.range.lowerBound..<(index + 1), stroke: stroke)
+            let rasterizes = glyph.face.rasterizes
+            if let last = runs.last, last.color == glyph.color, last.level == level, last.stroke == glyph.stroke, last.rasterizes == rasterizes {
+                runs[runs.count - 1] = Run(color: last.color, level: level, range: last.range.lowerBound..<(index + 1), stroke: glyph.stroke, rasterizes: rasterizes)
             } else {
-                runs.append(Run(color: glyph.color, level: level, range: index..<(index + 1), stroke: stroke))
+                runs.append(Run(color: glyph.color, level: level, range: index..<(index + 1), stroke: glyph.stroke, rasterizes: rasterizes))
             }
         }
         return runs
@@ -107,8 +108,7 @@ enum LyricsFXCanvas {
             layer.opacity = opacity(ofLevel: run.level)
             let color = palette[run.color].color
             let strategy = rendering == .vectorReference ? .vectorMerged : glyphRunStrategy(
-                level: run.level, count: members.count, stroke: run.stroke,
-                rasterizes: members.allSatisfy(\.face.rasterizes)
+                level: run.level, count: members.count, stroke: run.stroke, rasterizes: run.rasterizes
             )
             switch strategy {
             case .vectorMerged:
