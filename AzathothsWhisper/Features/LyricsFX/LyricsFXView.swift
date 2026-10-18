@@ -139,7 +139,7 @@ enum LyricsFXCanvas {
             guard !entry.isEmpty else { continue }
             let placement = transform(for: glyph, entry: entry)
             let tier = GlyphRasterCache.Tier(placement: placement, deviceScale: deviceScale)
-            guard let raster = paths.rasters.entry(text: glyph.text, face: glyph.face, path: entry, tier: tier) else { continue }
+            guard let raster = paths.rasters.entry(path: entry, tier: tier) else { continue }
             var single = context
             single.concatenate(raster.fromPixels.concatenating(placement))
             var image = single.resolve(raster.image)

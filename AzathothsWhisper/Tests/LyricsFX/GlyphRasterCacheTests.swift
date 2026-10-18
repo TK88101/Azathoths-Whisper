@@ -17,7 +17,7 @@ struct GlyphRasterCacheTests {
 
     /// 測試裡的字都建得出點陣
     static func raster(_ cache: GlyphRasterCache, _ text: String, tier: GlyphRasterCache.Tier = tier) throws -> GlyphRasterCache.Entry {
-        try #require(cache.entry(text: text, face: face, path: pathEntry(text), tier: tier))
+        try #require(cache.entry(path: pathEntry(text), tier: tier))
     }
 
     static func pathEntry(_ text: String = "A", face: FontFace = face) -> GlyphPathCache.Entry {
@@ -220,6 +220,35 @@ struct GlyphRasterCacheTests {
             _ = try Self.raster(cache, "O")
             #expect(cache.misses == misses + 1, "O 被逐出")
         }
+    }
+
+
+    // MARK: 遺留收尾 ②e：外框與點陣共用語義鍵
+
+    @Test func glyphKeysAreEqualByValueAndHitTheSameSlot() {
+        let key = GlyphKey(text: "A", face: Self.face, size: 100)
+        let twin = GlyphKey(text: "A", face: Self.face, size: 100)
+        #expect(key == twin && key.hashValue == twin.hashValue)
+        #expect([key: 1][twin] == 1)
+        var other = Self.face
+        other.rasterizes = false
+        for different in [GlyphKey(text: "B", face: Self.face, size: 100), GlyphKey(text: "A", face: other, size: 100), GlyphKey(text: "A", face: Self.face, size: 100.5)] {
+            #expect(different != key)
+        }
+    }
+
+    /// 外框快取整批清空後，同一個字同一檔仍命中原點陣（點陣鍵是語義鍵，不是外框快取的生命週期）
+    @Test func clearingTheOutlineCacheKeepsTheBitmaps() {
+        let paths = GlyphPathCache(capacity: 2)
+        var plan = FramePlan(palette: .mono)
+        plan.glyphs = [GlyphDraw(text: "A", face: Self.face, fontSize: 80, origin: CGPoint(x: 20, y: 20), opacity: 1, color: .fg)]
+        Self.draw(plan, frames: 1, paths: paths)
+        #expect(paths.rasters.misses == 1)
+        for text in ["B", "C", "D"] {
+            _ = paths.entry(for: GlyphDraw(text: text, face: Self.face, fontSize: 80, origin: .zero, opacity: 1, color: .fg))
+        }
+        Self.draw(plan, frames: 2, paths: paths)
+        #expect(paths.rasters.misses == 1, "清空外框後 A 仍命中點陣")
     }
 
 }

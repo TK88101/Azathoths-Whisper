@@ -24,9 +24,7 @@ final class GlyphRasterCache {
     }
 
     private struct Key: Hashable {
-        let text: String
-        let face: FontFace
-        let size: CGFloat
+        let glyph: GlyphKey
         let tier: Tier
     }
 
@@ -77,8 +75,8 @@ final class GlyphRasterCache {
     }
 
     /// 建不出點陣（配置失敗）回 nil：這個字這一幀不畫、也不進快取。沒有外框的字由呼叫端先擋掉（`GlyphPathCache.Entry.isEmpty`）
-    func entry(text: String, face: FontFace, path: GlyphPathCache.Entry, tier: Tier) -> Entry? {
-        let key = Key(text: text, face: face, size: path.size, tier: tier)
+    func entry(path: GlyphPathCache.Entry, tier: Tier) -> Entry? {
+        let key = Key(glyph: path.key, tier: tier)
         if let index = store.index(forKey: key) {
             store.values[index].lastUsedFrame = frame
             return store.values[index].entry
