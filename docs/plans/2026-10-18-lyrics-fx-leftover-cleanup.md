@@ -177,6 +177,11 @@
 - ③d：`ComposedStyle.wrapWidth(_:)`（算式不變），正式碼 2 處＋測試 1 處改用。
 - ③e：`inkSpan`／`inkSpanX` → `B2BatchFourT7FixTests.inkBox(_:) -> CGRect`；`fontFace(_:)` 取代 8 處 `guard case .font`；兩條縮字描邊測試參數化為 `aShrunkLineStrokesWithItsShrunkEm(font:)`（Anton 多驗「縮後描邊 < 未縮描邊」）；`if font != "Anton"` 改為 `sizeScale <= 1`。對照：測試名單只少被併入的那條；`#expect`／`#require` 63→64、24→25，無刪減。相關 3 suites 34 條綠。
 
+### 9.8 T7 ③ 收尾量測（2026-10-18；新版 bf0e286 -O）
+- **V3**：Fidelity 全綠（96 s）；636 張雜湊與 T0 基線**逐張相同** → ③a–③e 未改任何畫面。
+- **每幀 V1**（全螢幕 1728×941、全程前景；捨第一個 5 s 視窗（含啟動），其餘 7 窗；log `v1-t7/`）：Rock Salt p50 0.91–1.25／p95 1.77–2.27 ms、IM Fell 1.00–1.38／1.85–2.27、Courier 0.79–1.08／1.58–1.93、Shadows 1.07–1.72／2.26–2.77、Marker 1.02–1.48／2.49–2.69、Catacombs 1.14–1.59／2.14–2.33、Elite 0.86–1.03／1.81–2.06、**Cenobyte（Mayhem 可抽的最重組合 snow／condense／dissolve／misreg／shake／ice）1.02–1.62／1.73–2.37**；單幀最慢 6.2 ms（Elite，< 一格 8.3 ms）。**全部達標**（p50 ≤ 2、p95 ≤ 3）。
+- **V2.1 中止（未得結果）**：第 2 跑失焦、第 3 跑約束更新超標皆作廢；第 4 跑前 fail-closed 守衛偵測到「仍有 app 在跑」而中止——查證為**另一個 Claude session（569cdfd0）同時在本機跑 Azathoth's Whisper 的 UI 測試**（12:18 另起實例，`-ApplePersistenceIgnoreState`）。失焦即其搶前景所致。V2 需獨佔機器 → 等使用者協調後補跑；不動該 session 的行程。V1 期間是否有並行負載未能排除，但並行只會使數字變差，「達標」結論不受影響。
+
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（Codex，2026-10-18）
 | # | 嚴重度／位置 | 處置 | 理由／修改 |
