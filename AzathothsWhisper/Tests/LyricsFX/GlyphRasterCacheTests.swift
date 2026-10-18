@@ -178,14 +178,12 @@ struct GlyphRasterCacheTests {
 
     // MARK: 遺留收尾 ②c、②d（docs/plans/2026-10-18-lyrics-fx-leftover-cleanup.md §2.2）
 
-    /// 以正式繪製路徑離屏畫 `frames` 幀，共用同一個外框／點陣快取
-    static func draw(_ plan: FramePlan, frames: Int, paths: GlyphPathCache) {
+    /// 模擬繪製端 `frames` 幀：每幀開頭 `beginFrame`，每個字照 `stamp` 的順序先取外框、再取點陣。
+    /// 不經 ImageRenderer：離屏畫圖會在同一行程留下 SwiftUI 內部狀態，曾使之後的光暈點陣比對雜湊改變（遺留收尾計劃 §9.10）
+    static func simulate(_ glyphs: [GlyphDraw], frames: Int, paths: GlyphPathCache) {
         for _ in 0..<frames {
-            let renderer = ImageRenderer(content: Canvas { context, size in
-                LyricsFXCanvas.draw(plan, in: context, size: size, paths: paths)
-            }.frame(width: 300, height: 200))
-            renderer.scale = 2
-            _ = renderer.cgImage
+            paths.rasters.beginFrame()
+            for glyph in glyphs { _ = paths.rasters.entry(path: paths.entry(for: glyph), tier: tier) }
         }
     }
 
@@ -197,9 +195,7 @@ struct GlyphRasterCacheTests {
         let letter = GlyphDraw(text: "A", face: Self.face, fontSize: 80, origin: CGPoint(x: 120, y: 20), opacity: 1, color: .fg)
         #expect(paths.entry(for: empty).isEmpty)
         #expect(!paths.entry(for: letter).isEmpty)
-        var plan = FramePlan(palette: .mono)
-        plan.glyphs = [empty, letter]
-        Self.draw(plan, frames: 3, paths: paths)
+        Self.simulate([empty, letter], frames: 3, paths: paths)
         #expect(paths.rasters.misses == 1, "只有 A 建過一次點陣")
     }
 
@@ -240,14 +236,13 @@ struct GlyphRasterCacheTests {
     /// 外框快取整批清空後，同一個字同一檔仍命中原點陣（點陣鍵是語義鍵，不是外框快取的生命週期）
     @Test func clearingTheOutlineCacheKeepsTheBitmaps() {
         let paths = GlyphPathCache(capacity: 2)
-        var plan = FramePlan(palette: .mono)
-        plan.glyphs = [GlyphDraw(text: "A", face: Self.face, fontSize: 80, origin: CGPoint(x: 20, y: 20), opacity: 1, color: .fg)]
-        Self.draw(plan, frames: 1, paths: paths)
+        let letter = [GlyphDraw(text: "A", face: Self.face, fontSize: 80, origin: CGPoint(x: 20, y: 20), opacity: 1, color: .fg)]
+        Self.simulate(letter, frames: 1, paths: paths)
         #expect(paths.rasters.misses == 1)
         for text in ["B", "C", "D"] {
             _ = paths.entry(for: GlyphDraw(text: text, face: Self.face, fontSize: 80, origin: .zero, opacity: 1, color: .fg))
         }
-        Self.draw(plan, frames: 2, paths: paths)
+        Self.simulate(letter, frames: 2, paths: paths)
         #expect(paths.rasters.misses == 1, "清空外框後 A 仍命中點陣")
     }
 

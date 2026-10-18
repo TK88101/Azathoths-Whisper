@@ -191,6 +191,28 @@
 | R2 | 自評（R1 的 27＋／39− 行）＋codex review --uncommitted | 無（「behavior-preserving cleanup … No actionable regressions」） | — |
 - 驗證：相關 8 suites 82 條綠。無安全敏感改動（無認證、網路、檔案寫入、使用者資料），未派 security-reviewer。
 
+### 9.10 T9 全量回歸與 V2.1 定稿（2026-10-18）
+- 使用者協調另一 session 停止後開跑（先以 ps 確認無其他 xcodebuild／App 實例）。
+- 全量（e88ee0f）：**1293 條／160 suites 綠**（skip `overlappingLoadSuspendsPollingUntilLastCompletes()`）；`no_playback_gate.sh` 0；`coverage_gate.sh` Services+Infra 96.2%；Scripts Python OK。
+- **全量情境下光暈 2 張雜湊與基線不同**（glow@4.6、@20.5 的 2× 點陣候選；參考圖相同；門檻判定仍綠）。鑑別：
+| 條件 | 光暈 2 張 |
+|---|---|
+| e88ee0f 只跑 Fidelity | 與基線相同 |
+| e88ee0f 全量（2 次） | 不同（2 次雜湊相同＝確定性） |
+| 464026f（正式碼＝284e2d1）全量 | 與基線相同 |
+| d38e0a3（①）全量 | 相同 |
+| add2e5c（②b–d）、6137325（②e）全量 | 不同 |
+| e88ee0f 只跑 GlyphRasterCacheTests＋Fidelity | 不同 |
+| 同上但跳過 ②c、②e 兩條以 ImageRenderer 離屏畫圖的新測試 | **相同** |
+  - 結論：**正式碼的改動不改畫面**；差異來自兩條新測試先在同一行程離屏畫圖（同字型、同字、2×），影響之後光暈點陣的雜湊。機制 TBD（推測為 SwiftUI／RenderBox 內部快取狀態），熔斷不深挖。
+  - 修正：兩條測試改為在快取層模擬幀（`beginFrame`＋`rasters.entry`，②c 的判斷本就已在 `entry` 內），不再用 ImageRenderer；斷言語義不變。改後「快取測試＋contract＋Fidelity」與**全量**（1293 條綠）雜湊皆**逐張相同**。正式碼未變（仍＝e88ee0f），V2.1 定稿量測有效。
+- **V2.1 定稿**（新版 e88ee0f -O vs 284e2d1；log `v21-final/`；有效跑全部 1728×941、前景）：
+| 配方 | 有效輪 | 對照 V2 | 新版 V2 | 平均 Δ | 判定 |
+|---|---|---|---|---|---|
+| Rock Salt | 2／3（第 3 輪對照 R 臂連 3 次約束更新 > 5%，依協定該輪無效） | 0.805 | 0.792 | −0.012 | 達標 |
+| Catacombs | 3／3 | 0.798 | 0.750 | −0.048 | 達標 |
+  - 作廢 9 臂皆因約束更新（新版 5、對照 4）。對照絕對值較 T5 V2.1 高（0.759→0.805），同協定配對下 Δ 仍 ≤ 0。
+
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（Codex，2026-10-18）
 | # | 嚴重度／位置 | 處置 | 理由／修改 |
