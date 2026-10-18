@@ -1,4 +1,5 @@
 import CoreGraphics
+import CryptoKit
 import Foundation
 import SwiftUI
 import Testing
@@ -52,19 +53,48 @@ struct GlyphRasterFidelityTests {
         "antonlp": ["Anton", "scan", "stamp", "scatter", "rgbsplit", "thump", "acid"],
         "antonsk": ["Anton", "smokeHaze", "drop", "fall", "misreg", "shake", "ampRed"],
         "mono": [],
+        // 霓虹描邊＋會產生殘影的效果（遺留收尾計劃 R1 #8）：只比新舊像素雜湊、不判門檻
+        "neonmisreg": ["Bungee", "void", "fadeUp", "sink", "neonstroke", "misreg", "revenge"],
+        "neonreflect": ["Bungee", "void", "fadeUp", "sink", "neonstroke", "reflect", "revenge"],
+        "neonweep": ["Bungee", "void", "fadeUp", "sink", "neonstroke", "weep", "revenge"],
+        "neonsplit": ["Bungee", "void", "fadeUp", "sink", "neonstroke", "rgbsplit", "revenge"],
     ]
+
+    /// 改版前後畫面等價的主證據（遺留收尾計劃 §4 V3）：每張影像原始 RGBA 位元組的 SHA-256
+    static func digest(_ pixels: [UInt8]) -> String {
+        SHA256.hash(data: Data(pixels)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func writeHashes(_ lines: [String], name: String) throws {
+        let folder = Self.directory.appendingPathComponent("hashes", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try lines.joined(separator: "\n").write(to: folder.appendingPathComponent("\(name).txt"), atomically: true, encoding: .utf8)
+    }
 
     static func recipe(_ name: String) -> SessionRecipe {
         guard let ids = recipes[name], ids.count == 7 else { return .mono }
         return .composed(ComposedRecipe(font: ids[0], backdrop: ids[1], enter: ids[2], exit: ids[3], fx1: ids[4], fx2: ids[5], palette: ids[6], seed: 7, profile: profile))
     }
 
-    static func image(_ recipe: SessionRecipe, time: Double, scale: CGFloat, rendering: LyricsFXCanvas.GlyphRendering, size: CGSize = size) -> CGImage? {
+    /// 不走點陣的字型（`FontFace.rasterizes == false`，例如 Anton）也強制走點陣：只改 face 的這一個欄位（結構體複製，不逐欄抄 `FontFace`）
+    static func forcingRaster(_ glyph: GlyphDraw) -> GlyphDraw {
+        var face = glyph.face
+        face.rasterizes = true
+        return glyph.withFace(face)
+    }
+
+    static func image(
+        _ recipe: SessionRecipe, time: Double, scale: CGFloat, rendering: LyricsFXCanvas.GlyphRendering, size: CGSize = size, forceRaster: Bool = false
+    ) -> CGImage? {
         let measurer = CoreTextMeasurer()
         let paths = GlyphPathCache()
         let timeline = LyricsTimelineBuilder.build(lyrics: LyricsFXPreviewFixture.lyrics, duration: LyricsFXPreviewFixture.duration)
         let view = Canvas { context, size in
-            let plan = LyricsFXFrame.plan(timeline: timeline, time: time, size: size, motion: .full, recipe: recipe, measurer: measurer)
+            var plan = LyricsFXFrame.plan(timeline: timeline, time: time, size: size, motion: .full, recipe: recipe, measurer: measurer)
+            if forceRaster {
+                plan.glyphs = plan.glyphs.map(Self.forcingRaster)
+                plan.ghosts = plan.ghosts.map(Self.forcingRaster)
+            }
             LyricsFXCanvas.draw(plan, in: context, size: size, paths: paths, rendering: rendering)
         }
         .frame(width: size.width, height: size.height)
@@ -154,17 +184,21 @@ struct GlyphRasterFidelityTests {
     }
 
     /// 一份配方 × 6 個時刻 × 一種 scale：judged＝照門檻判，否則只記錄；回傳逐案報告，最差一案輸出熱圖
-    static func check(_ name: String, size: CGSize, scale: CGFloat, rendering: LyricsFXCanvas.GlyphRendering, judged: Bool, prefix: String = "") throws -> [String] {
+    static func check(
+        _ name: String, size: CGSize, scale: CGFloat, forceRaster: Bool = false, judged: Bool, prefix: String = "", hashes: inout [String]
+    ) throws -> [String] {
         let recipe = Self.recipe(name)
         let limits = try #require(Self.limits[scale])
         var report: [String] = []
         var worst: (stats: Stats, time: Double, a: [UInt8], b: [UInt8], ra: CGImage?, rb: CGImage?) = (Stats(), 0, [], [], nil, nil)
         for time in Self.times {
             let reference = try #require(Self.image(recipe, time: time, scale: scale, rendering: .vectorReference, size: size))
-            let candidate = try #require(Self.image(recipe, time: time, scale: scale, rendering: rendering, size: size))
+            let candidate = try #require(Self.image(recipe, time: time, scale: scale, rendering: .raster, size: size, forceRaster: forceRaster))
             let a = Self.pixels(reference), b = Self.pixels(candidate)
             let stats = Self.compare(a, b, width: reference.width, height: reference.height)
             let label = "\(prefix)\(name)@\(time) \(Int(scale))x"
+            hashes.append("\(label) reference \(Self.digest(a))")
+            hashes.append("\(label) candidate \(Self.digest(b))")
             if judged {
                 #expect(stats.mean <= limits.mean, "\(label) 平均差 \(stats.mean)")
                 #expect(stats.over2 <= limits.over2, "\(label) 差>2 占比 \(stats.over2)")
@@ -203,44 +237,82 @@ struct GlyphRasterFidelityTests {
                 effective = max(effective, glyph.fontSize * max(glyph.scaleX, glyph.scaleY) * plan.zoom)
             }
             grouped += LyricsFXCanvas.runs(of: plan.ghosts).filter { $0.level < LyricsFXCanvas.opacityLevels && $0.range.count > 1 }.count
-            grouped += LyricsFXCanvas.runs(of: plan.glyphs, stroking: true).filter { $0.level < LyricsFXCanvas.opacityLevels && $0.range.count > 1 }.count
+            grouped += LyricsFXCanvas.runs(of: plan.glyphs).filter { $0.level < LyricsFXCanvas.opacityLevels && $0.range.count > 1 }.count
         }
         return String(format: "%@ 變換：max|rot|=%.3f scale=%.3f…%.3f zoom≤%.3f 最大有效字級=%.1f pt 半透明多字 run=%d", name, rotation, minScale, maxScale, zoom, effective, grouped)
     }
 
     @Test(arguments: ["rocksalt", "imfell", "courier", "shadows", "marker", "catacombs", "elite", "thump", "glow", "mono"])
     func theRasterDrawingLooksLikeTheMergedOutlineDrawing(_ name: String) throws {
-        var report: [String] = []
+        var report: [String] = [], hashes: [String] = []
         for scale in [CGFloat(2), 1] {
-            report += try Self.check(name, size: Self.size, scale: scale, rendering: .raster, judged: true)
+            report += try Self.check(name, size: Self.size, scale: scale, judged: true, hashes: &hashes)
         }
         try Self.writeReport(report, name: name)
+        try Self.writeHashes(hashes, name: name)
     }
 
     /// 實際全螢幕字級（計劃 2026-10-17 全螢幕缺口 §3.1）：Anton 也強制走點陣；2× 照同一組門檻判（內建螢幕是 2×），1× 只記錄（這個尺寸的 1× 不會出現）
     @Test(arguments: ["rocksalt", "imfell", "courier", "shadows", "marker", "catacombs", "elite", "glow", "mono", "thump", "antonlp", "antonsk"])
     func theRasterDrawingHoldsAtTheRealFullScreenSize(_ name: String) throws {
-        var report = [Self.transformSummary(name, size: Self.fullscreen)]
-        report += try Self.check(name, size: Self.fullscreen, scale: 2, rendering: .rasterIgnoringOptOut, judged: true, prefix: "full-")
-        report += try Self.check(name, size: Self.fullscreen, scale: 1, rendering: .rasterIgnoringOptOut, judged: false, prefix: "full-")
+        var report = [Self.transformSummary(name, size: Self.fullscreen)], hashes: [String] = []
+        report += try Self.check(name, size: Self.fullscreen, scale: 2, forceRaster: true, judged: true, prefix: "full-", hashes: &hashes)
+        report += try Self.check(name, size: Self.fullscreen, scale: 1, forceRaster: true, judged: false, prefix: "full-", hashes: &hashes)
         try Self.writeReport(report, name: "full-\(name)")
+        try Self.writeHashes(hashes, name: "full-\(name)")
     }
 
     /// 霓虹描邊走合併外框（描邊要路徑）→ 和參考畫法同一條路，必須逐像素相同
     @Test func neonStrokeStillDrawsTheMergedOutlinePixelForPixel() throws {
         let recipe = Self.recipe("neonstroke")
+        var hashes: [String] = []
         for scale in [CGFloat(2), 1] {
             for time in Self.times {
                 let reference = try #require(Self.image(recipe, time: time, scale: scale, rendering: .vectorReference))
                 let candidate = try #require(Self.image(recipe, time: time, scale: scale, rendering: .raster))
                 #expect(Self.pixels(reference) == Self.pixels(candidate), "neonstroke@\(time) \(Int(scale))x")
+                hashes.append("neonstroke@\(time) \(Int(scale))x candidate \(Self.digest(Self.pixels(candidate)))")
             }
         }
+        try Self.writeHashes(hashes, name: "neonstroke")
+    }
+
+    /// 霓虹描邊與殘影效果並存：殘影不描邊（遺留收尾計劃 R1 #8）。不判門檻，只輸出新舊比對用的雜湊
+    @Test(arguments: ["neonmisreg", "neonreflect", "neonweep", "neonsplit"])
+    func neonStrokeWithGhostEffectsIsRecordedForBeforeAfterComparison(_ name: String) throws {
+        var hashes: [String] = []
+        for scale in [CGFloat(2), 1] {
+            for time in Self.times {
+                for (label, rendering) in [("reference", LyricsFXCanvas.GlyphRendering.vectorReference), ("candidate", .raster)] {
+                    let image = try #require(Self.image(Self.recipe(name), time: time, scale: scale, rendering: rendering))
+                    hashes.append("\(name)@\(time) \(Int(scale))x \(label) \(Self.digest(Self.pixels(image)))")
+                }
+            }
+        }
+        try Self.writeHashes(hashes, name: name)
+    }
+}
+
+extension GlyphDraw {
+    /// 測試用：只換 face、其餘欄位照抄
+    func withFace(_ face: FontFace) -> GlyphDraw {
+        GlyphDraw(text: text, face: face, fontSize: fontSize, origin: origin, rotation: rotation, scaleX: scaleX, scaleY: scaleY, opacity: opacity, color: color, stroke: stroke)
     }
 }
 
 @Suite("Glyph run strategy")
 struct GlyphRunStrategyTests {
+    /// 強制點陣只動 `rasterizes`：把它改回原值後必須與原字完全相同（`GlyphDraw` 日後加欄位而 `withFace` 漏抄時轉紅；遺留收尾計劃 R1 #9）
+    @Test @MainActor func forcingRasterChangesNothingButTheRasterizesFlag() throws {
+        let anton = try #require(LyricsFXCatalog.font("Anton"))
+        let glyph = GlyphDraw(text: "Q", face: anton, fontSize: 87.5, origin: CGPoint(x: 3.25, y: -7.5), rotation: 0.21, scaleX: 1.07, scaleY: -0.93,
+                              opacity: 0.62, color: .splitBlue, stroke: 1.75)
+        let forced = GlyphRasterFidelityTests.forcingRaster(glyph)
+        #expect(forced.face.rasterizes && !anton.rasterizes)
+        #expect(forced != glyph)
+        #expect(forced.withFace(anton) == glyph)
+    }
+
     @Test func aStrokedRunKeepsTheMergedOutline() {
         #expect(LyricsFXCanvas.glyphRunStrategy(level: 20, count: 5, stroke: 2) == .vectorMerged)
         #expect(LyricsFXCanvas.glyphRunStrategy(level: 7, count: 1, stroke: 0.5) == .vectorMerged)

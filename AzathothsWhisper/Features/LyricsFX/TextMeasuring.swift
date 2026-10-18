@@ -110,37 +110,68 @@ final class CoreTextMeasurer: TextMeasuring {
     }
 }
 
+/// 一個字的外框在快取裡的身分：(文字, 字型, 快取字級)。外框快取與點陣快取共用（遺留收尾計劃 §2.2 ②e）：
+/// 雜湊在建立時以獨立的 `Hasher` 算一次存起來，查表只餵這個整數，字串不必每查一次就雜湊一次；`==` 照舊逐欄比。
+/// Swift 的雜湊每個行程隨機化 → `cachedHash` 只在同一行程有效，不得序列化
+struct GlyphKey: Hashable {
+    let text: String
+    let face: FontFace
+    let size: CGFloat
+    private let cachedHash: Int
+
+    init(text: String, face: FontFace, size: CGFloat) {
+        self.text = text
+        self.face = face
+        self.size = size
+        var hasher = Hasher()
+        hasher.combine(text)
+        hasher.combine(face)
+        hasher.combine(size)
+        cachedHash = hasher.finalize()
+    }
+
+    static func == (lhs: GlyphKey, rhs: GlyphKey) -> Bool {
+        lhs.cachedHash == rhs.cachedHash && lhs.text == rhs.text && lhs.face == rhs.face && lhs.size == rhs.size
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(cachedHash)
+    }
+}
+
 /// 每個字的外框路徑（A2 計劃 §3.7：實測逐字 `draw(Text)` 是 200 字超出 2 ms 的主因，改畫路徑）。
 /// 以 (文字, 字型) 在參考字級存，畫時乘字級比例（B1 計劃 §3.3）。路徑以字的行盒 top-leading 為原點、y 向下。只在主執行緒用
 final class GlyphPathCache {
     struct Entry {
+        let key: GlyphKey
         let path: CGPath
         /// 快取時的字級；畫時 `scale = fontSize / size`
         let size: CGFloat
         /// 外框中心（快取字級下），旋轉與縮放的軸
         let center: CGPoint
+        /// 沒有外框（例如零寬空白 U+200B：不是 `isWhitespace`，排版不會濾掉）：畫不出東西，不必建點陣
+        let isEmpty: Bool
     }
 
-    private struct Key: Hashable {
-        let text: String
-        let face: FontFace
-        let size: CGFloat
-    }
-
-    private static let capacity = 4000
-    private var store: [Key: Entry] = [:]
+    private let capacity: Int
+    private var store: [GlyphKey: Entry] = [:]
     private let fonts = FaceFonts()
     /// 由外框光柵化的點陣（計劃 2026-10-16 §2.2）：和外框快取同生命週期，繪製端不必另外持有
     let rasters = GlyphRasterCache()
 
+    /// capacity：超過就整批清空（點陣快取以同一個語義鍵存，清空外框後同一個字仍命中原點陣）
+    init(capacity: Int = 4000) {
+        self.capacity = capacity
+    }
+
     func entry(for glyph: GlyphDraw) -> Entry {
         let size = UnitGlyphMetrics.cacheSize(for: glyph.fontSize, linear: fonts.scalesLinearly(glyph.face))
-        let key = Key(text: glyph.text, face: glyph.face, size: size)
+        let key = GlyphKey(text: glyph.text, face: glyph.face, size: size)
         if let entry = store[key] { return entry }
-        if store.count >= Self.capacity { store.removeAll(keepingCapacity: true) }
+        if store.count >= capacity { store.removeAll(keepingCapacity: true) }
         let path = Self.outline(glyph.text, font: fonts.font(glyph.face, size: size))
         let bounds = path.boundingBoxOfPath
-        let entry = Entry(path: path, size: size, center: CGPoint(x: bounds.midX, y: bounds.midY))
+        let entry = Entry(key: key, path: path, size: size, center: CGPoint(x: bounds.midX, y: bounds.midY), isEmpty: bounds.isNull)
         store[key] = entry
         return entry
     }

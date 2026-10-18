@@ -67,7 +67,7 @@ final class LyricsFXFrameMeter {
     func record(_ elapsed: Duration, plan: FramePlan, canvas: CGSize, rasters: GlyphRasterCache) {
         samples.record(micros: Int(elapsed.inSeconds * 1_000_000), glyphs: plan.glyphs.count)
         let particles = ComposedStyle.particleCount(plan.back)
-        let fills = LyricsFXCanvas.runs(of: plan.ghosts).count + LyricsFXCanvas.runs(of: plan.glyphs, stroking: true).count
+        let fills = LyricsFXCanvas.runs(of: plan.ghosts).count + LyricsFXCanvas.runs(of: plan.glyphs).count
         peak = (max(peak.ghosts, plan.ghosts.count), max(peak.particles, particles), max(peak.fills, fills))
         let now = ContinuousClock.now
         guard now - lastLog >= Self.logInterval, let summary = samples.summary else { return }

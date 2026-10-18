@@ -4,12 +4,10 @@ import SwiftUI
 /// painter order 上**連續、同鍵**（色槽, 量化透明度）的字是一個 run（B1 計劃 §3.2）；run 內逐字貼快取的點陣（計劃 2026-10-16），描邊仍併成一條外框。
 /// 不跨 run 合併：否則 A(0.2)、B(0.5)、A(0.2) 的第三個 A 會跑到 B 底下（計劃評審 R1-1）
 enum LyricsFXCanvas {
-    /// 字形怎麼畫（計劃 2026-10-16 §2.3）：`.raster` 是正式畫法；`.vectorReference`＝改版前的合併外框畫法，只給畫面一致性測試比對；
-    /// `.rasterIgnoringOptOut`＝連 `FontFace.rasterizes == false` 的字型也走點陣（描邊仍走外框），只給測試量那些字型走點陣的樣子（計劃 2026-10-17 全螢幕缺口 §3.1）
+    /// 字形怎麼畫（計劃 2026-10-16 §2.3）：`.raster` 是正式畫法；`.vectorReference`＝改版前的合併外框畫法，只給畫面一致性測試比對與量測基線
     enum GlyphRendering {
         case raster
         case vectorReference
-        case rasterIgnoringOptOut
     }
 
     /// 一個 run 的畫法：描邊要路徑、或有不走點陣的字型（`FontFace.rasterizes`）→ 合併外框；半透明且多字 → 群組圖層裡逐字貼點陣（整層一次套透明度，疊色語義同合併外框）；其餘逐字貼點陣
@@ -32,6 +30,7 @@ enum LyricsFXCanvas {
         let level: Int
         let range: Range<Int>
         var stroke: CGFloat = 0
+        var rasterizes = true
     }
 
     static func opacityLevel(_ opacity: Double) -> Int {
@@ -42,17 +41,17 @@ enum LyricsFXCanvas {
         Double(level) / Double(opacityLevels)
     }
 
-    /// 連續同鍵的字切成一段；量化後為 0 的字不畫、也不打斷前後
-    static func runs(of glyphs: [GlyphDraw], stroking: Bool = false) -> [Run] {
+    /// 連續同鍵（色槽、量化透明度、描邊寬、走不走點陣）的字切成一段；量化後為 0 的字不畫、也不打斷前後
+    static func runs(of glyphs: [GlyphDraw]) -> [Run] {
         var runs: [Run] = []
         for (index, glyph) in glyphs.enumerated() {
             let level = opacityLevel(glyph.opacity)
             guard level > 0 else { continue }
-            let stroke = stroking ? glyph.stroke : 0
-            if let last = runs.last, last.color == glyph.color, last.level == level, last.stroke == stroke {
-                runs[runs.count - 1] = Run(color: last.color, level: level, range: last.range.lowerBound..<(index + 1), stroke: stroke)
+            let rasterizes = glyph.face.rasterizes
+            if let last = runs.last, last.color == glyph.color, last.level == level, last.stroke == glyph.stroke, last.rasterizes == rasterizes {
+                runs[runs.count - 1] = Run(color: last.color, level: level, range: last.range.lowerBound..<(index + 1), stroke: glyph.stroke, rasterizes: rasterizes)
             } else {
-                runs.append(Run(color: glyph.color, level: level, range: index..<(index + 1), stroke: stroke))
+                runs.append(Run(color: glyph.color, level: level, range: index..<(index + 1), stroke: glyph.stroke, rasterizes: rasterizes))
             }
         }
         return runs
@@ -86,31 +85,30 @@ enum LyricsFXCanvas {
             shaken.translateBy(x: -bounds.midX, y: -bounds.midY)
         }
         for layer in plan.back { draw(layer, in: shaken, bounds: bounds) }
-        fill(plan.ghosts, in: shaken, palette: palette, paths: paths, zoom: plan.zoom, rendering: rendering)
+        fill(plan.ghosts, in: shaken, palette: palette, paths: paths, rendering: rendering)
         for box in plan.boxes { draw(box, in: shaken, palette: palette) }
         if plan.glow > 0 {
             // 濾鏡套在整層的合成結果上，只做一次模糊（不是每個透明度 run 各做一次）
             shaken.drawLayer { lit in
                 lit.addFilter(.shadow(color: palette.acc.color, radius: plan.glow))
-                fill(plan.glyphs, in: lit, palette: palette, paths: paths, zoom: plan.zoom, stroking: true, rendering: rendering)
+                fill(plan.glyphs, in: lit, palette: palette, paths: paths, rendering: rendering)
             }
         } else {
-            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, zoom: plan.zoom, stroking: true, rendering: rendering)
+            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, rendering: rendering)
         }
         for layer in plan.front { draw(layer, in: context, bounds: bounds) }
     }
 
     private static func fill(
-        _ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, zoom: CGFloat, stroking: Bool = false, rendering: GlyphRendering
+        _ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, rendering: GlyphRendering
     ) {
-        for run in runs(of: glyphs, stroking: stroking) {
+        for run in runs(of: glyphs) {
             let members = glyphs[run.range].filter { opacityLevel($0.opacity) > 0 }
             var layer = context
             layer.opacity = opacity(ofLevel: run.level)
             let color = palette[run.color].color
             let strategy = rendering == .vectorReference ? .vectorMerged : glyphRunStrategy(
-                level: run.level, count: members.count, stroke: run.stroke,
-                rasterizes: rendering == .rasterIgnoringOptOut || members.allSatisfy(\.face.rasterizes)
+                level: run.level, count: members.count, stroke: run.stroke, rasterizes: run.rasterizes
             )
             switch strategy {
             case .vectorMerged:
@@ -124,22 +122,28 @@ enum LyricsFXCanvas {
                 layer.fill(shape, with: .color(color))
             case .rasterGrouped:
                 // 圖層裡逐字全不透明，合成時整層一次套 run 的透明度——疊字處不會比合併外框更深
-                layer.drawLayer { group in stamp(members, in: group, color: color, paths: paths, zoom: zoom) }
+                layer.drawLayer { group in stamp(members, in: group, color: color, paths: paths) }
             case .rasterDirect:
-                stamp(members, in: layer, color: color, paths: paths, zoom: zoom)
+                stamp(members, in: layer, color: color, paths: paths)
             }
         }
     }
 
+    /// 畫布點 → 螢幕像素：displayScale × context 目前的縮放（整屏 zoom）。實測（遺留收尾計劃 §9 T4）：`context.transform` 不含 displayScale、
+    /// 只有等比縮放與平移，`drawLayer` 的子 context 保留外層縮放——離屏 1×／2× 與真視窗一致；`LyricsFXDeviceScaleContractTests` 把關
+    static func deviceScale(of context: GraphicsContext) -> CGFloat {
+        context.environment.displayScale * hypot(context.transform.a, context.transform.b)
+    }
+
     /// 逐字貼點陣：點陣像素 → 外框座標 → 畫布，後半段和合併外框共用同一個 `transform(for:)`。
     /// 檔位依字在螢幕上的縮放（displayScale × 整屏縮放 × 字級與逐字縮放）決定（計劃 2026-10-17 全螢幕缺口 §9.5）
-    private static func stamp(_ glyphs: [GlyphDraw], in context: GraphicsContext, color: Color, paths: GlyphPathCache, zoom: CGFloat) {
-        let deviceScale = context.environment.displayScale * zoom
+    private static func stamp(_ glyphs: [GlyphDraw], in context: GraphicsContext, color: Color, paths: GlyphPathCache) {
+        let deviceScale = deviceScale(of: context)
         for glyph in glyphs {
             let entry = paths.entry(for: glyph)
             let placement = transform(for: glyph, entry: entry)
             let tier = GlyphRasterCache.Tier(placement: placement, deviceScale: deviceScale)
-            guard let raster = paths.rasters.entry(text: glyph.text, face: glyph.face, path: entry, tier: tier) else { continue }
+            guard let raster = paths.rasters.entry(path: entry, tier: tier) else { continue }
             var single = context
             single.concatenate(raster.fromPixels.concatenating(placement))
             var image = single.resolve(raster.image)

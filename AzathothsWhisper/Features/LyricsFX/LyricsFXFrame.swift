@@ -21,6 +21,8 @@ struct FontFace: Hashable, Sendable {
     var uppercase = false
     /// 字型固有的尺寸補償（與批次無關）：組合畫法每行的 em 乘上它。字面比同字級的其他字明顯大或小的字型才設（原型 composer.js:401：Rock Salt 0.085、Anton 0.15，預設 0.12；Butcherman 不在 app 目錄）
     var sizeScale: CGFloat = 1
+    /// 每字右側多留的間距（em 比例；原型 `S.spacing`，composer.js:331 預設 0.08、:401 Cenobyte 0.2）
+    var spacing: CGFloat = ComposedStyle.spacing
     /// false＝不走點陣快取、一律畫合併外框（批 4 遺留計劃 §2.3：Anton 放大後點陣偏離向量超出 I-46 門檻，研究出尺寸策略前暫走向量）
     var rasterizes = true
 
@@ -97,7 +99,7 @@ struct GlyphDraw: Equatable, Sendable {
     var scaleY: CGFloat = 1
     let opacity: Double
     let color: ColorSlot
-    /// 霓虹描邊寬（點；配色 acc 色，先描後填）。0＝不描；殘影層即使帶著也不畫（`LyricsFXCanvas.runs(of:stroking:)`）
+    /// 霓虹描邊寬（點；配色 acc 色，先描後填）。0＝不描；殘影由 `shifted` 產生、預設就是 0
     var stroke: CGFloat = 0
 
     init(text: String, face: FontFace, fontSize: CGFloat, origin: CGPoint, rotation: CGFloat = 0, scaleX: CGFloat = 1, scaleY: CGFloat = 1, opacity: Double, color: ColorSlot, stroke: CGFloat = 0) {

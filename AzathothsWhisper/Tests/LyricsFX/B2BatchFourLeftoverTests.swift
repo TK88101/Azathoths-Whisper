@@ -30,20 +30,6 @@ struct B2BatchFourLeftoverTests {
                                   recipe: .composed(LongLineFitTests.recipe(font: font, enter: enter, fx1: fx1, fx2: fx2)), measurer: CoreTextMeasurer())
     }
 
-    /// 主字形實際墨跡的左右緣（真實字形外框＋繪製端同一個仿射變換）
-    static func inkSpanX(_ frame: FramePlan) -> (left: CGFloat, right: CGFloat) {
-        let paths = GlyphPathCache()
-        var left = CGFloat.infinity, right = -CGFloat.infinity
-        for glyph in frame.glyphs {
-            let entry = paths.entry(for: glyph)
-            let box = entry.path.boundingBoxOfPath.applying(LyricsFXCanvas.transform(for: glyph, entry: entry))
-            left = min(left, box.minX)
-            right = max(right, box.maxX)
-        }
-        return (left, right)
-    }
-
-    static func maxWidth(_ size: CGSize) -> CGFloat { size.width * ComposedStyle.maxWidthRatio }
 
     // MARK: ① 超寬單字
 
@@ -53,13 +39,13 @@ struct B2BatchFourLeftoverTests {
         let report = try #require(Self.report(text, size: size))
         #expect(report.ratio < 1)
         #expect(!report.breaksLongWords)
-        #expect(report.rowWidths.allSatisfy { $0 <= Self.maxWidth(size) }, "列寬 \(report.rowWidths)／上限 \(Self.maxWidth(size))")
+        #expect(report.rowWidths.allSatisfy { $0 <= ComposedStyle.wrapWidth(size) }, "列寬 \(report.rowWidths)／上限 \(ComposedStyle.wrapWidth(size))")
         let margin = size.height * ComposedStyle.fitMargin
         for t in [30.0, 33.3, 37.7] {
             let frame = Self.plan(text, size: size, t: t)
-            let x = Self.inkSpanX(frame), y = B2BatchFourT7FixTests.inkSpan(frame)
-            #expect(!frame.glyphs.isEmpty && x.left >= size.width * ComposedStyle.fitMargin && x.right <= size.width * (1 - ComposedStyle.fitMargin), "t=\(t) 左右 \(x)")
-            #expect(y.top >= margin && y.bottom <= size.height - margin, "t=\(t) 上下 \(y)")
+            let ink = B2BatchFourT7FixTests.inkBox(frame)
+            #expect(!frame.glyphs.isEmpty && ink.minX >= size.width * ComposedStyle.fitMargin && ink.maxX <= size.width * (1 - ComposedStyle.fitMargin), "t=\(t) 左右 \(ink)")
+            #expect(ink.minY >= margin && ink.maxY <= size.height - margin, "t=\(t) 上下 \(ink)")
         }
     }
 
@@ -67,13 +53,13 @@ struct B2BatchFourLeftoverTests {
         let report = try #require(Self.report(Self.enormous, size: Self.narrow))
         #expect(report.ratio == ComposedStyle.minimumFitRatio)
         #expect(report.breaksLongWords)
-        #expect(report.rowWidths.allSatisfy { $0 <= Self.maxWidth(Self.narrow) }, "列寬 \(report.rowWidths)")
+        #expect(report.rowWidths.allSatisfy { $0 <= ComposedStyle.wrapWidth(Self.narrow) }, "列寬 \(report.rowWidths)")
         let broken = report.glyphs.filter { $0.wordIndex == 1 }
         #expect(broken.count == 120)
         #expect(Set(broken.map(\.row)).count >= 2)
         let frame = Self.plan(Self.enormous, size: Self.narrow)
-        let x = Self.inkSpanX(frame)
-        #expect(x.left >= 0 && x.right <= Self.narrow.width, "左右 \(x)")
+        let ink = B2BatchFourT7FixTests.inkBox(frame)
+        #expect(ink.minX >= 0 && ink.maxX <= Self.narrow.width, "左右 \(ink)")
     }
 
     /// 斷詞以 extended grapheme cluster（Swift Character）為單位：emoji 序列、國旗、組合音標、網址不被拆壞
@@ -238,6 +224,44 @@ struct B2BatchFourLeftoverTests {
         }
     }
 
+    /// ③c 的等價基線（遺留收尾計劃 R1 #5）：完整縮字結果（em、列寬、每字的詞與列、有無斷詞）的雜湊，改版前在 main 284e2d1 記下。
+    /// 每案算兩次（第二次走快取命中），兩次都必須等於基線
+    static let fitCases: [(name: String, text: String, size: CGSize)] = [
+        ("short-wide", LongLineFitTests.short, LongLineFitTests.wide),
+        ("long-narrow", LongLineFitTests.long, LongLineFitTests.narrow),
+        ("extreme-narrow", LongLineFitTests.extreme, LongLineFitTests.narrow),
+        ("oversized-narrow", "Paper harborlightsd tonight", LongLineFitTests.narrow),
+        ("enormous-narrow", "Gulls " + String(repeating: "lanternsoverthewater", count: 6) + " bells", LongLineFitTests.narrow),
+        ("graphemes-narrow", "Boats " + String(repeating: "\u{1F469}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{1F1EF}\u{1F1F5}e\u{0301}", count: 12)
+            + "https://example.com/harbor/lights?boat=paper&tide=slow#pier", LongLineFitTests.narrow),
+        ("brokeoverflow-short", String(repeating: "saltalongtheropeandthebells", count: 12), CGSize(width: 900, height: 300)),
+    ]
+    static let fitBaseline: [String: String] = [
+        "short-wide": "c1cf64d936601c436bbe79587a15195a87808b96cd7601ed204381cb3ddae8eb",
+        "long-narrow": "066e15db9026ae4d933f3dd2ed5e84c3dc2058b9afc8b7ed0fd3416a9bfaae47",
+        "extreme-narrow": "70b50a9d5f2cd1f69cfda68c1915182eef12af5b7ed1a7de4c1f93763195c150",
+        "oversized-narrow": "bb8a88ae2982533bc3a078fa57eef2a6305f13f92a365efdcee0e1a413dc0f86",
+        "enormous-narrow": "9192771f9fde02ad3be6e6c3b6610a1fcd45fc1b257414012d3655406ab0fbb7",
+        "graphemes-narrow": "01928056c389abb1f4a1818940a04b477e21a9f070f8578770520816ad925340",
+        "brokeoverflow-short": "f9962317058a50438d4b220e9fb1f9523452dee208e59310dc16815302308542",
+    ]
+
+    static func fitDigest(_ report: ComposedStyle.FitReport) -> String {
+        let rows = report.rowWidths.map { String(Double($0).bitPattern, radix: 16) }.joined(separator: ",")
+        let glyphs = report.glyphs.map { "\($0.text)|\($0.wordIndex)|\($0.row)" }.joined(separator: ";")
+        let canonical = "em=\(String(Double(report.em).bitPattern, radix: 16)) ratio=\(String(Double(report.ratio).bitPattern, radix: 16)) broke=\(report.breaksLongWords) rows=\(rows) glyphs=\(glyphs)"
+        return GlyphRasterFidelityTests.digest(Array(canonical.utf8))
+    }
+
+    @Test func coldAndCachedFitsMatchTheBaselineFieldByField() throws {
+        for fitCase in Self.fitCases {
+            for pass in 0..<2 {
+                let report = try #require(Self.report(fitCase.text, size: fitCase.size))
+                #expect(Self.fitDigest(report) == Self.fitBaseline[fitCase.name], "\(fitCase.name) 第 \(pass) 次：\(Self.fitDigest(report))")
+            }
+        }
+    }
+
     // MARK: ② 霓虹描邊隨該句 em
 
     /// 改版前的整幀常數：未縮、sizeScale＝1 的句子必須相同
@@ -248,13 +272,16 @@ struct B2BatchFourLeftoverTests {
         #expect(!frame.glyphs.isEmpty && frame.glyphs.allSatisfy { $0.stroke == before })
     }
 
-    @Test func aShrunkLineStrokesWithItsShrunkEm() throws {
+    /// 縮過的句子以縮後 em 描邊（Anton 另含字型字級 sizeScale；原 `aShrunkAntonNeonLineStrokesWithTheShrunkEm` 併入）
+    @Test(arguments: ["Marker", "Anton"])
+    func aShrunkLineStrokesWithItsShrunkEm(font: String) throws {
         let size = Self.narrow
-        let report = try #require(Self.report(LongLineFitTests.long, size: size, fx1: "neonstroke", fx2: "none"))
+        let report = try #require(Self.report(LongLineFitTests.long, font: font, size: size, fx1: "neonstroke", fx2: "none"))
         #expect(report.ratio < 1)
-        let frame = Self.plan(LongLineFitTests.long, size: size, fx1: "neonstroke", fx2: "none")
+        let frame = Self.plan(LongLineFitTests.long, font: font, size: size, fx1: "neonstroke", fx2: "none")
         #expect(!frame.glyphs.isEmpty && frame.glyphs.allSatisfy { $0.stroke == report.em * ComposedStyle.strokeRatio })
-        #expect(report.em * ComposedStyle.strokeRatio < size.height * ComposedStyle.emRatio * ComposedStyle.strokeRatio)
+        let unshrunkEm = size.height * ComposedStyle.emRatio * (try #require(LyricsFXCatalog.font(font))).sizeScale
+        #expect(report.em * ComposedStyle.strokeRatio < unshrunkEm * ComposedStyle.strokeRatio)
     }
 
     @Test(arguments: [("type", "misreg"), ("type", "reflect"), ("type", "weep"), ("type", "ransom"), ("negative", "none")])
@@ -263,22 +290,76 @@ struct B2BatchFourLeftoverTests {
         #expect(!frame.glyphs.isEmpty && frame.glyphs.allSatisfy { $0.stroke > 0 }, "\(enter)＋\(fx2)")
     }
 
-    @Test func shiftedKeepsTheStroke() {
+    /// 副本預設不描邊（殘影天生不描）；主字經 shifted 換色時明確帶上描邊（遺留收尾計劃 §2.3 ③a）
+    @Test func shiftedDropsTheStrokeUnlessItIsPassedOn() {
         let glyph = GlyphDraw(text: "A", face: .displayMedium, fontSize: 40, origin: .zero, opacity: 1, color: .fg, stroke: 2.5)
-        #expect(glyph.shifted(dx: 3, dy: 4, opacity: 0.5, color: .bg).stroke == 2.5)
+        #expect(glyph.shifted(dx: 3, dy: 4, opacity: 0.5, color: .bg).stroke == 0)
+        #expect(glyph.shifted(dx: 3, dy: 4, opacity: 0.5, color: .bg, stroke: glyph.stroke).stroke == 2.5)
     }
 
-    @Test func ghostsAreNeverStrokedAndDifferentStrokesSplitRuns() {
+    /// 霓虹描邊與各種殘影並存：殘影一律不帶描邊，主字都帶
+    /// 掃整句（每 0.05 s）：有殘影的每一幀，殘影都不帶描邊、主字都帶（RGB 分離只在進場前半段有副本，所以不挑單一時刻）
+    @Test(arguments: ["misreg", "reflect", "weep", "rgbsplit"])
+    func ghostsCarryNoStrokeAlongsideNeonStroke(fx2: String) {
+        let frames = stride(from: 2.0, to: 40.0, by: 0.05).map { Self.plan(LongLineFitTests.short, font: "Bebas", size: Self.wide, t: $0, fx1: "neonstroke", fx2: fx2) }
+            .filter { !$0.ghosts.isEmpty }
+        #expect(!frames.isEmpty, "\(fx2) 要有殘影")
+        #expect(frames.allSatisfy { $0.ghosts.allSatisfy { $0.stroke == 0 } }, "\(fx2)")
+        #expect(frames.allSatisfy { $0.glyphs.allSatisfy { $0.stroke > 0 } }, "\(fx2)")
+    }
+
+    @Test func differentStrokesSplitRunsAndUnstrokedCopiesStayUnstroked() {
         func glyph(_ stroke: CGFloat) -> GlyphDraw { GlyphDraw(text: "A", face: .displayMedium, fontSize: 40, origin: .zero, opacity: 1, color: .fg, stroke: stroke) }
         let glyphs = [glyph(4), glyph(4), glyph(3)]
-        #expect(LyricsFXCanvas.runs(of: glyphs, stroking: true).map(\.stroke) == [4, 3])
-        #expect(LyricsFXCanvas.runs(of: glyphs, stroking: false).map(\.stroke) == [0])
+        #expect(LyricsFXCanvas.runs(of: glyphs).map(\.stroke) == [4, 3])
+        #expect(LyricsFXCanvas.runs(of: glyphs.map { $0.shifted(dx: 1, dy: 1, opacity: 1, color: .fg) }).map(\.stroke) == [0])
+    }
+
+    // MARK: 遺留收尾 ① Cenobyte 字距（docs/plans/2026-10-18-lyrics-fx-leftover-cleanup.md §2.1）
+
+    @Test func cenobyteUsesThePrototypesWiderSpacingAndOtherFontsKeepTheDefault() {
+        #expect(LyricsFXCatalog.font("Cenobyte")?.spacing == 0.2)
+        for component in LyricsFXCatalog.fonts where component.id != "Cenobyte" {
+            guard case .font(let face) = component.payload else { continue }
+            #expect(face.spacing == ComposedStyle.spacing, "\(component.id)")
+        }
+    }
+
+    /// 每字排版寬＝字本身的寬＋字距 × 該句 em；畫字以字本身的寬置中（字距只在排版讀一次）
+    @Test(arguments: [("Cenobyte", 0.2), ("Marker", 0.08)])
+    func eachGlyphIsLaidOutWithItsFontsSpacing(font: String, spacing: CGFloat) throws {
+        let measurer = CoreTextMeasurer()
+        let report = try #require(ComposedStyle.fitReport(
+            line: Self.line(LongLineFitTests.short), index: 0, recipe: LongLineFitTests.recipe(font: font), size: Self.wide, measurer: measurer))
+        let face = try #require(LyricsFXCatalog.font(font))
+        #expect(!report.metrics.isEmpty)
+        for (glyph, metric) in zip(report.glyphs, report.metrics) {
+            let measured = measurer.advances(of: glyph.text, face: face, fontSize: metric.fontSize).last ?? 0
+            #expect(abs(metric.width - measured - spacing * report.em) < 1e-9, "\(font) \(glyph.text) 排版寬")
+            #expect(abs(metric.advance - measured) < 1e-9, "\(font) \(glyph.text) 字寬")
+        }
+    }
+
+    /// 真實 Cenobyte 長句（R1 #10）：字距變寬後仍守 I-45——每列 ≤ 折行寬、主字墨跡在安全區內、整行大寫
+    @Test(arguments: [CGSize(width: 1728, height: 945), CGSize(width: 900, height: 945)])
+    func aLongCenobyteLineStillFitsWithTheWiderSpacing(size: CGSize) throws {
+        let text = LongLineFitTests.long
+        let report = try #require(Self.report(text, font: "Cenobyte", size: size))
+        #expect(report.rowWidths.allSatisfy { $0 <= ComposedStyle.wrapWidth(size) }, "列寬 \(report.rowWidths)")
+        #expect(report.glyphs.allSatisfy { $0.text == $0.text.uppercased() })
+        let marginY = size.height * ComposedStyle.fitMargin, marginX = size.width * ComposedStyle.fitMargin
+        for t in [30.0, 33.3, 37.7] {
+            let frame = Self.plan(text, font: "Cenobyte", size: size, t: t)
+            let ink = B2BatchFourT7FixTests.inkBox(frame)
+            #expect(!frame.glyphs.isEmpty && ink.minX >= marginX && ink.maxX <= size.width - marginX, "t=\(t) 左右 \(ink)")
+            #expect(ink.minY >= marginY && ink.maxY <= size.height - marginY, "t=\(t) 上下 \(ink)")
+        }
     }
 
     // MARK: ③ Anton 字級
 
     @Test func antonIsDrawnAtThePrototypesLargerSize() throws {
-        guard case .font(let anton)? = LyricsFXCatalog.component("Anton")?.payload else { Issue.record("Anton 不是字型"); return }
+        let anton = try #require(LyricsFXCatalog.font("Anton"))
         #expect(abs(anton.sizeScale - 0.15 / 0.12) < 1e-9)
     }
 
@@ -294,25 +375,26 @@ struct B2BatchFourLeftoverTests {
         #expect(report.ratio < 1 && !report.breaksLongWords)
         let frame = Self.plan(LongLineFitTests.short, font: "Anton", size: Self.narrow)
         let margin = Self.narrow.height * ComposedStyle.fitMargin
-        let y = B2BatchFourT7FixTests.inkSpan(frame)
-        #expect(!frame.glyphs.isEmpty && y.top >= margin && y.bottom <= Self.narrow.height - margin, "上下 \(y)")
-    }
-
-    @Test func aShrunkAntonNeonLineStrokesWithTheShrunkEm() throws {
-        let report = try #require(Self.report(LongLineFitTests.long, font: "Anton", size: Self.narrow, fx1: "neonstroke", fx2: "none"))
-        #expect(report.ratio < 1)
-        let frame = Self.plan(LongLineFitTests.long, font: "Anton", size: Self.narrow, fx1: "neonstroke", fx2: "none")
-        #expect(!frame.glyphs.isEmpty && frame.glyphs.allSatisfy { $0.stroke == report.em * ComposedStyle.strokeRatio })
+        let ink = B2BatchFourT7FixTests.inkBox(frame)
+        #expect(!frame.glyphs.isEmpty && ink.minY >= margin && ink.maxY <= Self.narrow.height - margin, "上下 \(ink)")
     }
 
     /// Anton 放大後點陣偏離向量超出 I-46 門檻（計劃 §9.2–9.3）：研究出尺寸策略前，Anton 的字一律走合併外框
-    @Test func antonIsDrawnAsOutlinesWhileOtherFontsKeepTheRasterCache() {
-        guard case .font(let anton)? = LyricsFXCatalog.component("Anton")?.payload else { Issue.record("Anton 不是字型"); return }
-        #expect(!anton.rasterizes)
+    @Test func antonIsDrawnAsOutlinesWhileOtherFontsKeepTheRasterCache() throws {
+        #expect(try #require(LyricsFXCatalog.font("Anton")).rasterizes == false)
         for id in ["Marker", "RockSalt", "Bebas", "CourierPrime", "Catacombs", "IMFell"] {
-            guard case .font(let face)? = LyricsFXCatalog.component(id)?.payload else { Issue.record("\(id) 不是字型"); continue }
-            #expect(face.rasterizes, "\(id)")
+            #expect(try #require(LyricsFXCatalog.font(id), "\(id) 不是字型").rasterizes, "\(id)")
         }
+    }
+
+    /// 走不走點陣是 run 的鍵（遺留收尾計劃 §2.3 ③b）：相鄰的字型一換就切段，同字型不多切
+    @Test func whetherARunIsRasterizedIsPartOfItsKey() throws {
+        let anton = try #require(LyricsFXCatalog.font("Anton")), marker = try #require(LyricsFXCatalog.font("Marker"))
+        func glyph(_ face: FontFace) -> GlyphDraw { GlyphDraw(text: "A", face: face, fontSize: 40, origin: .zero, opacity: 1, color: .fg) }
+        let runs = LyricsFXCanvas.runs(of: [glyph(marker), glyph(marker), glyph(anton), glyph(marker)])
+        #expect(runs.map(\.rasterizes) == [true, false, true])
+        #expect(runs.map(\.range) == [0..<2, 2..<3, 3..<4])
+        #expect(LyricsFXCanvas.runs(of: [glyph(anton), glyph(anton)]).map(\.rasterizes) == [false])
     }
 
     @Test(arguments: [(20, 1), (20, 5), (10, 1), (10, 5)])

@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import AzathothsWhisper
@@ -16,7 +17,7 @@ struct GlyphRasterCacheTests {
 
     /// 測試裡的字都建得出點陣
     static func raster(_ cache: GlyphRasterCache, _ text: String, tier: GlyphRasterCache.Tier = tier) throws -> GlyphRasterCache.Entry {
-        try #require(cache.entry(text: text, face: face, path: pathEntry(text), tier: tier))
+        try #require(cache.entry(path: pathEntry(text), tier: tier))
     }
 
     static func pathEntry(_ text: String = "A", face: FontFace = face) -> GlyphPathCache.Entry {
@@ -173,5 +174,110 @@ struct GlyphRasterCacheTests {
         cache.beginFrame()
         _ = try Self.raster(cache, "A")
         #expect(cache.bytes == 0)
+    }
+
+    // MARK: 遺留收尾 ②c、②d（docs/plans/2026-10-18-lyrics-fx-leftover-cleanup.md §2.2）
+
+    /// 模擬繪製端 `frames` 幀：每幀開頭 `beginFrame`，每個字照 `stamp` 的順序先取外框、再取點陣。
+    /// 不經 ImageRenderer：離屏畫圖會在同一行程留下 SwiftUI 內部狀態，曾使之後的光暈點陣比對雜湊改變（遺留收尾計劃 §9.10）
+    static func simulate(_ glyphs: [GlyphDraw], frames: Int, paths: GlyphPathCache) {
+        for _ in 0..<frames {
+            paths.rasters.beginFrame()
+            for glyph in glyphs { _ = paths.rasters.entry(path: paths.entry(for: glyph), tier: tier) }
+        }
+    }
+
+    /// 零寬空白排版時不會被濾掉（不是 White_Space），外框為空：直接跳過，不每幀重試建點陣
+    @Test func aGlyphWithoutAnOutlineIsSkippedInsteadOfRetriedEveryFrame() {
+        #expect(!Character("\u{200B}").isWhitespace)
+        let paths = GlyphPathCache()
+        let empty = GlyphDraw(text: "\u{200B}", face: Self.face, fontSize: 80, origin: CGPoint(x: 20, y: 20), opacity: 1, color: .fg)
+        let letter = GlyphDraw(text: "A", face: Self.face, fontSize: 80, origin: CGPoint(x: 120, y: 20), opacity: 1, color: .fg)
+        #expect(paths.entry(for: empty).isEmpty)
+        #expect(!paths.entry(for: letter).isEmpty)
+        Self.simulate([empty, letter], frames: 3, paths: paths)
+        #expect(paths.rasters.misses == 1, "只有 A 建過一次點陣")
+    }
+
+    /// 同一幀用過的並列最舊者：先建的先出（建立序號決勝，可重現）
+    @Test func amongBitmapsLastUsedInTheSameFrameTheEarliestBuiltIsEvictedFirst() throws {
+        let probe = try Self.raster(GlyphRasterCache(), "O")
+        for _ in 0..<8 {
+            let cache = GlyphRasterCache(byteLimit: probe.bytes * 2 + probe.bytes / 2)
+            cache.beginFrame()
+            _ = try Self.raster(cache, "O")
+            _ = try Self.raster(cache, "Q")
+            cache.beginFrame()
+            _ = try Self.raster(cache, "C")  // 放不下 → 逐出 O、Q 中先建的 O
+            let misses = cache.misses
+            _ = try Self.raster(cache, "Q")
+            #expect(cache.misses == misses, "Q 還在")
+            cache.beginFrame()
+            _ = try Self.raster(cache, "O")
+            #expect(cache.misses == misses + 1, "O 被逐出")
+        }
+    }
+
+
+    // MARK: 遺留收尾 ②e：外框與點陣共用語義鍵
+
+    @Test func glyphKeysAreEqualByValueAndHitTheSameSlot() {
+        let key = GlyphKey(text: "A", face: Self.face, size: 100)
+        let twin = GlyphKey(text: "A", face: Self.face, size: 100)
+        #expect(key == twin && key.hashValue == twin.hashValue)
+        #expect([key: 1][twin] == 1)
+        var other = Self.face
+        other.rasterizes = false
+        for different in [GlyphKey(text: "B", face: Self.face, size: 100), GlyphKey(text: "A", face: other, size: 100), GlyphKey(text: "A", face: Self.face, size: 100.5)] {
+            #expect(different != key)
+        }
+    }
+
+    /// 外框快取整批清空後，同一個字同一檔仍命中原點陣（點陣鍵是語義鍵，不是外框快取的生命週期）
+    @Test func clearingTheOutlineCacheKeepsTheBitmaps() {
+        let paths = GlyphPathCache(capacity: 2)
+        let letter = [GlyphDraw(text: "A", face: Self.face, fontSize: 80, origin: CGPoint(x: 20, y: 20), opacity: 1, color: .fg)]
+        Self.simulate(letter, frames: 1, paths: paths)
+        #expect(paths.rasters.misses == 1)
+        for text in ["B", "C", "D"] {
+            _ = paths.entry(for: GlyphDraw(text: text, face: Self.face, fontSize: 80, origin: .zero, opacity: 1, color: .fg))
+        }
+        Self.simulate(letter, frames: 2, paths: paths)
+        #expect(paths.rasters.misses == 1, "清空外框後 A 仍命中點陣")
+    }
+
+}
+
+/// ②a 的框架語義契約（遺留收尾計劃 §2.2）：繪製端從 context 推整屏縮放，靠的是 SwiftUI `GraphicsContext.transform`
+/// 不含 displayScale、`drawLayer` 保留外層縮放。這條在 OS 升級後轉紅＝語義變了，改回由 plan 傳 zoom
+@MainActor
+@Suite("LyricsFX device scale contract")
+struct LyricsFXDeviceScaleContractTests {
+    @Test(arguments: [CGFloat(1), 2], [CGFloat(1), 1.0398039215686274, 1.04])
+    func theDeviceScaleSeenInsideLayersIsTheDisplayScaleTimesTheZoom(scale: CGFloat, zoom: CGFloat) {
+        var seen: [CGFloat] = []
+        let view = Canvas { context, size in
+            var shaken = context
+            shaken.translateBy(x: 3.5, y: -2)
+            shaken.translateBy(x: size.width / 2, y: size.height / 2)
+            shaken.scaleBy(x: zoom, y: zoom)
+            shaken.translateBy(x: -size.width / 2, y: -size.height / 2)
+            var faded = shaken
+            faded.opacity = 0.4
+            seen.append(LyricsFXCanvas.deviceScale(of: faded))
+            faded.drawLayer { group in seen.append(LyricsFXCanvas.deviceScale(of: group)) }
+            shaken.drawLayer { lit in
+                lit.addFilter(.shadow(color: .red, radius: 7.4))
+                seen.append(LyricsFXCanvas.deviceScale(of: lit))
+                var inner = lit
+                inner.opacity = 0.5
+                inner.drawLayer { group in seen.append(LyricsFXCanvas.deviceScale(of: group)) }
+            }
+        }.frame(width: 400, height: 300)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = scale
+        _ = renderer.cgImage
+        #expect(seen.count == 4)
+        #expect(seen.allSatisfy { $0 == scale * zoom }, "\(seen)")
     }
 }

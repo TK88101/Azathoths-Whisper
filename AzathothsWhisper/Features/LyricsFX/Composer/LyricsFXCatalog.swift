@@ -19,6 +19,10 @@ enum LyricsFXCatalog {
         if case .palette(let palette)? = component(id)?.payload { palette } else { nil }
     }
 
+    static func font(_ id: String) -> FontFace? {
+        if case .font(let face)? = component(id)?.payload { face } else { nil }
+    }
+
     private static let byID: [String: FXComponent] = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
     private static func make(
@@ -37,7 +41,7 @@ enum LyricsFXCatalog {
         // composer.js:9,11,12。這三套授權未確認（Cenobyte 只寫 Freeware、Mirage Gothic 內嵌 All rights reserved、Dark Metal 無授權檔），
         // 使用者 2026-10-06 裁定「放進去，風險我承擔」
         make(.font, "Cenobyte", [.cold: 0.9, .raw: 0.6, .aggression: 0.6, .elegance: 0.35, .theatrical: 0.3], [.black, .gothic],
-             .font(FontFace(id: "Cenobyte", family: "Cenobyte", weight: nil, uppercase: true))),
+             .font(FontFace(id: "Cenobyte", family: "Cenobyte", weight: nil, uppercase: true, spacing: 0.2))),
         make(.font, "DarkMetal", [.raw: 0.7, .decay: 0.8, .theatrical: 0.25, .cold: 0.5, .aggression: 0.5], [.black],
              .font(FontFace(id: "DarkMetal", family: "Dark Metal", weight: nil, uppercase: true))),
         make(.font, "Mirage", [.cold: 0.6, .elegance: 0.65, .theatrical: 0.55, .aggression: 0.4], [.black, .gothic, .symphonic, .gothmetal],

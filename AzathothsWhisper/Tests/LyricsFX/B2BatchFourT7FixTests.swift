@@ -20,26 +20,21 @@ struct B2BatchFourT7FixTests {
         return LyricsFXFrame.plan(timeline: Self.timeline, time: t, size: Self.size, motion: .full, recipe: .composed(recipe), measurer: CoreTextMeasurer())
     }
 
-    /// 每個主字形實際墨跡的上下緣：真實字形外框套上繪製端同一個仿射變換（含旋轉、scaleX／Y）
-    static func inkSpan(_ frame: FramePlan) -> (top: CGFloat, bottom: CGFloat) {
+    /// 主字形實際墨跡的外接框：真實字形外框套上繪製端同一個仿射變換（含旋轉、scaleX／Y）
+    static func inkBox(_ frame: FramePlan) -> CGRect {
         let paths = GlyphPathCache()
-        var top = CGFloat.infinity, bottom = -CGFloat.infinity
-        for glyph in frame.glyphs {
+        return frame.glyphs.reduce(CGRect.null) { box, glyph in
             let entry = paths.entry(for: glyph)
-            let box = entry.path.boundingBoxOfPath.applying(LyricsFXCanvas.transform(for: glyph, entry: entry))
-            top = min(top, box.minY)
-            bottom = max(bottom, box.maxY)
+            return box.union(entry.path.boundingBoxOfPath.applying(LyricsFXCanvas.transform(for: glyph, entry: entry)))
         }
-        return (top, bottom)
     }
 
     /// Anton 的 0.15 倍由批 4 遺留計劃 §2.3 補上（`B2BatchFourLeftoverTests`），這裡只看沒有補償的字型
     @Test func rockSaltIsDrawnAtThePrototypesSmallerSizeAndOtherFontsAreNot() throws {
-        let rockSalt = try #require(LyricsFXCatalog.component("RockSalt"))
-        guard case .font(let face) = rockSalt.payload else { Issue.record("RockSalt 不是字型"); return }
+        let face = try #require(LyricsFXCatalog.font("RockSalt"))
         #expect(abs(face.sizeScale - 0.085 / 0.12) < 1e-9)
         for id in ["IMFell", "ShadowsLight", "CourierPrime", "Bebas", "Marker"] {
-            guard case .font(let other)? = LyricsFXCatalog.component(id)?.payload else { Issue.record("\(id) 不是字型"); continue }
+            let other = try #require(LyricsFXCatalog.font(id), "\(id) 不是字型")
             #expect(other.sizeScale == 1, "\(id)")
         }
     }
@@ -47,9 +42,9 @@ struct B2BatchFourT7FixTests {
     /// 使用者 T7：「字體被砍掉了、沒有顯示全」——長句折行後，Rock Salt 的每個字都要完整落在歌詞區內、且至少兩列
     @Test func aLongRockSaltLineStaysInsideTheLyricsArea() {
         let frame = plan(font: "RockSalt")
-        let span = Self.inkSpan(frame)
+        let span = Self.inkBox(frame)
         let margin = Self.size.height * ComposedStyle.fitMargin
-        #expect(span.top >= margin && span.bottom <= Self.size.height - margin, "墨跡 \(span.top)…\(span.bottom)／高 \(Self.size.height)")
+        #expect(span.minY >= margin && span.maxY <= Self.size.height - margin, "墨跡 \(span.minY)…\(span.maxY)／高 \(Self.size.height)")
         // 以實際列高分組（em 已乘 sizeScale），兩列的字至少差一列高的一半
         let rowHeight = Self.size.height * ComposedStyle.emRatio * (0.085 / 0.12) * ComposedStyle.lineHeight
         let ys = frame.glyphs.map(\.origin.y)
@@ -108,9 +103,10 @@ struct LongLineFitTests {
 
     /// Anton 放大到原型的 0.15 後，窄視窗的短句會縮（`B2BatchFourLeftoverTests.aShortAntonLineShrinksInANarrowWindowAndStaysInside`），寬視窗仍不縮
     @Test(arguments: ["Marker", "RockSalt", "Anton", "Bebas", "CourierPrime"])
-    func aShortLineKeepsItsSizeExactly(font: String) {
+    func aShortLineKeepsItsSizeExactly(font: String) throws {
         #expect(Self.ratio(Self.short, font: font, size: Self.wide) == 1)
-        if font != "Anton" { #expect(Self.ratio(Self.short, font: font, size: Self.narrow) == 1) }
+        // 字面放大的字型（sizeScale > 1，目前只有 Anton）在窄視窗會縮，由字型資料推導、不寫死字型名
+        if try #require(LyricsFXCatalog.font(font)).sizeScale <= 1 { #expect(Self.ratio(Self.short, font: font, size: Self.narrow) == 1) }
     }
 
     /// 使用者 T7：The Used（Permanent Marker、整行大寫）「歌詞有超出顯示範圍的問題」
@@ -120,8 +116,8 @@ struct LongLineFitTests {
         let margin = size.height * ComposedStyle.fitMargin
         for t in [30.0, 33.3, 37.7] {
             let frame = LyricsFXFrame.plan(timeline: timeline, time: t, size: size, motion: .full, recipe: .composed(Self.recipe(font: font)), measurer: CoreTextMeasurer())
-            let span = B2BatchFourT7FixTests.inkSpan(frame)
-            #expect(!frame.glyphs.isEmpty && span.top >= margin && span.bottom <= size.height - margin, "\(font) \(size) t=\(t) 墨跡 \(span.top)…\(span.bottom)")
+            let span = B2BatchFourT7FixTests.inkBox(frame)
+            #expect(!frame.glyphs.isEmpty && span.minY >= margin && span.maxY <= size.height - margin, "\(font) \(size) t=\(t) 墨跡 \(span.minY)…\(span.maxY)")
         }
     }
 
