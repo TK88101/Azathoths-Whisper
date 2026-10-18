@@ -127,6 +127,18 @@
 - 綠燈：相關 5 suites 62 條綠（含 126 組縮字基線、③c 雜湊基線不變）。
 - ACCEPTANCE 新增 I-48 ⚠️（單測 ✅、目視待 T10）。
 
+### 9.2 T3 ②b–②e（2026-10-18）
+- ②b：正式 enum 只剩 `.raster`／`.vectorReference`；Fidelity 以 `forceRaster` 在畫前把 plan 字的 face 改成 `rasterizes = true`（結構體複製），`withFace` 防漏抄斷言（`GlyphRunStrategyTests.forcingRasterChangesNothingButTheRasterizesFlag`）。等價重構，無紅燈，等價性待 T5 雜湊。
+- ②c：推測 P2 **證實**——U+200B 不是 `isWhitespace`、外框為空；紅燈：連畫 3 幀 `misses` = 4（3 次空外框重試＋A）→ 實作後 1。`GlyphPathCache.Entry.isEmpty`，`stamp` 先擋。
+- ②d：紅燈：同幀並列時本行程先逐出後建的 Q（8 迭代 16 斷言紅；字典迭代序隨行程雜湊種子而變，證實現行順序不確定）→ 最小值掃描＋建立序號決勝後綠。
+- ②e：`GlyphKey`（init 以獨立 Hasher 算 `cachedHash`）同時當外框與點陣的鍵；外框快取容量可注入。新測試（相等鍵互相命中、各欄位不同即不等；外框清空後點陣仍命中）為回歸防線，舊寫法下也成立，無紅燈。
+- checkpoint：add2e5c（②b–②d）、6137325（②e）。
+
+### 9.3 T4 ②a 探針與採用（2026-10-18）
+- 離屏（ImageRenderer 1728×945，Marker＋thump×{glow, none}，3 個 zoom>1.02 的時刻＋t=9.3，1×／2×）：一般字與光暈層、直接貼與群組圖層，`transform.a == d == zoom`（逐位元）、b = c = 0，displayScale 另計（1 或 2）。log：scratchpad `spike-transform.txt`。
+- 真視窗（DEBUG 預覽 40 s × 2，內建螢幕 2×）：glow 配方 600 筆（215 筆 zoom≠1）全在光暈層 direct／grouped；none 配方 600 筆一般字 direct／grouped（192 筆 zoom>1、408 筆 zoom=1）；全部 a = d = zoom（日誌 6 位小數）、b = c = 0、ds = 2。log：`t4-onscreen*.log`。
+- 判定：符合 §2.2 採用條件 → **採用**。`LyricsFXCanvas.deviceScale(of:)`＝displayScale × hypot(a, b)，刪 `zoom` 參數鏈；`LyricsFXDeviceScaleContractTests`（1×／2× × zoom 1／1.0398／1.04，含濾鏡圖層與巢狀 drawLayer）6 組綠。探針碼已還原（以 `git show` 取回 checkpoint 版本）。
+
 ## 附錄 A　計劃評審記錄
 ### A.1 R1（Codex，2026-10-18）
 | # | 嚴重度／位置 | 處置 | 理由／修改 |

@@ -252,3 +252,37 @@ struct GlyphRasterCacheTests {
     }
 
 }
+
+/// ②a 的框架語義契約（遺留收尾計劃 §2.2）：繪製端從 context 推整屏縮放，靠的是 SwiftUI `GraphicsContext.transform`
+/// 不含 displayScale、`drawLayer` 保留外層縮放。這條在 OS 升級後轉紅＝語義變了，改回由 plan 傳 zoom
+@MainActor
+@Suite("LyricsFX device scale contract")
+struct LyricsFXDeviceScaleContractTests {
+    @Test(arguments: [CGFloat(1), 2], [CGFloat(1), 1.0398039215686274, 1.04])
+    func theDeviceScaleSeenInsideLayersIsTheDisplayScaleTimesTheZoom(scale: CGFloat, zoom: CGFloat) {
+        var seen: [CGFloat] = []
+        let view = Canvas { context, size in
+            var shaken = context
+            shaken.translateBy(x: 3.5, y: -2)
+            shaken.translateBy(x: size.width / 2, y: size.height / 2)
+            shaken.scaleBy(x: zoom, y: zoom)
+            shaken.translateBy(x: -size.width / 2, y: -size.height / 2)
+            var faded = shaken
+            faded.opacity = 0.4
+            seen.append(LyricsFXCanvas.deviceScale(of: faded))
+            faded.drawLayer { group in seen.append(LyricsFXCanvas.deviceScale(of: group)) }
+            shaken.drawLayer { lit in
+                lit.addFilter(.shadow(color: .red, radius: 7.4))
+                seen.append(LyricsFXCanvas.deviceScale(of: lit))
+                var inner = lit
+                inner.opacity = 0.5
+                inner.drawLayer { group in seen.append(LyricsFXCanvas.deviceScale(of: group)) }
+            }
+        }.frame(width: 400, height: 300)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = scale
+        _ = renderer.cgImage
+        #expect(seen.count == 4)
+        #expect(seen.allSatisfy { $0 == scale * zoom }, "\(seen)")
+    }
+}

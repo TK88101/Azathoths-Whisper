@@ -84,22 +84,22 @@ enum LyricsFXCanvas {
             shaken.translateBy(x: -bounds.midX, y: -bounds.midY)
         }
         for layer in plan.back { draw(layer, in: shaken, bounds: bounds) }
-        fill(plan.ghosts, in: shaken, palette: palette, paths: paths, zoom: plan.zoom, rendering: rendering)
+        fill(plan.ghosts, in: shaken, palette: palette, paths: paths, rendering: rendering)
         for box in plan.boxes { draw(box, in: shaken, palette: palette) }
         if plan.glow > 0 {
             // 濾鏡套在整層的合成結果上，只做一次模糊（不是每個透明度 run 各做一次）
             shaken.drawLayer { lit in
                 lit.addFilter(.shadow(color: palette.acc.color, radius: plan.glow))
-                fill(plan.glyphs, in: lit, palette: palette, paths: paths, zoom: plan.zoom, stroking: true, rendering: rendering)
+                fill(plan.glyphs, in: lit, palette: palette, paths: paths, stroking: true, rendering: rendering)
             }
         } else {
-            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, zoom: plan.zoom, stroking: true, rendering: rendering)
+            fill(plan.glyphs, in: shaken, palette: palette, paths: paths, stroking: true, rendering: rendering)
         }
         for layer in plan.front { draw(layer, in: context, bounds: bounds) }
     }
 
     private static func fill(
-        _ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, zoom: CGFloat, stroking: Bool = false, rendering: GlyphRendering
+        _ glyphs: [GlyphDraw], in context: GraphicsContext, palette: FXPalette, paths: GlyphPathCache, stroking: Bool = false, rendering: GlyphRendering
     ) {
         for run in runs(of: glyphs, stroking: stroking) {
             let members = glyphs[run.range].filter { opacityLevel($0.opacity) > 0 }
@@ -122,17 +122,23 @@ enum LyricsFXCanvas {
                 layer.fill(shape, with: .color(color))
             case .rasterGrouped:
                 // 圖層裡逐字全不透明，合成時整層一次套 run 的透明度——疊字處不會比合併外框更深
-                layer.drawLayer { group in stamp(members, in: group, color: color, paths: paths, zoom: zoom) }
+                layer.drawLayer { group in stamp(members, in: group, color: color, paths: paths) }
             case .rasterDirect:
-                stamp(members, in: layer, color: color, paths: paths, zoom: zoom)
+                stamp(members, in: layer, color: color, paths: paths)
             }
         }
     }
 
+    /// 畫布點 → 螢幕像素：displayScale × context 目前的縮放（整屏 zoom）。實測（遺留收尾計劃 §9 T4）：`context.transform` 不含 displayScale、
+    /// 只有等比縮放與平移，`drawLayer` 的子 context 保留外層縮放——離屏 1×／2× 與真視窗一致；`LyricsFXDeviceScaleContractTests` 把關
+    static func deviceScale(of context: GraphicsContext) -> CGFloat {
+        context.environment.displayScale * hypot(context.transform.a, context.transform.b)
+    }
+
     /// 逐字貼點陣：點陣像素 → 外框座標 → 畫布，後半段和合併外框共用同一個 `transform(for:)`。
     /// 檔位依字在螢幕上的縮放（displayScale × 整屏縮放 × 字級與逐字縮放）決定（計劃 2026-10-17 全螢幕缺口 §9.5）
-    private static func stamp(_ glyphs: [GlyphDraw], in context: GraphicsContext, color: Color, paths: GlyphPathCache, zoom: CGFloat) {
-        let deviceScale = context.environment.displayScale * zoom
+    private static func stamp(_ glyphs: [GlyphDraw], in context: GraphicsContext, color: Color, paths: GlyphPathCache) {
+        let deviceScale = deviceScale(of: context)
         for glyph in glyphs {
             let entry = paths.entry(for: glyph)
             // 沒有外框就沒有東西可畫：不建點陣（否則每幀重試）
