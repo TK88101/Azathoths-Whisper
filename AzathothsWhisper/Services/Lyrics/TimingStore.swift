@@ -2,8 +2,18 @@ import Foundation
 import OSLog
 
 /// 可寫進存檔的來源（母計劃 C.1／C.3）。內嵌 LRC 本來就在 Music 欄位、估算隨時可算，兩者都不存檔——型別層強制
-enum StoredTimingSource: String, Sendable, Codable {
-    case lrclib, youtubeMusic, deezer, qq, kugou
+enum StoredTimingSource: String, Sendable, Codable, Hashable {
+    case lrclib, youtubeMusic, deezer, qq, netease
+
+    var timingSource: TimingSource {
+        switch self {
+        case .lrclib: return .lrclib
+        case .youtubeMusic: return .youtubeMusic
+        case .deezer: return .deezer
+        case .qq: return .qq
+        case .netease: return .netease
+        }
+    }
 }
 
 /// 一首歌一份的時間軸存檔（母計劃 C.1）。「查過、沒有」也要存：7 天重試靠它（C.4）
@@ -37,6 +47,14 @@ struct TimingRecord: Equatable, Sendable {
     }
 }
 
+extension Array where Element == TimingRecord.LineStart {
+    /// 錨點本身的合法性（存檔讀取與對齊重建共用的唯一定義）：index 非負且遞增、時間有限、非負、單調不減
+    var areWellFormedAnchors: Bool {
+        allSatisfy { $0.index >= 0 && $0.start.isFinite && $0.start >= 0 }
+            && zip(self, dropFirst()).allSatisfy { $0.index < $1.index && $0.start <= $1.start }
+    }
+}
+
 /// 要不要再去外部找時間軸（母計劃 C.4）
 enum TimingLookupPolicy {
     static let retryInterval: TimeInterval = 7 * 86_400
@@ -66,7 +84,9 @@ actor TimingStore {
         case unrecognizedFileOnDisk
     }
 
-    static let schemaVersion = 1
+    /// v2（C 段 §3.4）：加了 netease。舊版讀到 v2 判認不出來、不覆寫；v1 檔照讀
+    static let schemaVersion = 2
+    static let oldestReadableVersion = 1
     /// 一份時間軸幾 KB；同步資料夾裡超過這個大小的檔不讀（防整檔讀進記憶體）
     static let maxFileBytes = 1 << 20
     static let maxLines = 5000
@@ -190,11 +210,10 @@ private struct StoredFile: Codable {
     }
 
     func record(expecting id: String) -> TimingRecord? {
-        guard schemaVersion == TimingStore.schemaVersion,
+        guard (TimingStore.oldestReadableVersion...TimingStore.schemaVersion).contains(schemaVersion),
               TimingStore.canonicalID(persistentID) == id,
               lines.count <= TimingStore.maxLines,
-              zip(lines, lines.dropFirst()).allSatisfy({ $0.index < $1.index }),
-              lines.allSatisfy({ $0.index >= 0 && $0.start.isFinite && $0.start >= 0 })
+              lines.areWellFormedAnchors
         else { return nil }
         switch (source, lines.isEmpty) {
         case (let source?, false):

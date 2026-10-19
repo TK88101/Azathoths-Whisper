@@ -112,6 +112,10 @@ struct UITestStubHTTPClient: HTTPClient {
     func post(_ url: URL, form: [String: String], headers: [String: String], timeout: TimeInterval) async throws -> HTTPResponse {
         HTTPResponse(statusCode: 404, body: "")
     }
+
+    func send(_ request: HTTPRequest) async throws -> HTTPResponse {
+        HTTPResponse(statusCode: 404, body: "")
+    }
 }
 
 /// batchImport 的替身 DarkLyrics 專輯頁：掛在真實的直連 URL 上，形狀照真站（`div.lyrics` 內 `h3` 標題＋`br` 分行），

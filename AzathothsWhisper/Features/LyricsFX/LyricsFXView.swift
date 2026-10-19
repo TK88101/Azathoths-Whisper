@@ -269,6 +269,22 @@ struct LyricsFXView: View {
                 }
             }
             statusOverlay
+            timingMark
+        }
+    }
+
+    /// 估算時間的角落小字 `~`（C 段計劃 §3.10）：拿到外部時間軸後熱替換，標記隨之消失
+    @ViewBuilder
+    private var timingMark: some View {
+        if model.isVisible, LyricsFXTimingMark.isShown(timeline: model.timeline, status: model.status) {
+            Text(verbatim: LyricsFXTimingMark.symbol)
+                .font(Theme.Fonts.mono(11))
+                .foregroundStyle(Theme.Gray.g400)
+                .padding(12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .allowsHitTesting(false)
+                .accessibilityLabel(Text("timing_estimated"))
+                .accessibilityIdentifier(AccessibilityID.lyricsFXTimingMark)
         }
     }
 

@@ -2,7 +2,7 @@ import Foundation
 
 /// 時間從哪裡來（母計劃 C.3 的退路順序）。**一個 enum**：存檔只收其子集 `StoredTimingSource`
 enum TimingSource: String, Sendable, Codable, CaseIterable {
-    case embeddedLRC, lrclib, youtubeMusic, deezer, qq, kugou, estimated
+    case embeddedLRC, lrclib, youtubeMusic, deezer, qq, netease, estimated
 }
 
 struct TimedWord: Equatable, Sendable {

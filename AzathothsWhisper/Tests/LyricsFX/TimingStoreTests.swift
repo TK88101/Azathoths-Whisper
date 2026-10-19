@@ -28,6 +28,25 @@ struct TimingStoreTests {
         #expect(await store.load(persistentID: Self.id) == Self.found())
     }
 
+    /// C 段 §3.4：加了網易雲 → 格式升到 v2（舊版 app 讀到 v2 會判認不出來、不覆寫）；v1 檔照讀
+    @Test func neteaseRoundTripsAndIsWrittenAsVersionTwo() async throws {
+        let directory = tempDirectory()
+        let store = TimingStore(directory: directory)
+        try await store.save(Self.found(.netease))
+        #expect(await store.load(persistentID: Self.id) == Self.found(.netease))
+        let json = try String(contentsOf: directory.appendingPathComponent("\(Self.id).json"), encoding: .utf8)
+        #expect(json.contains(#""schemaVersion" : 2"#))
+    }
+
+    @Test func aVersionOneFileIsStillRead() async throws {
+        let directory = tempDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let json = #"{"schemaVersion":1,"persistentID":"0123456789ABCDEF","lyricsHash":"\#(Self.hash.hex)","source":"qq","lines":[{"index":0,"start":1.5}],"fetchedAt":"2026-09-21T00:00:00Z"}"#
+        try Data(json.utf8).write(to: directory.appendingPathComponent("\(Self.id).json"))
+        let record = await TimingStore(directory: directory).load(persistentID: Self.id)
+        #expect(record?.outcome == .found(source: .qq, lines: [.init(index: 0, start: 1.5)]))
+    }
+
     @Test func missingFileIsNil() async {
         #expect(await TimingStore(directory: tempDirectory()).load(persistentID: Self.id) == nil)
     }
@@ -40,7 +59,7 @@ struct TimingStoreTests {
         let file = directory.appendingPathComponent("\(Self.id).json")
         let json = try String(contentsOf: file, encoding: .utf8)
         #expect(json.contains("\"fetchedAt\" : \"2026-"))
-        #expect(json.contains("\"schemaVersion\" : 1"))
+        #expect(json.contains("\"schemaVersion\" : 2"))   // C 段 §3.4 升版
         #expect(await store.load(persistentID: Self.id.lowercased())?.persistentID == Self.id)
     }
 
@@ -55,11 +74,14 @@ struct TimingStoreTests {
 
     @Test(arguments: [
         "not json",
-        #"{"schemaVersion":2,"persistentID":"0123456789ABCDEF","lyricsHash":"00000000000000000000000000000000","source":null,"lines":[],"fetchedAt":"2026-09-21T00:00:00Z"}"#,
+        // 比現行（v2，C 段 §3.4）還新的版本
+        #"{"schemaVersion":3,"persistentID":"0123456789ABCDEF","lyricsHash":"00000000000000000000000000000000","source":null,"lines":[],"fetchedAt":"2026-09-21T00:00:00Z"}"#,
         #"{"schemaVersion":1,"persistentID":"0123456789ABCDEF","lyricsHash":"00000000000000000000000000000000","source":"lrclib","lines":[],"fetchedAt":"2026-09-21T00:00:00Z"}"#,
         #"{"schemaVersion":1,"persistentID":"0123456789ABCDEF","lyricsHash":"00000000000000000000000000000000","source":null,"lines":[{"index":0,"start":1}],"fetchedAt":"2026-09-21T00:00:00Z"}"#,
         #"{"schemaVersion":1,"persistentID":"0123456789ABCDEF","lyricsHash":"00000000000000000000000000000000","source":"lrclib","lines":[{"index":1,"start":1},{"index":1,"start":2}],"fetchedAt":"2026-09-21T00:00:00Z"}"#,
         #"{"schemaVersion":1,"persistentID":"0123456789ABCDEF","lyricsHash":"00000000000000000000000000000000","source":"lrclib","lines":[{"index":0,"start":-1}],"fetchedAt":"2026-09-21T00:00:00Z"}"#,
+        // 時間倒退（C 段：與對齊重建共用同一個錨點合法性定義）
+        #"{"schemaVersion":2,"persistentID":"0123456789ABCDEF","lyricsHash":"00000000000000000000000000000000","source":"lrclib","lines":[{"index":0,"start":9},{"index":1,"start":3}],"fetchedAt":"2026-09-21T00:00:00Z"}"#,
         #"{"schemaVersion":1,"persistentID":"FFFFFFFFFFFFFFFF","lyricsHash":"00000000000000000000000000000000","source":null,"lines":[],"fetchedAt":"2026-09-21T00:00:00Z"}"#,
         #"{"schemaVersion":1,"persistentID":"0123456789ABCDEF","lyricsHash":"00000000000000000000000000000000","source":"estimated","lines":[{"index":0,"start":1}],"fetchedAt":"2026-09-21T00:00:00Z"}"#,
     ])
@@ -111,7 +133,7 @@ struct TimingStoreTests {
 
     /// 認不出來的檔（較新版本、沒有版本欄位、超大、符號連結）：讀不懂＝未知，不得蓋掉（安全評審 LOW；simplify R2 altitude）
     @Test(arguments: [
-        #"{"schemaVersion":2,"persistentID":"0123456789ABCDEF","whatever":true}"#,
+        #"{"schemaVersion":3,"persistentID":"0123456789ABCDEF","whatever":true}"#,
         #"{"version":7,"lines":[]}"#,
     ])
     func anUnrecognizedFileOnDiskIsNotOverwritten(contents: String) async throws {

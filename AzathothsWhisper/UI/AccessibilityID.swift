@@ -12,6 +12,8 @@ enum AccessibilityID {
     static let styleLyricsFX = "lyricsflow-style-lyricsFX"
     /// 歌詞特效層（a11y value＝當前行）
     static let lyricsFXLayer = "lyricsflow-lyricsfx"
+    /// 估算時間的角落 `~`（C 段計劃 §3.10）
+    static let lyricsFXTimingMark = "lyricsflow-lyricsfx-timing-mark"
     /// DEBUG 限定的風格探針：value＝`RaisedLayerStyle.rawValue`（同 `surfaceProbe` 的理由）
     static let raisedStyleProbe = "lyricsflow-raised-style"
     /// DEBUG 限定的配方探針：value＝組合配方的字型元件 id，或 `mono`（B1 計劃 §5）

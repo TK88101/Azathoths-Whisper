@@ -145,7 +145,60 @@ final class CoverFlowViewModel {
     }
 
     func updateDetails(_ newDetails: [String: TrackDetails]) {
+        let changed = newDetails.keys.filter { details[$0]?.lyrics != newDetails[$0]?.lyrics }
         details.merge(newDetails) { _, new in new }
+        refreshTimingMarks(for: changed)
+    }
+
+    // MARK: 尚無時間軸（C 段計劃 §3.10）
+
+    /// 存檔是不是「全部來源都明確說沒有」（同一份詞），由 AppModel 接到時間軸存檔；nil＝不標
+    @ObservationIgnored var timingNotFoundReader: (@Sendable (String, LyricsFingerprint) async -> Bool)?
+    /// 要標「尚無時間軸」的卡（persistentID）
+    private(set) var timingNotFound: Set<String> = []
+    /// 每首的標記世代：查找結果一到就 +1，比它早開始的存檔讀取結果作廢（較新的事件勝）
+    @ObservationIgnored private var timingMarkGeneration: [String: Int] = [:]
+
+    /// 查找結果回來（寫入後背景補做、特效層補做）：只認同一份詞；一時失敗不改變已知狀態
+    func timingResolved(_ resolution: TimingResolution) {
+        guard currentLyricsHash(of: resolution.persistentID) == resolution.lyricsHash else { return }
+        timingMarkGeneration[resolution.persistentID, default: 0] += 1
+        switch resolution.outcome {
+        case .notFound: setTimingNotFound(true, for: resolution.persistentID)
+        case .found: setTimingNotFound(false, for: resolution.persistentID)
+        case .unavailable, .cancelled, .skipped: break
+        }
+    }
+
+    /// 只有真的變了才寫：`@Observable` 的集合寫入不比對相等，空寫也會讓徽章重繪
+    private func setTimingNotFound(_ notFound: Bool, for persistentID: String) {
+        guard timingNotFound.contains(persistentID) != notFound else { return }
+        if notFound { timingNotFound.insert(persistentID) } else { timingNotFound.remove(persistentID) }
+    }
+
+    /// 只重讀詞變了（或第一次看到）的卡
+    private func refreshTimingMarks(for persistentIDs: [String]) {
+        for persistentID in persistentIDs {
+            guard let hash = currentLyricsHash(of: persistentID) else {
+                setTimingNotFound(false, for: persistentID)
+                continue
+            }
+            guard let reader = timingNotFoundReader else { continue }
+            let generation = timingMarkGeneration[persistentID, default: 0]
+            Task { [weak self] in
+                let notFound = await reader(persistentID, hash)
+                guard let self, self.currentLyricsHash(of: persistentID) == hash,
+                      self.timingMarkGeneration[persistentID, default: 0] == generation
+                else { return }
+                self.setTimingNotFound(notFound, for: persistentID)
+            }
+        }
+    }
+
+    /// 有詞（非空白）才有指紋
+    private func currentLyricsHash(of persistentID: String) -> LyricsFingerprint? {
+        guard let lyrics = details[persistentID]?.lyrics, !LyricsText.isBlank(lyrics) else { return nil }
+        return .of(lyrics)
     }
 
     func updateMarks(_ newMarks: Set<String>) {

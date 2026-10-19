@@ -45,7 +45,8 @@ extension AppModel {
             artworkDiskDirectory: nil,
             // 假檔寫不出來就退回「觀察到的歷史」模式（右側標明讀不到），不讓測試組裝本身崩潰
             queueDirectory: try? LyricsFlowUITestQueueFiles.write(),
-            isMusicRunning: { true }
+            isMusicRunning: { true },
+            timing: UITestTimingResolver(environment: environment[LyricsFXPreviewFixture.fakeTimingVariable])
         )
         model.lyricsFX.forcesReducedMotion = environment[LyricsFXPreviewFixture.reduceMotionVariable] == "1"
         if let nonce = LyricsFXPreviewRecipe.nonce(in: environment) {

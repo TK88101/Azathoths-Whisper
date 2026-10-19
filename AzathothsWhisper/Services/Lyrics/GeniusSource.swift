@@ -79,6 +79,7 @@ struct GeniusSource: LyricsSource {
         case .transport(let message): return message
         case .invalidURL(let value): return "invalid URL \(value)"
         case .undecodableBody: return "undecodable response body"
+        case .responseTooLarge: return "response too large"
         }
     }
 }
