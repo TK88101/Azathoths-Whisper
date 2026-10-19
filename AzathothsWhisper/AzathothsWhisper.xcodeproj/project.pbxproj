@@ -19,6 +19,7 @@
 		075FBD3B58B182B90210D093 /* TimingTestDoubles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BD621C3665C0A624549C808 /* TimingTestDoubles.swift */; };
 		08B2979FD9AEF2D7E7CAF85F /* LegacyConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4C0B0B66B19683FACBCA666 /* LegacyConfig.swift */; };
 		08BA22A9B2E229C0FFF28A8D /* CourierPrime-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1ED0E3177261F67542173F0F /* CourierPrime-Bold.ttf */; };
+		0A2DB8314D95AEEC75F5FB3A /* WordPacingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D3A4D3D976D14C76AA828D /* WordPacingTests.swift */; };
 		0A8DAD9C375EFE076842E89B /* CoverFlowStripStackingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CAA8E2815FD13EE91B7306C /* CoverFlowStripStackingTests.swift */; };
 		0C184008ADCCB6EB8711BF52 /* HTMLText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7B16B314B3DA14C6C421D5 /* HTMLText.swift */; };
 		0D929F53346E047ADD3EBD3D /* Anton-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5F0AB26E9B4AEA128961EE2A /* Anton-Regular.ttf */; };
@@ -87,6 +88,7 @@
 		30ABF77C88091B6A279DBD34 /* OFL-IMFellEnglishSC.txt in Resources */ = {isa = PBXBuildFile; fileRef = 24FBB91AB266A275CD21A539 /* OFL-IMFellEnglishSC.txt */; };
 		30B2AD2ABC9D292BF5FC7ABC /* OFL-Bangers.txt in Resources */ = {isa = PBXBuildFile; fileRef = 5F271DF7D02B973AE9FECC52 /* OFL-Bangers.txt */; };
 		30BA00A4FD528E2312E51367 /* TimingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98E8EFA1CC362BCD9BF8535E /* TimingStore.swift */; };
+		314ADE098CB65E9D2375805C /* WordPacing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F28E68DDA48BBCA8FFD8F37 /* WordPacing.swift */; };
 		3242E4A40B713F348EAA6D3A /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = ED165E3BE2EC50BD3C0CD5AF /* Fixtures */; };
 		328372DB625F7E9E650B24D8 /* CoverFlowUITestMusicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 298C6019808B478E0D0EF144 /* CoverFlowUITestMusicTests.swift */; };
 		32972EE7894BEF202AA32E57 /* SpyPlayerChangeSignal.swift in Sources */ = {isa = PBXBuildFile; fileRef = E558EC88735D5FF7028F1216 /* SpyPlayerChangeSignal.swift */; };
@@ -550,6 +552,7 @@
 		469085BCC5001E8EB78677AF /* QueueFileSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueFileSourceTests.swift; sourceTree = "<group>"; };
 		47C676087878B1DEA5569C96 /* CoverFlowProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowProbe.swift; sourceTree = "<group>"; };
 		48B5785DBC8AE50D1A015696 /* CoverFlowUITestFixtureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowUITestFixtureTests.swift; sourceTree = "<group>"; };
+		48D3A4D3D976D14C76AA828D /* WordPacingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordPacingTests.swift; sourceTree = "<group>"; };
 		48EE3078BA87F472D8FC5815 /* TrackMatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackMatcherTests.swift; sourceTree = "<group>"; };
 		4AB087BA735E28B10D6C5249 /* PlayableSpace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayableSpace.swift; sourceTree = "<group>"; };
 		4C2B3108D17F2230CCF170B0 /* B2BatchTwoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = B2BatchTwoTests.swift; sourceTree = "<group>"; };
@@ -629,6 +632,7 @@
 		7D26718C38D4D4887E31073A /* SongProfileResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongProfileResolver.swift; sourceTree = "<group>"; };
 		7DBAF4CAD3EF4380B4259BA2 /* OFL-SpaceGrotesk.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-SpaceGrotesk.txt"; sourceTree = "<group>"; };
 		7E9B711BC5C1C82605BAC205 /* TrackLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackLabel.swift; sourceTree = "<group>"; };
+		7F28E68DDA48BBCA8FFD8F37 /* WordPacing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordPacing.swift; sourceTree = "<group>"; };
 		8179E6435F197611082AEEE4 /* SongProfileResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongProfileResolverTests.swift; sourceTree = "<group>"; };
 		8443348F9A45452D22DB6395 /* TimingMarksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimingMarksTests.swift; sourceTree = "<group>"; };
 		85072CCF54AE37F3400A647E /* LyricsFlowUITestMusic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFlowUITestMusic.swift; sourceTree = "<group>"; };
@@ -998,6 +1002,7 @@
 				CB55F8F11543865471522355 /* SignedBatchFixture.swift */,
 				8179E6435F197611082AEEE4 /* SongProfileResolverTests.swift */,
 				7B1FC589B83AFCFBB2163488 /* TimingStoreTests.swift */,
+				48D3A4D3D976D14C76AA828D /* WordPacingTests.swift */,
 			);
 			path = LyricsFX;
 			sourceTree = "<group>";
@@ -1382,6 +1387,7 @@
 				7D26718C38D4D4887E31073A /* SongProfileResolver.swift */,
 				98E8EFA1CC362BCD9BF8535E /* TimingStore.swift */,
 				DBE99EBE7AB502BEB8B5CE36 /* TitleSanitizer.swift */,
+				7F28E68DDA48BBCA8FFD8F37 /* WordPacing.swift */,
 				9F406EF6D0F2BFCB4ECA4032 /* Timing */,
 			);
 			path = Lyrics;
@@ -1904,6 +1910,7 @@
 				6E0F72E6CF9588F5F7ED94AF /* TokenValidatorTests.swift in Sources */,
 				7D7234F68BFF710C010BE8CB /* TrackLabelTests.swift in Sources */,
 				8A7536DD6AA3108112DE795D /* TrackMatcherTests.swift in Sources */,
+				0A2DB8314D95AEEC75F5FB3A /* WordPacingTests.swift in Sources */,
 				2012B30BF6A07504977C0831 /* YouTubeMusicProviderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2061,6 +2068,7 @@
 				D4F57FDDB04DDE4019CF0F74 /* UITestTimingResolver.swift in Sources */,
 				CF79A1657D6F9670863F8D6C /* VisualEffectView.swift in Sources */,
 				2FCEBBB682A899D43804711B /* WindowConfigurator.swift in Sources */,
+				314ADE098CB65E9D2375805C /* WordPacing.swift in Sources */,
 				B99C352506938387D0BB41D7 /* YouTubeMusicProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

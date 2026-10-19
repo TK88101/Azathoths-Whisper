@@ -122,7 +122,10 @@ enum LyricsTimelineBuilder {
             let line = lrc[index]
             guard !line.text.isEmpty else { return nil }
             let end = index + 1 < lrc.count ? lrc[index + 1].start : lastLineEnd(start: line.start, duration: duration)
-            return TimedLine(start: line.start, end: end, text: line.text, isChorus: false)
+            return TimedLine(
+                start: line.start, end: end, text: line.text, isChorus: false,
+                revealEnd: WordPacing.revealEnd(text: line.text, start: line.start, lineEnd: end)
+            )
         }
         guard let last = lines.last else { return nil }
         return LyricsTimeline(lines: lines, source: .embeddedLRC, duration: max(duration, last.end))

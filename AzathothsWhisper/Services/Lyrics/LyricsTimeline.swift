@@ -16,14 +16,17 @@ struct TimedLine: Equatable, Sendable {
     let end: Double
     let text: String
     let isChorus: Bool
+    /// 字出完的時刻（≤ `end`）：外部與內嵌 LRC 由 `WordPacing` 限速，其餘等於 `end`
+    let revealEnd: Double
     let words: [TimedWord]
 
-    init(start: Double, end: Double, text: String, isChorus: Bool) {
+    init(start: Double, end: Double, text: String, isChorus: Bool, revealEnd: Double? = nil) {
         self.start = start
         self.end = end
         self.text = text
         self.isChorus = isChorus
-        self.words = TimedWord.split(text, start: start, end: end)
+        self.revealEnd = revealEnd ?? end
+        self.words = TimedWord.split(text, start: start, end: self.revealEnd)
     }
 }
 

@@ -93,7 +93,11 @@ enum LRCAligner {
             let end = index + 1 < starts.count
                 ? starts[index + 1]
                 : LyricsTimelineBuilder.lastLineEnd(start: starts[index], duration: duration)
-            return TimedLine(start: starts[index], end: end, text: music[index].text, isChorus: music[index].isChorus)
+            let text = music[index].text
+            return TimedLine(
+                start: starts[index], end: end, text: text, isChorus: music[index].isChorus,
+                revealEnd: WordPacing.revealEnd(text: text, start: starts[index], lineEnd: end)
+            )
         }
         return LyricsTimeline(lines: lines, source: source, duration: max(duration, lines.last?.end ?? 0))
     }
