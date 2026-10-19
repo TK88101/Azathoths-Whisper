@@ -158,6 +158,21 @@ struct TimingResolverTests {
         #expect(await provider.callCount == 0)
     }
 
+    /// 舊對齊版本的 found 重查一次；重查全是「沒有」時保留舊錨點、回給畫面、且不再重查（Codex review P2，2026-10-20）
+    @Test func anOldAlignerFoundThatFindsNothingNewIsKeptAndNotRetriedAgain() async throws {
+        let store = TimingStore(directory: directory())
+        let old = TimingRecord(persistentID: Self.id, lyricsHash: .of(Self.lyrics), outcome: .found(source: .qq, lines: [.init(index: 0, start: 5)]),
+                               fetchedAt: Self.now.addingTimeInterval(-86_400), alignerRevision: LRCAligner.revision - 1)
+        try await store.save(old)
+        let provider = FakeTimingProvider(.lrclib, [.outcome(.noTiming(.notFound)), .outcome(.noTiming(.notFound))])
+        let (resolver, _) = resolver([provider], store: store)
+        #expect(await resolver.resolve(request(), priority: .visible).outcome == .found(.qq, [.init(index: 0, start: 5)]))
+        #expect(await provider.callCount == 1)
+        #expect(await store.load(persistentID: Self.id)?.alignerRevision == LRCAligner.revision)
+        #expect(await resolver.resolve(request(), priority: .visible).outcome == .found(.qq, [.init(index: 0, start: 5)]))
+        #expect(await provider.callCount == 1)
+    }
+
     @Test func aWeekOldNotFoundIsLookedUpAgain() async throws {
         let store = TimingStore(directory: directory())
         try await store.save(TimingRecord(persistentID: Self.id, lyricsHash: .of(Self.lyrics), outcome: .notFound, fetchedAt: Self.now.addingTimeInterval(-8 * 86_400)))

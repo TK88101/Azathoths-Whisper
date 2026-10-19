@@ -46,13 +46,19 @@ struct TimingRecord: Equatable, Sendable {
     }
 
     /// 兩份記錄的合併（多台 Mac 經同步資料夾、或同程序先後寫入）：
-    /// 詞不同→取新來的（新詞）；同詞：found 勝 notFound；同類→`fetchedAt` 較新者勝
+    /// 詞不同→取新來的（新詞）；同詞：found 勝 notFound；同類→`fetchedAt` 較新者勝（同時刻取新來的）
     static func merged(existing: TimingRecord?, incoming: TimingRecord) -> TimingRecord {
         guard let existing, existing.lyricsHash == incoming.lyricsHash else { return incoming }
         switch (existing.outcome, incoming.outcome) {
-        case (.found, .notFound): return existing
+        case (.found, .notFound):
+            // 錨點留著，但記下這個對齊版本已重查過：否則舊版本 found 每次都會再查（Codex review P2）
+            return TimingRecord(
+                persistentID: existing.persistentID, lyricsHash: existing.lyricsHash, outcome: existing.outcome, fetchedAt: existing.fetchedAt,
+                alignerRevision: max(existing.alignerRevision, incoming.alignerRevision)
+            )
         case (.notFound, .found): return incoming
-        default: return incoming.fetchedAt > existing.fetchedAt ? incoming : existing
+        // 同時刻＝新寫入者勝（它是剛查到的；舊的可能是錨點已套不上的壞檔）
+        default: return incoming.fetchedAt >= existing.fetchedAt ? incoming : existing
         }
     }
 }
@@ -126,7 +132,9 @@ actor TimingStore {
         return record
     }
 
-    func save(_ record: TimingRecord) throws {
+    /// 回傳實際寫下的（與磁碟既有者合併後的）記錄
+    @discardableResult
+    func save(_ record: TimingRecord) throws -> TimingRecord {
         guard let id = Self.canonicalID(record.persistentID) else { throw StoreError.invalidPersistentID }
         let canonical = TimingRecord(
             persistentID: id, lyricsHash: record.lyricsHash, outcome: record.outcome, fetchedAt: record.fetchedAt,
@@ -141,6 +149,7 @@ actor TimingStore {
         let merged = TimingRecord.merged(existing: existing, incoming: canonical)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Self.encoder.encode(StoredFile(merged)).write(to: fileURL(for: id), options: .atomic)
+        return merged
     }
 
     /// Music 的 persistentID 是 16 位 hex；大寫正規化後才驗證與命名（大小寫不同不得變成兩個檔、防路徑穿越）

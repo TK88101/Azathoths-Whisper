@@ -181,13 +181,15 @@ actor TimingResolver: TimingResolving {
 
     private func save(_ outcome: TimingRecord.Outcome, for request: TimingRequest, hash: LyricsFingerprint) async -> TimingResolution.Outcome {
         guard !Task.isCancelled, latestHash[request.persistentID] == hash else { return .cancelled }
+        var kept = outcome
         do {
-            try await store.save(TimingRecord(persistentID: request.persistentID, lyricsHash: hash, outcome: outcome, fetchedAt: now()))
+            // 合併後的結果才是答案：同詞已有 found 時，這次的 notFound 不會蓋掉它
+            kept = try await store.save(TimingRecord(persistentID: request.persistentID, lyricsHash: hash, outcome: outcome, fetchedAt: now())).outcome
         } catch {
             diagnostics.record(.storeFailed)
         }
         backoff.recordSuccess(request.persistentID)
-        return TimingResolution.Outcome(outcome)
+        return TimingResolution.Outcome(kept)
     }
 
     // MARK: 佇列

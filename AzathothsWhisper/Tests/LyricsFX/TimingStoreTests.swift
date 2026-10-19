@@ -219,6 +219,20 @@ struct TimingRecordMergeTests {
         #expect(TimingRecord.merged(existing: T.notFound(at: T.base), incoming: later) == later)
     }
 
+    /// 舊版本 found 遇到新版本的 notFound：錨點留著、版本前進（同一版本不再重查）
+    @Test func foundKeepsItsAnchorsButTakesTheNewerAlignerRevision() {
+        let old = TimingRecord(persistentID: T.id, lyricsHash: T.hash, outcome: T.found().outcome, fetchedAt: T.base, alignerRevision: 1)
+        let merged = TimingRecord.merged(existing: old, incoming: T.notFound(at: T.base.addingTimeInterval(60)))
+        #expect(merged.outcome == T.found().outcome)
+        #expect(merged.alignerRevision == LRCAligner.revision)
+    }
+
+    @Test func theIncomingRecordWinsATieBetweenLikeOutcomes() {
+        let existing = T.found(.qq, at: T.base)
+        let incoming = T.found(.lrclib, at: T.base)
+        #expect(TimingRecord.merged(existing: existing, incoming: incoming) == incoming)
+    }
+
     @Test func newerFetchWinsBetweenLikeOutcomes() {
         let older = T.found(.lrclib, at: T.base)
         let newer = T.found(.youtubeMusic, at: T.base.addingTimeInterval(60))
