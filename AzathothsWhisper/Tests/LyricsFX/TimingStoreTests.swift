@@ -47,6 +47,25 @@ struct TimingStoreTests {
         #expect(record?.outcome == .found(source: .qq, lines: [.init(index: 0, start: 1.5)]))
     }
 
+    /// 對齊演算法版本（docs/plans/2026-10-19-lyrics-fx-merged-line-align.md）：沒有這個欄位的舊檔＝版本 1
+    @Test func aFileWithoutAlignerRevisionReadsAsRevisionOne() async throws {
+        let directory = tempDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let json = #"{"schemaVersion":2,"persistentID":"0123456789ABCDEF","lyricsHash":"\#(Self.hash.hex)","source":"lrclib","lines":[{"index":0,"start":1.5}],"fetchedAt":"2026-10-19T00:00:00Z"}"#
+        try Data(json.utf8).write(to: directory.appendingPathComponent("\(Self.id).json"))
+        let record = await TimingStore(directory: directory).load(persistentID: Self.id)
+        #expect(record?.alignerRevision == 1)
+    }
+
+    @Test func savedRecordsCarryTheCurrentAlignerRevision() async throws {
+        let directory = tempDirectory()
+        let store = TimingStore(directory: directory)
+        try await store.save(Self.found())
+        #expect(await store.load(persistentID: Self.id)?.alignerRevision == LRCAligner.revision)
+        let text = try String(contentsOf: directory.appendingPathComponent("\(Self.id).json"), encoding: .utf8)
+        #expect(text.contains("\"alignerRevision\" : \(LRCAligner.revision)"))
+    }
+
     @Test func missingFileIsNil() async {
         #expect(await TimingStore(directory: tempDirectory()).load(persistentID: Self.id) == nil)
     }
@@ -228,6 +247,19 @@ struct TimingLookupPolicyTests {
 
     @Test func foundIsNeverLookedUpAgain() {
         #expect(!TimingLookupPolicy.shouldLookup(record: T.found(), currentHash: T.hash, now: T.base.addingTimeInterval(365 * Self.day)))
+    }
+
+    /// 舊演算法對出來的 found 要重查一次，否則修好的對齊永遠到不了已存過的歌
+    @Test func foundFromAnOlderAlignerIsLookedUpAgain() {
+        let found = T.found()
+        let old = TimingRecord(persistentID: found.persistentID, lyricsHash: found.lyricsHash, outcome: found.outcome, fetchedAt: found.fetchedAt, alignerRevision: LRCAligner.revision - 1)
+        #expect(TimingLookupPolicy.shouldLookup(record: old, currentHash: T.hash, now: T.base))
+    }
+
+    /// notFound 與演算法版本無關（沒有任何來源給時間），照 7 天規則
+    @Test func notFoundFromAnOlderAlignerKeepsTheSevenDayRule() {
+        let old = TimingRecord(persistentID: T.id, lyricsHash: T.hash, outcome: .notFound, fetchedAt: T.base, alignerRevision: LRCAligner.revision - 1)
+        #expect(!TimingLookupPolicy.shouldLookup(record: old, currentHash: T.hash, now: T.base))
     }
 
     @Test func notFoundIsRetriedAfterSevenDays() {

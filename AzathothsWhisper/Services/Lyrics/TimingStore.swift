@@ -34,6 +34,16 @@ struct TimingRecord: Equatable, Sendable {
     let outcome: Outcome
     /// 最後一次查找的時刻（wall-clock：要跨重啟、跨機器比較，單調時鐘做不到）
     let fetchedAt: Date
+    /// 對出這份錨點的 `LRCAligner.revision`；欄位出現前寫下的檔＝1
+    let alignerRevision: Int
+
+    init(persistentID: String, lyricsHash: LyricsFingerprint, outcome: Outcome, fetchedAt: Date, alignerRevision: Int = LRCAligner.revision) {
+        self.persistentID = persistentID
+        self.lyricsHash = lyricsHash
+        self.outcome = outcome
+        self.fetchedAt = fetchedAt
+        self.alignerRevision = alignerRevision
+    }
 
     /// 兩份記錄的合併（多台 Mac 經同步資料夾、或同程序先後寫入）：
     /// 詞不同→取新來的（新詞）；同詞：found 勝 notFound；同類→`fetchedAt` 較新者勝
@@ -64,7 +74,7 @@ enum TimingLookupPolicy {
     static func shouldLookup(record: TimingRecord?, currentHash: LyricsFingerprint, now: Date) -> Bool {
         guard let record else { return true }
         if record.lyricsHash != currentHash { return true }
-        if case .found = record.outcome { return false }
+        if case .found = record.outcome { return record.alignerRevision < LRCAligner.revision }
         let age = now.timeIntervalSince(record.fetchedAt)
         return age >= retryInterval || age < -futureTolerance
     }
@@ -118,7 +128,10 @@ actor TimingStore {
 
     func save(_ record: TimingRecord) throws {
         guard let id = Self.canonicalID(record.persistentID) else { throw StoreError.invalidPersistentID }
-        let canonical = TimingRecord(persistentID: id, lyricsHash: record.lyricsHash, outcome: record.outcome, fetchedAt: record.fetchedAt)
+        let canonical = TimingRecord(
+            persistentID: id, lyricsHash: record.lyricsHash, outcome: record.outcome, fetchedAt: record.fetchedAt,
+            alignerRevision: record.alignerRevision
+        )
         let existing: TimingRecord?
         switch inspect(id) {
         case .unrecognized: throw StoreError.unrecognizedFileOnDisk
@@ -193,12 +206,15 @@ private struct StoredFile: Codable {
     let source: StoredTimingSource?
     let lines: [TimingRecord.LineStart]
     let fetchedAt: Date
+    /// 可選欄位：舊版讀到會忽略，所以不必升 schemaVersion
+    let alignerRevision: Int?
 
     init(_ record: TimingRecord) {
         schemaVersion = TimingStore.schemaVersion
         persistentID = record.persistentID
         lyricsHash = record.lyricsHash
         fetchedAt = record.fetchedAt
+        alignerRevision = record.alignerRevision
         switch record.outcome {
         case .found(let source, let lines):
             self.source = source
@@ -217,9 +233,12 @@ private struct StoredFile: Codable {
         else { return nil }
         switch (source, lines.isEmpty) {
         case (let source?, false):
-            return TimingRecord(persistentID: id, lyricsHash: lyricsHash, outcome: .found(source: source, lines: lines), fetchedAt: fetchedAt)
+            return TimingRecord(
+                persistentID: id, lyricsHash: lyricsHash, outcome: .found(source: source, lines: lines), fetchedAt: fetchedAt,
+                alignerRevision: alignerRevision ?? 1
+            )
         case (nil, true):
-            return TimingRecord(persistentID: id, lyricsHash: lyricsHash, outcome: .notFound, fetchedAt: fetchedAt)
+            return TimingRecord(persistentID: id, lyricsHash: lyricsHash, outcome: .notFound, fetchedAt: fetchedAt, alignerRevision: alignerRevision ?? 1)
         default:
             return nil
         }

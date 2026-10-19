@@ -2,7 +2,8 @@ import Foundation
 
 /// 外部時間軸「只借時間、不借文字」（母計劃 §2.4，Codex R1-4；C 段計劃 §3.4）。
 ///
-/// Music 的每個歌詞行在 LRC 中單調向前找相似度 ≥ `lineSimilarityThreshold` 的行（一對一）。採用條件全部成立：
+/// Music 的每個歌詞行在 LRC 中單調向前找相似度 ≥ `lineSimilarityThreshold` 的行；單行不中時試連續 2–`maxMergedCues` 行串接
+/// （Genius 常把 LRC 兩行合成一行，錨到第一行起點；docs/plans/2026-10-19-lyrics-fx-merged-line-align.md）。採用條件全部成立：
 /// Music 側對上比例 ≥ `alignmentRateThreshold`、LRC 側（非空行）被對上比例 ≥ `lrcCoverageThreshold`、
 /// 直接錨點 ≥ `minimumAnchors`（否則視為別盤／別曲／別版本，或重複副歌錯錨）。
 /// 未對上的行在相鄰已對上行之間等距內插。顯示文字永遠是 Music 的
@@ -12,6 +13,10 @@ enum LRCAligner {
     /// 擋「Music 漏了前段、LRC 有兩段相同副歌」整段錨到前一段（Codex R2）；2026-10-19 探針達標 5 首最低 0.618
     static let lrcCoverageThreshold = 0.6
     static let minimumAnchors = 3
+    /// Music 一行最多對上幾行連續的 LRC（不跨空行）
+    static let maxMergedCues = 3
+    /// 對齊演算法版本：1＝一對一、2＝加串接。存檔記下它，舊版本對出的 found 重查一次（`TimingLookupPolicy`）
+    static let revision = 2
     /// 外部 cue 與存檔時間可以比曲長晚這麼多（曲長取整、尾奏淡出）
     static let durationSlack: Double = 5
 
@@ -46,7 +51,8 @@ enum LRCAligner {
         let music = texts.map { Array(normalized($0)) }
         let cues = lrc.map { Array(normalized($0.text)) }
         guard let hits = matchedIndices(music, cues: cues) else { return nil }
-        let anchors = hits.map { $0.map { lrc[$0].start } }
+        let anchors = hits.map { $0.map { lrc[$0.index].start } }
+        // LRC 側覆蓋率照舊以對上的 Music 行數計：串接不放寬這道防錯錨的門檻（Codex M1-Q2）
         let matched = hits.compactMap { $0 }.count
         let comparable = cues.filter { !$0.isEmpty }.count
         return Alignment(
@@ -120,20 +126,32 @@ enum LRCAligner {
         String(text.lowercased().filter { $0.isLetter || $0.isNumber })
     }
 
-    /// 單調前向、一對一：每行回傳對上的 LRC 序號。每次比對前檢查取消（20 s 時限與 shutdown 才管得到它）；取消＝nil
-    private static func matchedIndices(_ music: [[Character]], cues: [[Character]]) -> [Int?]? {
+    /// 一個 Music 行對上的 LRC：從 `index` 起連續 `span` 行
+    private struct Hit {
+        let index: Int
+        let span: Int
+    }
+
+    /// 單調前向：每行回傳對上的 LRC 起點與行數；同一起點先試單行、再試串接。每次比對前檢查取消（20 s 時限與 shutdown 才管得到它）；取消＝nil
+    private static func matchedIndices(_ music: [[Character]], cues: [[Character]]) -> [Hit?]? {
         var cursor = 0
-        var hits: [Int?] = []
+        var hits: [Hit?] = []
         for line in music {
-            var hit: Int?
-            for index in cues.indices.dropFirst(cursor) {
-                guard !Task.isCancelled else { return nil }
-                if similarity(line, cues[index]) >= lineSimilarityThreshold {
-                    hit = index
-                    break
+            var hit: Hit?
+            search: for index in cues.indices.dropFirst(cursor) {
+                var joined: [Character] = []
+                for span in 1...maxMergedCues {
+                    let next = index + span - 1
+                    guard next < cues.count, !cues[next].isEmpty else { break }
+                    guard !Task.isCancelled else { return nil }
+                    joined += cues[next]
+                    if similarity(line, joined) >= lineSimilarityThreshold {
+                        hit = Hit(index: index, span: span)
+                        break search
+                    }
                 }
             }
-            if let hit { cursor = hit + 1 }
+            if let hit { cursor = hit.index + hit.span }
             hits.append(hit)
         }
         return hits
