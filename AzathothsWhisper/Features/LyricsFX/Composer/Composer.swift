@@ -58,6 +58,17 @@ enum Composer {
         return (first, second)
     }
 
+    /// 讀不到歌詞的出場＋退場組合（docs/plans/2026-10-19-lyrics-fx-style-coverage.md）：condense 慢慢浮現＋cut 直接切掉，換句瞬間整屏近全黑
+    static let forbiddenPairs: [(enter: String, exit: String)] = [("condense", "cut")]
+
+    /// 退場候選先排除與已選出場相衝的；排除完沒有合格者才不排除（取樣次數不變）
+    static func compatibleExits(_ catalog: [FXComponent], enter: String, profile: SongProfile) -> [FXComponent] {
+        let exits = catalog.filter { $0.slot == .exit }
+        let banned = Set(forbiddenPairs.filter { $0.enter == enter }.map(\.exit))
+        let allowed = exits.filter { !banned.contains($0.id) }
+        return allowed.contains { fit($0, profile) > 0 } ? allowed : exits
+    }
+
     /// 六槽各抽一、效果抽兩個；任一必選槽沒有候選＝整份 mono（修正原型回 `list[0]`，composer.js:164）。
     /// `avoiding`＝同一首歌上一次的配方：每一槽都先排除上一次的元件（使用者：「每次都給我感覺變了」「全部都要隨機起來」），
     /// 只剩它一個候選時才允許重複。每槽恰取一次亂數，排除與否不影響其他槽的取樣位置
@@ -69,7 +80,8 @@ enum Composer {
             sample(catalog.filter { $0.slot == slot }, profile, &random, avoiding: avoided)?.id
         }
         guard let font = pick(.font, previous?.font, &random), let backdrop = pick(.backdrop, previous?.backdrop, &random),
-              let enter = pick(.enter, previous?.enter, &random), let exit = pick(.exit, previous?.exit, &random),
+              let enter = pick(.enter, previous?.enter, &random),
+              let exit = sample(compatibleExits(catalog, enter: enter, profile: profile), profile, &random, avoiding: previous?.exit)?.id,
               let palette = sample(compatiblePalettes(catalog, backdrop: backdrop, profile: profile), profile, &random, avoiding: previous?.palette)?.id
         else { return .mono }
         let (fx1, fx2) = pickEffects(catalog.filter { $0.slot == .fx }, profile, &random, avoiding: previous?.fx1)

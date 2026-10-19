@@ -180,9 +180,21 @@ struct ComposerSamplingTests {
             counts[id, default: 0] += 1
         }
         for candidate in shortlist {
-            let expected = Composer.fit(candidate, profile) / total
+            let expected = slot == .exit ? Self.exitShare(candidate.id, profile) : Composer.fit(candidate, profile) / total
             let actual = Double(counts[candidate.id] ?? 0) / Double(draws)
             #expect(abs(actual - expected) < 0.04, "\(slot) \(candidate.id) 期望 \(expected) 實得 \(actual)")
+        }
+    }
+
+    /// 退場依出場排除禁止組合後再按 fit 抽（`Composer.compatibleExits`）：期望值＝Σ P(出場) × P(退場｜相容名單)
+    private static func exitShare(_ id: String, _ profile: SongProfile) -> Double {
+        let enters = Composer.candidates(LyricsFXCatalog.components(in: .enter), profile)
+        let enterTotal = enters.reduce(0) { $0 + Composer.fit($1, profile) }
+        return enters.reduce(0) { sum, enter in
+            let exits = Composer.candidates(Composer.compatibleExits(LyricsFXCatalog.all, enter: enter.id, profile: profile), profile)
+            let exitTotal = exits.reduce(0) { $0 + Composer.fit($1, profile) }
+            let share = exits.first { $0.id == id }.map { Composer.fit($0, profile) / exitTotal } ?? 0
+            return sum + Composer.fit(enter, profile) / enterTotal * share
         }
     }
 
@@ -233,6 +245,29 @@ struct CatalogValidatorTests {
         #expect(!CatalogValidator.problems(in: [good, good]).isEmpty, "id 重複")
         for tag in FXTag.nuFamily {
             #expect(!CatalogValidator.problems(in: [good, component(.fx, "ind", tags: [.industrial]), component(.fx, "nuToo", tags: [.industrial, tag])]).isEmpty, "industrial 與 \(tag) 共用")
+        }
+    }
+}
+
+// 讀得到的歌詞（docs/plans/2026-10-19-lyrics-fx-style-coverage.md）：condense 慢慢浮現＋cut 直接切掉，換句瞬間整屏近全黑
+@Suite("Composer forbidden pairs")
+struct ComposerForbiddenPairTests {
+    @Test func condenseNeverMeetsCut() {
+        let profiles = SongProfileResolver.bandTable.map(\.profile)
+            + SongProfileResolver.keywordRows.compactMap { SongProfileResolver.compose(genre: $0.keywords[0], rows: [$0]) }
+        for profile in profiles {
+            var previous: ComposedRecipe?
+            for seed in UInt64(0)..<200 {
+                guard case .composed(let recipe) = Composer.compose(profile: profile, seed: seed, avoiding: previous) else { continue }
+                #expect(!(recipe.enter == "condense" && recipe.exit == "cut"), "seed \(seed)")
+                previous = recipe
+            }
+        }
+    }
+
+    @Test func forbiddenPairsReferToCatalogComponents() {
+        for pair in Composer.forbiddenPairs {
+            #expect(LyricsFXCatalog.component(pair.enter) != nil && LyricsFXCatalog.component(pair.exit) != nil, "\(pair)")
         }
     }
 }
