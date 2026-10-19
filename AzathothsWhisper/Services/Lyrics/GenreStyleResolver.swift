@@ -35,7 +35,18 @@ enum GenreStyleResolver {
 
     private static let separators = CharacterSet(charactersIn: "/,&+- ").union(.whitespaces)
 
-    private static let japaneseTags = ["ロック", "j-pop"]
+    /// 標籤層面的日本語系訊號。「ロック」不算：它是 Music 日文介面的曲風名，曲庫裡多是西洋樂團（docs/plans/2026-10-19-lyrics-fx-japanese-genre-tags.md）
+    private static let japaneseTags = ["j-pop", "j-rock"]
+
+    /// Music 日文介面的曲風名 → 英文關鍵字；長的在前（ハードロック先於ロック、ブラックメタル先於メタル）
+    private static let japaneseGenreNames: [(String, String)] = [
+        ("ハードロック", "hard rock"), ("ヘヴィメタル", "heavy metal"), ("ブラックメタル", "black metal"), ("デスメタル", "death metal"),
+        ("サウンドトラック", "soundtrack"), ("オルタナティブ", "alternative"), ("インダストリアル", "industrial"),
+        ("エレクトロニック", "electronic"), ("エレクトロニカ", "electronic"), ("ヒップホップ", "hip-hop"),
+        ("ハードコア", "hardcore"), ("インディー", "indie"), ("クラシック", "classical"), ("カントリー", "country"),
+        ("ゴシック", "goth"), ("フォーク", "folk"), ("ワールド", "world"), ("メタル", "metal"), ("ロック", "rock"),
+        ("パンク", "punk"), ("ポップ", "pop"), ("ダンス", "dance"), ("ラップ", "rap"), ("ソウル", "soul"),
+    ]
 
     private static let englishRules: [(StyleFamily, [String])] = [
         (.cathedral, ["symphon", "neoclassic", "classical", "religious", "soundtrack", "score"]),
@@ -54,7 +65,7 @@ enum GenreStyleResolver {
     ]
 
     static func resolve(genre: String?, lyrics: String?) -> GenreStyle {
-        let tag = (genre ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let tag = normalizedTag(genre)
         let isJapanese = japaneseTags.contains { tag.contains($0) }
             || japaneseRatio(lyrics ?? "") >= japaneseRatioThreshold
         if isJapanese {
@@ -77,9 +88,16 @@ enum GenreStyleResolver {
 
     /// 同一套切詞＋整詞規則判斷 genre 是否命中關鍵字（歌曲目標值 `SongProfileResolver` 共用；B1 計劃 §3.5）
     static func genre(_ genre: String?, matches keyword: String) -> Bool {
-        let tag = (genre ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let tag = normalizedTag(genre)
         let tokens = Set(tag.components(separatedBy: separators).filter { !$0.isEmpty })
         return matches(keyword, tag: tag, tokens: tokens)
+    }
+
+    /// 去頭尾空白、小寫、日文曲風名換成英文（兩個入口共用的唯一定義）
+    private static func normalizedTag(_ genre: String?) -> String {
+        let lowered = (genre ?? "").lowercased()
+        let translated = japaneseGenreNames.reduce(lowered) { $0.replacingOccurrences(of: $1.0, with: " \($1.1) ") }
+        return translated.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
     private static func matches(_ keyword: String, tag: String, tokens: Set<String>) -> Bool {
