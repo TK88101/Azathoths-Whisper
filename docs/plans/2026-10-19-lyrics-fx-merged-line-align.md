@@ -31,3 +31,5 @@
 ## 6. 真機紀錄
 - 2026-10-19 21:4x Arch Enemy〈War Eternal〉：使用者「差不多」。
 - 2026-10-19 21:4x 下一首（網易雲時間軸 music=0.78 lrc=0.89）：使用者「差不多」。
+- 2026-10-19 21:56 Burzum〈Jesus' Tod〉（Death Metal/Black Metal，LRCLIB 8 行全對上）：使用者「沒問題」（樣式＋時間軸）。
+- 2026-10-19 21:5x The Agonist〈The Escape〉（メタル）：仍為 mono——已核：畫面樣式由 SongProfileResolver（34 團覆寫表＋只有黑金屬／交響兩列曲風）決定，一般 metal 本來就是 mono（B1 範圍）；e6f3d65 對它沒有可見效果。GenreStyleResolver 的家族目前沒有被畫面使用。

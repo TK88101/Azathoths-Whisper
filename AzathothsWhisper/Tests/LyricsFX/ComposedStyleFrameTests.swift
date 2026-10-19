@@ -41,7 +41,7 @@ struct ComposedStyleFrameTests {
     }
 
     @Test func valuesStayInRangeThroughTheSong() {
-        for enter in ["condense", "negative", "smoke", "rise", "swoop", "lash", "slam"] {
+        for enter in ["condense", "negative", "smoke", "rise", "swoop", "lash"] {
             for t in stride(from: 1.5, through: 12, by: 0.13) {
                 let frame = plan(t, Self.recipe(enter: enter, exit: "fade"))
                 for glyph in frame.glyphs + frame.ghosts {
@@ -102,10 +102,13 @@ struct ComposedStyleFrameTests {
         #expect(plan(5.95, recipe).shake == .zero)
     }
 
-    @Test func slamWordsExpireOnTheirOwnClock() {
-        let long = LyricsTimeline(lines: [TimedLine(start: 1, end: 20, text: "iron", isChorus: false)], source: .embeddedLRC, duration: 30)
-        #expect(!plan(1.5, Self.recipe(enter: "slam"), timeline: long).glyphs.isEmpty)
-        #expect(plan(1 + 3.9, Self.recipe(enter: "slam"), timeline: long).glyphs.isEmpty)
+    /// 彈片堆（slam）讓詞互相疊住、讀不出歌詞：使用者 2026-10-19 指示拿掉，目錄裡不得再有會堆疊的出場
+    @Test func noEntranceInTheCatalogPilesWordsOnTopOfEachOther() {
+        #expect(LyricsFXCatalog.component("slam") == nil)
+        for component in LyricsFXCatalog.components(in: .enter) {
+            guard case .enter(let spec) = component.payload else { continue }
+            #expect(!spec.pile, "\(component.id)")
+        }
     }
 
     @Test func backdropsBecomeLayers() {
@@ -150,8 +153,6 @@ struct ComposedStyleFrameTests {
             }
             #expect(abs(spec.duration.lowerBound - range.lowerBound * 0.6) < 1e-9 && abs(spec.duration.upperBound - range.upperBound * 0.6) < 1e-9, "\(id)")
         }
-        guard case .enter(let slam)? = LyricsFXCatalog.component("slam")?.payload else { return }
-        #expect(slam.duration == 0.14...0.26, "快速進場不動")
         #expect(ComposedStyle.trailHold == 0.4 && ComposedStyle.trailFade == 1.4)
     }
 

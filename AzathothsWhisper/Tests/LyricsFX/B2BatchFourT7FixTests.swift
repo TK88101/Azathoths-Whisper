@@ -165,8 +165,4 @@ struct LongLineFitTests {
         #expect(real != fake)
     }
 
-    /// 彈片堆的詞錨點按畫布比例散布、不隨 em 走：縮字救不了，照現狀
-    @Test func thePileEntranceIsLeftAlone() {
-        #expect(Self.ratio(Self.long, font: "Marker", size: Self.narrow, enter: "slam") == 1)
-    }
 }

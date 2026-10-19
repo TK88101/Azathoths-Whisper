@@ -168,8 +168,7 @@ enum LyricsFXCatalog {
 
     // composer.js:55,57-61,64。淡入型（condense、smoke、rise）的時長依 P12 縮短 40%（使用者 2026-10-06：「漸入漸出稍長，字發虛」）
     static let enters: [FXComponent] = [
-        make(.enter, "slam", [.aggression: 0.9, .speed: 0.9, .raw: 0.7, .elegance: 0], [.black, .death, .hardcore, .thrash, .grind, .horrormetal],
-             forbid: [.elegance: 0.8], .enter(EnterSpec(weights: [(.slam, 1)], duration: 0.14...0.26, wordLevel: true, pile: true, expires: true))),
+        // slam（彈片堆）2026-10-19 依使用者指示拿掉：詞互相疊住、讀不出歌詞。引擎的 pile／expires 畫法保留未刪
         make(.enter, "condense", [.cold: 0.85, .speed: 0.1, .elegance: 0.4], [.black, .gothic, .doom],
              .enter(EnterSpec(weights: [(.condense, 4), (.fadeUp, 1)], duration: 0.54...1.02))),
         make(.enter, "negative", [.raw: 0.8, .aggression: 0.6, .speed: 0.6], [.black],

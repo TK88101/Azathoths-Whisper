@@ -97,7 +97,7 @@ struct B2BatchThreeContrastTests {
         let linkinPark = drawn("Linkin Park"), slipknot = drawn("Slipknot")
         #expect(linkinPark.isSuperset(of: ["SpaceMono", "scan", "rgbsplit", "hybridGrey"]))
         #expect(linkinPark.isDisjoint(with: ["Elite", "slam", "film", "xerox", "rust", "ashGrey", "misreg"]))
-        #expect(slipknot.isSuperset(of: ["Elite", "slam", "rust", "ashGrey"]))
+        #expect(slipknot.isSuperset(of: ["Elite", "rust", "ashGrey"]))
         #expect(slipknot.isDisjoint(with: ["SpaceMono", "Grotesk", "scan", "grid", "type", "flip", "rgbsplit", "terminal", "hybridGrey"]))
     }
 

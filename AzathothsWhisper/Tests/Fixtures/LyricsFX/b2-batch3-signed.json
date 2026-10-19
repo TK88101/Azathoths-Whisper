@@ -108,7 +108,6 @@
     ],
     "enter": [
      "drop",
-     "slam",
      "slide",
      "stamp"
     ],
@@ -169,7 +168,6 @@
     ],
     "enter": [
      "drop",
-     "slam",
      "slide",
      "stamp"
     ],
@@ -608,7 +606,6 @@
     ],
     "enter": [
      "drop",
-     "slam",
      "slide",
      "stamp",
      "tumble",
@@ -641,7 +638,6 @@
     ],
     "enter": [
      "drop",
-     "slam",
      "stamp",
      "tumble",
      "type"
