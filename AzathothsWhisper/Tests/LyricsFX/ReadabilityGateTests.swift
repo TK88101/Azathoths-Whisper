@@ -75,9 +75,42 @@ struct ReadabilityAuditTests {
     /// 5 份 0.25 的煙霧副本疊在一起看得見；只有 1 份看不見
     @Test func stackedSmokeCopiesCountAsInk() {
         let copies = (0..<5).map { Self.glyph("A", x: 100 + CGFloat($0), opacity: 0.25) }
-        #expect(ReadabilityAudit.hasInkFromCopies(copies))
-        #expect(!ReadabilityAudit.hasInkFromCopies([Self.glyph("A", x: 100, opacity: 0.25)]))
-        #expect(!ReadabilityAudit.hasInkFromCopies([Self.glyph("A", x: 100, opacity: 0.25), Self.glyph("A", x: 300, opacity: 0.25)]))
+        #expect(!ReadabilityAudit.targets(Self.frame(ghosts: copies, glyphs: [])).isEmpty)
+        #expect(ReadabilityAudit.targets(Self.frame(ghosts: [Self.glyph("A", x: 100, opacity: 0.25)], glyphs: [])).isEmpty)
+        #expect(ReadabilityAudit.targets(Self.frame(ghosts: [Self.glyph("A", x: 100, opacity: 0.25), Self.glyph("A", x: 300, opacity: 0.25)], glyphs: [])).isEmpty)
+    }
+
+    /// 連續命中的刻度相加，最後一段再加一個刻度（兩個取樣點之間可能還在持續）
+    @Test func longestRunAddsOneStepAsAnUpperBound() {
+        let samples: [(hit: Bool, time: Double, step: Double)] = [(false, 0, 0.1), (true, 0.1, 0.1), (true, 0.2, 0.1), (false, 0.3, 0.1), (true, 0.4, 0.1)]
+        let run = ReadabilityAudit.longestRun(samples)
+        #expect(abs((run?.seconds ?? 0) - 0.3) < 1e-9)
+        #expect(run?.at == 0.1)
+        #expect(ReadabilityAudit.longestRun([(false, 0, 0.1)]) == nil)
+    }
+
+    /// smoke 進場只畫副本：疊起來看得見、附近又沒有本體的副本群，算一個主字
+    @Test func smokeCopiesWithoutABodyBecomeOneTarget() {
+        let copies = (0..<5).map { Self.glyph("A", x: 100 + CGFloat($0), opacity: 0.25) }
+        #expect(ReadabilityAudit.targets(Self.frame(ghosts: copies, glyphs: [])).count == 1)
+        // 有本體時，副本（錯位、分色）不另算
+        #expect(ReadabilityAudit.targets(Self.frame(ghosts: copies, glyphs: [Self.glyph("A", x: 100)])).count == 1)
+        #expect(ReadabilityAudit.targets(Self.frame(ghosts: [Self.glyph("A", x: 100, opacity: 0.25)], glyphs: [])).isEmpty)
+    }
+
+    /// 同一行相鄰的同一個字疊上來，不是自己的副本
+    @Test func anotherIdenticalGlyphOnTopStillCovers() {
+        let a = Self.glyph("l", x: 100), b = Self.glyph("l", x: 101)
+        #expect(ReadabilityAudit.coveredFraction(target: [a], screen: Self.frame(glyphs: [a, b]), measurer: CoreTextMeasurer()) == 1)
+    }
+
+    /// 整個畫面裡的自己可能透明度不同（讓位）、位置也略有不同（隨機擺動共用亂數流，別的行在場會改變它）：最近的那一個同字是自己
+    @Test func theNearestIdenticalGlyphOnScreenIsItself() {
+        let a = Self.glyph("A", x: 100), shifted = Self.glyph("A", x: 107, y: 109, opacity: 0.6)
+        #expect(ReadabilityAudit.coveredFraction(target: [a], screen: Self.frame(glyphs: [shifted]), measurer: CoreTextMeasurer()) == 0)
+        // 自己之外，再疊上一個同字就算蓋住
+        let another = Self.glyph("A", x: 102)
+        #expect(ReadabilityAudit.coveredFraction(target: [a], screen: Self.frame(glyphs: [shifted, another]), measurer: CoreTextMeasurer()) == 1)
     }
 
     @Test func faintGlyphsDoNotCover() {

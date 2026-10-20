@@ -85,6 +85,7 @@ enum LyricsFXCanvas {
             shaken.translateBy(x: -bounds.midX, y: -bounds.midY)
         }
         for layer in plan.back { draw(layer, in: shaken, bounds: bounds) }
+        for layer in plan.underText { draw(layer, in: context, bounds: bounds) }
         fill(plan.ghosts, in: shaken, palette: palette, paths: paths, rendering: rendering)
         for box in plan.boxes { draw(box, in: shaken, palette: palette) }
         fill(plan.unlit, in: shaken, palette: palette, paths: paths, rendering: rendering)

@@ -111,6 +111,19 @@ struct ComposedStyleFrameTests {
         }
     }
 
+    /// film 與 crimsonFog 的強暈影（0.95）畫在字下、不跟著抖動：蓋在字上會把兩側的字壓暗到讀不清（讀得到的檢查 G1，2026-10-20）。
+    /// 其他背景的暈影照原型畫在字上（lyrics-fx-preview.html:1206）
+    @Test func strongVignetteSitsUnderTheText() {
+        for backdrop in ["film", "crimsonFog"] {
+            let frame = plan(3, Self.recipe(backdrop: backdrop))
+            #expect(frame.underText == [.vignette(strength: 0.95)], "\(backdrop)")
+            #expect(!frame.front.contains { if case .vignette = $0 { true } else { false } }, "\(backdrop)")
+        }
+        let void = plan(3, Self.recipe(backdrop: "void"))
+        #expect(void.underText.isEmpty)
+        #expect(void.front.first == .vignette(strength: 0.7))
+    }
+
     @Test func backdropsBecomeLayers() {
         let shafts = plan(3, Self.recipe(backdrop: "shafts"))
         if case .axialGlow = shafts.back.first {} else { Issue.record("光柱的底是漸層") }

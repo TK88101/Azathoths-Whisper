@@ -182,6 +182,7 @@ enum ComposedStyle {
     static func plan(timeline: LyricsTimeline, time: Double, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring) -> FramePlan {
         var frame = FramePlan(palette: style.palette)
         frame.back = ComposedBackdrop.back(style.backdrop, palette: style.palette, size: size, time: time)
+        frame.underText = ComposedBackdrop.underText(style.backdrop)
         frame.front = ComposedBackdrop.front(style.backdrop, size: size, time: time)
         let visible = visibleLines(timeline.lines, time: time, exit: style.exit)
         var specks: [(Particle, Double)] = []

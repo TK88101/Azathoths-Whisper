@@ -169,6 +169,8 @@ struct FramePlan: Equatable, Sendable {
     let palette: FXPalette
     /// 字之下
     var back: [LayerDraw] = []
+    /// 字之下、不套 shake／zoom（畫在 back 之後、殘影與字之前）：film、crimsonFog 的強暈影（讀得到的檢查 G1）
+    var underText: [LayerDraw] = []
     /// 殘影與錯位副本，先於字畫
     var ghosts: [GlyphDraw] = []
     var boxes: [GlyphBox] = []

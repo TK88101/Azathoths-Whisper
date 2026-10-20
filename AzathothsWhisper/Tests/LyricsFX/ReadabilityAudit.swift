@@ -54,35 +54,57 @@ enum ReadabilityAudit {
         glyph.opacity >= visibleOpacity && !glyph.text.allSatisfy(\.isWhitespace)
     }
 
-    /// 對象行自己的煙霧殘影（smoke 進場只畫 5 份淡副本、不畫本體）：同字、彼此距離 0.3 字級以內的副本合成透明度 1−Π(1−a)
-    static func hasInkFromCopies(_ ghosts: [GlyphDraw]) -> Bool {
-        ghosts.contains { anchor in
-            let near = ghosts.filter {
-                $0.text == anchor.text && !$0.text.allSatisfy(\.isWhitespace)
-                    && hypot($0.origin.x - anchor.origin.x, $0.origin.y - anchor.origin.y) < anchor.fontSize * 0.3
-            }
-            return 1 - near.reduce(1.0) { $0 * (1 - $1.opacity) } >= visibleOpacity
-        }
+    static func distance(_ a: GlyphDraw, _ b: GlyphDraw) -> CGFloat {
+        hypot(a.origin.x - b.origin.x, a.origin.y - b.origin.y)
     }
 
-    /// G2：最長的「對象行沒有看得見主字」時間（連續取樣的刻度相加；最後一段再加一個刻度當保守上界）
-    static func longestBlank(_ timeline: LyricsTimeline, recipe: ComposedRecipe, measurer: any TextMeasuring) -> Finding? {
-        var worst: Finding?
-        for index in timeline.lines.indices where !timeline.lines[index].text.allSatisfy(\.isWhitespace) {
-            let single = onlyLine(timeline, index)
-            var run = 0.0, runStart = 0.0
-            for (time, step) in samples(timeline.lines[index]) {
-                let frame = plan(single, time: time, recipe: recipe, measurer: measurer)
-                if (frame.glyphs + frame.unlit).contains(where: isInk) || hasInkFromCopies(frame.ghosts) {
-                    run = 0
-                } else {
-                    if run == 0 { runStart = time }
-                    run += step
-                    if run + step > (worst?.seconds ?? 0) { worst = Finding(line: index, seconds: run + step, at: runStart) }
-                }
-            }
+    /// 對象行看得見的主字：本體（glyphs＋unlit），加上沒有本體的煙霧副本群（smoke 進場只畫 5 份淡副本）——
+    /// 同字、彼此距離 0.3 字級以內的副本合成透明度 1−Π(1−a)，看得見就算一個字（以群裡第一份的位置）。
+    /// 附近 0.5 字級內有同字本體的副本（錯位、分色、淚痕）是本體的效果，不另算。G2／G3 共用這一個定義
+    static func targets(_ frame: FramePlan) -> [GlyphDraw] {
+        let bodies = (frame.glyphs + frame.unlit).filter(isInk)
+        let copies = frame.ghosts.filter { ghost in
+            !ghost.text.allSatisfy(\.isWhitespace) && !bodies.contains { $0.text == ghost.text && distance($0, ghost) < ghost.fontSize * 0.5 }
+        }
+        var claimed = Set<Int>()
+        var clusters: [GlyphDraw] = []
+        for (i, anchor) in copies.enumerated() where !claimed.contains(i) {
+            let members = copies.indices.filter { !claimed.contains($0) && copies[$0].text == anchor.text && distance(copies[$0], anchor) < anchor.fontSize * 0.3 }
+            let combined = 1 - members.reduce(1.0) { $0 * (1 - copies[$1].opacity) }
+            guard combined >= visibleOpacity else { continue }
+            claimed.formUnion(members)
+            clusters.append(GlyphDraw(text: anchor.text, face: anchor.face, fontSize: anchor.fontSize, origin: anchor.origin, rotation: anchor.rotation,
+                                      scaleX: anchor.scaleX, scaleY: anchor.scaleY, opacity: combined, color: anchor.color))
+        }
+        return bodies + clusters
+    }
+
+    /// 最長的連續命中：刻度相加，最後再加一個刻度當保守上界（兩個取樣點之間可能還在持續）。G2／G3 共用
+    static func longestRun(_ samples: [(hit: Bool, time: Double, step: Double)]) -> (seconds: Double, at: Double)? {
+        var worst: (seconds: Double, at: Double)?
+        var run = 0.0, runStart = 0.0
+        for sample in samples {
+            guard sample.hit else { run = 0; continue }
+            if run == 0 { runStart = sample.time }
+            run += sample.step
+            if run + sample.step > (worst?.seconds ?? 0) { worst = (run + sample.step, runStart) }
         }
         return worst
+    }
+
+    /// 每一行各自量，回傳最長的一筆
+    static func worstLine(_ timeline: LyricsTimeline, _ hit: (Int, Double) -> Bool) -> Finding? {
+        timeline.lines.indices.filter { !timeline.lines[$0].text.allSatisfy(\.isWhitespace) }.compactMap { index -> Finding? in
+            let run = longestRun(samples(timeline.lines[index]).map { (hit(index, $0.time), $0.time, $0.step) })
+            return run.map { Finding(line: index, seconds: $0.seconds, at: $0.at) }
+        }.max { $0.seconds < $1.seconds }
+    }
+
+    /// G2：最長的「對象行沒有看得見主字」時間
+    static func longestBlank(_ timeline: LyricsTimeline, recipe: ComposedRecipe, measurer: any TextMeasuring) -> Finding? {
+        worstLine(timeline) { index, time in
+            targets(plan(onlyLine(timeline, index), time: time, recipe: recipe, measurer: measurer)).isEmpty
+        }
     }
 
     /// 字框：CoreText 實際字寬 ×（行盒高 × 0.8），左右內縮 8%；不含旋轉（近似）
@@ -92,22 +114,31 @@ enum ReadabilityAudit {
         return CGRect(x: glyph.origin.x, y: glyph.origin.y, width: width, height: height).insetBy(dx: width * 0.08, dy: 0)
     }
 
-    /// 自己的殘影副本：同字、原點在半個字級以內
+    /// 自己的殘影副本：殘影層裡同字、原點在半個字級以內
     static func isOwnCopy(_ other: GlyphDraw, of target: GlyphDraw) -> Bool {
         other.text == target.text && abs(other.origin.x - target.origin.x) < target.fontSize * 0.5 && abs(other.origin.y - target.origin.y) < target.fontSize * 0.5
+    }
+
+    /// 字層裡的自己：半個字級內、離主字最近的那一個同字（整個畫面的 plan 裡，自己的透明度可能因讓位不同，
+    /// 位置也可能因隨機擺動共用亂數流而略有不同）；其他同字（相鄰的 ll）照算
+    static func itself(of target: GlyphDraw, among bodies: [GlyphDraw]) -> Int? {
+        bodies.indices.filter { bodies[$0].text == target.text && distance(bodies[$0], target) < target.fontSize * 0.5 }
+            .min { distance(bodies[$0], target) < distance(bodies[$1], target) }
     }
 
     /// 對象行看得見的主字中，被畫面上其他看得見字形蓋住一半以上者的比例
     static func coveredFraction(target: [GlyphDraw], screen: FramePlan, measurer: any TextMeasuring) -> Double {
         let mains = target.filter(isInk)
         guard !mains.isEmpty else { return 0 }
-        let others = (screen.glyphs + screen.unlit + screen.ghosts).filter(isInk)
+        let bodies = (screen.glyphs + screen.unlit).filter(isInk)
+        let ghosts = screen.ghosts.filter(isInk)
         let covered = mains.filter { main in
             let box = Self.box(main, measurer: measurer)
             let area = box.width * box.height
             guard area > 0 else { return false }
+            let me = itself(of: main, among: bodies)
+            let others = bodies.indices.filter { $0 != me }.map { bodies[$0] } + ghosts.filter { !isOwnCopy($0, of: main) }
             return others.contains { other in
-                guard other != main, !isOwnCopy(other, of: main) else { return false }
                 let overlap = box.intersection(Self.box(other, measurer: measurer))
                 return !overlap.isNull && overlap.width * overlap.height / area > coveredArea
             }
@@ -115,27 +146,13 @@ enum ReadabilityAudit {
         return Double(covered.count) / Double(mains.count)
     }
 
-    /// G3：最長的「對象行疊住」時間（取樣刻度相加）
+    /// G3：最長的「對象行疊住」時間（取樣與 G2 同一張時刻表）
     static func longestCovered(_ timeline: LyricsTimeline, recipe: ComposedRecipe, measurer: any TextMeasuring) -> Finding? {
-        var worst: Finding?
-        for index in timeline.lines.indices where !timeline.lines[index].text.allSatisfy(\.isWhitespace) {
-            let single = onlyLine(timeline, index)
-            var run = 0.0, runStart = 0.0
-            var t = timeline.lines[index].start
-            while t < timeline.lines[index].revealEnd {
-                let target = plan(single, time: t, recipe: recipe, measurer: measurer).glyphs
-                let screen = plan(timeline, time: t, recipe: recipe, measurer: measurer)
-                if coveredFraction(target: target, screen: screen, measurer: measurer) > coveredShare {
-                    if run == 0 { runStart = t }
-                    run += coarseStep
-                    if run > (worst?.seconds ?? 0) { worst = Finding(line: index, seconds: run, at: runStart) }
-                } else {
-                    run = 0
-                }
-                t += coarseStep
-            }
+        worstLine(timeline) { index, time in
+            let target = targets(plan(onlyLine(timeline, index), time: time, recipe: recipe, measurer: measurer))
+            let screen = plan(timeline, time: time, recipe: recipe, measurer: measurer)
+            return coveredFraction(target: target, screen: screen, measurer: measurer) > coveredShare
         }
-        return worst
     }
 
     /// 涵蓋：全部 profile（樂團表＋曲風列）
