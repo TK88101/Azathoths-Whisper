@@ -314,8 +314,9 @@ enum LyricsFXCatalog {
         make(.palette, "goldNavy", [.theatrical: 0.9, .elegance: 0.85, .bright: 0.5], [.symphonic, .power],
              forbid: [.raw: 0.75, .aggression: 0.65],
              .palette(FXPalette(bg: RGB(hex: 0x0E1733), fg: RGB(hex: 0xC9A227), acc: RGB(hex: 0xF0D47A), dim: RGB(hex: 0x6B5A45)))),
+        // 字色 2026-10-20 由 #8A1C2B（對比約 2.1，B1 簽字時的例外）改為 #FF6E6E：使用者看新舊並排後重簽；背景與輔助色不變
         make(.palette, "crimsonVelvet", [.theatrical: 0.7, .elegance: 0.65, .decay: 0.5], [.gothic, .doom, .symphonic],
-             .palette(FXPalette(bg: RGB(hex: 0x140A1A), fg: RGB(hex: 0x8A1C2B), acc: RGB(hex: 0xC9A0A8), dim: RGB(hex: 0x6B5C73)))),
+             .palette(FXPalette(bg: RGB(hex: 0x140A1A), fg: RGB(hex: 0xFF6E6E), acc: RGB(hex: 0xC9A0A8), dim: RGB(hex: 0x6B5C73)))),
         make(.palette, "bloodBlack", [.theatrical: 0.85, .aggression: 0.8, .decay: 0.6, .bright: 0.05, .elegance: 0.4], [.black, .gothic, .horrormetal, .gothmetal],
              .palette(FXPalette(bg: RGB(hex: 0x030203), fg: RGB(hex: 0xEDE6DA), acc: RGB(hex: 0xB3001B), dim: RGB(hex: 0x4A2A2E)))),
         make(.palette, "ashGrey", [.raw: 0.8, .decay: 0.7, .cold: 0.4], [.black, .hardcore, .death, .horrormetal],

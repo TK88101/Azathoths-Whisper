@@ -63,10 +63,6 @@ struct LyricsFXContrastTests {
                        profile: SongProfile(axes: [.aggression: 0.3], tags: [.britpop]))
     }
 
-    /// B1 使用者簽字的配色，字本身就是低對比（緋紅字＋深紫黑底，比值約 1.6–2.0）。B2 不回頭改，釘住；改它要使用者重新簽字。
-    /// 例外不是豁免：仍要高於地板，新背景不得把它壓到看不見
-    static let signedLowContrastPalettes: Set<String> = ["crimsonVelvet"]
-    static let signedLowContrastFloor = 1.5
 
     /// 實際會被同一個樂團一起抽到的（背景, 配色）：兩者對該團 fit > 0，且亮暗相容
     static let reachablePairs: [(backdrop: String, palette: String)] = {
@@ -93,8 +89,7 @@ struct LyricsFXContrastTests {
     static func readabilityFailure(backdrop: String, palette: String, who: [String] = []) -> String? {
         let label = "\(palette)＋\(backdrop)" + (who.isEmpty ? "" : "（\(who.joined(separator: "、"))）")
         guard let result = contrast(recipe(backdrop: backdrop, palette: palette)) else { return "\(label)：量不到字" }
-        let floor = signedLowContrastPalettes.contains(palette) ? signedLowContrastFloor : minimum
-        return result.ratio < floor ? "\(label)：\(String(format: "%.2f", result.ratio))" : nil
+        return result.ratio < minimum ? "\(label)：\(String(format: "%.2f", result.ratio))" : nil
     }
 
     @Test func mainTextStaysReadableOnEveryReachableBackdrop() {
@@ -132,7 +127,13 @@ struct LyricsFXContrastTests {
         }
     }
 
-    @Test func theSignedLowContrastPaletteIsStillReachable() {
-        #expect(Self.reachablePairs.contains { $0.palette == "crimsonVelvet" }, "沒有團抽得到就該從例外清單拿掉")
+    /// crimsonVelvet 原本是 B1 簽字的低對比例外（字 #8A1C2B，約 2.1）。2026-10-20 使用者同意「只調亮字色、例外拿掉」，看新舊並排後選 #FF6E6E（實測 4.92–5.47）：
+    /// 交響類曲風每兩次抽到一次，讀不清楚不行。每個背景都要達標、沒有例外
+    @Test func crimsonVelvetMeetsTheMinimumOnEveryBackdropWithoutAnException() {
+        let backdrops = Self.reachablePairs.filter { $0.palette == "crimsonVelvet" }.map(\.backdrop)
+        #expect(!backdrops.isEmpty)
+        for backdrop in backdrops {
+            #expect(Self.readabilityFailure(backdrop: backdrop, palette: "crimsonVelvet") == nil, "\(backdrop)")
+        }
     }
 }
