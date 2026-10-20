@@ -89,6 +89,28 @@ struct ReadabilityAuditTests {
         #expect(ReadabilityAudit.longestRun([(false, 0, 0.1)]) == nil)
     }
 
+    /// G3：命中之間小於 0.1 s 的空隙算連續（字輪流互相穿過，眼睛看是一直疊著）；空隙到 0.1 s 就斷開
+    @Test func shortGapsBridgeIntoOneRun() {
+        let step = 0.02
+        let pattern = "##..###..##" + "......" + "##"   // 前段空隙 0.04 s 接起來；中間 0.12 s 斷開
+        let samples = pattern.enumerated().map { (hit: $1 == "#", time: Double($0) * step, step: step) }
+        let run = ReadabilityAudit.longestRun(samples, bridging: ReadabilityAudit.fusionGap)
+        // 第一段 0.00–0.20（11 格）＋保守上界一格
+        #expect(abs((run?.seconds ?? 0) - 0.24) < 1e-9)
+        #expect(run?.at == 0)
+        // G2 不接空隙：最長只是 3 格＋一格
+        #expect(abs((ReadabilityAudit.longestRun(samples)?.seconds ?? 0) - 0.08) < 1e-9)
+    }
+
+    /// 全程固定刻度（0.1 s 會把交疊的閃爍誤連、也會漏掉）
+    @Test func samplesAreEvenlySpacedAtTheFineStep() {
+        let line = TimedLine(start: 1, end: 3, text: "a", isChorus: false)
+        let samples = ReadabilityAudit.samples(line)
+        #expect(samples.allSatisfy { $0.step == ReadabilityAudit.step })
+        #expect(ReadabilityAudit.step == 0.02)
+        #expect(samples.count == Int(((line.revealEnd - line.start) / ReadabilityAudit.step).rounded(.up)))
+    }
+
     /// smoke 進場只畫副本：疊起來看得見、附近又沒有本體的副本群，算一個主字
     @Test func smokeCopiesWithoutABodyBecomeOneTarget() {
         let copies = (0..<5).map { Self.glyph("A", x: 100 + CGFloat($0), opacity: 0.25) }
@@ -96,6 +118,18 @@ struct ReadabilityAuditTests {
         // 有本體時，副本（錯位、分色）不另算
         #expect(ReadabilityAudit.targets(Self.frame(ghosts: copies, glyphs: [Self.glyph("A", x: 100)])).count == 1)
         #expect(ReadabilityAudit.targets(Self.frame(ghosts: [Self.glyph("A", x: 100, opacity: 0.25)], glyphs: [])).isEmpty)
+    }
+
+    /// 倒影（上下翻轉的淡副本）不是煙霧：不跟附近的煙霧副本併成一個主字；翻轉的字框不往上翻
+    @Test func reflectionsAreNotSmokeAndFlippedBoxesStayInPlace() {
+        var mirror = Self.glyph("L", x: 100, y: 180, opacity: 0.04)
+        mirror.scaleY = -1
+        let smoke = (0..<5).map { Self.glyph("L", x: 103 + CGFloat($0), y: 195, opacity: 0.16) }
+        let targets = ReadabilityAudit.targets(Self.frame(ghosts: [mirror] + smoke, glyphs: []))
+        #expect(targets.count == 1)
+        #expect(targets.first?.scaleY == 1)
+        let measurer = CoreTextMeasurer()
+        #expect(ReadabilityAudit.box(mirror, measurer: measurer) == ReadabilityAudit.box(Self.glyph("L", x: 100, y: 180), measurer: measurer))
     }
 
     /// 同一行相鄰的同一個字疊上來，不是自己的副本

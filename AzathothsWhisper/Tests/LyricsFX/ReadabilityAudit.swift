@@ -14,10 +14,10 @@ enum ReadabilityAudit {
     static let coveredShare = 0.1
     static let coveredArea = 0.5
     static let maxCovered = 0.5
-    /// 開頭 1 s 細取樣（空白多半在行首）
-    static let fineWindow = 1.0
-    static let fineStep = 0.05
-    static let coarseStep = 0.1
+    /// 全程固定刻度：0.1 s 會把字輪流交疊的閃爍誤連成一段、也會漏掉（計劃 §6 的 0.01 s 實測）
+    static let step = 0.02
+    /// G3：命中之間短於這個的空隙算連續（約為眼睛分不出閃爍的間隔）；G2 不接空隙——空白中短暫看得見字，就不算空白
+    static let fusionGap = 0.1
 
     struct Finding: CustomStringConvertible {
         let line: Int
@@ -26,16 +26,10 @@ enum ReadabilityAudit {
         var description: String { "第 \(line) 行 \(String(format: "%.2f", seconds)) s（約 \(String(format: "%.2f", at)) s 起）" }
     }
 
-    /// 對象行的時刻表：開頭細、之後粗
+    /// 對象行的時刻表（以序號乘刻度，不累加，避免浮點誤差多出一格）
     static func samples(_ line: TimedLine) -> [(time: Double, step: Double)] {
-        var result: [(Double, Double)] = []
-        var t = line.start
-        while t < line.revealEnd {
-            let step = t - line.start < fineWindow ? fineStep : coarseStep
-            result.append((t, step))
-            t += step
-        }
-        return result
+        let count = Int(((line.revealEnd - line.start) / step).rounded(.up))
+        return (0..<max(0, count)).map { (line.start + Double($0) * step, step) }
     }
 
     /// 只留對象行：其他行清成空白（空白行不畫），行號不變——排版與種子依行號，重新編號會換位置
@@ -63,8 +57,9 @@ enum ReadabilityAudit {
     /// 附近 0.5 字級內有同字本體的副本（錯位、分色、淚痕）是本體的效果，不另算。G2／G3 共用這一個定義
     static func targets(_ frame: FramePlan) -> [GlyphDraw] {
         let bodies = (frame.glyphs + frame.unlit).filter(isInk)
+        // 倒影（scaleY < 0）是本體的效果、畫在遠處，不是煙霧
         let copies = frame.ghosts.filter { ghost in
-            !ghost.text.allSatisfy(\.isWhitespace) && !bodies.contains { $0.text == ghost.text && distance($0, ghost) < ghost.fontSize * 0.5 }
+            ghost.scaleY > 0 && !ghost.text.allSatisfy(\.isWhitespace) && !bodies.contains { $0.text == ghost.text && distance($0, ghost) < ghost.fontSize * 0.5 }
         }
         var claimed = Set<Int>()
         var clusters: [GlyphDraw] = []
@@ -79,23 +74,31 @@ enum ReadabilityAudit {
         return bodies + clusters
     }
 
-    /// 最長的連續命中：刻度相加，最後再加一個刻度當保守上界（兩個取樣點之間可能還在持續）。G2／G3 共用
-    static func longestRun(_ samples: [(hit: Bool, time: Double, step: Double)]) -> (seconds: Double, at: Double)? {
+    /// 最長的連續命中：從段首到最後一次命中再加兩個刻度（該格本身＋保守上界，兩個取樣點之間可能還在持續）。
+    /// 命中之間的空隙（未命中格數 × 刻度）短於 `bridging` 時接成同一段。G2／G3 共用
+    static func longestRun(_ samples: [(hit: Bool, time: Double, step: Double)], bridging: Double = 0) -> (seconds: Double, at: Double)? {
         var worst: (seconds: Double, at: Double)?
-        var run = 0.0, runStart = 0.0
+        var runStart: Double?
+        var gap = 0.0
         for sample in samples {
-            guard sample.hit else { run = 0; continue }
-            if run == 0 { runStart = sample.time }
-            run += sample.step
-            if run + sample.step > (worst?.seconds ?? 0) { worst = (run + sample.step, runStart) }
+            guard sample.hit else {
+                gap += sample.step
+                if gap >= bridging - 1e-9 { runStart = nil }
+                continue
+            }
+            gap = 0
+            let start = runStart ?? sample.time
+            runStart = start
+            let seconds = sample.time - start + 2 * sample.step
+            if seconds > (worst?.seconds ?? 0) + 1e-12 { worst = (seconds, start) }
         }
         return worst
     }
 
     /// 每一行各自量，回傳最長的一筆
-    static func worstLine(_ timeline: LyricsTimeline, _ hit: (Int, Double) -> Bool) -> Finding? {
+    static func worstLine(_ timeline: LyricsTimeline, bridging: Double = 0, _ hit: (Int, Double) -> Bool) -> Finding? {
         timeline.lines.indices.filter { !timeline.lines[$0].text.allSatisfy(\.isWhitespace) }.compactMap { index -> Finding? in
-            let run = longestRun(samples(timeline.lines[index]).map { (hit(index, $0.time), $0.time, $0.step) })
+            let run = longestRun(samples(timeline.lines[index]).map { (hit(index, $0.time), $0.time, $0.step) }, bridging: bridging)
             return run.map { Finding(line: index, seconds: $0.seconds, at: $0.at) }
         }.max { $0.seconds < $1.seconds }
     }
@@ -107,10 +110,10 @@ enum ReadabilityAudit {
         }
     }
 
-    /// 字框：CoreText 實際字寬 ×（行盒高 × 0.8），左右內縮 8%；不含旋轉（近似）
+    /// 字框：CoreText 實際字寬 ×（行盒高 × 0.8），左右內縮 8%；不含旋轉（近似）；翻轉（倒影）取絕對值，框不往上翻
     static func box(_ glyph: GlyphDraw, measurer: any TextMeasuring) -> CGRect {
         let width = (measurer.advances(of: glyph.text, face: glyph.face, fontSize: glyph.fontSize).last ?? glyph.fontSize * 0.5) * glyph.scaleX
-        let height = (measurer.ascent(face: glyph.face, fontSize: glyph.fontSize) + measurer.descent(face: glyph.face, fontSize: glyph.fontSize)) * glyph.scaleY * 0.8
+        let height = (measurer.ascent(face: glyph.face, fontSize: glyph.fontSize) + measurer.descent(face: glyph.face, fontSize: glyph.fontSize)) * abs(glyph.scaleY) * 0.8
         return CGRect(x: glyph.origin.x, y: glyph.origin.y, width: width, height: height).insetBy(dx: width * 0.08, dy: 0)
     }
 
@@ -146,9 +149,9 @@ enum ReadabilityAudit {
         return Double(covered.count) / Double(mains.count)
     }
 
-    /// G3：最長的「對象行疊住」時間（取樣與 G2 同一張時刻表）
+    /// G3：最長的「對象行疊住」時間（取樣與 G2 同一張時刻表；短空隙接起來）
     static func longestCovered(_ timeline: LyricsTimeline, recipe: ComposedRecipe, measurer: any TextMeasuring) -> Finding? {
-        worstLine(timeline) { index, time in
+        worstLine(timeline, bridging: fusionGap) { index, time in
             let target = targets(plan(onlyLine(timeline, index), time: time, recipe: recipe, measurer: measurer))
             let screen = plan(timeline, time: time, recipe: recipe, measurer: measurer)
             return coveredFraction(target: target, screen: screen, measurer: measurer) > coveredShare

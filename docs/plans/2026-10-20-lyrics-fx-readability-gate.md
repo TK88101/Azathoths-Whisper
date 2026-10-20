@@ -51,4 +51,12 @@
 - 0.01 s 細取樣：最長連續 0.06 s、空隙 0.01–0.03 s → 0.1 s 粗取樣是**相位混疊**，會誤連也會漏判。以「0.01 s、< 0.1 s 空隙算連續」重量 swagger：Weezer 0.66、Oasis 0.56、Blur 0.52（Weezer／Blur 粗取樣只有 0.40，漏判）。
 - 修法實驗（只量 swagger）：swagger 時長 0.2–0.35 → 最壞 0.50（卡線，且慢步調少 35%）；slide 改短距離水平 0.6 em → 最壞 0.38。
 - Codex 結論（採納）：①G2／G3 全程 0.02 s 取樣，不用「只在粗取樣命中處細看」（粗取樣全沒命中的事件看不到）；②swagger 改用新模板 sidle（水平短距離），位移 0.6 em 太大（剛可見時距落點 0.34 em，相鄰窄字仍可被蓋過半），用 0.3 em 或依實際字寬設上限，並加相鄰字／反方向／窄字的直接測試；③G2 不套用「空隙算連續」（會改變 G2 的意思）；④改量法後全 enter 重跑，新失敗逐一修正／移出候選／使用者簽字例外，最後全量重取綠。
-- 未定：0.02 s 讓 G2＋G3 約 4–5 倍時間（全量單元由約 20 分增至約 45–60 分，推測，未實測），而且多半會找出更多不合格的進場。要不要擴大到這個範圍，由使用者決定。
+- 使用者 2026-10-20 決定：現在徹底做（接受測試變慢、可能牽出更多進場）。
+
+## 7. 0.02 s 量法實作與牽出的修正（2026-10-20）
+- 量法：G2／G3 全程 0.02 s（`ReadabilityAudit.step`，以序號乘刻度）；G3 命中之間 < 0.1 s 的空隙接成一段（`fusionGap`），G2 不接；段長＝段首到最後命中＋兩刻度。紅燈：`shortGapsBridgeIntoOneRun`、`samplesAreEvenlySpacedAtTheFineStep` 2 條 5 斷言（空殼實作）。新閘門 G2＋G3 一輪 1748 s。
+- 新量法查出 10 份 G3 不合格、G2 0 份：swagger 4、slide 元件 4、swoop 元件 1、smoke 1。
+  - smoke（Type O Negative）是**量測誤判**：上一行倒影（scaleY −1、0.04）被併進下一行的煙霧群，群位置取了倒影、字框又沒處理翻轉而往上翻。修：倒影不算煙霧、字框取 |scaleY|（`reflectionsAreNotSmokeAndFlippedBoxesStayInPlace`）。
+  - swagger、slide 元件：滑入的字橫越同一行已到位的鄰字。修：新模板 `sidle`（水平 0.3 em、alpha min(1,2p)，看得見時距落點約 0.17 em），swagger 與 slide 元件改用它；`slide` 模板與 kick／punch／skank（合格）不動。sidle 的測試與實作同一步寫，未先單獨跑紅燈。
+  - swoop 元件：延後 swoop 模板可見時點（45%→55／60／70／75%）幾乎無效；逐一拿掉混入的模板找出元兇是 **fling**（衝過頭再彈回）。拿掉 fling 後該元件最壞 0.42 s；拿掉 orbit 反而變差。修：swoop 元件權重 swoop 3／orbit 1；fling 模板與 lash（0.46 s，合格）不動。
+- 以上都偏離原型 composer.js（106、116、101 行），待使用者看改前改後後記 ACCEPTANCE。

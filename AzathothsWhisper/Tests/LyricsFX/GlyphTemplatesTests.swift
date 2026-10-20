@@ -219,6 +219,20 @@ struct EnterLeadInTests {
         #expect(EnterTemplate.swoop.transform(progress: 0.9, context: Self.context).alpha == 1)
     }
 
+    /// sidle（swagger 用）：只在水平方向滑一小段，一看得見就離落點不到 0.2 字寬——不會橫越鄰字（slide 從畫面遠處飛入）。
+    /// 兩個方向都一樣短；最後停在原位
+    @Test func sidleOnlyEdgesInSideways() {
+        for dir: CGFloat in [1, -1] {
+            let context = GlyphContext(em: 40, width: 960, height: 600, radius: 528, dir: dir, side: 1, phase: 0, angle: 0.7, bend: 0.5)
+            let first = EnterTemplate.sidle.transform(progress: EnterTemplate.sidle.visibleLeadIn, context: context)
+            #expect(abs(first.dx) <= 0.2 * context.em, "dir \(dir) dx \(first.dx)")
+            #expect(first.dx * dir > 0)
+            #expect(first.dy == 0 && first.rotation == 0)
+            let start = EnterTemplate.sidle.transform(progress: 0, context: context)
+            #expect(abs(start.dx) <= 0.3 * context.em + 1e-9)
+        }
+    }
+
     @Test func enterProgressStartsAtTheLeadIn() {
         let personality = LinePersonalities.make(line: TimedLine(start: 2, end: 6, text: "ash", isChorus: false), seed: 1,
                                                 style: PersonalityStyle(enter: [(.condense, 1)], enterDuration: 1...1, hold: [(.still, 1)], exit: [(.fade, 1)],

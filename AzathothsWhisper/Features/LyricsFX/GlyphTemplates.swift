@@ -63,6 +63,11 @@ enum EnterTemplate: String, CaseIterable, Sendable {
     case tumble
     /// B2 批 3（Nu-metal）
     case drop, type, flip
+    /// 讀得到的檢查 G3（2026-10-20）：swagger 原用 slide 從遠處滑入，慢步調下字會輪流橫越已到位的鄰字
+    case sidle
+
+    /// sidle 的起點距離（字寬倍數）
+    static let sidleReach: CGFloat = 0.3
 
     func transform(progress p: Double, context c: GlyphContext) -> GlyphTransform {
         let em = Double(c.em)
@@ -134,6 +139,9 @@ enum EnterTemplate: String, CaseIterable, Sendable {
             return GlyphTransform(scale: CGFloat(1.08 - 0.08 * FXEasing.outCubic(p)))
         case .flip:
             return GlyphTransform(scaleY: CGFloat(max(0.01, FXEasing.outCubic(p))))
+        case .sidle:
+            // 只從旁邊 0.3 字寬處水平挪進來（方向逐字）；看得見時（leadIn 0.175）距落點約 0.17 字寬
+            return GlyphTransform(dx: CGFloat(1 - FXEasing.outCubic(p)) * c.em * Self.sidleReach * c.dir, alpha: min(1, p * 2))
         }
     }
 }
