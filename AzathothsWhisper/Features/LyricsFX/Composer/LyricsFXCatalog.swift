@@ -191,16 +191,14 @@ enum LyricsFXCatalog {
              forbid: [.aggression: 0.5, .theatrical: 0.8], .enter(EnterSpec(weights: [(.pop, 3), (.fallIn, 2), (.fadeUp, 1)], duration: 0.18...0.4))),
         make(.enter, "kick", [.aggression: 0.6, .bounce: 0.5, .speed: 0.65, .warm: 0.4], [.hardrock, .rapmetal, .latinmetal],
              .enter(EnterSpec(weights: [(.stamp, 3), (.pop, 2), (.slide, 1)], duration: 0.12...0.28))),
-        // slide → sidle（2026-10-20 讀得到的檢查 G3：從畫面外推入的字會輪流橫越鄰字；原型 composer.js:106 是 slide）
         make(.enter, "slide", [.aggression: 0.6, .speed: 0.7, .bounce: 0.2], [.hardrock, .heavy, .thrash, .nu, .hardcore, .punk, .skatepunk, .rock, .bigbeat, .melodichc, .ska, .rapmetal, .altmetal, .posthardcore, .emopop],
-             .enter(EnterSpec(weights: [(.sidle, 4), (.stamp, 1)], duration: 0.15...0.35))),
+             .enter(EnterSpec(weights: [(.slide, 4), (.stamp, 1)], duration: 0.15...0.35))),
         make(.enter, "stamp", [.aggression: 0.7, .speed: 0.8, .raw: 0.3], [.hardrock, .hardcore, .nu, .heavy, .thrash, .rapmetal, .altmetal, .latinmetal, .posthardcore],
              .enter(EnterSpec(weights: [(.stamp, 4), (.pop, 1)], duration: 0.1...0.25))),
         make(.enter, "strut", [.theatrical: 0.8, .bright: 0.6, .speed: 0.5, .elegance: 0.5], [.glam, .arena],
              .enter(EnterSpec(weights: [(.slant, 3), (.swoop, 2), (.stamp, 1)], duration: 0.2...0.4))),
-        // slide → sidle（2026-10-20 讀得到的檢查 G3：慢步調的 slide 讓字輪流橫越鄰字；步調 0.3–0.55 s 不變，原型 composer.js:116 是 slide）
         make(.enter, "swagger", [.raw: 0.5, .aggression: 0.4, .speed: 0.45, .warm: 0.5], [.britpop, .hardrock, .indie, .latinmetal],
-             .enter(EnterSpec(weights: [(.sidle, 3), (.fadeUp, 2)], duration: 0.3...0.55))),
+             .enter(EnterSpec(weights: [(.slide, 3), (.fadeUp, 2)], duration: 0.3...0.55))),
         // B2 批 2（龐克系；原型 composer.js 的 B2 批 2 段）。標籤只收本批專屬的，其餘等它們的團進批次再補
         make(.enter, "ease", [.elegance: 0.4, .bounce: 0.35, .speed: 0.5, .warm: 0.5], [.poprock, .powerpop, .indieemo, .emopop],
              .enter(EnterSpec(weights: [(.fadeUp, 3), (.pop, 1)], duration: 0.25...0.5))),

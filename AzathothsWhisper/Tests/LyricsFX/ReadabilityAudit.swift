@@ -16,6 +16,8 @@ enum ReadabilityAudit {
     static let maxCovered = 0.5
     /// 全程固定刻度：0.1 s 會把字輪流交疊的閃爍誤連成一段、也會漏掉（計劃 §6 的 0.01 s 實測）
     static let step = 0.02
+    /// G3 豁免：從旁邊滑進來的字會短暫橫越鄰字；使用者看過改前改後選原樣（2026-10-20，ACCEPTANCE I-60）。只豁免 G3，G1／G2 照量
+    static let coverExemptEnters: Set<String> = ["swagger", "slide"]
     /// G3：命中之間短於這個的空隙算連續（約為眼睛分不出閃爍的間隔）；G2 不接空隙——空白中短暫看得見字，就不算空白
     static let fusionGap = 0.1
 

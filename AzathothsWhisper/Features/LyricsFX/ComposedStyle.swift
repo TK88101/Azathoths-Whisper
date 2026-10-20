@@ -337,10 +337,11 @@ enum ComposedStyle {
         return transform
     }
 
-    /// 進場進度；開始那一刻就從 `visibleLeadIn` 起播（唱到即看得見），所有派生（RGB 分離等）都讀它
+    /// 進場進度；所有派生（RGB 分離等）都讀它。第一個詞開始那一刻就從 `visibleLeadIn` 起播（唱到時整行不空白，讀得到的檢查 G2）；
+    /// 後面的詞照原樣從透明浮現——前面的詞已經看得見，逐字浮現要保留（使用者 2026-10-20）
     static func enterProgress(_ personality: GlyphPersonality, time: Double) -> Double {
         guard time >= personality.start else { return 0 }
-        let lead = personality.enter.visibleLeadIn
+        let lead = personality.wordIndex == 0 ? personality.enter.visibleLeadIn : 0
         return lead + (1 - lead) * FXEasing.clamp01((time - personality.start) / max(personality.duration, 1e-6))
     }
 

@@ -61,3 +61,8 @@
   - swoop 元件：延後 swoop 模板可見時點（45%→55／60／70／75%）幾乎無效；逐一拿掉混入的模板找出元兇是 **fling**（衝過頭再彈回）。拿掉 fling 後該元件最壞 0.42 s；拿掉 orbit 反而變差。修：swoop 元件權重 swoop 3／orbit 1；fling 模板與 lash（0.46 s，合格）不動。
 - 以上都偏離原型 composer.js（106、116、101 行），待使用者看改前改後後記 ACCEPTANCE。
 - Codex 整體確認（b04a45b，無致命矛盾）：P1 基線測試只比對元件 ID，證明不了其他團沒被連帶改到 → 核實：逐字抽模板每次固定用一個亂數（GlyphPersonality.swift:91）、組合器不讀元件內權重，所以不連鎖；影響只限抽得到 swagger（7 團）、slide（28）、swoop（15）的配方，共 54 團中的 44 團，全部要在改前改後裡讓使用者看代表。P2 sidle 缺直接測試 → 補 `SidleReadabilityTests`（窄字、相鄰同字、12 種子、兩字型）；短句版新舊都綠（抓不到，作廢），換長句後新版綠、舊 slide 紅 3 份（swagger seed 8 兩字型、slide seed 4）。Codex 認為最容易出錯的下一步：給使用者看改前改後（在那之前不得併進 main）。
+
+## 8. 使用者看改前改後（2026-10-20，兩輪）
+- 第一輪（7 組 GIF，本機頁）：1 condense、2 smoke、3 swoop 對；4 swagger、5 slide「改前是對的」；6、7 紅字顏色改後對，但「字母逐漸顯現效果弱了」。
+- 處置：swagger、slide 元件恢復 slide 模板，sidle 與其測試移除（不留死碼），G3 只豁免這兩個進場（`ReadabilityAudit.coverExemptEnters`，`ReadabilityExemptionTests` 鎖名單，ACCEPTANCE I-60）；leadIn 只用在每行第一個詞（後面的詞照原樣從透明浮現，G2 是整行層級，前面的詞已看得見），紅燈 `onlyTheFirstWordSkipsTheInvisibleFadeIn` 2 斷言。
+- 第二輪：使用者「OK 了，都沒問題了」。ACCEPTANCE I-59–I-62 記錄。

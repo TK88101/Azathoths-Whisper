@@ -219,20 +219,6 @@ struct EnterLeadInTests {
         #expect(EnterTemplate.swoop.transform(progress: 0.9, context: Self.context).alpha == 1)
     }
 
-    /// sidle（swagger 用）：只在水平方向滑一小段，一看得見就離落點不到 0.2 字寬——不會橫越鄰字（slide 從畫面遠處飛入）。
-    /// 兩個方向都一樣短；最後停在原位
-    @Test func sidleOnlyEdgesInSideways() {
-        for dir: CGFloat in [1, -1] {
-            let context = GlyphContext(em: 40, width: 960, height: 600, radius: 528, dir: dir, side: 1, phase: 0, angle: 0.7, bend: 0.5)
-            let first = EnterTemplate.sidle.transform(progress: EnterTemplate.sidle.visibleLeadIn, context: context)
-            #expect(abs(first.dx) <= 0.2 * context.em, "dir \(dir) dx \(first.dx)")
-            #expect(first.dx * dir > 0)
-            #expect(first.dy == 0 && first.rotation == 0)
-            let start = EnterTemplate.sidle.transform(progress: 0, context: context)
-            #expect(abs(start.dx) <= 0.3 * context.em + 1e-9)
-        }
-    }
-
     @Test func enterProgressStartsAtTheLeadIn() {
         let personality = LinePersonalities.make(line: TimedLine(start: 2, end: 6, text: "ash", isChorus: false), seed: 1,
                                                 style: PersonalityStyle(enter: [(.condense, 1)], enterDuration: 1...1, hold: [(.still, 1)], exit: [(.fade, 1)],
@@ -240,5 +226,17 @@ struct EnterLeadInTests {
         #expect(ComposedStyle.enterProgress(personality, time: personality.start - 0.01) == 0)
         #expect(abs(ComposedStyle.enterProgress(personality, time: personality.start) - EnterTemplate.condense.visibleLeadIn) < 1e-9)
         #expect(ComposedStyle.enterProgress(personality, time: personality.start + personality.duration) == 1)
+    }
+
+    /// 只有第一個詞從看得見起播（唱到時整行不空白）；後面的詞照原樣從透明慢慢浮現（使用者 2026-10-20：逐字浮現要明顯）
+    @Test func onlyTheFirstWordSkipsTheInvisibleFadeIn() {
+        let glyphs = LinePersonalities.make(line: TimedLine(start: 2, end: 6, text: "ash rain", isChorus: false), seed: 1,
+                                            style: PersonalityStyle(enter: [(.condense, 1)], enterDuration: 1...1, hold: [(.still, 1)], exit: [(.fade, 1)],
+                                                                    vary: .init(size: 0, dy: 0, rotation: 0, scatter: 0), wordLevel: false))
+        let first = try! #require(glyphs.first { $0.wordIndex == 0 })
+        let second = try! #require(glyphs.first { $0.wordIndex == 1 })
+        #expect(abs(ComposedStyle.enterProgress(first, time: first.start) - EnterTemplate.condense.visibleLeadIn) < 1e-9)
+        #expect(ComposedStyle.enterProgress(second, time: second.start) == 0)
+        #expect(abs(ComposedStyle.enterProgress(second, time: second.start + second.duration / 2) - 0.5) < 1e-9)
     }
 }
