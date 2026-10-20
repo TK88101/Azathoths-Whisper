@@ -91,6 +91,31 @@ final class LyricsFXUITests: AppUITestCase {
         attach("lyricsfx-frozen-3.5s")
     }
 
+    // MARK: C 段（C 段計劃 §5）：外部時間軸熱替換
+
+    private func startPlainLyrics(timing: String) {
+        start(.lyricsFX, extra: [
+            Scenario.raisedStyleVariable: "lyricsFX",
+            LyricsFXPreviewFixture.previewAtVariable: "3.5",
+            LyricsFXPreviewFixture.plainLyricsVariable: "1",
+            LyricsFXPreviewFixture.fakeTimingVariable: timing,
+        ])
+        waitForStyle("lyricsFX")
+    }
+
+    /// I-53：欄位是純文字、外部也找不到 → 一直是估算，角落有 `~`
+    func testEstimatedTimingShowsTheTildeMark() {
+        startPlainLyrics(timing: "notFound")
+        XCTAssertTrue(element(ID.lyricsFXTimingMark).waitForExistence(timeout: Self.timeout), "估算時應有 ~")
+    }
+
+    /// I-53：外部找到時間軸 → 熱替換，`~` 消失、3.5 秒處是時間軸給的那一行（估算在 3.5 秒還沒出字，兩者可分）
+    func testAFoundTimelineReplacesTheEstimate() {
+        startPlainLyrics(timing: "found")
+        waitForValue(element(ID.lyricsFXLayer), "Paper boats drift past the harbor lights", timeout: Self.timeout, "3.5 秒處應是時間軸的行")
+        XCTAssertFalse(element(ID.lyricsFXTimingMark).exists, "拿到時間軸後不應有 ~")
+    }
+
     // MARK: B1（B1 計劃 §5）：風格依曲風自動選
 
     private func waitForRecipe(_ predicate: @escaping (String) -> Bool, _ message: String, file: StaticString = #filePath, line: UInt = #line) {

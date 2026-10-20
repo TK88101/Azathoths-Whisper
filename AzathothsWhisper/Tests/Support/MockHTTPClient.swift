@@ -9,6 +9,8 @@ final class MockHTTPClient: HTTPClient, @unchecked Sendable {
         let url: String
         let headers: [String: String]
         let form: [String: String]
+        /// `send` 的原始 body（UTF-8 文字）；get／post 為 nil
+        var body: String? = nil
     }
 
     enum Route {
@@ -61,9 +63,16 @@ final class MockHTTPClient: HTTPClient, @unchecked Sendable {
         try resolve(method: "POST", url: url, headers: headers, form: form)
     }
 
-    private func resolve(method: String, url: URL, headers: [String: String], form: [String: String]) throws -> HTTPResponse {
+    func send(_ request: HTTPRequest) async throws -> HTTPResponse {
+        try resolve(
+            method: request.method, url: request.url, headers: request.headers, form: [:],
+            body: request.body.map { String(decoding: $0, as: UTF8.self) }
+        )
+    }
+
+    private func resolve(method: String, url: URL, headers: [String: String], form: [String: String], body: String? = nil) throws -> HTTPResponse {
         lock.lock()
-        recorded.append(Request(method: method, url: url.absoluteString, headers: headers, form: form))
+        recorded.append(Request(method: method, url: url.absoluteString, headers: headers, form: form, body: body))
         let matched = routes.first { url.absoluteString.contains($0.match) }?.route ?? fallback
         lock.unlock()
 

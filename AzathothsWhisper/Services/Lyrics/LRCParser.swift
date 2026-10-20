@@ -15,10 +15,13 @@ enum LRCParser {
     private static var wordTag: Regex<Substring> { /<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>/ }
     private static var offsetTag: Regex<(Substring, Substring)> { /\[offset:\s*([+-]?\d+)\s*\]/ }
     private static var idTagLine: Regex<Substring> { /^\[[A-Za-z]+:.*\]$/ }
+    static let maxOffsetMilliseconds = 3_600_000
 
     static func parse(_ text: String) -> [LRCLine] {
         let lines = LineEndings.normalized(text).components(separatedBy: "\n")
-        let offset = lines.lazy.compactMap { $0.firstMatch(of: offsetTag).flatMap { Int($0.1) } }.first ?? 0
+        // 外部 LRC（C 段）也走這裡：超過 ±1 小時的 offset 當 0，避免 `milliseconds - offset` 溢位閃退（安全評審 HIGH-1）
+        let offset = lines.lazy.compactMap { $0.firstMatch(of: offsetTag).flatMap { Int($0.1) } }.first
+            .flatMap { $0.magnitude <= maxOffsetMilliseconds ? $0 : nil } ?? 0   // magnitude：abs(Int.min) 本身也會溢位
         let parsed = lines.flatMap { line -> [(milliseconds: Int, text: String)] in
             let (stamps, rest) = leadingStamps(of: line.trimmingCharacters(in: .whitespaces))
             let text = cleaned(rest)

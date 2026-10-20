@@ -20,6 +20,10 @@ enum LyricsFXPreviewFixture {
     static let recipeVariable = "AZW_LYRICSFX_PREVIEW_RECIPE"
     /// "1"＝全部畫合併外框（量主執行緒總量時的向量基線，計劃 2026-10-17 全螢幕缺口 §3.3 V2）
     static let vectorReferenceVariable = "AZW_LYRICSFX_VECTOR_REFERENCE"
+    /// "1"＝欄位放純文字（去掉時間標籤）：畫面走估算、角落出 `~`（C 段 E2E）
+    static let plainLyricsVariable = "AZW_LYRICSFX_PREVIEW_PLAIN"
+    /// 注入假的時間軸退路鏈（C 段 E2E，不連網）："found"＝回「找到」（時間＝本檔 LRC 的時間點）；"notFound"＝回「沒有」
+    static let fakeTimingVariable = "AZW_TIMING_FAKE"
     static let duration: Double = 60
 
     /// 12 個時間點：含兩段空檔（間奏）、一行長句、一行 CJK
@@ -51,7 +55,23 @@ enum LyricsFXPreviewFixture {
     static let denseNext = "Morning finds the harbor quiet and the tide returning slowly to the stones beneath the old pier under pale grey sky"
 
     static func lyrics(in environment: [String: String]) -> String {
-        environment[denseVariable] == "1" ? denseLyrics : lyrics
+        if environment[plainLyricsVariable] == "1" { return plainLyrics }
+        return environment[denseVariable] == "1" ? denseLyrics : lyrics
+    }
+
+    /// 預覽 LRC 的非空行與其開始秒數（純文字版與假退路鏈共用，兩邊的行序一致）
+    static var timedLines: [(start: Double, text: String)] {
+        lyrics.split(separator: "\n").compactMap { line in
+            guard line.hasPrefix("["), let close = line.firstIndex(of: "]") else { return nil }
+            let text = line[line.index(after: close)...].trimmingCharacters(in: .whitespaces)
+            let stamp = line[line.index(after: line.startIndex)..<close].split(separator: ":")
+            guard !text.isEmpty, stamp.count == 2, let minutes = Double(stamp[0]), let seconds = Double(stamp[1]) else { return nil }
+            return (minutes * 60 + seconds, text)
+        }
+    }
+
+    static var plainLyrics: String {
+        timedLines.map(\.text).joined(separator: "\n")
     }
 
     /// 定格的秒數；未設或不是數字＝跑動

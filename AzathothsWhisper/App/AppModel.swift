@@ -39,6 +39,8 @@ final class AppModel {
     private let playerSignal: any PlayerChangeSignaling
     /// Batch 成功後自動切回 Editor 分頁的計時（§4.6）。只與 LyricsFlow 升回共用時長常數，不共用排程（R1-6）
     private let batchSwitchClock: any PollClock
+    /// 外部時間軸查找（C 段）；nil＝不查
+    private let timing: (any TimingResolving)?
     @ObservationIgnored private var pendingReturnToEditor: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
     private var didStart = false
@@ -67,7 +69,9 @@ final class AppModel {
         batchSwitchClock: any PollClock = SystemPollClock(),
         /// 歌詞特效位置時鐘的輪詢節奏（母計劃 §2.3）
         positionPollClock: any PollClock = SystemPollClock(),
-        isMusicRunning: @escaping () -> Bool = MusicProcess.isRunning
+        isMusicRunning: @escaping () -> Bool = MusicProcess.isRunning,
+        /// 外部時間軸查找（C 段）。nil＝不查——單元測試與 UI 測試組裝的預設，絕不連網
+        timing: (any TimingResolving)? = nil
     ) {
         self.configStore = configStore
         self.httpClient = httpClient
@@ -79,6 +83,7 @@ final class AppModel {
         self.notifier = notifier
         self.playerSignal = playerSignal
         self.batchSwitchClock = batchSwitchClock
+        self.timing = timing
         self.editor = EditorViewModel(
             lyricsService: Self.makeLyricsService(client: httpClient, token: initialToken),
             music: music
@@ -115,6 +120,12 @@ final class AppModel {
             positionClock: PlaybackPositionClock(music: music, pollClock: positionPollClock),
             recipeHistory: StoredRecipeHistory(store: configStore)
         )
+        // C 段 §3.8：特效層顯示一首只有估算時間的歌時補做（visible：插隊、搶占背景工作）
+        if let timing {
+            let coverFlow = self.coverFlow
+            self.lyricsFX.timingLookup = { @Sendable request in await Self.resolveTiming(request, .visible, with: timing, reportingTo: coverFlow) }
+            coverFlow.timingNotFoundReader = { persistentID, hash in await timing.storedNotFound(persistentID: persistentID, lyricsHash: hash) }
+        }
 
         self.settings = SettingsViewModel(
             validator: validator,
@@ -140,6 +151,7 @@ final class AppModel {
         editor.onSaved = { [weak self] persistentID, text in
             self?.lyricsFlow.saved(persistentID: persistentID, text: text)
             self?.lyricsFX.lyricsUpdated(persistentID: persistentID, text: text)
+            self?.lookUpTiming(persistentID: persistentID, lyrics: text)
         }
         editor.onSavedTrack = { [weak self] track in
             self?.postIfEnabled(
@@ -172,6 +184,7 @@ final class AppModel {
         batch.onLyricsWritten = { [weak self] persistentID, text in
             self?.lyricsFlow.batchSaved(persistentID: persistentID, text: text)
             self?.lyricsFX.lyricsUpdated(persistentID: persistentID, text: text)
+            self?.lookUpTiming(persistentID: persistentID, lyrics: text)
         }
         batch.onImportFinished = { [weak self] result in self?.batchImportFinished(result) }
     }
@@ -266,6 +279,12 @@ final class AppModel {
         let music = MusicAppleEventsClient()
         #endif
         #if DEBUG
+        // 單元測試 host 不連外網查時間軸
+        let timing: (any TimingResolving)? = isTestHost ? nil : TimingResolver.live(music: music)
+        #else
+        let timing: (any TimingResolving)? = TimingResolver.live(music: music)
+        #endif
+        #if DEBUG
         // D11：單元測試 host 不讀使用者的曲庫
         let queueDirectory: URL? = isTestHost ? nil : QueueFileSource.defaultDirectory
         #else
@@ -282,7 +301,8 @@ final class AppModel {
             initialToken: store.token,
             initialLanguage: store.language,
             artworkDiskDirectory: artworkCacheDirectory,
-            queueDirectory: queueDirectory
+            queueDirectory: queueDirectory,
+            timing: timing
         )
     }
 
@@ -347,6 +367,27 @@ final class AppModel {
         lyricsFX.setVisible(false)
         playerSignal.stop()
         Task { await monitor.stop() }
+        if let timing { Task { await timing.shutdown() } }
+    }
+
+    /// 寫入成功後在背景補找時間軸（C 段 §3.8）：與寫入解耦——不在 busy 區間內、不等結果、不影響寫入成敗
+    private func lookUpTiming(persistentID: String, lyrics: String) {
+        guard let timing else { return }
+        let coverFlow = self.coverFlow
+        Task {
+            _ = await Self.resolveTiming(
+                TimingRequest(persistentID: persistentID, lyrics: lyrics, query: nil), .background, with: timing, reportingTo: coverFlow
+            )
+        }
+    }
+
+    /// 所有查找的唯一出口：結果一律轉給 Cover Flow（「尚無時間軸」標記）
+    private static func resolveTiming(
+        _ request: TimingRequest, _ priority: TimingPriority, with timing: any TimingResolving, reportingTo coverFlow: CoverFlowViewModel
+    ) async -> TimingResolution {
+        let resolution = await timing.resolve(request, priority: priority)
+        await coverFlow.timingResolved(resolution)
+        return resolution
     }
 
     // MARK: 導航與 modal

@@ -29,6 +29,9 @@ final class LyricsFXViewModel {
     /// 預覽場景強制「減少動態效果」（XCUITest 改不了系統設定）；只有 UI 測試組裝會設成 true
     @ObservationIgnored var forcesReducedMotion = false
 
+    /// 外部時間軸查找（C 段 §3.8），由 AppModel 注入；nil＝不查
+    @ObservationIgnored var timingLookup: (@Sendable (TimingRequest) async -> TimingResolution)?
+
     /// 「已標記無詞」的唯讀判斷式，由 AppModel 接到 `lyricsFlow`（與 Editor 同一份標記，D8）
     @ObservationIgnored var isMarkedNoLyrics: (String) -> Bool = { _ in false }
 
@@ -47,6 +50,9 @@ final class LyricsFXViewModel {
     /// session 身分＝`track.signature`（空 persistentID 時退回三元組，不會全體撞種子；Codex 辯論 J4″）
     @ObservationIgnored private var sessionSignature: String?
     @ObservationIgnored private var sessionArtist = ""
+    @ObservationIgnored private var sessionTitle = ""
+    /// 已為哪一份詞發過查找：顯示切換、曲長晚到（revision +1 但詞沒變）都不重發。鍵與 resolver 相同＝(pid, 指紋)
+    @ObservationIgnored private var requestedTiming: (persistentID: String, fingerprint: LyricsFingerprint)?
     @ObservationIgnored private var sessionNonce: UInt64 = 0
     /// recipe 已定格（得到 profile 或確定是 mono）：之後同一 session 內不再重組
     @ObservationIgnored private var isRecipeSettled = false
@@ -100,6 +106,7 @@ final class LyricsFXViewModel {
     func setVisible(_ visible: Bool) {
         isVisible = visible
         updateClock()
+        requestTimingIfNeeded()
     }
 
     /// 「已標記無詞」改了（使用者在 Cover Flow 標記）：不發播放事件，由 AppModel 在升降變更時叫這裡重判。
@@ -145,6 +152,33 @@ final class LyricsFXViewModel {
         timeline = timeline(for: lyrics)
         genreStyle = GenreStyleResolver.resolve(genre: metadata.genre, lyrics: lyrics)
         updateClock()
+        requestTimingIfNeeded()
+    }
+
+    /// 顯示中、確實有詞、目前只有估算時間：向退路鏈要一次（存檔先行，結果回來時熱替換）
+    private func requestTimingIfNeeded() {
+        guard isVisible, status == .present, timeline?.source == .estimated, let identity, !identity.persistentID.isEmpty,
+              let lyrics, let fingerprint, let timingLookup
+        else { return }
+        if let requested = requestedTiming, requested.persistentID == identity.persistentID, requested.fingerprint == fingerprint { return }
+        requestedTiming = (identity.persistentID, fingerprint)
+        let query = metadata.duration.map { TimingQuery(artist: sessionArtist, title: sessionTitle, duration: $0) }
+        let request = TimingRequest(persistentID: identity.persistentID, lyrics: lyrics, query: query)
+        // 不留 Task 控制代碼：結果不理會取消，過期與否只看 applyTiming 的 (pid, 指紋) 守衛
+        Task { [weak self] in
+            self?.applyTiming(await timingLookup(request))
+        }
+    }
+
+    /// 只換時間、不換文字；換曲、改詞（pid 或指紋不同）的舊結果一律丟棄。
+    /// 只看 (pid, 指紋)：曲長晚到讓 revision +1 但詞沒變，結果仍然有效
+    private func applyTiming(_ resolution: TimingResolution) {
+        guard identity?.persistentID == resolution.persistentID, resolution.lyricsHash == fingerprint, let lyrics,
+              case .found(let source, let lines) = resolution.outcome
+        else { return }
+        let duration = metadata.duration ?? (lines.last?.start ?? 0) + LyricsTimelineBuilder.lastLineFallback
+        guard let found = LRCAligner.timeline(lyrics: lyrics, stored: lines, duration: duration, source: source.timingSource) else { return }
+        timeline = found
     }
 
     /// 只有確實有詞（`.present`）才建；`.present` 蘊含 lyrics 非 nil
@@ -154,6 +188,7 @@ final class LyricsFXViewModel {
     }
 
     private func clear(statusText text: String) {
+        requestedTiming = nil
         identity = nil
         fingerprint = nil
         lyrics = nil
@@ -172,6 +207,7 @@ final class LyricsFXViewModel {
     private func startSession(_ track: TrackInfo) {
         sessionSignature = track.signature
         sessionArtist = track.artist
+        sessionTitle = track.title
         sessionNonce = nonceSource.next()
         isRecipeSettled = false
         recipe = .mono

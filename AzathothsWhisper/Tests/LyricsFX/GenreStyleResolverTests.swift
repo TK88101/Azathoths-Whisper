@@ -9,7 +9,7 @@ struct GenreStyleResolverTests {
     static let english = "Lanterns over the river"
 
     static let libraryTags: [(String, StyleFamily)] = [
-        ("ロック", .jrock), ("Metal", .chrome), ("Alternative", .indie), ("Hard Rock", .rock),
+        ("ロック", .rock), ("Metal", .chrome), ("Alternative", .indie), ("Hard Rock", .rock),
         ("Indie Rock", .indie), ("Rock", .rock), ("Black Metal", .frost), ("Death Metal/Black Metal", .frost),
         ("Pop", .pop), ("Electronica", .circuit), ("Symphony Black Metal", .cathedral), ("Melodic Death Metal", .slab),
         ("Adult Alternative", .indie), ("Industrial Metal", .stencil), ("Britpop", .indie), ("J-Pop", .jpop),
@@ -66,8 +66,34 @@ struct GenreStyleResolverTests {
     }
 
     @Test func japaneseTagsMakeTheJapaneseSystemEvenWithEnglishLyrics() {
-        #expect(GenreStyleResolver.resolve(genre: "ロック", lyrics: Self.english).system == .japanese)
         #expect(GenreStyleResolver.resolve(genre: "J-Pop", lyrics: Self.english).family == .jpop)
+        #expect(GenreStyleResolver.resolve(genre: "J-Rock", lyrics: Self.english).family == .jrock)
+    }
+
+    // Music 日文介面的曲風名（docs/plans/2026-10-19-lyrics-fx-japanese-genre-tags.md）：曲庫裡標「ロック」「メタル」的多是西洋樂團
+    @Test(arguments: [
+        ("ロック", StyleFamily.rock), ("ハードロック", .rock), ("メタル", .chrome), ("ヘヴィメタル", .chrome),
+        ("ブラックメタル", .frost), ("デスメタル", .slab), ("パンク", .riot), ("ハードコア", .riot),
+        ("オルタナティブ", .indie), ("インディー", .indie), ("ポップ", .pop), ("エレクトロニック", .circuit),
+        ("エレクトロニカ", .circuit), ("ダンス", .circuit), ("ヒップホップ", .block), ("ラップ", .block),
+        ("ソウル", .block), ("クラシック", .cathedral), ("サウンドトラック", .cathedral), ("フォーク", .hearth),
+        ("カントリー", .hearth), ("ワールド", .hearth), ("ゴシック", .velvet), ("インダストリアル", .stencil),
+    ])
+    func japaneseGenreNamesMapToTheEnglishFamily(tag: String, family: StyleFamily) {
+        #expect(GenreStyleResolver.resolve(genre: tag, lyrics: Self.english).family == family, "\(tag)")
+    }
+
+    /// 日文曲風名不再決定體系：日本語系只看歌詞
+    @Test func japaneseGenreNamesFollowTheLyricsForTheSystem() {
+        let japanese = "夜明けの鐘が鳴る\n川の上の灯り"
+        #expect(GenreStyleResolver.resolve(genre: "ロック", lyrics: Self.english).system == .english)
+        #expect(GenreStyleResolver.resolve(genre: "ロック", lyrics: japanese).family == .jrock)
+        #expect(GenreStyleResolver.resolve(genre: "ポップ", lyrics: japanese).family == .jpop)
+    }
+
+    @Test func genreKeywordMatchingSharesTheJapaneseMapping() {
+        #expect(GenreStyleResolver.genre("メタル", matches: "metal"))
+        #expect(GenreStyleResolver.genre("ブラックメタル", matches: "black"))
     }
 
     @Test func aFewJapaneseWordsInEnglishLyricsStayEnglish() {

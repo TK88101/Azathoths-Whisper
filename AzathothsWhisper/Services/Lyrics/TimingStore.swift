@@ -2,8 +2,18 @@ import Foundation
 import OSLog
 
 /// 可寫進存檔的來源（母計劃 C.1／C.3）。內嵌 LRC 本來就在 Music 欄位、估算隨時可算，兩者都不存檔——型別層強制
-enum StoredTimingSource: String, Sendable, Codable {
-    case lrclib, youtubeMusic, deezer, qq, kugou
+enum StoredTimingSource: String, Sendable, Codable, Hashable {
+    case lrclib, youtubeMusic, deezer, qq, netease
+
+    var timingSource: TimingSource {
+        switch self {
+        case .lrclib: return .lrclib
+        case .youtubeMusic: return .youtubeMusic
+        case .deezer: return .deezer
+        case .qq: return .qq
+        case .netease: return .netease
+        }
+    }
 }
 
 /// 一首歌一份的時間軸存檔（母計劃 C.1）。「查過、沒有」也要存：7 天重試靠它（C.4）
@@ -24,16 +34,40 @@ struct TimingRecord: Equatable, Sendable {
     let outcome: Outcome
     /// 最後一次查找的時刻（wall-clock：要跨重啟、跨機器比較，單調時鐘做不到）
     let fetchedAt: Date
+    /// 對出這份錨點的 `LRCAligner.revision`；欄位出現前寫下的檔＝1
+    let alignerRevision: Int
+
+    init(persistentID: String, lyricsHash: LyricsFingerprint, outcome: Outcome, fetchedAt: Date, alignerRevision: Int = LRCAligner.revision) {
+        self.persistentID = persistentID
+        self.lyricsHash = lyricsHash
+        self.outcome = outcome
+        self.fetchedAt = fetchedAt
+        self.alignerRevision = alignerRevision
+    }
 
     /// 兩份記錄的合併（多台 Mac 經同步資料夾、或同程序先後寫入）：
-    /// 詞不同→取新來的（新詞）；同詞：found 勝 notFound；同類→`fetchedAt` 較新者勝
+    /// 詞不同→取新來的（新詞）；同詞：found 勝 notFound；同類→`fetchedAt` 較新者勝（同時刻取新來的）
     static func merged(existing: TimingRecord?, incoming: TimingRecord) -> TimingRecord {
         guard let existing, existing.lyricsHash == incoming.lyricsHash else { return incoming }
         switch (existing.outcome, incoming.outcome) {
-        case (.found, .notFound): return existing
+        case (.found, .notFound):
+            // 錨點留著，但記下這個對齊版本已重查過：否則舊版本 found 每次都會再查（Codex review P2）
+            return TimingRecord(
+                persistentID: existing.persistentID, lyricsHash: existing.lyricsHash, outcome: existing.outcome, fetchedAt: existing.fetchedAt,
+                alignerRevision: max(existing.alignerRevision, incoming.alignerRevision)
+            )
         case (.notFound, .found): return incoming
-        default: return incoming.fetchedAt > existing.fetchedAt ? incoming : existing
+        // 同時刻＝新寫入者勝（它是剛查到的；舊的可能是錨點已套不上的壞檔）
+        default: return incoming.fetchedAt >= existing.fetchedAt ? incoming : existing
         }
+    }
+}
+
+extension Array where Element == TimingRecord.LineStart {
+    /// 錨點本身的合法性（存檔讀取與對齊重建共用的唯一定義）：index 非負且遞增、時間有限、非負、單調不減
+    var areWellFormedAnchors: Bool {
+        allSatisfy { $0.index >= 0 && $0.start.isFinite && $0.start >= 0 }
+            && zip(self, dropFirst()).allSatisfy { $0.index < $1.index && $0.start <= $1.start }
     }
 }
 
@@ -46,7 +80,7 @@ enum TimingLookupPolicy {
     static func shouldLookup(record: TimingRecord?, currentHash: LyricsFingerprint, now: Date) -> Bool {
         guard let record else { return true }
         if record.lyricsHash != currentHash { return true }
-        if case .found = record.outcome { return false }
+        if case .found = record.outcome { return record.alignerRevision < LRCAligner.revision }
         let age = now.timeIntervalSince(record.fetchedAt)
         return age >= retryInterval || age < -futureTolerance
     }
@@ -66,7 +100,9 @@ actor TimingStore {
         case unrecognizedFileOnDisk
     }
 
-    static let schemaVersion = 1
+    /// v2（C 段 §3.4）：加了 netease。舊版讀到 v2 判認不出來、不覆寫；v1 檔照讀
+    static let schemaVersion = 2
+    static let oldestReadableVersion = 1
     /// 一份時間軸幾 KB；同步資料夾裡超過這個大小的檔不讀（防整檔讀進記憶體）
     static let maxFileBytes = 1 << 20
     static let maxLines = 5000
@@ -96,9 +132,14 @@ actor TimingStore {
         return record
     }
 
-    func save(_ record: TimingRecord) throws {
+    /// 回傳實際寫下的（與磁碟既有者合併後的）記錄
+    @discardableResult
+    func save(_ record: TimingRecord) throws -> TimingRecord {
         guard let id = Self.canonicalID(record.persistentID) else { throw StoreError.invalidPersistentID }
-        let canonical = TimingRecord(persistentID: id, lyricsHash: record.lyricsHash, outcome: record.outcome, fetchedAt: record.fetchedAt)
+        let canonical = TimingRecord(
+            persistentID: id, lyricsHash: record.lyricsHash, outcome: record.outcome, fetchedAt: record.fetchedAt,
+            alignerRevision: record.alignerRevision
+        )
         let existing: TimingRecord?
         switch inspect(id) {
         case .unrecognized: throw StoreError.unrecognizedFileOnDisk
@@ -108,6 +149,7 @@ actor TimingStore {
         let merged = TimingRecord.merged(existing: existing, incoming: canonical)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Self.encoder.encode(StoredFile(merged)).write(to: fileURL(for: id), options: .atomic)
+        return merged
     }
 
     /// Music 的 persistentID 是 16 位 hex；大寫正規化後才驗證與命名（大小寫不同不得變成兩個檔、防路徑穿越）
@@ -173,12 +215,15 @@ private struct StoredFile: Codable {
     let source: StoredTimingSource?
     let lines: [TimingRecord.LineStart]
     let fetchedAt: Date
+    /// 可選欄位：舊版讀到會忽略，所以不必升 schemaVersion
+    let alignerRevision: Int?
 
     init(_ record: TimingRecord) {
         schemaVersion = TimingStore.schemaVersion
         persistentID = record.persistentID
         lyricsHash = record.lyricsHash
         fetchedAt = record.fetchedAt
+        alignerRevision = record.alignerRevision
         switch record.outcome {
         case .found(let source, let lines):
             self.source = source
@@ -190,17 +235,19 @@ private struct StoredFile: Codable {
     }
 
     func record(expecting id: String) -> TimingRecord? {
-        guard schemaVersion == TimingStore.schemaVersion,
+        guard (TimingStore.oldestReadableVersion...TimingStore.schemaVersion).contains(schemaVersion),
               TimingStore.canonicalID(persistentID) == id,
               lines.count <= TimingStore.maxLines,
-              zip(lines, lines.dropFirst()).allSatisfy({ $0.index < $1.index }),
-              lines.allSatisfy({ $0.index >= 0 && $0.start.isFinite && $0.start >= 0 })
+              lines.areWellFormedAnchors
         else { return nil }
         switch (source, lines.isEmpty) {
         case (let source?, false):
-            return TimingRecord(persistentID: id, lyricsHash: lyricsHash, outcome: .found(source: source, lines: lines), fetchedAt: fetchedAt)
+            return TimingRecord(
+                persistentID: id, lyricsHash: lyricsHash, outcome: .found(source: source, lines: lines), fetchedAt: fetchedAt,
+                alignerRevision: alignerRevision ?? 1
+            )
         case (nil, true):
-            return TimingRecord(persistentID: id, lyricsHash: lyricsHash, outcome: .notFound, fetchedAt: fetchedAt)
+            return TimingRecord(persistentID: id, lyricsHash: lyricsHash, outcome: .notFound, fetchedAt: fetchedAt, alignerRevision: alignerRevision ?? 1)
         default:
             return nil
         }

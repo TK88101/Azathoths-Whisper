@@ -10,8 +10,7 @@
     ],
     "enter": [
      "condense",
-     "negative",
-     "slam"
+     "negative"
     ],
     "exit": [
      "cut",
@@ -48,8 +47,7 @@
     ],
     "enter": [
      "condense",
-     "negative",
-     "slam"
+     "negative"
     ],
     "exit": [
      "cut",
@@ -111,8 +109,7 @@
     ],
     "enter": [
      "condense",
-     "negative",
-     "slam"
+     "negative"
     ],
     "exit": [
      "cut",
@@ -149,8 +146,7 @@
     ],
     "enter": [
      "condense",
-     "negative",
-     "slam"
+     "negative"
     ],
     "exit": [
      "cut",
@@ -212,8 +208,7 @@
     ],
     "enter": [
      "condense",
-     "negative",
-     "slam"
+     "negative"
     ],
     "exit": [
      "cut",
@@ -250,8 +245,7 @@
     ],
     "enter": [
      "condense",
-     "negative",
-     "slam"
+     "negative"
     ],
     "exit": [
      "cut",
@@ -314,7 +308,6 @@
     "enter": [
      "condense",
      "negative",
-     "slam",
      "smoke"
     ],
     "exit": [
@@ -358,7 +351,6 @@
     "enter": [
      "condense",
      "negative",
-     "slam",
      "smoke"
     ],
     "exit": [
@@ -433,7 +425,6 @@
      "condense",
      "lash",
      "negative",
-     "slam",
      "smoke",
      "swoop"
     ],
@@ -475,9 +466,9 @@
      "void"
     ],
     "enter": [
+     "condense",
      "lash",
      "negative",
-     "slam",
      "smoke",
      "swoop"
     ],
@@ -558,7 +549,6 @@
      "condense",
      "lash",
      "negative",
-     "slam",
      "smoke",
      "swoop"
     ],
@@ -600,9 +590,9 @@
      "void"
     ],
     "enter": [
+     "condense",
      "lash",
      "negative",
-     "slam",
      "smoke",
      "swoop"
     ],
@@ -683,7 +673,6 @@
      "condense",
      "lash",
      "negative",
-     "slam",
      "smoke",
      "swoop"
     ],
@@ -803,7 +792,6 @@
      "void"
     ],
     "enter": [
-     "slam",
      "slide",
      "stamp"
     ],
@@ -833,7 +821,6 @@
      "void"
     ],
     "enter": [
-     "slam",
      "slide",
      "stamp"
     ],
@@ -876,9 +863,7 @@
      "film",
      "void"
     ],
-    "enter": [
-     "slam"
-    ],
+    "enter": [],
     "exit": [
      "cut",
      "fall"
@@ -898,42 +883,7 @@
     ]
    },
    "name": "Cannibal Corpse",
-   "playable": {
-    "backdrop": [
-     "film",
-     "void"
-    ],
-    "enter": [
-     "slam"
-    ],
-    "exit": [
-     "cut",
-     "fall"
-    ],
-    "font": [
-     "Anton",
-     "Catacombs",
-     "Grimoire"
-    ],
-    "fx1": [
-     "none",
-     "shake"
-    ],
-    "fx2": [
-     "none",
-     "shake"
-    ],
-    "paletteByBackdrop": {
-     "film": [
-      "ashGrey",
-      "boneBlood"
-     ],
-     "void": [
-      "ashGrey",
-      "boneBlood"
-     ]
-    }
-   }
+   "playable": null
   },
   {
    "eligible": {
@@ -945,7 +895,6 @@
     ],
     "enter": [
      "drop",
-     "slam",
      "slide",
      "stamp",
      "tumble",
@@ -984,7 +933,7 @@
     ],
     "enter": [
      "drop",
-     "slam",
+     "slide",
      "stamp",
      "tumble",
      "type"
@@ -1307,7 +1256,6 @@
      "void"
     ],
     "enter": [
-     "slam",
      "slide",
      "stamp"
     ],
@@ -1337,7 +1285,6 @@
      "void"
     ],
     "enter": [
-     "slam",
      "slide",
      "stamp"
     ],
@@ -1563,7 +1510,6 @@
     ],
     "enter": [
      "lash",
-     "slam",
      "slide",
      "smoke",
      "stamp",
@@ -1601,8 +1547,8 @@
     ],
     "enter": [
      "lash",
-     "slam",
      "slide",
+     "smoke",
      "stamp",
      "swoop"
     ],
@@ -4506,7 +4452,6 @@
     ],
     "enter": [
      "drop",
-     "slam",
      "slide",
      "stamp"
     ],
@@ -4548,7 +4493,6 @@
     ],
     "enter": [
      "drop",
-     "slam",
      "slide",
      "stamp"
     ],
@@ -4628,7 +4572,6 @@
     ],
     "enter": [
      "drop",
-     "slam",
      "slide",
      "stamp"
     ],
@@ -4670,7 +4613,6 @@
     ],
     "enter": [
      "drop",
-     "slam",
      "slide",
      "stamp"
     ],

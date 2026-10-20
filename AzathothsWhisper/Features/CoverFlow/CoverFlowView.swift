@@ -230,11 +230,18 @@ private struct CoverFlowItemContainer: View {
     /// AC7：✓ 有詞／✗ 缺詞／— 已標記／? 讀不到；中心（播放中）卡附軌號
     private var badge: some View {
         let status = model.status(for: card)
-        return Text(verbatim: LyricsBadge.text(
-            for: status,
-            trackNumber: model.details[card.persistentID]?.trackNumber,
-            isCurrent: card.side == .current
-        ))
+        return HStack(spacing: 4) {
+            Text(verbatim: LyricsBadge.text(
+                for: status,
+                trackNumber: model.details[card.persistentID]?.trackNumber,
+                isCurrent: card.side == .current
+            ))
+            // C 段計劃 §3.10：全部來源都明確說沒有時才標（一時失敗不標）
+            if status == .present, model.timingNotFound.contains(card.persistentID) {
+                Image(systemName: "clock.badge.xmark")
+                    .accessibilityLabel(Text("timing_not_found_yet"))
+            }
+        }
         .font(Theme.Fonts.mono(12))
         .foregroundStyle(LyricsBadge.tone(for: status).color)
         .padding(.horizontal, 6)
