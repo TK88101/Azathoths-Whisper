@@ -36,6 +36,31 @@ struct ReadabilityGateTests {
     }
 }
 
+// sidle（swagger、slide 元件）的直接 G3：窄字（i、l）、相鄰同字、兩個方向（12 個種子），寬窄兩種字型都不持續疊住
+@Suite("Sidle readability")
+struct SidleReadabilityTests {
+    static let timeline = LyricsTimelineBuilder.build(lyrics: """
+        [00:01.00]Quiet harbor, quiet hands, little lilies in the mill
+        [00:05.00]Still we drift along the lilting hills until it is light
+        [00:09.00]Tilt the wild idle fills, will it fill the silent sill
+        [00:13.00]
+        """, duration: 16)!
+
+    @Test(arguments: ["swagger", "slide"])
+    func narrowNeighboursDoNotStayCovered(enter: String) {
+        let measurer = CoreTextMeasurer()
+        for font in ["Oswald", "Bebas"] {
+            for seed in 0..<UInt64(12) {
+                let recipe = ComposedRecipe(font: font, backdrop: "void", enter: enter, exit: "up", fx1: "none", fx2: "none", palette: "britRed", seed: seed,
+                                            profile: SongProfile(axes: [.aggression: 0.3], tags: [.britpop]))
+                if let finding = ReadabilityAudit.longestCovered(Self.timeline, recipe: recipe, measurer: measurer), finding.seconds > ReadabilityAudit.maxCovered + 1e-9 {
+                    Issue.record("\(enter) \(font) seed \(seed)：疊住 \(finding)")
+                }
+            }
+        }
+    }
+}
+
 // 量測函式自己的測試（人造情境，跨門檻兩側）
 @Suite("Readability audit")
 struct ReadabilityAuditTests {
