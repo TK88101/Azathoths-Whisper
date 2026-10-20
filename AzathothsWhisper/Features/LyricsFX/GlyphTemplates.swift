@@ -99,7 +99,8 @@ enum EnterTemplate: String, CaseIterable, Sendable {
             let control = (x: cos(c.angle + c.bend) * radius * 0.55, y: sin(c.angle + c.bend) * radius * 0.55)
             return GlyphTransform(
                 dx: CGFloat(u * u * start.x + 2 * u * e * control.x), dy: CGFloat(u * u * start.y + 2 * u * e * control.y),
-                rotation: CGFloat(u * 0.9) * c.dir, alpha: min(1, p * 2.5)
+                // 飛行中不可見、接近落點才出現：飛過別的字時不蓋住它（讀得到的檢查 G3，2026-10-20）
+                rotation: CGFloat(u * 0.9) * c.dir, alpha: FXEasing.clamp01((p - 0.45) / 0.4)
             )
         case .orbit:
             let u = 1 - FXEasing.outCubic(p)
@@ -203,4 +204,21 @@ enum ExitTemplate: String, CaseIterable, Sendable {
             return .identity
         }
     }
+}
+
+extension EnterTemplate {
+    /// 看得見的透明度（讀得到的檢查，docs/plans/2026-10-20-lyrics-fx-readability-gate.md）
+    static let visibleAlpha = 0.35
+
+    /// 透明度第一次達到 `visibleAlpha` 的進度：出場從這裡開始播，唱到的那一刻字就看得見，被跳過的只有看不見的那一段
+    var visibleLeadIn: Double { Self.leadIns[self] ?? 0 }
+
+    private static let leadIns: [EnterTemplate: Double] = {
+        let context = GlyphContext(em: 40, width: 960, height: 600, radius: 528, dir: 1, side: 1, phase: 0, angle: 0, bend: 0)
+        let steps = 2000
+        return Dictionary(uniqueKeysWithValues: allCases.map { template in
+            let first = (0...steps).first { template.transform(progress: Double($0) / Double(steps), context: context).alpha >= visibleAlpha } ?? 0
+            return (template, Double(first) / Double(steps))
+        })
+    }()
 }

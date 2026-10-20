@@ -162,3 +162,37 @@ struct ComposedStyleFrameTests {
         #expect(LyricsFXView.recipeProbeValue(.mono, reduceMotion: false) == "mono")
     }
 }
+
+// 讀得到的檢查 G3（docs/plans/2026-10-20-lyrics-fx-readability-gate.md）：新一行開始唱，前一行（退場或殘留）在 0.35 s 內讓位
+@Suite("Line handover")
+struct LineHandoverTests {
+    static let lines = [
+        TimedLine(start: 1, end: 4, text: "lanterns over water", isChorus: false),
+        TimedLine(start: 4, end: 8, text: "ash in the wind", isChorus: false),
+    ]
+
+    @Test func anExitingLineYieldsOnceTheNextLineStarts() {
+        let exit = ExitSpec(weights: [(.fade, 1)], duration: 1)
+        let at = { (time: Double) in ComposedStyle.visibleLines(Self.lines, time: time, exit: exit).first { $0.index == 0 } }
+        #expect(at(4.0)?.yield == 1)
+        #expect(abs((at(4.175)?.yield ?? -1) - 0.5) < 1e-9)
+        #expect((at(4.35)?.yield ?? 1) < 1e-9)
+    }
+
+    @Test func aTrailingLineYieldsToo() {
+        let exit = ExitSpec(weights: [(.fade, 1)], duration: 1.2, trail: true)
+        let entry = ComposedStyle.visibleLines(Self.lines, time: 4.2, exit: exit).first { $0.index == 0 }
+        #expect(abs((entry?.yield ?? -1) - (1 - 0.2 / ComposedStyle.handover)) < 1e-9)
+    }
+
+    @Test func withNoNextLineSungTheExitRunsAsBefore() {
+        let gap = [TimedLine(start: 1, end: 4, text: "lanterns over water", isChorus: false), TimedLine(start: 9, end: 12, text: "ash in the wind", isChorus: false)]
+        let exit = ExitSpec(weights: [(.fade, 1)], duration: 1)
+        #expect(ComposedStyle.visibleLines(gap, time: 4.5, exit: exit).first { $0.index == 0 }?.yield == 1)
+    }
+
+    @Test func theCurrentLineNeverYields() {
+        let exit = ExitSpec(weights: [(.fade, 1)], duration: 1)
+        #expect(ComposedStyle.visibleLines(Self.lines, time: 4.3, exit: exit).first { $0.index == 1 }?.yield == 1)
+    }
+}
