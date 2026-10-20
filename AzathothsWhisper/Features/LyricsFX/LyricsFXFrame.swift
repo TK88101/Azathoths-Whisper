@@ -174,6 +174,8 @@ struct FramePlan: Equatable, Sendable {
     var boxes: [GlyphBox] = []
     /// 一個 grapheme 一筆；陣列順序＝painter order
     var glyphs: [GlyphDraw] = []
+    /// 光暈層外的字（光暈配方中正在讓位的舊句），先於 `glyphs` 畫
+    var unlit: [GlyphDraw] = []
     /// 字之上
     var front: [LayerDraw] = []
     /// 整屏抖動（套在 back 與字上，不套 front；原型 html:1010）

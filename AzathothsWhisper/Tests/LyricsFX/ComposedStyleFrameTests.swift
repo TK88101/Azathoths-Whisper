@@ -196,3 +196,29 @@ struct LineHandoverTests {
         #expect(ComposedStyle.visibleLines(Self.lines, time: 4.3, exit: exit).first { $0.index == 1 }?.yield == 1)
     }
 }
+
+// 光暈配方：讓位中的舊句畫在光暈層外（點陣忠實度，Codex 2026-10-20）；霓虹描邊不受影響
+@Suite("Handover glow")
+struct HandoverGlowTests {
+    static let timeline = LyricsTimeline(lines: LineHandoverTests.lines, source: .lrclib, duration: 10)
+
+    static func recipe(fx: String) -> ComposedRecipe {
+        ComposedRecipe(font: "Cinzel", backdrop: "void", enter: "fadeUp", exit: "fade", fx1: fx, fx2: "none", palette: "goldNavy", seed: 1,
+                       profile: SongProfile(axes: [.theatrical: 0.8], tags: [.symphonic]))
+    }
+
+    static func plan(fx: String, time: Double) -> FramePlan {
+        LyricsFXFrame.plan(timeline: timeline, time: time, size: CGSize(width: 960, height: 600), motion: .full, recipe: .composed(recipe(fx: fx)), measurer: CoreTextMeasurer())
+    }
+
+    @Test func aYieldingLineIsDrawnOutsideTheGlowLayer() {
+        let frame = Self.plan(fx: "glow", time: 4.1)
+        #expect(!frame.unlit.isEmpty)
+        #expect(frame.unlit.allSatisfy { $0.opacity < 1 })
+        #expect(Self.plan(fx: "glow", time: 3).unlit.isEmpty)
+    }
+
+    @Test func neonStrokeKeepsTheYieldingLineInItsLayer() {
+        #expect(Self.plan(fx: "neonstroke", time: 4.1).unlit.isEmpty)
+    }
+}

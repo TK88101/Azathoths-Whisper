@@ -186,7 +186,13 @@ enum ComposedStyle {
         let visible = visibleLines(timeline.lines, time: time, exit: style.exit)
         var specks: [(Particle, Double)] = []
         for entry in visible {
+            let first = frame.glyphs.count
             draw(entry, time: time, size: size, style: style, measurer: measurer, into: &frame, specks: &specks)
+            // 光暈只給現行句：讓位中的舊句移到光暈層外（點陣與向量在淡字光暈邊緣會差幾個像素；霓虹描邊共用半徑但不受影響）
+            if style.effects.contains(.glow), entry.yield < 1 {
+                frame.unlit += frame.glyphs[first...]
+                frame.glyphs.removeSubrange(first...)
+            }
         }
         // 先減粒子不減字：冰屑只用剩下的預算
         frame.back += ComposedBackdrop.particleLayers(specks.prefix(max(maxParticles - particleCount(frame.back), 0)), color: style.palette.fg)

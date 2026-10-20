@@ -73,7 +73,7 @@ enum ReadabilityAudit {
             var run = 0.0, runStart = 0.0
             for (time, step) in samples(timeline.lines[index]) {
                 let frame = plan(single, time: time, recipe: recipe, measurer: measurer)
-                if frame.glyphs.contains(where: isInk) || hasInkFromCopies(frame.ghosts) {
+                if (frame.glyphs + frame.unlit).contains(where: isInk) || hasInkFromCopies(frame.ghosts) {
                     run = 0
                 } else {
                     if run == 0 { runStart = time }
@@ -101,7 +101,7 @@ enum ReadabilityAudit {
     static func coveredFraction(target: [GlyphDraw], screen: FramePlan, measurer: any TextMeasuring) -> Double {
         let mains = target.filter(isInk)
         guard !mains.isEmpty else { return 0 }
-        let others = (screen.glyphs + screen.ghosts).filter(isInk)
+        let others = (screen.glyphs + screen.unlit + screen.ghosts).filter(isInk)
         let covered = mains.filter { main in
             let box = Self.box(main, measurer: measurer)
             let area = box.width * box.height
