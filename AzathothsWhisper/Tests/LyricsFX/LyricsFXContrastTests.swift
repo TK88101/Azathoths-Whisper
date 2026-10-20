@@ -5,9 +5,10 @@ import Testing
 
 @testable import AzathothsWhisper
 
-// B2 計劃 T3：renderer 對比指標。同一幀渲染兩次（有字／沒字），在「兩張圖不同」的像素上取平均色：
-// 有字那張＝字的顏色，沒字那張＝字後面的背景（含背景層與顆粒、暈影）。以 WCAG 相對亮度公式算比值，主字要 ≥ 4.5:1。
-// 這是影像平均色的代理指標（受反鋸齒與紋理影響），不宣稱符合 WCAG。歌詞為編造句
+// 讀得到的檢查 G1（docs/plans/2026-10-20-lyrics-fx-readability-gate.md；改寫自 B2 計劃 T3 的平均色指標）：
+// 同一 plan、同一時刻畫三張——全部、去掉主字（glyphs＋unlit）、純背景（再去掉 ghosts 與 boxes）。
+// 主字核心像素＝「全部」與「去掉主字」任一通道差 > 48、且與配色 fg 每通道差 ≤ 24（字的內部）；每個核心像素算「全部」該像素與「純背景」同座標的 WCAG 相對亮度比，
+// 取 5 百分位，要 ≥ 4.5（字完全顯示的定格；出退場另由 G2／G3 管）。代理指標，不宣稱符合 WCAG。歌詞為編造句
 @MainActor
 @Suite("LyricsFX contrast")
 struct LyricsFXContrastTests {
@@ -19,12 +20,15 @@ struct LyricsFXContrastTests {
     /// 停穩的時刻（fadeUp 進場最長 0.6 s）
     static let settled = 5.0
 
-    private static func render(_ recipe: ComposedRecipe, withGlyphs: Bool) -> CGImage? {
+    enum Layers { case all, withoutMainText, backgroundOnly }
+
+    private static func render(_ recipe: ComposedRecipe, layers: Layers) -> CGImage? {
         let measurer = CoreTextMeasurer()
         let paths = GlyphPathCache()
         let view = Canvas { context, size in
             var plan = LyricsFXFrame.plan(timeline: timeline, time: settled, size: size, motion: .full, recipe: .composed(recipe), measurer: measurer)
-            if !withGlyphs { plan.glyphs = [] }
+            if layers != .all { plan.glyphs = []; plan.unlit = [] }
+            if layers == .backgroundOnly { plan.ghosts = []; plan.boxes = [] }
             LyricsFXCanvas.draw(plan, in: context, size: size, paths: paths)
         }
         .frame(width: canvas.width, height: canvas.height)
@@ -41,25 +45,35 @@ struct LyricsFXContrastTests {
         return pixels
     }
 
-    /// 字像素＝兩張圖任一通道差 > 48 的像素；回傳（比值, 字像素數）
-    static func contrast(_ recipe: ComposedRecipe) -> (ratio: Double, pixels: Int)? {
-        guard let lit = render(recipe, withGlyphs: true), let bare = render(recipe, withGlyphs: false) else { return nil }
-        let a = rgba(lit), b = rgba(bare)
-        var text = (0.0, 0.0, 0.0), back = (0.0, 0.0, 0.0), count = 0
-        for i in stride(from: 0, to: a.count, by: 4) where (0..<3).contains(where: { abs(Int(a[i + $0]) - Int(b[i + $0])) > 48 }) {
-            text = (text.0 + Double(a[i]), text.1 + Double(a[i + 1]), text.2 + Double(a[i + 2]))
-            back = (back.0 + Double(b[i]), back.1 + Double(b[i + 1]), back.2 + Double(b[i + 2]))
-            count += 1
-        }
-        guard count > 0 else { return nil }
-        let n = Double(count) * 255
-        let l1 = RGB(red: text.0 / n, green: text.1 / n, blue: text.2 / n).relativeLuminance
-        let l2 = RGB(red: back.0 / n, green: back.1 / n, blue: back.2 / n).relativeLuminance
-        return ((max(l1, l2) + 0.05) / (min(l1, l2) + 0.05), count)
+    static let percentile = 0.05
+    /// 核心像素與字色的每通道容差（0–255）
+    static let coreTolerance = 24
+
+    private static func luminance(_ p: [UInt8], _ i: Int) -> Double {
+        RGB(red: Double(p[i]) / 255, green: Double(p[i + 1]) / 255, blue: Double(p[i + 2]) / 255).relativeLuminance
     }
 
-    static func recipe(backdrop: String, palette: String) -> ComposedRecipe {
-        ComposedRecipe(font: "Bebas", backdrop: backdrop, enter: "fadeUp", exit: "up", fx1: "none", fx2: "none", palette: palette, seed: 5,
+    /// 回傳（核心像素對比的 5 百分位, 核心像素數）
+    static func contrast(_ recipe: ComposedRecipe) -> (ratio: Double, pixels: Int)? {
+        guard let full = render(recipe, layers: .all), let withoutMain = render(recipe, layers: .withoutMainText),
+              let background = render(recipe, layers: .backgroundOnly) else { return nil }
+        let a = rgba(full), m = rgba(withoutMain), b = rgba(background)
+        guard let fg = LyricsFXCatalog.palette(recipe.palette)?.fg else { return nil }
+        let ink = [fg.red, fg.green, fg.blue].map { Int(($0 * 255).rounded()) }
+        var ratios: [Double] = []
+        // 核心＝有字才不同、且顏色接近字色（排除反鋸齒邊緣與光暈、描邊的發光像素）
+        for i in stride(from: 0, to: a.count, by: 4)
+        where (0..<3).contains(where: { abs(Int(a[i + $0]) - Int(m[i + $0])) > 48 }) && (0..<3).allSatisfy({ abs(Int(a[i + $0]) - ink[$0]) <= coreTolerance }) {
+            let l1 = luminance(a, i), l2 = luminance(b, i)
+            ratios.append((max(l1, l2) + 0.05) / (min(l1, l2) + 0.05))
+        }
+        guard !ratios.isEmpty else { return nil }
+        ratios.sort()
+        return (ratios[Int(Double(ratios.count - 1) * percentile)], ratios.count)
+    }
+
+    static func recipe(backdrop: String, palette: String, fx: String = "none") -> ComposedRecipe {
+        ComposedRecipe(font: "Bebas", backdrop: backdrop, enter: "fadeUp", exit: "up", fx1: fx, fx2: "none", palette: palette, seed: 5,
                        profile: SongProfile(axes: [.aggression: 0.3], tags: [.britpop]))
     }
 
@@ -86,14 +100,21 @@ struct LyricsFXContrastTests {
     }()
 
     /// 量一組（背景, 配色）的主字對比；不及格回傳失敗說明（`who`＝抽得到它的團，可省）
-    static func readabilityFailure(backdrop: String, palette: String, who: [String] = []) -> String? {
-        let label = "\(palette)＋\(backdrop)" + (who.isEmpty ? "" : "（\(who.joined(separator: "、"))）")
-        guard let result = contrast(recipe(backdrop: backdrop, palette: palette)) else { return "\(label)：量不到字" }
+    static func readabilityFailure(backdrop: String, palette: String, fx: String = "none", who: [String] = []) -> String? {
+        let label = "\(palette)＋\(backdrop)" + (fx == "none" ? "" : "＋\(fx)") + (who.isEmpty ? "" : "（\(who.joined(separator: "、"))）")
+        guard let result = contrast(recipe(backdrop: backdrop, palette: palette, fx: fx)) else { return "\(label)：量不到字" }
         return result.ratio < minimum ? "\(label)：\(String(format: "%.2f", result.ratio))" : nil
     }
 
     @Test func mainTextStaysReadableOnEveryReachableBackdrop() {
         let failures = Self.reachablePairs.compactMap { Self.readabilityFailure(backdrop: $0.backdrop, palette: $0.palette) }
+        #expect(failures.isEmpty, "\(failures.joined(separator: "；"))")
+    }
+
+    /// 會改變字本身顏色或邊緣的效果：每組抽得到的（背景, 配色）各加一個量一次
+    @Test(arguments: ["glow", "neonstroke", "rgbsplit", "misreg", "reflect"])
+    func mainTextStaysReadableWithEffectsThatTouchTheText(fx: String) {
+        let failures = Self.reachablePairs.compactMap { Self.readabilityFailure(backdrop: $0.backdrop, palette: $0.palette, fx: fx) }
         #expect(failures.isEmpty, "\(failures.joined(separator: "；"))")
     }
 
