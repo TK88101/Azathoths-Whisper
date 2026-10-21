@@ -32,12 +32,12 @@ struct TimingResolverTests {
     private func resolver(
         _ providers: [FakeTimingProvider], store: TimingStore? = nil, metadata: TimingQuery? = TimingResolverTests.query,
         switches: TimingSwitches = .allEnabled, deadline: any PollClock = NeverSleeper(), queueLimit: Int = TimingResolver.defaultQueueLimit,
-        clock: FakeTimingClock = FakeTimingClock()
+        clock: FakeTimingClock = FakeTimingClock(), diagnostics: any TimingDiagnostics = NoopTimingDiagnostics()
     ) -> (TimingResolver, TimingStore) {
         let store = store ?? TimingStore(directory: directory())
         let resolver = TimingResolver(
             providers: providers, store: store, metadata: { _ in metadata }, switches: switches,
-            deadlineSleeper: deadline, clock: clock, now: { Self.now }, queueLimit: queueLimit
+            deadlineSleeper: deadline, clock: clock, now: { Self.now }, queueLimit: queueLimit, diagnostics: diagnostics
         )
         return (resolver, store)
     }
@@ -128,6 +128,190 @@ struct TimingResolverTests {
         let (resolver, _) = resolver([provider], metadata: nil)
         _ = await resolver.resolve(request(query: given), priority: .visible)
         #expect(await provider.queries == [given])
+    }
+
+    // MARK: 候選排序（候選排序計劃 §3.3–§3.6）
+
+    /// 對上 3／4 行、LRC 側全對上：通過但不完美
+    static let partial = ProviderOutcome.timed(
+        [LRCLine(start: 10, text: "Lanterns over the river"), LRCLine(start: 14, text: "Ash in the wind"),
+         LRCLine(start: 20, text: "Count the silent bells")], matched: matched
+    )
+    /// 對上 3／4 行、LRC 側 3／4：通過，比 `partial` 差
+    static let weaker = ProviderOutcome.timed(
+        [LRCLine(start: 11, text: "Lanterns over the river"), LRCLine(start: 15, text: "Ash in the wind"),
+         LRCLine(start: 21, text: "Count the silent bells"), LRCLine(start: 30, text: "Something else entirely")], matched: matched
+    )
+    static let partialLines: [TimingRecord.LineStart] = [.init(index: 0, start: 10), .init(index: 1, start: 14), .init(index: 2, start: 20)]
+    static let alignedLines: [TimingRecord.LineStart] = [.init(index: 0, start: 10), .init(index: 1, start: 14), .init(index: 2, start: 20), .init(index: 3, start: 24)]
+
+    static func candidate(_ id: String, duration: Double = 200) -> TimingCandidate {
+        TimingCandidate(track: MatchedTrack(artist: "Some Band", title: "Lantern Song", duration: duration), id: id)
+    }
+
+    static let threeCandidates = [candidate("c0"), candidate("c1"), candidate("c2")]
+
+    @Test func theBetterAlignedLaterCandidateIsStored() async {
+        let provider = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
+            "c0": [.outcome(Self.weaker)], "c1": [.outcome(Self.partial)], "c2": [.outcome(Self.unaligned)],
+        ])
+        let (resolver, store) = resolver([provider])
+        #expect(await resolver.resolve(request(), priority: .background).outcome == .found(.lrclib, Self.partialLines))
+        #expect(await provider.fetched == ["c0", "c1", "c2"])
+        #expect(await store.load(persistentID: Self.id)?.outcome == .found(source: .lrclib, lines: Self.partialLines))
+    }
+
+    @Test func aPerfectFirstCandidateStopsFurtherFetches() async {
+        let provider = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: ["c0": [.outcome(Self.aligned)]])
+        let (resolver, _) = resolver([provider])
+        #expect(await resolver.resolve(request(), priority: .background).outcome == .found(.lrclib, Self.alignedLines))
+        #expect(await provider.fetched == ["c0"])
+    }
+
+    @Test func onlyTheTopThreeCandidatesAreFetched() async {
+        let four = Self.threeCandidates + [Self.candidate("c3")]
+        let provider = FakeTimingProvider(.lrclib, searches: [.candidates(four)], timings: ["c3": [.outcome(Self.aligned)]])
+        let (resolver, _) = resolver([provider])
+        #expect(await resolver.resolve(request(), priority: .background).outcome == .notFound)
+        #expect(await provider.fetched == ["c0", "c1", "c2"])
+    }
+
+    @Test func aFailingFirstCandidateFallsThroughToTheSecond() async {
+        let provider = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
+            "c0": [.failure(.transport)], "c1": [.outcome(Self.partial)],
+        ])
+        let (resolver, _) = resolver([provider])
+        #expect(await resolver.resolve(request(), priority: .background).outcome == .found(.lrclib, Self.partialLines))
+    }
+
+    @Test func whenNoCandidateAlignsTheNextSourceIsAsked() async {
+        let first = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
+            "c0": [.outcome(Self.unaligned)], "c1": [.outcome(.noTiming(.plainOnly))], "c2": [.outcome(Self.unaligned)],
+        ])
+        let second = FakeTimingProvider(.youtubeMusic, [.outcome(Self.aligned)])
+        let (resolver, _) = resolver([first, second])
+        #expect(await resolver.resolve(request(), priority: .background).outcome == .found(.youtubeMusic, Self.alignedLines))
+        #expect(await first.fetched == ["c0", "c1", "c2"])
+    }
+
+    @Test func atExactlyTenSecondsTheNextCandidateIsStillFetched() async {
+        let clock = FakeTimingClock()
+        let provider = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
+            "c0": [.advancing(10, .outcome(Self.unaligned))], "c1": [.outcome(Self.aligned)],
+        ], clock: clock)
+        let (resolver, _) = resolver([provider], clock: clock)
+        #expect(await resolver.resolve(request(), priority: .background).outcome == .found(.lrclib, Self.alignedLines))
+        #expect(await provider.fetched == ["c0", "c1"])
+    }
+
+    @Test func pastTenSecondsTheNextSourceIsAskedInstead() async {
+        let clock = FakeTimingClock()
+        let first = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
+            "c0": [.advancing(10.001, .outcome(Self.unaligned))], "c1": [.outcome(Self.partial)],
+        ], clock: clock)
+        let second = FakeTimingProvider(.youtubeMusic, [.outcome(Self.aligned)])
+        let (resolver, _) = resolver([first, second], clock: clock)
+        #expect(await resolver.resolve(request(), priority: .background).outcome == .found(.youtubeMusic, Self.alignedLines))
+        #expect(await first.fetched == ["c0"])
+        #expect(await second.callCount == 1)
+    }
+
+    @Test func atTheDeadlineAnAlreadyAcceptedCandidateIsStored() async {
+        let deadline = GatedSleeper()
+        let provider = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
+            "c0": [.outcome(Self.partial)], "c1": [.suspend(then: Self.aligned)],
+        ])
+        let (resolver, store) = resolver([provider], deadline: deadline)
+        let result = Task { await resolver.resolve(request(), priority: .visible) }
+        while await provider.fetched.count < 2 { await Task.yield() }
+        while await deadline.parkedCount == 0 { await Task.yield() }
+        await deadline.fire()
+        #expect(await result.value.outcome == .found(.lrclib, Self.partialLines))
+        #expect(await store.load(persistentID: Self.id)?.outcome == .found(source: .lrclib, lines: Self.partialLines))
+    }
+
+    @Test func atTheDeadlineWithoutAnAcceptedCandidateNothingIsStored() async {
+        let deadline = GatedSleeper()
+        let provider = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
+            "c0": [.outcome(Self.unaligned)], "c1": [.suspend(then: Self.aligned)],
+        ])
+        let (resolver, store) = resolver([provider], deadline: deadline)
+        let result = Task { await resolver.resolve(request(), priority: .visible) }
+        while await provider.fetched.count < 2 { await Task.yield() }
+        while await deadline.parkedCount == 0 { await Task.yield() }
+        await deadline.fire()
+        #expect(await result.value.outcome == .unavailable)
+        #expect(await store.load(persistentID: Self.id) == nil)
+    }
+
+    @Test func aCandidateThatAlignsOnlyAfterTheDeadlineIsNotStored() async {
+        let deadline = GatedSleeper()
+        let provider = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
+            "c0": [.suspendIgnoringCancel(then: Self.aligned)],
+        ])
+        let (resolver, store) = resolver([provider], deadline: deadline)
+        let result = Task { await resolver.resolve(request(), priority: .visible) }
+        while await provider.fetched.isEmpty { await Task.yield() }
+        while await deadline.parkedCount == 0 { await Task.yield() }
+        await deadline.fire()
+        while await resolver.isCollectingCandidates { await Task.yield() }
+        await provider.release()
+        #expect(await result.value.outcome == .unavailable)
+        #expect(await store.load(persistentID: Self.id) == nil)
+    }
+
+    @Test func preemptedBackgroundWorkSearchesAgainFromScratch() async {
+        let shared = FakeTimingProvider(.lrclib, searches: [
+            .candidates([Self.candidate("bg0"), Self.candidate("bg1")]), .candidates([]), .candidates([Self.candidate("bg0")]),
+        ], timings: [
+            "bg0": [.outcome(Self.partial), .outcome(Self.unaligned)], "bg1": [.suspend(then: Self.aligned)],
+        ])
+        let fallback = FakeTimingProvider(.youtubeMusic, [.outcome(Self.aligned), .outcome(.noTiming(.notFound))])
+        let (resolver, _) = resolver([shared, fallback])
+        let background = Task { await resolver.resolve(TimingRequest(persistentID: "AAAAAAAAAAAAAAAA", lyrics: Self.lyrics, query: nil), priority: .background) }
+        while await shared.fetched.count < 2 { await Task.yield() }
+        let visible = await resolver.resolve(request(), priority: .visible)
+        #expect(visible.outcome == .found(.youtubeMusic, Self.alignedLines))
+        // 重跑從頭搜尋；第一次已通過的 bg0 不被沿用（這次 bg0 對不上）→ 全部明確沒有
+        #expect(await background.value.outcome == .notFound)
+        #expect(await shared.callCount == 3)
+    }
+
+    @Test func newLyricsDiscardTheOldWorksAcceptedCandidates() async {
+        let provider = FakeTimingProvider(.lrclib, searches: [
+            .candidates([Self.candidate("c0"), Self.candidate("c1")]), .candidates([Self.candidate("n0")]),
+        ], timings: [
+            "c0": [.outcome(Self.partial)], "c1": [.suspendIgnoringCancel(then: Self.weaker)], "n0": [.outcome(Self.otherAligned)],
+        ])
+        let (resolver, store) = resolver([provider])
+        async let old = resolver.resolve(request(), priority: .background)
+        while await provider.fetched.count < 2 { await Task.yield() }
+        async let new = resolver.resolve(request(Self.otherLyrics), priority: .background)
+        await Task.yield()
+        await provider.release()
+        let (oldResult, newResult) = await (old, new)
+        #expect(oldResult.outcome == .cancelled)
+        #expect(newResult.outcome == .found(.lrclib, [.init(index: 0, start: 30), .init(index: 1, start: 34), .init(index: 2, start: 40), .init(index: 3, start: 44)]))
+        #expect(await store.load(persistentID: Self.id)?.lyricsHash == .of(Self.otherLyrics))
+    }
+
+    @Test func diagnosticsCarryTheRankAndThePick() async {
+        let diagnostics = RecordingTimingDiagnostics()
+        let provider = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
+            "c0": [.outcome(Self.unaligned)], "c1": [.outcome(Self.partial)], "c2": [.outcome(Self.weaker)],
+        ])
+        let (resolver, _) = resolver([provider], diagnostics: diagnostics)
+        _ = await resolver.resolve(request(), priority: .background)
+        let ranks = diagnostics.events.compactMap { event -> Int? in
+            if case .answer(_, let rank, _, _) = event { return rank }
+            return nil
+        }
+        #expect(ranks == [0, 1, 2])
+        let picks = diagnostics.events.compactMap { event -> String? in
+            if case .picked(let source, let rank, let tried) = event { return "\(source.rawValue) \(rank) \(tried)" }
+            return nil
+        }
+        #expect(picks == ["lrclib 1 3"])
     }
 
     // MARK: 存檔
