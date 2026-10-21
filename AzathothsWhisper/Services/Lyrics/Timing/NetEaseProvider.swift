@@ -10,14 +10,16 @@ struct NetEaseProvider: TimedLyricsProvider {
     let gate: SourceGate
     var source: StoredTimingSource { .netease }
 
-    func lookup(_ query: TimingQuery) async throws(ProviderFailure) -> ProviderOutcome {
+    func candidates(for query: TimingQuery) async throws(ProviderFailure) -> [TimingCandidate] {
         let form = ["s": "\(query.artist) \(query.title)", "type": "1", "limit": String(TimingCandidate.limit)]
         let search = try await gate.send(.timingPOST(
             Self.searchURL, body: Data(URLSessionHTTPClient.encodeForm(form).utf8),
             headers: ["Content-Type": "application/x-www-form-urlencoded", "Referer": Self.referer]
         ), cacheable: true)
-        let candidates = try Self.candidates(search.okBody())
-        guard let picked = TimingCandidate.pick(candidates, for: query) else { return .noTiming(.miss(among: candidates.count)) }
+        return try Self.candidates(search.okBody())
+    }
+
+    func timing(of picked: TimingCandidate, for query: TimingQuery) async throws(ProviderFailure) -> ProviderOutcome {
         let response = try await gate.send(.timingGET(
             Self.lyricURL, query: ["id": picked.id, "lv": "-1", "kv": "-1", "tv": "-1"], headers: ["Referer": Self.referer]
         ))

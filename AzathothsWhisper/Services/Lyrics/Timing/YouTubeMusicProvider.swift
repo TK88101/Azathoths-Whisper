@@ -15,10 +15,12 @@ struct YouTubeMusicProvider: TimedLyricsProvider {
     let gate: SourceGate
     var source: StoredTimingSource { .youtubeMusic }
 
-    func lookup(_ query: TimingQuery) async throws(ProviderFailure) -> ProviderOutcome {
+    func candidates(for query: TimingQuery) async throws(ProviderFailure) -> [TimingCandidate] {
         let search = try await post("search", client: Self.webClient, ["query": "\(query.artist) \(query.title)", "params": Self.songsFilter], cacheable: true)
-        let candidates = Self.candidates(search)
-        guard let picked = TimingCandidate.pick(candidates, for: query) else { return .noTiming(.miss(among: candidates.count)) }
+        return Self.candidates(search)
+    }
+
+    func timing(of picked: TimingCandidate, for query: TimingQuery) async throws(ProviderFailure) -> ProviderOutcome {
         let next = try await post("next", client: Self.webClient, ["videoId": picked.id, "isAudioOnly": true], cacheable: true)
         guard let browseID = TimingJSON.values(forKey: "browseId", in: next).compactMap({ $0 as? String }).first(where: { $0.hasPrefix("MPLY") })
         else { return .noTiming(.notFound) }

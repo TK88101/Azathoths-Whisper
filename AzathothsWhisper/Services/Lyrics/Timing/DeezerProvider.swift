@@ -16,12 +16,14 @@ struct DeezerProvider: TimedLyricsProvider {
         self.gate = gate
     }
 
-    func lookup(_ query: TimingQuery) async throws(ProviderFailure) -> ProviderOutcome {
+    func candidates(for query: TimingQuery) async throws(ProviderFailure) -> [TimingCandidate] {
         let search = try await gate.send(
             .timingGET(Self.searchURL, query: ["q": "\(query.artist) \(query.title)", "limit": String(TimingCandidate.limit)]), cacheable: true
         )
-        let candidates = try Self.candidates(search.okBody())
-        guard let picked = TimingCandidate.pick(candidates, for: query) else { return .noTiming(.miss(among: candidates.count)) }
+        return try Self.candidates(search.okBody())
+    }
+
+    func timing(of picked: TimingCandidate, for query: TimingQuery) async throws(ProviderFailure) -> ProviderOutcome {
         let lyrics = try await lyrics(trackID: picked.id, retryingExpiredToken: true)
         let synced = (lyrics?["synchronizedLines"] as? [[String: Any]] ?? []).compactMap(Self.line)
         guard !synced.isEmpty else {

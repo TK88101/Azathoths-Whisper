@@ -1,7 +1,7 @@
 import Foundation
 
-/// LRCLIB（https://lrclib.net/docs，C 段計劃 §3.7）：先 `/api/get` 精確查、404 才 `/api/search`；
-/// 帶 syncedLyrics 且通過 `TrackMatcher` 的候選**唯一**才採用（母計劃 §2.4 R1-4；不送 album，不再用它消歧）
+/// LRCLIB（https://lrclib.net/docs，C 段計劃 §3.7）：先 `/api/get` 精確查；404 或該筆沒有 syncedLyrics 才 `/api/search`。
+/// 帶 syncedLyrics 的紀錄全部是候選（候選排序計劃 §3.1 廢除「唯一」規則；排序在 resolver）；不送 album
 struct LRCLIBProvider: TimedLyricsProvider {
     static let base = URL(string: "https://lrclib.net/api/")!
     /// 文件要求：app 名、版本、首頁網址
@@ -12,32 +12,31 @@ struct LRCLIBProvider: TimedLyricsProvider {
     let gate: SourceGate
     var source: StoredTimingSource { .lrclib }
 
-    func lookup(_ query: TimingQuery) async throws(ProviderFailure) -> ProviderOutcome {
+    func candidates(for query: TimingQuery) async throws(ProviderFailure) -> [TimingCandidate] {
         let headers = ["User-Agent": Self.userAgent]
         let exact = try await gate.send(.timingGET(Self.base.appendingPathComponent("get"), query: [
             "artist_name": query.artist, "track_name": query.title, "duration": String(Int(query.duration.rounded())),
         ], headers: headers), cacheable: true)
-        let records: [[String: Any]]
-        if exact.statusCode == 404 {
-            let search = try await gate.send(.timingGET(Self.base.appendingPathComponent("search"), query: [
-                "artist_name": query.artist, "track_name": query.title,
-            ], headers: headers), cacheable: true)
-            records = try TimingJSON.array(search.okBody())
-        } else {
-            records = [try TimingJSON.dictionary(exact.okBody())]
+        if exact.statusCode != 404 {
+            let found = Self.candidates([try TimingJSON.dictionary(exact.okBody())])
+            if !found.isEmpty { return found }
         }
-        return Self.outcome(records, for: query)
+        let search = try await gate.send(.timingGET(Self.base.appendingPathComponent("search"), query: [
+            "artist_name": query.artist, "track_name": query.title,
+        ], headers: headers), cacheable: true)
+        return Self.candidates(try TimingJSON.array(search.okBody()))
     }
 
-    static func outcome(_ records: [[String: Any]], for query: TimingQuery) -> ProviderOutcome {
-        let considered = records.prefix(TimingCandidate.limit)
-        let matching = considered.filter { TrackMatcher.matches(query, track(of: $0)) }
-        guard !matching.isEmpty else { return .noTiming(.miss(among: considered.count)) }
-        let synced = matching.filter { !(($0["syncedLyrics"] as? String) ?? "").isEmpty }
-        guard synced.count == 1, let only = synced.first, let text = only["syncedLyrics"] as? String else {
-            return .noTiming(synced.isEmpty ? .plainOnly : .mismatch)
+    func timing(of candidate: TimingCandidate, for query: TimingQuery) async throws(ProviderFailure) -> ProviderOutcome {
+        .fromLRCText(candidate.embeddedLRC ?? "", matched: candidate.track, duration: query.duration)
+    }
+
+    /// 只有帶 syncedLyrics 的紀錄（純文字的佔掉前幾名的名額沒有意義）；沒有 id 的以位置代替
+    static func candidates(_ records: [[String: Any]]) -> [TimingCandidate] {
+        records.enumerated().compactMap { index, record in
+            guard let synced = record["syncedLyrics"] as? String, !synced.isEmpty else { return nil }
+            return TimingCandidate(track: track(of: record), id: TimingJSON.string(record["id"]) ?? "#\(index)", embeddedLRC: synced)
         }
-        return .fromLRCText(text, matched: track(of: only), duration: query.duration)
     }
 
     private static func track(of record: [String: Any]) -> MatchedTrack {

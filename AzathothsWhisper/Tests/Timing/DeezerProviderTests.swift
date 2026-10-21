@@ -18,7 +18,7 @@ struct DeezerProviderTests {
 
     @Test func aMatchWithSynchronizedLinesIsAnAnswer() async throws {
         let client = ScriptedHTTPClient([.respond(200, Self.search), .respond(200, Self.jwt), .respond(200, Self.synced)])
-        let outcome = try await provider(client).lookup(Self.query)
+        let outcome = try await provider(client).lookupFirstRanked(Self.query)
         guard case .timed(let lines, _) = outcome else { Issue.record("\(outcome)"); return }
         #expect(lines.map(\.start) == [10, 14, 20])
         let graph = client.requests[2]
@@ -29,7 +29,7 @@ struct DeezerProviderTests {
     /// V2：搜尋只帶「歌手 曲名」；匿名通行證請求不帶任何使用者資料；沒有 cookie
     @Test func requestsCarryNothingButArtistAndTitle() async throws {
         let client = ScriptedHTTPClient([.respond(200, Self.search), .respond(200, Self.jwt), .respond(200, Self.synced)])
-        _ = try await provider(client).lookup(Self.query)
+        _ = try await provider(client).lookupFirstRanked(Self.query)
         let search = client.requests[0]
         let items = URLComponents(url: search.url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         #expect(search.url.host == "api.deezer.com")
@@ -45,8 +45,8 @@ struct DeezerProviderTests {
             .respond(200, Self.search.replacingOccurrences(of: "Lantern Song", with: "Other Song")), .respond(200, Self.synced),
         ])
         let provider = provider(client)
-        _ = try await provider.lookup(Self.query)
-        _ = try await provider.lookup(TimingQuery(artist: "Some Band", title: "Other Song", duration: 200))
+        _ = try await provider.lookupFirstRanked(Self.query)
+        _ = try await provider.lookupFirstRanked(TimingQuery(artist: "Some Band", title: "Other Song", duration: 200))
         #expect(client.requests.filter { $0.url.host == "auth.deezer.com" }.count == 1)
     }
 
@@ -54,23 +54,23 @@ struct DeezerProviderTests {
         let client = ScriptedHTTPClient([
             .respond(200, Self.search), .respond(200, Self.jwt), .respond(401, "{}"), .respond(200, Self.jwt), .respond(200, Self.synced),
         ])
-        guard case .timed = try await provider(client).lookup(Self.query) else { Issue.record("expected timed"); return }
+        guard case .timed = try await provider(client).lookupFirstRanked(Self.query) else { Issue.record("expected timed"); return }
         #expect(client.requests.filter { $0.url.host == "auth.deezer.com" }.count == 2)
     }
 
     @Test func textWithoutSynchronizedLinesIsPlainOnly() async throws {
         let client = ScriptedHTTPClient([.respond(200, Self.search), .respond(200, Self.jwt), .respond(200, Self.plain)])
-        #expect(try await provider(client).lookup(Self.query) == .noTiming(.plainOnly))
+        #expect(try await provider(client).lookupFirstRanked(Self.query) == .noTiming(.plainOnly))
     }
 
     @Test func aWrongDurationIsAMismatchAndSkipsTheToken() async throws {
         let client = ScriptedHTTPClient([.respond(200, Self.search.replacingOccurrences(of: "199", with: "250"))])
-        #expect(try await provider(client).lookup(Self.query) == .noTiming(.mismatch))
+        #expect(try await provider(client).lookupFirstRanked(Self.query) == .noTiming(.mismatch))
         #expect(client.requests.count == 1)
     }
 
     @Test func anErrorPayloadFromSearchIsUnparsable() async {
         let client = ScriptedHTTPClient([.respond(200, #"{"error":{"type":"Exception","code":4}}"#)])
-        await #expect(throws: ProviderFailure.unparsable) { _ = try await provider(client).lookup(Self.query) }
+        await #expect(throws: ProviderFailure.unparsable) { _ = try await provider(client).lookupFirstRanked(Self.query) }
     }
 }

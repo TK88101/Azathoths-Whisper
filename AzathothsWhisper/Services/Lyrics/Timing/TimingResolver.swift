@@ -309,7 +309,12 @@ actor TimingResolver: TimingResolving {
             guard !Task.isCancelled else { return .cancelled }
             let started = clock.now
             do {
-                let outcome = try await provider.lookup(query)
+                let candidates = try await provider.candidates(for: query)
+                guard let first = TimingCandidate.ranked(candidates, for: query).first else {
+                    diagnostics.record(.noTiming(provider.source, .miss(among: candidates.count), elapsed: clock.now - started))
+                    continue
+                }
+                let outcome = try await provider.timing(of: first, for: query)
                 guard !Task.isCancelled else { return .cancelled }
                 let elapsed = clock.now - started
                 switch outcome {

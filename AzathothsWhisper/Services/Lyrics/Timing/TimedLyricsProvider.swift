@@ -53,25 +53,32 @@ enum ProviderOutcome: Equatable, Sendable {
     }
 }
 
-/// 一個外部時間軸來源（C 段計劃 §3.2）。對外只送 `TimingQuery` 的三樣；每個請求都經過自己的 `SourceGate`
+/// 一個外部時間軸來源（C 段計劃 §3.2；候選排序計劃 §3.1）。對外只送 `TimingQuery` 的三樣；每個請求都經過自己的 `SourceGate`。
+/// 搜尋與取時間軸分開：排序、逐筆取、對齊與挑選都在 `TimingResolver`
 protocol TimedLyricsProvider: Sendable {
     var source: StoredTimingSource { get }
-    func lookup(_ query: TimingQuery) async throws(ProviderFailure) -> ProviderOutcome
+    /// 搜尋：來源回的原始候選（未比對、未截斷）
+    func candidates(for query: TimingQuery) async throws(ProviderFailure) -> [TimingCandidate]
+    /// 取一筆候選的時間軸
+    func timing(of candidate: TimingCandidate, for query: TimingQuery) async throws(ProviderFailure) -> ProviderOutcome
 }
 
 /// 來源搜尋結果裡的一筆候選：比對用的曲目資料＋該來源取歌詞要用的 ID
 struct TimingCandidate: Sendable {
     let track: MatchedTrack
     let id: String
+    /// 搜尋結果本身就帶的 LRC（LRCLIB）：取時間軸不再發請求
+    let embeddedLRC: String?
 
-    /// 每個來源最多看前幾筆候選（比對要做 folding 與 regex；回應可帶上萬筆）。全專案唯一的上限：
-    /// 來源解析時不自行截斷，請求的 page size 也用它；LRCLIB 的「唯一」判定同樣只看前這幾筆
-    static let limit = 10
-
-    /// 前 `limit` 筆中第一個通過 `TrackMatcher` 的候選
-    static func pick(_ candidates: [TimingCandidate], for query: TimingQuery) -> TimingCandidate? {
-        candidates.prefix(limit).first { TrackMatcher.matches(query, $0.track) }
+    init(track: MatchedTrack, id: String, embeddedLRC: String? = nil) {
+        self.track = track
+        self.id = id
+        self.embeddedLRC = embeddedLRC
     }
+
+    /// 每個來源最多看前幾個不重複的候選（比對要做 folding 與 regex；回應可帶上萬筆）。全專案唯一的上限：
+    /// 來源解析時不自行截斷，請求的 page size 也用它
+    static let limit = 10
 }
 
 extension NoTimingReason {

@@ -20,7 +20,7 @@ struct QQMusicProviderTests {
 
     @Test func aMatchWithAnLRCIsAnAnswer() async throws {
         let client = ScriptedHTTPClient([.respond(200, Self.search()), .respond(200, Self.lyric)])
-        let outcome = try await provider(client).lookup(Self.query)
+        let outcome = try await provider(client).lookupFirstRanked(Self.query)
         guard case .timed(let lines, let matched) = outcome else { Issue.record("\(outcome)"); return }
         #expect(lines.map(\.start) == [10, 14, 20])
         #expect(lines[1].text == "Ash in the wind's path")
@@ -33,7 +33,7 @@ struct QQMusicProviderTests {
     /// V2：搜尋 body 只帶「歌手 曲名」；沒有 cookie
     @Test func theSearchCarriesOnlyArtistAndTitle() async throws {
         let client = ScriptedHTTPClient([.respond(200, Self.search()), .respond(200, Self.lyric)])
-        _ = try await provider(client).lookup(Self.query)
+        _ = try await provider(client).lookupFirstRanked(Self.query)
         let request = client.requests[0]
         #expect(request.url.absoluteString == "https://u.y.qq.com/cgi-bin/musicu.fcg")
         let body = String(decoding: request.body ?? Data(), as: UTF8.self)
@@ -43,21 +43,21 @@ struct QQMusicProviderTests {
 
     @Test func anEmptyLyricIsNotFound() async throws {
         let client = ScriptedHTTPClient([.respond(200, Self.search()), .respond(200, #"{"retcode":0,"lyric":""}"#)])
-        #expect(try await provider(client).lookup(Self.query) == .noTiming(.notFound))
+        #expect(try await provider(client).lookupFirstRanked(Self.query) == .noTiming(.notFound))
     }
 
     @Test func aLyricWithoutTimeTagsIsPlainOnly() async throws {
         let client = ScriptedHTTPClient([.respond(200, Self.search()), .respond(200, #"{"retcode":0,"lyric":"Lanterns over the river\nAsh in the wind"}"#)])
-        #expect(try await provider(client).lookup(Self.query) == .noTiming(.plainOnly))
+        #expect(try await provider(client).lookupFirstRanked(Self.query) == .noTiming(.plainOnly))
     }
 
     @Test func aWrongSingerIsAMismatch() async throws {
         let client = ScriptedHTTPClient([.respond(200, Self.search(singer: "Somebody Else"))])
-        #expect(try await provider(client).lookup(Self.query) == .noTiming(.mismatch))
+        #expect(try await provider(client).lookupFirstRanked(Self.query) == .noTiming(.mismatch))
     }
 
     @Test func garbageIsUnparsable() async {
         let client = ScriptedHTTPClient([.respond(200, "<html>")])
-        await #expect(throws: ProviderFailure.unparsable) { _ = try await provider(client).lookup(Self.query) }
+        await #expect(throws: ProviderFailure.unparsable) { _ = try await provider(client).lookupFirstRanked(Self.query) }
     }
 }
