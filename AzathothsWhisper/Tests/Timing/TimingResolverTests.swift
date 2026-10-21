@@ -217,43 +217,43 @@ struct TimingResolverTests {
     }
 
     @Test func atTheDeadlineAnAlreadyAcceptedCandidateIsStored() async {
-        let deadline = GatedSleeper()
+        let deadline = GatedPollClock()
         let provider = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
             "c0": [.outcome(Self.partial)], "c1": [.suspend(then: Self.aligned)],
         ])
         let (resolver, store) = resolver([provider], deadline: deadline)
         let result = Task { await resolver.resolve(request(), priority: .visible) }
         while await provider.fetched.count < 2 { await Task.yield() }
-        while await deadline.parkedCount == 0 { await Task.yield() }
-        await deadline.fire()
+        await deadline.waitUntilPending(1)
+        await deadline.releaseAll()
         #expect(await result.value.outcome == .found(.lrclib, Self.partialLines))
         #expect(await store.load(persistentID: Self.id)?.outcome == .found(source: .lrclib, lines: Self.partialLines))
     }
 
     @Test func atTheDeadlineWithoutAnAcceptedCandidateNothingIsStored() async {
-        let deadline = GatedSleeper()
+        let deadline = GatedPollClock()
         let provider = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
             "c0": [.outcome(Self.unaligned)], "c1": [.suspend(then: Self.aligned)],
         ])
         let (resolver, store) = resolver([provider], deadline: deadline)
         let result = Task { await resolver.resolve(request(), priority: .visible) }
         while await provider.fetched.count < 2 { await Task.yield() }
-        while await deadline.parkedCount == 0 { await Task.yield() }
-        await deadline.fire()
+        await deadline.waitUntilPending(1)
+        await deadline.releaseAll()
         #expect(await result.value.outcome == .unavailable)
         #expect(await store.load(persistentID: Self.id) == nil)
     }
 
     @Test func aCandidateThatAlignsOnlyAfterTheDeadlineIsNotStored() async {
-        let deadline = GatedSleeper()
+        let deadline = GatedPollClock()
         let provider = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
             "c0": [.suspendIgnoringCancel(then: Self.aligned)],
         ])
         let (resolver, store) = resolver([provider], deadline: deadline)
         let result = Task { await resolver.resolve(request(), priority: .visible) }
         while await provider.fetched.isEmpty { await Task.yield() }
-        while await deadline.parkedCount == 0 { await Task.yield() }
-        await deadline.fire()
+        await deadline.waitUntilPending(1)
+        await deadline.releaseAll()
         while await resolver.isCollectingCandidates { await Task.yield() }
         await provider.release()
         #expect(await result.value.outcome == .unavailable)

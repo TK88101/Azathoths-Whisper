@@ -114,17 +114,16 @@ actor TimingResolver: TimingResolving {
     private var latestHash: [String: LyricsFingerprint] = [:]
     private var backoff = ArtworkFailureBackoff()
     private var isShutDown = false
-    /// 每次執行查找配一個新號（被搶占後重跑也換號）：只有目前收集中的那一號能寫 `provisional`
+    /// 每次執行查找配一個新號（被搶占後重跑也換號）
     private var runCounter: UInt64 = 0
-    private var acceptingRun: UInt64?
-    /// 目前這個來源已通過的候選：時限到時從這裡挑（候選排序計劃 §3.5）
-    private var provisional: Provisional?
+    /// 收集中的這一號與它目前這個來源已通過的候選；nil＝停收（時限到時凍結、查找結束時清掉；候選排序計劃 §3.5）
+    private var collecting: Provisional?
 
-    private struct Provisional {
+    private struct Provisional: Sendable {
         let run: UInt64
-        let source: StoredTimingSource
-        let accepted: [RankedAlignment]
-        let tried: Int
+        var source: StoredTimingSource?
+        var accepted: [RankedAlignment] = []
+        var tried = 0
     }
 
     init(
@@ -146,7 +145,7 @@ actor TimingResolver: TimingResolving {
 
     var pendingCount: Int { pending.count }
     /// 目前這次查找還收不收「已通過」的候選（時限到即停收；測試用）
-    var isCollectingCandidates: Bool { acceptingRun != nil }
+    var isCollectingCandidates: Bool { collecting != nil }
 
     func resolve(_ request: TimingRequest, priority: TimingPriority) async -> TimingResolution {
         let pid = request.persistentID
@@ -320,12 +319,8 @@ actor TimingResolver: TimingResolving {
     private func lookupWithinDeadline(_ request: TimingRequest, hash: LyricsFingerprint) async -> TimingResolution.Outcome {
         runCounter += 1
         let run = runCounter
-        acceptingRun = run
-        provisional = nil
-        defer {
-            if acceptingRun == run { acceptingRun = nil }
-            if provisional?.run == run { provisional = nil }
-        }
+        collecting = Provisional(run: run)
+        defer { _ = stopCollecting(run) }
         let sleeper = deadlineSleeper
         let race = await withTaskGroup(of: Race?.self) { group -> Race in
             group.addTask { .finished(await self.lookup(request, hash: hash, run: run)) }
@@ -343,9 +338,8 @@ actor TimingResolver: TimingResolving {
         case .finished(let finished):
             outcome = finished
         case .expired(let snapshot):
-            if let snapshot, let best = RankedAlignment.best(of: snapshot.accepted) {
-                diagnostics.record(.picked(snapshot.source, rank: best.rank, tried: snapshot.tried))
-                return await save(.found(source: snapshot.source, lines: best.alignment.lineStarts), for: request, hash: hash)
+            if let snapshot, let source = snapshot.source, let best = RankedAlignment.best(of: snapshot.accepted) {
+                return await commit(best, from: source, tried: snapshot.tried, for: request, hash: hash)
             }
             outcome = .unavailable
         }
@@ -353,15 +347,24 @@ actor TimingResolver: TimingResolving {
         return outcome
     }
 
+    /// 停收並交出這一號的快照（別號的不動）
     private func stopCollecting(_ run: UInt64) -> Provisional? {
-        if acceptingRun == run { acceptingRun = nil }
-        return provisional?.run == run ? provisional : nil
+        guard let current = collecting, current.run == run else { return nil }
+        collecting = nil
+        return current
     }
 
     /// 只在這一號還在收集、且沒被取消時記下（時限到、被搶占、新詞取消之後都寫不進來）
     private func remember(_ accepted: [RankedAlignment], tried: Int, from source: StoredTimingSource, run: UInt64) {
-        guard acceptingRun == run, !Task.isCancelled else { return }
-        provisional = Provisional(run: run, source: source, accepted: accepted, tried: tried)
+        guard collecting?.run == run, !Task.isCancelled else { return }
+        collecting = Provisional(run: run, source: source, accepted: accepted, tried: tried)
+    }
+
+    private func commit(
+        _ best: RankedAlignment, from source: StoredTimingSource, tried: Int, for request: TimingRequest, hash: LyricsFingerprint
+    ) async -> TimingResolution.Outcome {
+        diagnostics.record(.picked(source, rank: best.rank, tried: tried))
+        return await save(.found(source: source, lines: best.alignment.lineStarts), for: request, hash: hash)
     }
 
     private func lookup(_ request: TimingRequest, hash: LyricsFingerprint, run: UInt64) async -> TimingResolution.Outcome {
@@ -374,26 +377,25 @@ actor TimingResolver: TimingResolving {
         for provider in providers where !switches.disabledSources.contains(provider.source) {
             guard !Task.isCancelled else { return .cancelled }
             let started = clock.now
-            let ranked: [TimingCandidate]
+            let candidates: [TimingCandidate]
             do {
-                let candidates = try await provider.candidates(for: query)
-                ranked = TimingCandidate.ranked(candidates, for: query)
-                guard !ranked.isEmpty else {
-                    diagnostics.record(.noTiming(provider.source, .miss(among: candidates.count), elapsed: clock.now - started))
-                    continue
-                }
+                candidates = try await provider.candidates(for: query)
             } catch {
                 guard error != .cancelled, !Task.isCancelled else { return .cancelled }
                 hadFailure = true
                 diagnostics.record(.failure(provider.source, error, elapsed: clock.now - started))
                 continue
             }
+            let ranked = TimingCandidate.ranked(candidates, for: query)
+            guard !ranked.isEmpty else {
+                diagnostics.record(.noTiming(provider.source, .miss(among: candidates.count), elapsed: clock.now - started))
+                continue
+            }
             switch await ask(provider, for: ranked, query: query, lyrics: request.lyrics, run: run, since: lookupStarted) {
             case .cancelled:
                 return .cancelled
             case .picked(let best, let tried):
-                diagnostics.record(.picked(provider.source, rank: best.rank, tried: tried))
-                return await save(.found(source: provider.source, lines: best.alignment.lineStarts), for: request, hash: hash)
+                return await commit(best, from: provider.source, tried: tried, for: request, hash: hash)
             case .noAnswer(let failed):
                 hadFailure = hadFailure || failed
             }
@@ -413,7 +415,6 @@ actor TimingResolver: TimingResolving {
             if rank > 0, clock.now - lookupStarted > Self.extraCandidateCutoff { break }
             guard !Task.isCancelled else { return .cancelled }
             tried += 1
-            remember(accepted, tried: tried, from: provider.source, run: run)
             let started = clock.now
             do {
                 let outcome = try await provider.timing(of: candidate, for: query)

@@ -252,43 +252,6 @@ extension SourceGate {
     }
 }
 
-/// 手動觸發的時限：`fire()` 才到期；被取消時立即返回（查找先完成時時限子工作要能結束）
-actor GatedSleeper: PollClock {
-    private var waiting: [UUID: CheckedContinuation<Void, Never>] = [:]
-    private var cancelledEarly: Set<UUID> = []
-
-    var parkedCount: Int { waiting.count }
-
-    nonisolated func sleep(for interval: Duration) async throws {
-        let id = UUID()
-        await withTaskCancellationHandler {
-            await park(id)
-        } onCancel: {
-            Task { await self.wake(id) }
-        }
-        try Task.checkCancellation()
-    }
-
-    func fire() {
-        let all = waiting
-        waiting = [:]
-        all.values.forEach { $0.resume() }
-    }
-
-    private func park(_ id: UUID) async {
-        guard cancelledEarly.remove(id) == nil else { return }
-        await withCheckedContinuation { waiting[id] = $0 }
-    }
-
-    private func wake(_ id: UUID) {
-        guard let continuation = waiting.removeValue(forKey: id) else {
-            cancelledEarly.insert(id)
-            return
-        }
-        continuation.resume()
-    }
-}
-
 /// 收集診斷事件（測 rank／picked）
 final class RecordingTimingDiagnostics: TimingDiagnostics, @unchecked Sendable {
     private let lock = NSLock()
