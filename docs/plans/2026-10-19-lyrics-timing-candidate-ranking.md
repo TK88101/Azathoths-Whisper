@@ -153,5 +153,12 @@ protocol TimedLyricsProvider: Sendable {
 
 R2 結論：主幹無其他阻塞問題；駁回條目雙方一致。
 
-## 10. 實作記錄
-（紅燈摘要、測試數字）
+## 10. 實作記錄（2026-10-22，未在真機驗證）
+- T1 紅：`CandidateRankingTests` 編譯失敗（`ranked`／`RankedAlignment` 不存在）→ 綠 17 條；過程中修正一條測試資料（folding 含小寫，`LANTERN BAND` 本來就算完全一致）。
+- T2：契約重構先保持行為不變（resolver 只取第 1 名），timing 16 suite 140 條綠。兩個測試替身問題：LRCLIB 假資料 id 重複被去重合併（改不同 id）；舊單步替身的掛起點從搜尋移到取詞造成放行落空、2 條掛 120 s（改回在搜尋掛住）。
+- T3 紅：新測試 8 條失敗或掛住（舊流程只取第 1 名）→ 綠；另補「新詞取消舊工作」與真 LRCLIB 整合各 1 條。
+- 已知工具限制：一次帶 16 個 `-only-testing` 時 Swift Testing 跑 0 條（原因 TBD），分兩組跑。
+- /simcodex 2 輪提前結束：R1 Reuse P1（時限替身改用既有 `GatedPollClock`）採納；收集狀態收斂為單一 `collecting`、`commit` 抽取、判空移出 do/catch；Codex R1 P1「Provisional 非 Sendable 編不過」與事實不符（已編譯通過，非 public struct 隱式 Sendable），仍補明確標註。安全評審無 CRITICAL／HIGH；LOW-1（去重掃全陣列）修。R2：Codex 無問題、simplify 無 P1。
+- 全量單元 1515 條綠（2231 s，略過已知 flaky 一條）；coverage_gate Services＋Infra 95.9 %（CandidateRanking 100 %、TimingResolver 96.7 %、LRCLIBProvider 89.7 %）；no_playback_gate 通過；Scripts Python 333 條綠。
+- 遺留 P2：Deezer／QQ／網易雲請求只拿 10 筆，去重後碰不到第 11 筆（Codex）；`quality` 每筆重算查詢側正規化（微秒級）；`FakeTimingProvider` 舊單步翻譯層；`matches` 只剩測試呼叫；`exactKey` 與 GenreStyleResolver 同寫法；時限快照的 tried 不含進行中那筆；時限與存檔同時發生時同內容存兩次（無害）；對齊不理會取消（現行性質，TBD）。
+- 待使用者拍板：安全評審 MEDIUM——第 1 名通過但不完美時仍取第 2、3 名，背景補查總請求量可能增加（每秒速率受 gate 限制不變）。
