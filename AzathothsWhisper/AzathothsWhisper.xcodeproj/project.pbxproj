@@ -36,6 +36,7 @@
 		1450092B07DB954E7B027A01 /* OFL-SpaceMono.txt in Resources */ = {isa = PBXBuildFile; fileRef = 679D9FBF1EE48912154AD401 /* OFL-SpaceMono.txt */; };
 		156D29F451CD333678FA3430 /* ArtworkDiskCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05EFB5F1B46342FF23FBAAB7 /* ArtworkDiskCache.swift */; };
 		15BEBA37FD4FC48D58894E0D /* LICENSE-PermanentMarker.txt in Resources */ = {isa = PBXBuildFile; fileRef = A0D0638F61B9A58601FFE7C0 /* LICENSE-PermanentMarker.txt */; };
+		1684F2038754D7BFE73A8061 /* CandidateRankingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E601E58D6FBA12DD7AF58063 /* CandidateRankingTests.swift */; };
 		16FBD7EDEABE6E49B37816EB /* SpaceGrotesk-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2D73EEC1E7143A8AD5C82C3D /* SpaceGrotesk-Variable.ttf */; };
 		17C79DE6A8458CC78A37FCEA /* GlyphRasterFidelityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56882674866B1BE63373C32 /* GlyphRasterFidelityTests.swift */; };
 		193B259FC4EBFB36BEC757FB /* DeckFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA67BEAF9D31D2A090F57BF1 /* DeckFixtures.swift */; };
@@ -361,6 +362,7 @@
 		DD3361E9C46A55A061643ABC /* LyricsLines.swift in Sources */ = {isa = PBXBuildFile; fileRef = C207B43C1ACA4C7F46C87E81 /* LyricsLines.swift */; };
 		DDC9F67453DDBE763CAA7968 /* MockMusicClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58C02EBBD0929808F2D86024 /* MockMusicClient.swift */; };
 		DDDF1E0A90E37612266F5724 /* MonoGoldenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69DEE31AF61AEB2EAB49E136 /* MonoGoldenTests.swift */; };
+		DEA21E201AACC06289B7BBC8 /* CandidateRanking.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB871802D079A88D159A2DA /* CandidateRanking.swift */; };
 		DEFCB5D284B8229341580DBF /* LyricsFlowHistoryRecheckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D424056DECB7B088193E304 /* LyricsFlowHistoryRecheckTests.swift */; };
 		DF3043676E3572184FDE8E8B /* EditDistanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D99F39CC213C9A1006433EC /* EditDistanceTests.swift */; };
 		E0286B7505063A3ADBD3E90B /* LiveLyricsFXMeasurementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFC514BECABCF777B7D4A41D /* LiveLyricsFXMeasurementTests.swift */; };
@@ -604,6 +606,7 @@
 		6C61FC001523CA630A644E18 /* LyricsFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFlowUITests.swift; sourceTree = "<group>"; };
 		6CEAE1416634122A9C99B5D1 /* GlyphTemplatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlyphTemplatesTests.swift; sourceTree = "<group>"; };
 		6FA504860EF4A6A183692791 /* EditDistance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditDistance.swift; sourceTree = "<group>"; };
+		6FB871802D079A88D159A2DA /* CandidateRanking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateRanking.swift; sourceTree = "<group>"; };
 		70100D311C4A8C4190052A3D /* LyricsFlowUITestScenario.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFlowUITestScenario.swift; sourceTree = "<group>"; };
 		70D36E4B199CE0078AB78D50 /* Syncopate-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Syncopate-Bold.ttf"; sourceTree = "<group>"; };
 		71D5D3EB1307A6301785FE06 /* AppModel+LyricsFlowUITest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+LyricsFlowUITest.swift"; sourceTree = "<group>"; };
@@ -794,6 +797,7 @@
 		E4A23284E8409575E924EE1B /* LyricsFXTimingMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFXTimingMark.swift; sourceTree = "<group>"; };
 		E558EC88735D5FF7028F1216 /* SpyPlayerChangeSignal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpyPlayerChangeSignal.swift; sourceTree = "<group>"; };
 		E5EDBED3C33AED07C30D09C1 /* SpyLyricsNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpyLyricsNotifier.swift; sourceTree = "<group>"; };
+		E601E58D6FBA12DD7AF58063 /* CandidateRankingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateRankingTests.swift; sourceTree = "<group>"; };
 		E6C9DC917927EE65DB90D069 /* AboutModalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutModalView.swift; sourceTree = "<group>"; };
 		E6F57571418FBB32775836CD /* LyricsTimelineEstimatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsTimelineEstimatorTests.swift; sourceTree = "<group>"; };
 		E801916D5168FBAADA13266A /* LRCParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRCParser.swift; sourceTree = "<group>"; };
@@ -1090,6 +1094,7 @@
 			isa = PBXGroup;
 			children = (
 				D6AD927DD129DBEA80C85219 /* AppModelTimingTests.swift */,
+				E601E58D6FBA12DD7AF58063 /* CandidateRankingTests.swift */,
 				A44AAABD29FF82E886284854 /* DeezerProviderTests.swift */,
 				0D99F39CC213C9A1006433EC /* EditDistanceTests.swift */,
 				EF1AE03CB9242A181BB082CE /* LRCLIBProviderTests.swift */,
@@ -1263,6 +1268,7 @@
 		9F406EF6D0F2BFCB4ECA4032 /* Timing */ = {
 			isa = PBXGroup;
 			children = (
+				6FB871802D079A88D159A2DA /* CandidateRanking.swift */,
 				1C11998EEFEE3C54DD9B0E9D /* DeezerProvider.swift */,
 				866B12FE15E9E4A693765AA8 /* LRCLIBProvider.swift */,
 				ABE584CEF31E367E673AF530 /* NetEaseProvider.swift */,
@@ -1787,6 +1793,7 @@
 				2ECE532039045B813A605A95 /* BatchViewModelTests.swift in Sources */,
 				9DE491949DBE697BCD8958E9 /* BatchWriteReportTests.swift in Sources */,
 				FF3DBC581CDEF7162CA528DE /* BusyLedgerTests.swift in Sources */,
+				1684F2038754D7BFE73A8061 /* CandidateRankingTests.swift in Sources */,
 				41E4C401554F86C1C2568605 /* CardDetailsReaderTests.swift in Sources */,
 				B98366A5E631F3558B92111A /* ComposedStyleFrameTests.swift in Sources */,
 				6D219A0162D2E35F1342E799 /* ComposerTests.swift in Sources */,
@@ -1949,6 +1956,7 @@
 				958B87B91D1E04C5F667EB58 /* BatchViewModel.swift in Sources */,
 				C900CBC274F34AAFDF35C9E5 /* BundleAssets.swift in Sources */,
 				875F1BC3029263DCD97A68EC /* BusyLedger.swift in Sources */,
+				DEA21E201AACC06289B7BBC8 /* CandidateRanking.swift in Sources */,
 				5852A9AC08154BDAE4AB8F91 /* CardDetailsReader.swift in Sources */,
 				437F6CA90159C3C0891D63A6 /* ComposedBackdrop.swift in Sources */,
 				70E51A71CA3A1B20EDF3AA72 /* ComposedStyle.swift in Sources */,

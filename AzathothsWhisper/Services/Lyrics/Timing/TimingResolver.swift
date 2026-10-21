@@ -67,16 +67,20 @@ protocol TimingResolving: Sendable {
 /// 外部時間軸的退路鏈（C 段計劃 §3.5）。
 ///
 /// - 存檔先行：指紋相符的 found（且錨點套得上）或未滿 7 天的 notFound 直接回，不連網
-/// - 依序問來源，第一個「配對正確且對得上詞」（`LRCAligner.Alignment.isAccepted`）就停並存檔
+/// - 依序問來源；每個來源依中繼資料排出前 3 名逐筆取、對齊，只在通過者（`LRCAligner.Alignment.isAccepted`）之間挑最好的存檔並停
+///   （候選排序計劃 §3.4；第 2、3 名只在已用 ≤ 10 s 時才取，全對上就不再取）
 /// - 全部明確說沒有才存 notFound；任一來源失敗＝unavailable、不存檔、記憶體退避
 /// - 同 pid 同指紋加入同一份工作；新指紋取消舊工作；存檔前再比一次最新指紋，舊結果不蓋新詞
-/// - 同一時間只跑一首；visible 插隊並搶占正在跑的 background（被搶占的放回佇列）；每首總時限 20 s
+/// - 同一時間只跑一首；visible 插隊並搶占正在跑的 background（被搶占的放回佇列）；每首總時限 20 s，
+///   到期時從這次已通過的候選挑（到期後才完成的不算），沒有就 unavailable
 /// - `shutdown()` 後一切取消、不發請求、不寫檔
 actor TimingResolver: TimingResolving {
     static let defaultQueueLimit = 500
     static let deadline: Duration = .seconds(20)
     /// 超過一天的曲長不是歌（防 `Int(duration)` 溢位，安全評審 LOW-4）
     static let maximumDuration: TimeInterval = 86_400
+    /// 這首已用時間超過它就不再取同一來源的第 2、3 名（軟截點：已開始的請求仍可能用滿自己的逾時；候選排序計劃 §3.4）
+    static let extraCandidateCutoff: TimeInterval = 10
 
     /// 一首歌的一份查找工作；同 pid 同時最多一份（`jobs` 以 pid 為鍵，以參照比對身分）
     private final class Job {
@@ -110,6 +114,17 @@ actor TimingResolver: TimingResolving {
     private var latestHash: [String: LyricsFingerprint] = [:]
     private var backoff = ArtworkFailureBackoff()
     private var isShutDown = false
+    /// 每次執行查找配一個新號（被搶占後重跑也換號）
+    private var runCounter: UInt64 = 0
+    /// 收集中的這一號與它目前這個來源已通過的候選；nil＝停收（時限到時凍結、查找結束時清掉；候選排序計劃 §3.5）
+    private var collecting: Provisional?
+
+    private struct Provisional: Sendable {
+        let run: UInt64
+        var source: StoredTimingSource?
+        var accepted: [RankedAlignment] = []
+        var tried = 0
+    }
 
     init(
         providers: [any TimedLyricsProvider], store: TimingStore, metadata: @escaping @Sendable (String) async -> TimingQuery?,
@@ -129,6 +144,8 @@ actor TimingResolver: TimingResolving {
     }
 
     var pendingCount: Int { pending.count }
+    /// 目前這次查找還收不收「已通過」的候選（時限到即停收；測試用）
+    var isCollectingCandidates: Bool { collecting != nil }
 
     func resolve(_ request: TimingRequest, priority: TimingPriority) async -> TimingResolution {
         let pid = request.persistentID
@@ -285,42 +302,135 @@ actor TimingResolver: TimingResolving {
 
     // MARK: 退路鏈
 
+    private enum Race: Sendable {
+        case finished(TimingResolution.Outcome)
+        /// 時限到：當下凍結的已通過候選（之後才完成的不算）
+        case expired(Provisional?)
+    }
+
+    /// 一個來源問完的結果
+    private enum SourceAnswer {
+        case picked(RankedAlignment, tried: Int)
+        case noAnswer(hadFailure: Bool)
+        case cancelled
+    }
+
     /// 查找與 20 s 計時器賽跑；計時器被取消（查找先完成或整份工作被取消）回 nil、略過
     private func lookupWithinDeadline(_ request: TimingRequest, hash: LyricsFingerprint) async -> TimingResolution.Outcome {
+        runCounter += 1
+        let run = runCounter
+        collecting = Provisional(run: run)
+        defer { _ = stopCollecting(run) }
         let sleeper = deadlineSleeper
-        let outcome = await withTaskGroup(of: TimingResolution.Outcome?.self) { group -> TimingResolution.Outcome in
-            group.addTask { await self.lookup(request, hash: hash) }
-            group.addTask { (try? await sleeper.sleep(for: Self.deadline)) == nil ? nil : .unavailable }
+        let race = await withTaskGroup(of: Race?.self) { group -> Race in
+            group.addTask { .finished(await self.lookup(request, hash: hash, run: run)) }
+            group.addTask { (try? await sleeper.sleep(for: Self.deadline)) == nil ? nil : .expired(nil) }
             defer { group.cancelAll() }
-            for await case let result? in group { return result }
-            return .cancelled
+            for await case let result? in group {
+                // 時限勝出的這一刻（等子工作結束之前）就停收並取快照
+                if case .expired = result { return .expired(stopCollecting(run)) }
+                return result
+            }
+            return .finished(.cancelled)
+        }
+        let outcome: TimingResolution.Outcome
+        switch race {
+        case .finished(let finished):
+            outcome = finished
+        case .expired(let snapshot):
+            if let snapshot, let source = snapshot.source, let best = RankedAlignment.best(of: snapshot.accepted) {
+                return await commit(best, from: source, tried: snapshot.tried, for: request, hash: hash)
+            }
+            outcome = .unavailable
         }
         if outcome == .unavailable { backoff.record(request.persistentID, now: clock.now) }
         return outcome
     }
 
-    private func lookup(_ request: TimingRequest, hash: LyricsFingerprint) async -> TimingResolution.Outcome {
+    /// 停收並交出這一號的快照（別號的不動）
+    private func stopCollecting(_ run: UInt64) -> Provisional? {
+        guard let current = collecting, current.run == run else { return nil }
+        collecting = nil
+        return current
+    }
+
+    /// 只在這一號還在收集、且沒被取消時記下（時限到、被搶占、新詞取消之後都寫不進來）
+    private func remember(_ accepted: [RankedAlignment], tried: Int, from source: StoredTimingSource, run: UInt64) {
+        guard collecting?.run == run, !Task.isCancelled else { return }
+        collecting = Provisional(run: run, source: source, accepted: accepted, tried: tried)
+    }
+
+    private func commit(
+        _ best: RankedAlignment, from source: StoredTimingSource, tried: Int, for request: TimingRequest, hash: LyricsFingerprint
+    ) async -> TimingResolution.Outcome {
+        diagnostics.record(.picked(source, rank: best.rank, tried: tried))
+        return await save(.found(source: source, lines: best.alignment.lineStarts), for: request, hash: hash)
+    }
+
+    private func lookup(_ request: TimingRequest, hash: LyricsFingerprint, run: UInt64) async -> TimingResolution.Outcome {
         guard let query = await validQuery(for: request) else {
             diagnostics.record(.skipped(.missingMetadata))
             return .skipped(.missingMetadata)
         }
+        let lookupStarted = clock.now
         var hadFailure = false
         for provider in providers where !switches.disabledSources.contains(provider.source) {
             guard !Task.isCancelled else { return .cancelled }
             let started = clock.now
+            let candidates: [TimingCandidate]
             do {
-                let outcome = try await provider.lookup(query)
+                candidates = try await provider.candidates(for: query)
+            } catch {
+                guard error != .cancelled, !Task.isCancelled else { return .cancelled }
+                hadFailure = true
+                diagnostics.record(.failure(provider.source, error, elapsed: clock.now - started))
+                continue
+            }
+            let ranked = TimingCandidate.ranked(candidates, for: query)
+            guard !ranked.isEmpty else {
+                diagnostics.record(.noTiming(provider.source, .miss(among: candidates.count), elapsed: clock.now - started))
+                continue
+            }
+            switch await ask(provider, for: ranked, query: query, lyrics: request.lyrics, run: run, since: lookupStarted) {
+            case .cancelled:
+                return .cancelled
+            case .picked(let best, let tried):
+                return await commit(best, from: provider.source, tried: tried, for: request, hash: hash)
+            case .noAnswer(let failed):
+                hadFailure = hadFailure || failed
+            }
+        }
+        if hadFailure { return .unavailable }
+        return await save(.notFound, for: request, hash: hash)
+    }
+
+    /// 依名次逐筆取時間軸並對齊；全對上就不再取，已用超過 `extraCandidateCutoff` 就不再開始下一筆
+    private func ask(
+        _ provider: any TimedLyricsProvider, for ranked: [TimingCandidate], query: TimingQuery, lyrics: String, run: UInt64, since lookupStarted: TimeInterval
+    ) async -> SourceAnswer {
+        var accepted: [RankedAlignment] = []
+        var hadFailure = false
+        var tried = 0
+        candidates: for (rank, candidate) in ranked.enumerated() {
+            if rank > 0, clock.now - lookupStarted > Self.extraCandidateCutoff { break }
+            guard !Task.isCancelled else { return .cancelled }
+            tried += 1
+            let started = clock.now
+            do {
+                let outcome = try await provider.timing(of: candidate, for: query)
                 guard !Task.isCancelled else { return .cancelled }
-                let elapsed = clock.now - started
                 switch outcome {
                 case .timed(let lines, _):
-                    let alignment = await Self.align(lyrics: request.lyrics, lrc: lines)
-                    diagnostics.record(.answer(provider.source, alignment: alignment, elapsed: elapsed))
-                    if let alignment, alignment.isAccepted {
-                        return await save(.found(source: provider.source, lines: alignment.lineStarts), for: request, hash: hash)
-                    }
+                    let alignment = await Self.align(lyrics: lyrics, lrc: lines)
+                    guard !Task.isCancelled else { return .cancelled }
+                    diagnostics.record(.answer(provider.source, rank: rank, alignment: alignment, elapsed: clock.now - started))
+                    guard let alignment, alignment.isAccepted else { continue }
+                    let passed = RankedAlignment(rank: rank, alignment: alignment)
+                    accepted.append(passed)
+                    remember(accepted, tried: tried, from: provider.source, run: run)
+                    if passed.isPerfect { break candidates }
                 case .noTiming(let reason):
-                    diagnostics.record(.noTiming(provider.source, reason, elapsed: elapsed))
+                    diagnostics.record(.noTiming(provider.source, reason, elapsed: clock.now - started))
                 }
             } catch {
                 guard error != .cancelled, !Task.isCancelled else { return .cancelled }
@@ -328,8 +438,8 @@ actor TimingResolver: TimingResolving {
                 diagnostics.record(.failure(provider.source, error, elapsed: clock.now - started))
             }
         }
-        if hadFailure { return .unavailable }
-        return await save(.notFound, for: request, hash: hash)
+        if let best = RankedAlignment.best(of: accepted) { return .picked(best, tried: tried) }
+        return .noAnswer(hadFailure: hadFailure)
     }
 
     /// 對齊是同步 CPU 工作：在 actor 外跑，不佔住 resolver（resolve／shutdown 照常進得來；R2 層級審查）

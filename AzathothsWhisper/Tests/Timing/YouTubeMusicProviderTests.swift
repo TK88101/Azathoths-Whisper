@@ -41,7 +41,7 @@ struct YouTubeMusicProviderTests {
             .respond(200, Self.searchResult([("Other Band", "Lantern Song", "3:20", "v0"), ("Some Band", "Lantern Song", "3:21", "v1")])),
             .respond(200, Self.next), .respond(200, Self.browse(timed: true)),
         ])
-        let outcome = try await provider(client).lookup(Self.query)
+        let outcome = try await provider(client).lookupFirstRanked(Self.query)
         guard case .timed(let lines, let matched) = outcome else { Issue.record("\(outcome)"); return }
         #expect(lines.map(\.start) == [10, 14, 20])
         #expect(matched == MatchedTrack(artist: "Some Band", title: "Lantern Song", duration: 201))
@@ -56,7 +56,7 @@ struct YouTubeMusicProviderTests {
     /// V2：搜尋請求只帶「歌手 曲名」與固定的客戶端欄位，沒有 cookie
     @Test func theSearchRequestCarriesOnlyArtistAndTitle() async throws {
         let client = ScriptedHTTPClient([.respond(200, Self.searchResult([]))])
-        _ = try await provider(client).lookup(Self.query)
+        _ = try await provider(client).lookupFirstRanked(Self.query)
         let request = try #require(client.requests.first)
         #expect(request.method == "POST")
         #expect(request.url.absoluteString == "https://music.youtube.com/youtubei/v1/search?prettyPrint=false")
@@ -72,25 +72,25 @@ struct YouTubeMusicProviderTests {
             .respond(200, Self.searchResult([("Some Band", "Lantern Song", "3:20", "v1")])),
             .respond(200, Self.next), .respond(200, Self.browse(timed: false)),
         ])
-        #expect(try await provider(client).lookup(Self.query) == .noTiming(.plainOnly))
+        #expect(try await provider(client).lookupFirstRanked(Self.query) == .noTiming(.plainOnly))
     }
 
     @Test func noLyricsTabIsNotFound() async throws {
         let client = ScriptedHTTPClient([
             .respond(200, Self.searchResult([("Some Band", "Lantern Song", "3:20", "v1")])), .respond(200, Self.nextWithoutLyrics),
         ])
-        #expect(try await provider(client).lookup(Self.query) == .noTiming(.notFound))
+        #expect(try await provider(client).lookupFirstRanked(Self.query) == .noTiming(.notFound))
     }
 
     @Test func candidatesThatDoNotMatchAreAMismatch() async throws {
         let client = ScriptedHTTPClient([.respond(200, Self.searchResult([("Some Band", "Lantern Song", "4:30", "v1")]))])
-        #expect(try await provider(client).lookup(Self.query) == .noTiming(.mismatch))
+        #expect(try await provider(client).lookupFirstRanked(Self.query) == .noTiming(.mismatch))
         #expect(client.requests.count == 1)
     }
 
     @Test func noResultsIsNotFound() async throws {
         let client = ScriptedHTTPClient([.respond(200, Self.searchResult([]))])
-        #expect(try await provider(client).lookup(Self.query) == .noTiming(.notFound))
+        #expect(try await provider(client).lookupFirstRanked(Self.query) == .noTiming(.notFound))
     }
 
     @Test(arguments: [("3:21", 201.0), ("1:02:03", 3723.0), ("abc", nil)])

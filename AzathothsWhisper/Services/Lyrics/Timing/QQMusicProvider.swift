@@ -11,7 +11,7 @@ struct QQMusicProvider: TimedLyricsProvider {
     let gate: SourceGate
     var source: StoredTimingSource { .qq }
 
-    func lookup(_ query: TimingQuery) async throws(ProviderFailure) -> ProviderOutcome {
+    func candidates(for query: TimingQuery) async throws(ProviderFailure) -> [TimingCandidate] {
         let request: [String: Any] = ["req_1": [
             "method": "DoSearchForQQMusicDesktop", "module": "music.search.SearchCgiService",
             "param": ["num_per_page": TimingCandidate.limit, "page_num": 1, "query": "\(query.artist) \(query.title)", "search_type": 0],
@@ -19,8 +19,10 @@ struct QQMusicProvider: TimedLyricsProvider {
         let search = try await gate.send(.timingPOST(
             Self.searchURL, body: try TimingJSON.data(request), headers: ["Content-Type": "application/json", "Referer": Self.referer]
         ), cacheable: true)
-        let candidates = try Self.candidates(search.okBody())
-        guard let picked = TimingCandidate.pick(candidates, for: query) else { return .noTiming(.miss(among: candidates.count)) }
+        return try Self.candidates(search.okBody())
+    }
+
+    func timing(of picked: TimingCandidate, for query: TimingQuery) async throws(ProviderFailure) -> ProviderOutcome {
         let response = try await gate.send(.timingGET(
             Self.lyricURL, query: ["songmid": picked.id, "format": "json", "nobase64": "1", "g_tk": "5381"], headers: ["Referer": Self.referer]
         ))

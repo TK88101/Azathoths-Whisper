@@ -3,8 +3,10 @@ import OSLog
 
 /// 查找的本機診斷事件（C 段計劃 §3.9）：只有來源、結果類別、對齊率、耗時——不含曲名、歌詞、URL
 enum TimingDiagnosticEvent: Sendable {
-    /// 來源給了帶時間的行；`alignment?.isAccepted` 決定它是不是答案
-    case answer(StoredTimingSource, alignment: LRCAligner.Alignment?, elapsed: TimeInterval)
+    /// 來源給了帶時間的行；`alignment?.isAccepted` 決定它是否通過；`rank`＝候選名次（0 起算）
+    case answer(StoredTimingSource, rank: Int, alignment: LRCAligner.Alignment?, elapsed: TimeInterval)
+    /// 存檔的答案：勝出名次、這個來源實際取了幾筆（候選排序計劃 §3.6）
+    case picked(StoredTimingSource, rank: Int, tried: Int)
     case noTiming(StoredTimingSource, NoTimingReason, elapsed: TimeInterval)
     case failure(StoredTimingSource, ProviderFailure, elapsed: TimeInterval)
     case skipped(TimingResolution.SkipReason)
@@ -35,12 +37,14 @@ final class OSLogTimingDiagnostics: TimingDiagnostics, @unchecked Sendable {
 
     static func line(for event: TimingDiagnosticEvent) -> String {
         switch event {
-        case .answer(let source, let alignment, let elapsed):
+        case .answer(let source, let rank, let alignment, let elapsed):
             let accepted = alignment?.isAccepted == true
             let scores = alignment.map {
                 " music=\(format($0.musicRate)) lrc=\(format($0.lrcCoverage)) anchors=\($0.anchors.compactMap { $0 }.count)"
             } ?? ""
-            return "source=\(source.rawValue) result=\(accepted ? "answer" : "alignFail")\(scores) ms=\(milliseconds(elapsed))"
+            return "source=\(source.rawValue) result=\(accepted ? "answer" : "alignFail") rank=\(rank)\(scores) ms=\(milliseconds(elapsed))"
+        case .picked(let source, let rank, let tried):
+            return "source=\(source.rawValue) result=picked rank=\(rank) tried=\(tried)"
         case .noTiming(let source, let reason, let elapsed):
             return "source=\(source.rawValue) result=\(reason.rawValue) ms=\(milliseconds(elapsed))"
         case .failure(let source, let failure, let elapsed):
@@ -69,17 +73,18 @@ final class OSLogTimingDiagnostics: TimingDiagnostics, @unchecked Sendable {
     private static func milliseconds(_ seconds: TimeInterval) -> Int { Int((seconds * 1000).rounded()) }
 }
 
-/// 累計：各來源命中數、各失敗種類次數；每 `interval` 次來源請求吐一行
+/// 累計：各來源命中數、各失敗種類次數、勝出名次；每 `interval` 次來源請求吐一行
 struct TimingTally {
     static let interval = 20
 
     private var queries = 0
     private var answers: [String: Int] = [:]
     private var failures: [String: Int] = [:]
+    private var picks: [String: Int] = [:]
 
     mutating func add(_ event: TimingDiagnosticEvent) -> String? {
         switch event {
-        case .answer(let source, let alignment, _):
+        case .answer(let source, _, let alignment, _):
             queries += 1
             if alignment?.isAccepted == true { answers[source.rawValue, default: 0] += 1 }
         case .noTiming:
@@ -87,11 +92,14 @@ struct TimingTally {
         case .failure(_, let failure, _):
             queries += 1
             failures[OSLogTimingDiagnostics.name(failure), default: 0] += 1
+        case .picked(_, let rank, _):
+            picks["rank\(rank)", default: 0] += 1
+            return nil
         case .skipped, .storeFailed:
             return nil
         }
         guard queries.isMultiple(of: Self.interval) else { return nil }
-        return "summary queries=\(queries) answers \(Self.list(answers)) failures \(Self.list(failures))"
+        return "summary queries=\(queries) answers \(Self.list(answers)) failures \(Self.list(failures)) picked \(Self.list(picks))"
     }
 
     private static func list(_ counts: [String: Int]) -> String {
