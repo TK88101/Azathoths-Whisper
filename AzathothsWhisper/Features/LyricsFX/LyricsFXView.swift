@@ -85,8 +85,10 @@ enum LyricsFXCanvas {
             shaken.translateBy(x: -bounds.midX, y: -bounds.midY)
         }
         for layer in plan.back { draw(layer, in: shaken, bounds: bounds) }
+        for layer in plan.underText { draw(layer, in: context, bounds: bounds) }
         fill(plan.ghosts, in: shaken, palette: palette, paths: paths, rendering: rendering)
         for box in plan.boxes { draw(box, in: shaken, palette: palette) }
+        fill(plan.unlit, in: shaken, palette: palette, paths: paths, rendering: rendering)
         if plan.glow > 0 {
             // 濾鏡套在整層的合成結果上，只做一次模糊（不是每個透明度 run 各做一次）
             shaken.drawLayer { lit in

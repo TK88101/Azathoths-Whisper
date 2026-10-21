@@ -187,6 +187,17 @@ enum ComposedBackdrop {
         return particleLayers(particles, color: RGB(hex: 0xFFA028))
     }
 
+    /// 字之下、不跟著抖動：film 與 crimsonFog 的強暈影。原型畫在字上（lyrics-fx-preview.html:1206），
+    /// 會把兩側的字壓暗到讀不清（crimsonVelvet 只有 3.85／4.20），讀得到的檢查 G1 改到字下（2026-10-20）；其他背景的暈影照原型
+    static func underText(_ backdrop: BackdropKind) -> [LayerDraw] {
+        switch backdrop {
+        case .film, .crimsonFog: return [.vignette(strength: strongVignette)]
+        default: return []
+        }
+    }
+
+    static let strongVignette = 0.95
+
     /// 字之上：暈影、顆粒、底片刮痕與閃爍
     static func front(_ backdrop: BackdropKind, size: CGSize, time: Double) -> [LayerDraw] {
         let grainFrame = Int(time * 12)
@@ -194,9 +205,9 @@ enum ComposedBackdrop {
         case .shafts:
             return []
         case .film:
-            return [.vignette(strength: 0.95), .grain(opacity: 0.42, frame: Int(time * 18), overlay: true)] + filmArtefacts(size: size, time: time)
+            return [.grain(opacity: 0.42, frame: Int(time * 18), overlay: true)] + filmArtefacts(size: size, time: time)
         case .crimsonFog:
-            return [.vignette(strength: 0.95), .grain(opacity: 0.05, frame: grainFrame, overlay: false)]
+            return [.grain(opacity: 0.05, frame: grainFrame, overlay: false)]
         case .void, .snow, .ash, .ampGlow, .spot, .smokeHaze, .prism, .stars, .gig, .bokeh, .bluehour:
             return [.vignette(strength: 0.7), .grain(opacity: 0.05, frame: grainFrame, overlay: false)]
         case .paper:

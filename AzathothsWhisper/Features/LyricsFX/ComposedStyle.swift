@@ -107,6 +107,8 @@ enum ComposedStyle {
     static let trailHold = 0.4
     static let trailFade = 1.4
     static let trailAlpha = 0.3
+    /// 新一行開始唱後，前一行（退場或殘留）在這段時間內淡到不可見（讀得到的檢查 G3，2026-10-20）
+    static let handover = 0.35
     /// 每幀粒子上限（G0 定案）；超過先砍字旁的冰屑
     static let maxParticles = 300
     /// thump：詞首 0.12 s 內整屏放大到 1.04（原型）
@@ -140,9 +142,22 @@ enum ComposedStyle {
         let exit: Double
         /// 殘留透明度；nil＝不是殘留
         let trail: Double?
+        /// 讓位係數：新一行開始唱後由 1 降到 0（只乘在透明度上，不改退場進度）
+        var yield: Double = 1
     }
 
     static func visibleLines(_ lines: [TimedLine], time: Double, exit: ExitSpec) -> [VisibleLine] {
+        let sung = lines.first { $0.start <= time && time < $0.end && !$0.text.allSatisfy(\.isWhitespace) }
+        let yielding = sung.map { FXEasing.clamp01(1 - (time - $0.start) / handover) } ?? 1
+        return entries(lines, time: time, exit: exit).map { entry in
+            guard entry.exit > 0 || entry.trail != nil else { return entry }
+            var yielded = entry
+            yielded.yield = yielding
+            return yielded
+        }
+    }
+
+    private static func entries(_ lines: [TimedLine], time: Double, exit: ExitSpec) -> [VisibleLine] {
         lines.enumerated().compactMap { index, line in
             // 先比時間（便宜）再判空白：每幀不必逐字掃整首歌
             guard time >= line.start else { return nil }
@@ -167,11 +182,18 @@ enum ComposedStyle {
     static func plan(timeline: LyricsTimeline, time: Double, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring) -> FramePlan {
         var frame = FramePlan(palette: style.palette)
         frame.back = ComposedBackdrop.back(style.backdrop, palette: style.palette, size: size, time: time)
+        frame.underText = ComposedBackdrop.underText(style.backdrop)
         frame.front = ComposedBackdrop.front(style.backdrop, size: size, time: time)
         let visible = visibleLines(timeline.lines, time: time, exit: style.exit)
         var specks: [(Particle, Double)] = []
         for entry in visible {
+            let first = frame.glyphs.count
             draw(entry, time: time, size: size, style: style, measurer: measurer, into: &frame, specks: &specks)
+            // 光暈只給現行句：讓位中的舊句移到光暈層外（點陣與向量在淡字光暈邊緣會差幾個像素；霓虹描邊共用半徑但不受影響）
+            if style.effects.contains(.glow), entry.yield < 1 {
+                frame.unlit += frame.glyphs[first...]
+                frame.glyphs.removeSubrange(first...)
+            }
         }
         // 先減粒子不減字：冰屑只用剩下的預算
         frame.back += ComposedBackdrop.particleLayers(specks.prefix(max(maxParticles - particleCount(frame.back), 0)), color: style.palette.fg)
@@ -241,7 +263,7 @@ enum ComposedStyle {
                 x: anchor.x + transform.dx + CGFloat(personality.scatterX) * em,
                 y: anchor.y + CGFloat(personality.dy) * em + transform.dy + CGFloat(personality.scatterY) * em
             )
-            let alpha = FXEasing.clamp01(transform.alpha * (entry.trail ?? 1))
+            let alpha = FXEasing.clamp01(transform.alpha * (entry.trail ?? 1) * entry.yield)
             let advance = glyph.advance
             let base = GlyphDraw(
                 text: glyph.character, face: style.face, fontSize: fontSize,
@@ -315,8 +337,12 @@ enum ComposedStyle {
         return transform
     }
 
+    /// 進場進度；所有派生（RGB 分離等）都讀它。第一個詞開始那一刻就從 `visibleLeadIn` 起播（唱到時整行不空白，讀得到的檢查 G2）；
+    /// 後面的詞照原樣從透明浮現——前面的詞已經看得見，逐字浮現要保留（使用者 2026-10-20）
     static func enterProgress(_ personality: GlyphPersonality, time: Double) -> Double {
-        FXEasing.clamp01((time - personality.start) / max(personality.duration, 1e-6))
+        guard time >= personality.start else { return 0 }
+        let lead = personality.wordIndex == 0 ? personality.enter.visibleLeadIn : 0
+        return lead + (1 - lead) * FXEasing.clamp01((time - personality.start) / max(personality.duration, 1e-6))
     }
 
     /// RGB 分離：進場前半段左右各偏 6 點、到一半時合攏（原型 rgbsplit，`6*(1-p*2)`）；之後不畫

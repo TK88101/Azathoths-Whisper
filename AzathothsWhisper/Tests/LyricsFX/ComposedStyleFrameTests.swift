@@ -111,6 +111,19 @@ struct ComposedStyleFrameTests {
         }
     }
 
+    /// film 與 crimsonFog 的強暈影（0.95）畫在字下、不跟著抖動：蓋在字上會把兩側的字壓暗到讀不清（讀得到的檢查 G1，2026-10-20）。
+    /// 其他背景的暈影照原型畫在字上（lyrics-fx-preview.html:1206）
+    @Test func strongVignetteSitsUnderTheText() {
+        for backdrop in ["film", "crimsonFog"] {
+            let frame = plan(3, Self.recipe(backdrop: backdrop))
+            #expect(frame.underText == [.vignette(strength: 0.95)], "\(backdrop)")
+            #expect(!frame.front.contains { if case .vignette = $0 { true } else { false } }, "\(backdrop)")
+        }
+        let void = plan(3, Self.recipe(backdrop: "void"))
+        #expect(void.underText.isEmpty)
+        #expect(void.front.first == .vignette(strength: 0.7))
+    }
+
     @Test func backdropsBecomeLayers() {
         let shafts = plan(3, Self.recipe(backdrop: "shafts"))
         if case .axialGlow = shafts.back.first {} else { Issue.record("光柱的底是漸層") }
@@ -160,5 +173,65 @@ struct ComposedStyleFrameTests {
         #expect(LyricsFXView.recipeProbeValue(Self.recipe(font: "Cinzel"), reduceMotion: false) == "Cinzel")
         #expect(LyricsFXView.recipeProbeValue(Self.recipe(font: "Cinzel"), reduceMotion: true) == "mono")
         #expect(LyricsFXView.recipeProbeValue(.mono, reduceMotion: false) == "mono")
+    }
+}
+
+// 讀得到的檢查 G3（docs/plans/2026-10-20-lyrics-fx-readability-gate.md）：新一行開始唱，前一行（退場或殘留）在 0.35 s 內讓位
+@Suite("Line handover")
+struct LineHandoverTests {
+    static let lines = [
+        TimedLine(start: 1, end: 4, text: "lanterns over water", isChorus: false),
+        TimedLine(start: 4, end: 8, text: "ash in the wind", isChorus: false),
+    ]
+
+    @Test func anExitingLineYieldsOnceTheNextLineStarts() {
+        let exit = ExitSpec(weights: [(.fade, 1)], duration: 1)
+        let at = { (time: Double) in ComposedStyle.visibleLines(Self.lines, time: time, exit: exit).first { $0.index == 0 } }
+        #expect(at(4.0)?.yield == 1)
+        #expect(abs((at(4.175)?.yield ?? -1) - 0.5) < 1e-9)
+        #expect((at(4.35)?.yield ?? 1) < 1e-9)
+    }
+
+    @Test func aTrailingLineYieldsToo() {
+        let exit = ExitSpec(weights: [(.fade, 1)], duration: 1.2, trail: true)
+        let entry = ComposedStyle.visibleLines(Self.lines, time: 4.2, exit: exit).first { $0.index == 0 }
+        #expect(abs((entry?.yield ?? -1) - (1 - 0.2 / ComposedStyle.handover)) < 1e-9)
+    }
+
+    @Test func withNoNextLineSungTheExitRunsAsBefore() {
+        let gap = [TimedLine(start: 1, end: 4, text: "lanterns over water", isChorus: false), TimedLine(start: 9, end: 12, text: "ash in the wind", isChorus: false)]
+        let exit = ExitSpec(weights: [(.fade, 1)], duration: 1)
+        #expect(ComposedStyle.visibleLines(gap, time: 4.5, exit: exit).first { $0.index == 0 }?.yield == 1)
+    }
+
+    @Test func theCurrentLineNeverYields() {
+        let exit = ExitSpec(weights: [(.fade, 1)], duration: 1)
+        #expect(ComposedStyle.visibleLines(Self.lines, time: 4.3, exit: exit).first { $0.index == 1 }?.yield == 1)
+    }
+}
+
+// 光暈配方：讓位中的舊句畫在光暈層外（點陣忠實度，Codex 2026-10-20）；霓虹描邊不受影響
+@Suite("Handover glow")
+struct HandoverGlowTests {
+    static let timeline = LyricsTimeline(lines: LineHandoverTests.lines, source: .lrclib, duration: 10)
+
+    static func recipe(fx: String) -> ComposedRecipe {
+        ComposedRecipe(font: "Cinzel", backdrop: "void", enter: "fadeUp", exit: "fade", fx1: fx, fx2: "none", palette: "goldNavy", seed: 1,
+                       profile: SongProfile(axes: [.theatrical: 0.8], tags: [.symphonic]))
+    }
+
+    static func plan(fx: String, time: Double) -> FramePlan {
+        LyricsFXFrame.plan(timeline: timeline, time: time, size: CGSize(width: 960, height: 600), motion: .full, recipe: .composed(recipe(fx: fx)), measurer: CoreTextMeasurer())
+    }
+
+    @Test func aYieldingLineIsDrawnOutsideTheGlowLayer() {
+        let frame = Self.plan(fx: "glow", time: 4.1)
+        #expect(!frame.unlit.isEmpty)
+        #expect(frame.unlit.allSatisfy { $0.opacity < 1 })
+        #expect(Self.plan(fx: "glow", time: 3).unlit.isEmpty)
+    }
+
+    @Test func neonStrokeKeepsTheYieldingLineInItsLayer() {
+        #expect(Self.plan(fx: "neonstroke", time: 4.1).unlit.isEmpty)
     }
 }

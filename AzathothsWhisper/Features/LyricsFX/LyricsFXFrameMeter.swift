@@ -65,9 +65,9 @@ final class LyricsFXFrameMeter {
         ProcessInfo.processInfo.environment[LyricsFXPreviewFixture.vectorReferenceVariable] == "1" ? .vectorReference : .raster
 
     func record(_ elapsed: Duration, plan: FramePlan, canvas: CGSize, rasters: GlyphRasterCache) {
-        samples.record(micros: Int(elapsed.inSeconds * 1_000_000), glyphs: plan.glyphs.count)
+        samples.record(micros: Int(elapsed.inSeconds * 1_000_000), glyphs: plan.glyphs.count + plan.unlit.count)
         let particles = ComposedStyle.particleCount(plan.back)
-        let fills = LyricsFXCanvas.runs(of: plan.ghosts).count + LyricsFXCanvas.runs(of: plan.glyphs).count
+        let fills = LyricsFXCanvas.runs(of: plan.ghosts).count + LyricsFXCanvas.runs(of: plan.unlit).count + LyricsFXCanvas.runs(of: plan.glyphs).count
         peak = (max(peak.ghosts, plan.ghosts.count), max(peak.particles, particles), max(peak.fills, fills))
         let now = ContinuousClock.now
         guard now - lastLog >= Self.logInterval, let summary = samples.summary else { return }

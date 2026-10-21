@@ -192,3 +192,51 @@ struct GlyphTemplatesB2Tests {
         }
     }
 }
+
+// 讀得到的檢查 G2／G3（docs/plans/2026-10-20-lyrics-fx-readability-gate.md）
+@Suite("Enter lead-in")
+struct EnterLeadInTests {
+    static let context = GlyphContext(em: 40, width: 960, height: 600, radius: 528, dir: 1, side: 1, phase: 0, angle: 0.7, bend: 0.5)
+
+    /// 一唱到就看得見：每種出場在補正後的第一刻，透明度已達「看得見」
+    @Test(arguments: EnterTemplate.allCases)
+    func everyEntranceIsVisibleTheMomentItStarts(template: EnterTemplate) {
+        let alpha = template.transform(progress: template.visibleLeadIn, context: Self.context).alpha
+        #expect(alpha >= ReadabilityAudit.visibleOpacity - 1e-6, "\(template) leadIn \(template.visibleLeadIn) alpha \(alpha)")
+    }
+
+    /// 只跳過看不見的那一段：補正點之前一點點還看不見（leadIn 為 0 者除外）
+    @Test(arguments: EnterTemplate.allCases)
+    func theLeadInSkipsOnlyTheInvisiblePart(template: EnterTemplate) {
+        guard template.visibleLeadIn > 0.01 else { return }
+        #expect(template.transform(progress: template.visibleLeadIn - 0.01, context: Self.context).alpha < ReadabilityAudit.visibleOpacity)
+    }
+
+    /// swoop 飛行中不可見，落地附近才出現（避免飛過別的字時蓋住它）
+    @Test func swoopStaysInvisibleWhileFlying() {
+        #expect(EnterTemplate.swoop.transform(progress: 0.5, context: Self.context).alpha < ReadabilityAudit.visibleOpacity)
+        #expect(abs(EnterTemplate.swoop.visibleLeadIn - 0.59) < 0.01)
+        #expect(EnterTemplate.swoop.transform(progress: 0.9, context: Self.context).alpha == 1)
+    }
+
+    @Test func enterProgressStartsAtTheLeadIn() {
+        let personality = LinePersonalities.make(line: TimedLine(start: 2, end: 6, text: "ash", isChorus: false), seed: 1,
+                                                style: PersonalityStyle(enter: [(.condense, 1)], enterDuration: 1...1, hold: [(.still, 1)], exit: [(.fade, 1)],
+                                                                        vary: .init(size: 0, dy: 0, rotation: 0, scatter: 0), wordLevel: false))[0]
+        #expect(ComposedStyle.enterProgress(personality, time: personality.start - 0.01) == 0)
+        #expect(abs(ComposedStyle.enterProgress(personality, time: personality.start) - EnterTemplate.condense.visibleLeadIn) < 1e-9)
+        #expect(ComposedStyle.enterProgress(personality, time: personality.start + personality.duration) == 1)
+    }
+
+    /// 只有第一個詞從看得見起播（唱到時整行不空白）；後面的詞照原樣從透明慢慢浮現（使用者 2026-10-20：逐字浮現要明顯）
+    @Test func onlyTheFirstWordSkipsTheInvisibleFadeIn() {
+        let glyphs = LinePersonalities.make(line: TimedLine(start: 2, end: 6, text: "ash rain", isChorus: false), seed: 1,
+                                            style: PersonalityStyle(enter: [(.condense, 1)], enterDuration: 1...1, hold: [(.still, 1)], exit: [(.fade, 1)],
+                                                                    vary: .init(size: 0, dy: 0, rotation: 0, scatter: 0), wordLevel: false))
+        let first = try! #require(glyphs.first { $0.wordIndex == 0 })
+        let second = try! #require(glyphs.first { $0.wordIndex == 1 })
+        #expect(abs(ComposedStyle.enterProgress(first, time: first.start) - EnterTemplate.condense.visibleLeadIn) < 1e-9)
+        #expect(ComposedStyle.enterProgress(second, time: second.start) == 0)
+        #expect(abs(ComposedStyle.enterProgress(second, time: second.start + second.duration / 2) - 0.5) < 1e-9)
+    }
+}

@@ -169,11 +169,15 @@ struct FramePlan: Equatable, Sendable {
     let palette: FXPalette
     /// 字之下
     var back: [LayerDraw] = []
+    /// 字之下、不套 shake／zoom（畫在 back 之後、殘影與字之前）：film、crimsonFog 的強暈影（讀得到的檢查 G1）
+    var underText: [LayerDraw] = []
     /// 殘影與錯位副本，先於字畫
     var ghosts: [GlyphDraw] = []
     var boxes: [GlyphBox] = []
     /// 一個 grapheme 一筆；陣列順序＝painter order
     var glyphs: [GlyphDraw] = []
+    /// 光暈層外的字（光暈配方中正在讓位的舊句），先於 `glyphs` 畫
+    var unlit: [GlyphDraw] = []
     /// 字之上
     var front: [LayerDraw] = []
     /// 整屏抖動（套在 back 與字上，不套 front；原型 html:1010）

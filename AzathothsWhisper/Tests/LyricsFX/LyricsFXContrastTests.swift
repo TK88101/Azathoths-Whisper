@@ -5,9 +5,11 @@ import Testing
 
 @testable import AzathothsWhisper
 
-// B2 計劃 T3：renderer 對比指標。同一幀渲染兩次（有字／沒字），在「兩張圖不同」的像素上取平均色：
-// 有字那張＝字的顏色，沒字那張＝字後面的背景（含背景層與顆粒、暈影）。以 WCAG 相對亮度公式算比值，主字要 ≥ 4.5:1。
-// 這是影像平均色的代理指標（受反鋸齒與紋理影響），不宣稱符合 WCAG。歌詞為編造句
+// 讀得到的檢查 G1（docs/plans/2026-10-20-lyrics-fx-readability-gate.md；改寫自 B2 計劃 T3 的平均色指標）：
+// 同一 plan、同一時刻畫四張——全部、純背景（去掉 glyphs／unlit／ghosts／boxes）、主字單獨（只留完全顯示的主字、不描邊、無光暈與圖層）、什麼都沒有。
+// 主字核心像素＝「主字單獨」與「什麼都沒有」任一通道差 > 48 的字形，再內縮 1 像素（去掉反鋸齒邊緣）——只看字形、不看顏色，
+// 效果把字內部改成什麼顏色都照量；每個核心像素算「全部」該像素與「純背景」同座標的 WCAG 相對亮度比，
+// 取 5 百分位，要 ≥ 4.5（字完全顯示的定格；出退場另由 G2／G3 管）。代理指標，不宣稱符合 WCAG。歌詞為編造句
 @MainActor
 @Suite("LyricsFX contrast")
 struct LyricsFXContrastTests {
@@ -19,12 +21,21 @@ struct LyricsFXContrastTests {
     /// 停穩的時刻（fadeUp 進場最長 0.6 s）
     static let settled = 5.0
 
-    private static func render(_ recipe: ComposedRecipe, withGlyphs: Bool) -> CGImage? {
+    enum Layers { case all, backgroundOnly, mainTextAlone, nothing }
+
+    private static func render(_ recipe: ComposedRecipe, layers: Layers, at time: Double = settled) -> CGImage? {
         let measurer = CoreTextMeasurer()
         let paths = GlyphPathCache()
         let view = Canvas { context, size in
-            var plan = LyricsFXFrame.plan(timeline: timeline, time: settled, size: size, motion: .full, recipe: .composed(recipe), measurer: measurer)
-            if !withGlyphs { plan.glyphs = [] }
+            var plan = LyricsFXFrame.plan(timeline: timeline, time: time, size: size, motion: .full, recipe: .composed(recipe), measurer: measurer)
+            if layers != .all { plan.ghosts = []; plan.boxes = [] }
+            if layers == .mainTextAlone || layers == .nothing { plan.back = []; plan.underText = []; plan.front = []; plan.glow = 0 }
+            // 只取完全顯示的主字（定格時句尾仍可能有字在淡入，那是 G2 的範圍）
+            if layers == .mainTextAlone {
+                plan.glyphs = plan.glyphs.filter { $0.opacity >= 1 }.map { var plain = $0; plain.stroke = 0; return plain }
+                plan.unlit = []
+            }
+            if layers == .backgroundOnly || layers == .nothing { plan.glyphs = []; plan.unlit = [] }
             LyricsFXCanvas.draw(plan, in: context, size: size, paths: paths)
         }
         .frame(width: canvas.width, height: canvas.height)
@@ -41,37 +52,48 @@ struct LyricsFXContrastTests {
         return pixels
     }
 
-    /// 字像素＝兩張圖任一通道差 > 48 的像素；回傳（比值, 字像素數）
-    static func contrast(_ recipe: ComposedRecipe) -> (ratio: Double, pixels: Int)? {
-        guard let lit = render(recipe, withGlyphs: true), let bare = render(recipe, withGlyphs: false) else { return nil }
-        let a = rgba(lit), b = rgba(bare)
-        var text = (0.0, 0.0, 0.0), back = (0.0, 0.0, 0.0), count = 0
-        for i in stride(from: 0, to: a.count, by: 4) where (0..<3).contains(where: { abs(Int(a[i + $0]) - Int(b[i + $0])) > 48 }) {
-            text = (text.0 + Double(a[i]), text.1 + Double(a[i + 1]), text.2 + Double(a[i + 2]))
-            back = (back.0 + Double(b[i]), back.1 + Double(b[i + 1]), back.2 + Double(b[i + 2]))
-            count += 1
-        }
-        guard count > 0 else { return nil }
-        let n = Double(count) * 255
-        let l1 = RGB(red: text.0 / n, green: text.1 / n, blue: text.2 / n).relativeLuminance
-        let l2 = RGB(red: back.0 / n, green: back.1 / n, blue: back.2 / n).relativeLuminance
-        return ((max(l1, l2) + 0.05) / (min(l1, l2) + 0.05), count)
+    static let percentile = 0.05
+    /// 「有字」的每通道差門檻（0–255）
+    static let inkDifference = 48
+
+    private static func luminance(_ p: [UInt8], _ i: Int) -> Double {
+        RGB(red: Double(p[i]) / 255, green: Double(p[i + 1]) / 255, blue: Double(p[i + 2]) / 255).relativeLuminance
     }
 
-    static func recipe(backdrop: String, palette: String) -> ComposedRecipe {
-        ComposedRecipe(font: "Bebas", backdrop: backdrop, enter: "fadeUp", exit: "up", fx1: "none", fx2: "none", palette: palette, seed: 5,
+    /// 回傳（核心像素對比的 5 百分位, 核心像素數）
+    /// 主字字形內部：主字單獨畫與什麼都沒有的差異，八鄰都在字形裡才算（內縮 1 像素）
+    static func core(text: [UInt8], empty: [UInt8], width: Int, height: Int) -> [Int] {
+        let inside = stride(from: 0, to: text.count, by: 4).map { i in (0..<3).contains { abs(Int(text[i + $0]) - Int(empty[i + $0])) > inkDifference } }
+        return (1..<max(1, height - 1)).flatMap { y in
+            (1..<max(1, width - 1)).filter { x in
+                (-1...1).allSatisfy { dy in (-1...1).allSatisfy { dx in inside[(y + dy) * width + x + dx] } }
+            }.map { x in (y * width + x) * 4 }
+        }
+    }
+
+    static func contrast(_ recipe: ComposedRecipe, at time: Double = settled) -> (ratio: Double, pixels: Int)? {
+        guard let full = render(recipe, layers: .all, at: time), let background = render(recipe, layers: .backgroundOnly, at: time),
+              let alone = render(recipe, layers: .mainTextAlone, at: time), let nothing = render(recipe, layers: .nothing, at: time) else { return nil }
+        let a = rgba(full), b = rgba(background)
+        var ratios = core(text: rgba(alone), empty: rgba(nothing), width: full.width, height: full.height).map { i in
+            let l1 = luminance(a, i), l2 = luminance(b, i)
+            return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+        }
+        guard !ratios.isEmpty else { return nil }
+        ratios.sort()
+        return (ratios[Int(Double(ratios.count - 1) * percentile)], ratios.count)
+    }
+
+    static func recipe(backdrop: String, palette: String, fx: String = "none") -> ComposedRecipe {
+        ComposedRecipe(font: "Bebas", backdrop: backdrop, enter: "fadeUp", exit: "up", fx1: fx, fx2: "none", palette: palette, seed: 5,
                        profile: SongProfile(axes: [.aggression: 0.3], tags: [.britpop]))
     }
 
-    /// B1 使用者簽字的配色，字本身就是低對比（緋紅字＋深紫黑底，比值約 1.6–2.0）。B2 不回頭改，釘住；改它要使用者重新簽字。
-    /// 例外不是豁免：仍要高於地板，新背景不得把它壓到看不見
-    static let signedLowContrastPalettes: Set<String> = ["crimsonVelvet"]
-    static let signedLowContrastFloor = 1.5
 
-    /// 實際會被同一個樂團一起抽到的（背景, 配色）：兩者對該團 fit > 0，且亮暗相容
+    /// 實際會被同一個 profile（樂團表＋曲風列）一起抽到的（背景, 配色）：兩者對該 profile fit > 0，且亮暗相容
     static let reachablePairs: [(backdrop: String, palette: String)] = {
         var pairs = Set<String>()
-        for band in SongProfileResolver.bandTable {
+        for band in ReadabilityAudit.profiles {
             let fits = { (slot: FXSlot) in LyricsFXCatalog.components(in: slot).filter { Composer.fit($0, band.profile) > 0 } }
             let palettes = fits(.palette)
             for backdrop in fits(.backdrop) {
@@ -90,11 +112,10 @@ struct LyricsFXContrastTests {
     }()
 
     /// 量一組（背景, 配色）的主字對比；不及格回傳失敗說明（`who`＝抽得到它的團，可省）
-    static func readabilityFailure(backdrop: String, palette: String, who: [String] = []) -> String? {
-        let label = "\(palette)＋\(backdrop)" + (who.isEmpty ? "" : "（\(who.joined(separator: "、"))）")
-        guard let result = contrast(recipe(backdrop: backdrop, palette: palette)) else { return "\(label)：量不到字" }
-        let floor = signedLowContrastPalettes.contains(palette) ? signedLowContrastFloor : minimum
-        return result.ratio < floor ? "\(label)：\(String(format: "%.2f", result.ratio))" : nil
+    static func readabilityFailure(backdrop: String, palette: String, fx: String = "none", who: [String] = [], at time: Double = settled) -> String? {
+        let label = "\(palette)＋\(backdrop)" + (fx == "none" ? "" : "＋\(fx)") + (who.isEmpty ? "" : "（\(who.joined(separator: "、"))）") + (time == settled ? "" : "@\(time)")
+        guard let result = contrast(recipe(backdrop: backdrop, palette: palette, fx: fx), at: time) else { return "\(label)：量不到字" }
+        return result.ratio < minimum ? "\(label)：\(String(format: "%.2f", result.ratio))" : nil
     }
 
     @Test func mainTextStaysReadableOnEveryReachableBackdrop() {
@@ -102,9 +123,21 @@ struct LyricsFXContrastTests {
         #expect(failures.isEmpty, "\(failures.joined(separator: "；"))")
     }
 
+    /// 會改變字本身顏色或邊緣的效果：每組抽得到的（背景, 配色）——含只有回退路徑才抽得到的——各加一個量一次
+    @Test(arguments: ["glow", "neonstroke", "rgbsplit", "misreg", "reflect"])
+    func mainTextStaysReadableWithEffectsThatTouchTheText(fx: String) {
+        let measured = Set(Self.reachablePairs.map { "\($0.backdrop)|\($0.palette)" })
+        let fallbacks = Self.playablePairs.keys.filter { !measured.contains($0) }.sorted().map { pair in
+            let parts = pair.split(separator: "|").map(String.init)
+            return (backdrop: parts[0], palette: parts[1])
+        }
+        let failures = (Self.reachablePairs + fallbacks).compactMap { Self.readabilityFailure(backdrop: $0.backdrop, palette: $0.palette, fx: fx) }
+        #expect(failures.isEmpty, "\(failures.joined(separator: "；"))")
+    }
+
     /// 各團實際抽得到的（背景, 配色）——含 `compatiblePalettes` 找不到相容配色而回退時抽到的不相容組合，
-    /// 那些不在 `reachablePairs` 裡（B2 批 2 計劃 V5）。值＝抽得到這一組的團
-    static let playablePairs: [String: [String]] = SongProfileResolver.bandTable.reduce(into: [:]) { pairs, band in
+    /// 那些不在 `reachablePairs` 裡（B2 批 2 計劃 V5）。值＝抽得到這一組的團（或曲風列）
+    static let playablePairs: [String: [String]] = ReadabilityAudit.profiles.reduce(into: [:]) { pairs, band in
         for (backdrop, palettes) in PlayableSpace.of(band.profile)?.paletteByBackdrop ?? [:] {
             for palette in palettes { pairs["\(backdrop)|\(palette)", default: []].append(band.name) }
         }
@@ -132,7 +165,26 @@ struct LyricsFXContrastTests {
         }
     }
 
-    @Test func theSignedLowContrastPaletteIsStillReachable() {
-        #expect(Self.reachablePairs.contains { $0.palette == "crimsonVelvet" }, "沒有團抽得到就該從例外清單拿掉")
+    /// crimsonVelvet 原本是 B1 簽字的低對比例外（字 #8A1C2B，約 2.1）。2026-10-20 使用者同意「只調亮字色、例外拿掉」，看新舊並排後選 #FF6E6E（實測 4.92–5.47）：
+    /// 交響類曲風每兩次抽到一次，讀不清楚不行。每個背景都要達標、沒有例外
+    @Test func crimsonVelvetMeetsTheMinimumOnEveryBackdropWithoutAnException() {
+        let backdrops = Self.reachablePairs.filter { $0.palette == "crimsonVelvet" }.map(\.backdrop)
+        #expect(!backdrops.isEmpty)
+        for backdrop in backdrops {
+            #expect(Self.readabilityFailure(backdrop: backdrop, palette: "crimsonVelvet") == nil, "\(backdrop)")
+        }
+    }
+
+    /// 顆粒、刮痕與閃爍每格都不同：字下強暈影的兩個背景，抽得到的每個配色在三個不同顆粒格（film 第 90／95／100 格）各量一次。
+    /// 其他背景的顆粒很淡（0.05–0.16），只量 settled 一格
+    static let grainFrames = [settled, 5.3, 5.6]
+
+    @Test(arguments: ["film", "crimsonFog"])
+    func strongVignetteBackdropsStayReadableOnEveryGrainFrame(backdrop: String) {
+        let palettes = Set(Self.reachablePairs.filter { $0.backdrop == backdrop }.map(\.palette)
+            + Self.playablePairs.keys.compactMap { pair in pair.hasPrefix("\(backdrop)|") ? String(pair.dropFirst(backdrop.count + 1)) : nil })
+        #expect(!palettes.isEmpty)
+        let failures = palettes.sorted().flatMap { palette in Self.grainFrames.compactMap { Self.readabilityFailure(backdrop: backdrop, palette: palette, at: $0) } }
+        #expect(failures.isEmpty, "\(failures.joined(separator: "；"))")
     }
 }

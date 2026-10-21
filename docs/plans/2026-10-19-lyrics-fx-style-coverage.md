@@ -18,5 +18,5 @@
 - 曲庫閘門：identityUnresolved 0（使用者處理）、composed 100%、readability（見待拍板）、每首列出解決來源。
 - 順序：可讀性基盤 → CJK → 分類層 → 通用零件 → 曲庫閘門。
 
-## 3. 待拍板
-- 署名樣式 crimsonVelvet 現有對比例外 1.5:1（`LyricsFXContrastTests.swift:68`）：保留例外（閘門不稱 100%）或替換重簽。
+## 3. 已拍板
+- crimsonVelvet（2026-10-20，/thecure 收斂＋使用者看並排圖）：只調亮字色 #8A1C2B→#FF6E6E、拿掉例外（ACCEPTANCE I-58）。可讀性閘門分「字完全顯示時 ≥ 4.5」與「出退場過程中的最低可見標準」兩種（Codex 最擔心點）。
