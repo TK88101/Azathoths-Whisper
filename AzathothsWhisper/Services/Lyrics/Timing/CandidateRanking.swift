@@ -22,8 +22,13 @@ extension TimingCandidate {
 
     /// 依原始順序以 id 去重、取前 `limit` 個，只留配對成功者，依 `MatchQuality` 排序（同分照來源原始順序），取前 `rankedLimit`
     static func ranked(_ candidates: [TimingCandidate], for query: TimingQuery) -> [TimingCandidate] {
+        // 湊滿 `limit` 個不重複的就停：回應可帶上萬筆，不必全部雜湊（安全評審 LOW-1）
         var seen = Set<String>()
-        let unique = candidates.filter { seen.insert($0.id).inserted }.prefix(limit)
+        var unique: [TimingCandidate] = []
+        for candidate in candidates {
+            guard unique.count < limit else { break }
+            if seen.insert(candidate.id).inserted { unique.append(candidate) }
+        }
         return unique.enumerated()
             .compactMap { index, candidate in TrackMatcher.quality(query, candidate.track).map { (quality: $0, index: index, candidate: candidate) } }
             .sorted { ($0.quality, $0.index) < ($1.quality, $1.index) }
