@@ -29,8 +29,10 @@ enum CJKLineBreak {
         }
     }
 
+    /// 可以在字與字之間斷行的文字：中日文，加上韓文音節（同 CSS `word-break: normal`；沒有空格的長韓文行才不會被當成超長單字縮到最小，Codex simcodex R2）。
+    /// 只管斷行；字型選擇看 `LyricsScript.line`
     static func isCJK(_ character: Character) -> Bool {
-        character.unicodeScalars.contains(where: LyricsScript.isCJK)
+        character.unicodeScalars.contains { LyricsScript.isCJK($0) || LyricsScript.isHangul($0) }
     }
 
     /// 這個字要不要開一個新 token（切 token 的唯一規則，組合與素面共用）：原文空白處、中日文字前後都是邊界；其餘連續的字同一個

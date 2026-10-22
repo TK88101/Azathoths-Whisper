@@ -317,8 +317,7 @@ enum ComposedStyle {
     private static func drawPlain(_ entry: VisibleLine, time: Double, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring, into frame: inout FramePlan) {
         let personalities = linePersonalities(line: entry.line, index: entry.index, style: style).1.map(\.plain)
         let fit = fitted(entry.line, personalities: personalities, size: size, style: style, measurer: measurer, index: entry.index)
-        let fadeIn = min(max((time - entry.line.start) / plainFade, 0), 1)
-        let alpha = FXEasing.clamp01(fadeIn * (1 - entry.exit) * (entry.trail ?? 1) * entry.yield)
+        let alpha = FXEasing.clamp01(FXEasing.clamp01((time - entry.line.start) / plainFade) * (1 - entry.exit) * (entry.trail ?? 1) * entry.yield)
         guard alpha > 0 else { return }
         let rowHeight = fit.em * lineHeight
         let baseY = firstBaseline(size: size, rows: fit.laid.rowWidths.count, em: fit.em)
@@ -610,15 +609,15 @@ enum ComposedStyle {
     private static func fits(_ laid: LineLayout, em: CGFloat, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring) -> Bool {
         let rows = CGFloat(laid.rowWidths.count)
         let rowHeight = em * lineHeight
-        let firstBaseline = firstBaseline(size: size, rows: laid.rowWidths.count, em: em)
-        let lastBaseline = firstBaseline + rowHeight * (rows - 1)
+        let firstRowBaseline = firstBaseline(size: size, rows: laid.rowWidths.count, em: em)
+        let lastBaseline = firstRowBaseline + rowHeight * (rows - 1)
         let vary = style.personality.vary
         let largest = em * CGFloat(1 + vary.size * LinePersonalities.rawness) * holdScale
         // 字寬已含各字的 size 變化；呼吸的放大在旋轉前，一併算進去
         let widest = laid.glyphs.reduce(0) { max($0, $1.width) } * holdScale
         let reach = CGFloat(vary.dy + vary.scatter) * em + holdReach * em + holdJitter
             + widest * 0.5 * sin(CGFloat(vary.rotation) + holdRotation)
-        let top = firstBaseline - measurer.ascent(face: style.face, fontSize: largest) - reach
+        let top = firstRowBaseline - measurer.ascent(face: style.face, fontSize: largest) - reach
         let bottom = lastBaseline + measurer.descent(face: style.face, fontSize: largest) + reach
         let margin = size.height * fitMargin
         return top >= margin && bottom <= size.height - margin && laid.rowWidths.allSatisfy { $0 <= wrapWidth(size) }

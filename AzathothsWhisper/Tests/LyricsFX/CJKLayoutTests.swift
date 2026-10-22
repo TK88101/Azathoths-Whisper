@@ -85,6 +85,14 @@ struct CJKLayoutTests {
         #expect(fit.glyphs.first?.text == "SS")
     }
 
+    /// 沒有空格的長韓文行在音節間折行，不被當成超長單字縮到最小（Codex simcodex R2）
+    @Test func anUnspacedKoreanLineWrapsBetweenSyllablesInsteadOfShrinking() throws {
+        let fit = try report(String(repeating: "새벽하늘아래등불이흐른다", count: 3), size: CGSize(width: 480, height: 400))
+        #expect(fit.ratio == 1)
+        #expect(!fit.breaksLongWords)
+        #expect(fit.rowWidths.count > 1)
+    }
+
     // MARK: 素面
 
     private func monoRows(_ text: String, width: CGFloat) -> [String] {
