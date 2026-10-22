@@ -416,46 +416,86 @@ enum ComposedStyle {
         }
     }
 
-    /// 以詞為單位貪婪折行（原型 `layout`）：字寬依個性字級量、每字加該字型的 spacing、詞間 0.3 em。
-    /// `breakLongWords`：比折行寬還寬的詞按字（Swift `Character`＝extended grapheme cluster）斷到多列，仍是同一個詞（同 wordIndex、同時間）——只在縮到下限仍放不下時用
+    /// 貪婪折行（原型 `layout`）：字寬依個性字級量、每字加該字型的 spacing、原文空白處加詞距 0.3 em。
+    /// 中日文字一字一個排版單位、之間不加詞距、可在字間斷行並守最小禁則（⑤ 計劃 §4.4，`CJKLineBreak`）；純英文與改動前相同。
+    /// `breakLongWords`：比折行寬還寬的非中日文詞按字（Swift `Character`＝extended grapheme cluster）斷到多列，仍是同一個詞（同 wordIndex、同時間）——只在縮到下限仍放不下時用
     private static func layout(
         _ line: TimedLine, personalities: [GlyphPersonality], em: CGFloat, maxWidth: CGFloat, face: FontFace, measurer: any TextMeasuring,
         breakLongWords: Bool = false
     ) -> LineLayout {
-        var glyphs: [LaidGlyph] = []
-        var rowWidths: [CGFloat] = [0]
-        var words: [(x: CGFloat, width: CGFloat)] = []
-        let spacing = face.spacing
+        let items = laidCharacters(line, personalities: personalities, em: em, face: face, measurer: measurer)
+        // (字的序號, 是不是斷開的超寬詞的第一個字)
+        var groups: [(members: [Int], forcesNewRow: Bool)] = tokenGroups(items).map { ($0, false) }
         var brokeWords = false
-        var index = 0
-        for (wordIndex, word) in line.words.enumerated() {
-            let characters = word.text.filter { !$0.isWhitespace }.enumerated().map { offset, character in
-                display(character, isLineStart: wordIndex == 0 && offset == 0, face: face)
+        if breakLongWords {
+            groups = groups.flatMap { group -> [(members: [Int], forcesNewRow: Bool)] in
+                guard !items[group.members[0]].isCJK, group.members.map({ items[$0].width }).reduce(0, +) > maxWidth else { return [group] }
+                brokeWords = true
+                return group.members.enumerated().map { ([$0.element], $0.offset == 0) }
             }
-            let widths = characters.enumerated().map { offset, character in
-                (measurer.advances(of: character, face: face, fontSize: em * CGFloat(personalities[index + offset].size)).last ?? 0) + spacing * em
-            }
-            let wordWidth = widths.reduce(0, +)
-            var row = rowWidths.count - 1
-            if rowWidths[row] > 0, rowWidths[row] + wordGap * em + wordWidth > maxWidth {
-                rowWidths.append(0)
-                row += 1
-            }
-            if rowWidths[row] > 0 { rowWidths[row] += wordGap * em }
-            words.append((rowWidths[row], wordWidth))
-            let breaks = breakLongWords && wordWidth > maxWidth
-            brokeWords = brokeWords || breaks
-            for (character, width) in zip(characters, widths) {
-                if breaks, rowWidths[row] > 0, rowWidths[row] + width > maxWidth {
-                    rowWidths.append(0)
-                    row += 1
-                }
-                glyphs.append(LaidGlyph(character: character, wordIndex: wordIndex, index: index, x: rowWidths[row], width: width, advance: width - spacing * em, row: row))
-                rowWidths[row] += width
-                index += 1
+        }
+        let tokens = groups.map { group in
+            CJKLineBreak.Token(
+                width: group.members.map { items[$0].width }.reduce(0, +),
+                gapBefore: items[group.members[0]].spaceBefore ? wordGap * em : 0,
+                first: Character(items[group.members[0]].character), last: Character(items[group.members[group.members.count - 1]].character),
+                forcesNewRow: group.forcesNewRow
+            )
+        }
+        let rowOf = CJKLineBreak.assignRows(tokens, maxWidth: maxWidth)
+        var glyphs: [LaidGlyph] = []
+        var rowWidths = [CGFloat](repeating: 0, count: (rowOf.max() ?? 0) + 1)
+        var words = [(x: CGFloat, width: CGFloat)](repeating: (0, 0), count: line.words.count)
+        for (offset, group) in groups.enumerated() {
+            let row = rowOf[offset]
+            if rowWidths[row] > 0 { rowWidths[row] += tokens[offset].gapBefore }
+            for itemIndex in group.members {
+                let item = items[itemIndex]
+                if words[item.wordIndex].width == 0 { words[item.wordIndex].x = rowWidths[row] }
+                words[item.wordIndex].width += item.width
+                glyphs.append(LaidGlyph(character: item.character, wordIndex: item.wordIndex, index: itemIndex, x: rowWidths[row], width: item.width, advance: item.width - face.spacing * em, row: row))
+                rowWidths[row] += item.width
             }
         }
         return LineLayout(glyphs: glyphs, rowWidths: rowWidths, words: words, brokeWords: brokeWords)
+    }
+
+    /// 排版前的一個字：顯示字、所屬的詞（時間歸屬）、含字距的寬
+    private struct LaidCharacter {
+        let character: String
+        let wordIndex: Int
+        let width: CGFloat
+        let isCJK: Bool
+        /// 原文在它前面有空白（詞距只加在這裡）
+        let spaceBefore: Bool
+    }
+
+    private static func laidCharacters(
+        _ line: TimedLine, personalities: [GlyphPersonality], em: CGFloat, face: FontFace, measurer: any TextMeasuring
+    ) -> [LaidCharacter] {
+        let spaced = line.text.contains(where: \.isWhitespace)
+        var items: [LaidCharacter] = []
+        for (wordIndex, word) in line.words.enumerated() {
+            for (offset, character) in word.text.filter({ !$0.isWhitespace }).enumerated() {
+                let shown = display(character, isLineStart: wordIndex == 0 && offset == 0, face: face)
+                let width = (measurer.advances(of: shown, face: face, fontSize: em * CGFloat(personalities[items.count].size)).last ?? 0) + face.spacing * em
+                items.append(LaidCharacter(
+                    character: shown, wordIndex: wordIndex, width: width, isCJK: CJKLineBreak.isCJK(character),
+                    spaceBefore: spaced && offset == 0 && wordIndex > 0
+                ))
+            }
+        }
+        return items
+    }
+
+    /// 字分成排版單位：原文空白處、中日文字前後都是邊界；其餘連續的字是一個單位（不從中切斷）
+    private static func tokenGroups(_ items: [LaidCharacter]) -> [[Int]] {
+        var groups: [[Int]] = []
+        for (index, item) in items.enumerated() {
+            let starts = index == 0 || item.spaceBefore || item.isCJK || items[index - 1].isCJK
+            if starts { groups.append([index]) } else { groups[groups.count - 1].append(index) }
+        }
+        return groups
     }
 
     private static func linePersonalities(line: TimedLine, index: Int, style: ResolvedStyle) -> (seed: UInt64, [GlyphPersonality]) {

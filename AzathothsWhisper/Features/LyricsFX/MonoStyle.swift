@@ -95,35 +95,39 @@ enum MonoLayout {
         min(max(width * 0.052, 24), 54)
     }
 
-    /// 貪婪折行：有空白的文字以詞為單位，否則（CJK）逐字；單詞超寬時逐字折；超過 `maxRows` 截掉（不縮字級）
+    /// 貪婪折行：原文空白處與中日文字之間可斷、守最小禁則（⑤ 計劃 §4.4，`CJKLineBreak`）；單詞超寬時逐字折；超過 `maxRows` 截掉（不縮字級）
     static func rows(
         of text: String, fontSize: CGFloat, face: FontFace, maxWidth: CGFloat, maxRows: Int, measurer: any TextMeasuring
     ) -> [String] {
-        let hasSpaces = text.contains(where: \.isWhitespace)
-        let tokens = hasSpaces ? text.split(whereSeparator: \.isWhitespace).map(String.init) : text.map(String.init)
-        let separator = hasSpaces ? " " : ""
         let width = { (candidate: String) in measurer.advances(of: candidate, face: face, fontSize: fontSize).last ?? 0 }
-        var rows: [String] = []
-        var row = ""
-        for token in tokens {
-            let candidate = row.isEmpty ? token : row + separator + token
-            if width(candidate) <= maxWidth {
-                row = candidate
+        let space = width(" ")
+        var pieces: [(text: String, token: CJKLineBreak.Token)] = []
+        for piece in CJKLineBreak.tokens(of: text) {
+            let gap = piece.spaceBefore ? space : 0
+            guard width(piece.text) > maxWidth, piece.text.count > 1 else {
+                pieces.append((piece.text, token(piece.text, gap: gap, width: width(piece.text))))
                 continue
             }
-            if !row.isEmpty { rows.append(row) }
-            row = ""
-            for character in token {
-                let extended = row + String(character)
-                if width(extended) > maxWidth, !row.isEmpty {
-                    rows.append(row)
-                    row = String(character)
-                } else {
-                    row = extended
-                }
+            // 超寬的詞逐字斷（所在列已有字就先換列）
+            for (offset, character) in piece.text.enumerated() {
+                var split = token(String(character), gap: offset == 0 ? gap : 0, width: width(String(character)))
+                split.forcesNewRow = offset == 0
+                pieces.append((String(character), split))
             }
         }
-        if !row.isEmpty { rows.append(row) }
+        let rowOf = CJKLineBreak.assignRows(pieces.map(\.token), maxWidth: maxWidth)
+        var rows: [String] = []
+        for (index, piece) in pieces.enumerated() {
+            if rowOf[index] == rows.count {
+                rows.append(piece.text)
+            } else {
+                rows[rows.count - 1] += (piece.token.gapBefore > 0 ? " " : "") + piece.text
+            }
+        }
         return Array(rows.prefix(maxRows))
+    }
+
+    private static func token(_ text: String, gap: CGFloat, width: CGFloat) -> CJKLineBreak.Token {
+        CJKLineBreak.Token(width: width, gapBefore: gap, first: text.first ?? " ", last: text.last ?? " ")
     }
 }
