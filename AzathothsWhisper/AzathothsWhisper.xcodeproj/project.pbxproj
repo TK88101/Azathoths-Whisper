@@ -392,6 +392,7 @@
 		EB6E14A73EE53D85D2351139 /* PlainLinePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 575D5B7DE2C625AC9B12A10E /* PlainLinePolicyTests.swift */; };
 		EC0CB41D352A96323833A261 /* GeniusSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9509CED4D1C8475EC0F0D2EC /* GeniusSource.swift */; };
 		ED158419DE8DA2D7142DE134 /* CoverFlowMarksFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2042248839B92C8571BF152 /* CoverFlowMarksFormatTests.swift */; };
+		ED50FA88094C8A786CB6C9A2 /* GlyphRasterCJKColdFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D42E35F5D45F8D01D273FFC1 /* GlyphRasterCJKColdFrameTests.swift */; };
 		EE526799CB830CA8AFAFE668 /* NowPlayingMonitorMetadataChangedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64678044D8D522B7C347553E /* NowPlayingMonitorMetadataChangedTests.swift */; };
 		EF17DAFB549EF41BA549F674 /* DarkLyricsSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD35F164D8DBC688441330AD /* DarkLyricsSource.swift */; };
 		EF9EFCB123EDF59A0DF3813F /* CoverFlowMarksFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8575F16A3A5A87F67499C2FF /* CoverFlowMarksFormat.swift */; };
@@ -785,6 +786,7 @@
 		D1404F2A5D9ABBB445E346EF /* ShadowsIntoLight-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ShadowsIntoLight-Regular.ttf"; sourceTree = "<group>"; };
 		D14C2A50B3D7C6543B996ED3 /* Righteous-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Righteous-Regular.ttf"; sourceTree = "<group>"; };
 		D3D287619A85F04254C4C202 /* Apache-2.0-MaterialSymbols.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Apache-2.0-MaterialSymbols.txt"; sourceTree = "<group>"; };
+		D42E35F5D45F8D01D273FFC1 /* GlyphRasterCJKColdFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlyphRasterCJKColdFrameTests.swift; sourceTree = "<group>"; };
 		D44F448D75E8EFC0FE87FC28 /* YouTubeMusicProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeMusicProviderTests.swift; sourceTree = "<group>"; };
 		D4C2ED2F8AF3B71A4BD9379E /* LineEndings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineEndings.swift; sourceTree = "<group>"; };
 		D4EDC65BF8AA8467BC04397D /* RaisedLayerStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaisedLayerStyle.swift; sourceTree = "<group>"; };
@@ -1002,6 +1004,7 @@
 				45487409C0F7EE37DC916AF1 /* FXSeedTests.swift */,
 				27D162E3C0D5CE321C92B8A6 /* GenreStyleResolverTests.swift */,
 				B54740AC596D19789B195534 /* GlyphRasterCacheTests.swift */,
+				D42E35F5D45F8D01D273FFC1 /* GlyphRasterCJKColdFrameTests.swift */,
 				FC2E25807D641BDC1218627A /* GlyphRasterColdFrameTests.swift */,
 				F56882674866B1BE63373C32 /* GlyphRasterFidelityTests.swift */,
 				6CEAE1416634122A9C99B5D1 /* GlyphTemplatesTests.swift */,
@@ -1863,6 +1866,7 @@
 				037862148C210FA8F1074CA3 /* GatedPollClockTests.swift in Sources */,
 				3F8EE9AF0BDA0A7D152B5AAB /* GeniusParserTests.swift in Sources */,
 				D35EF0FB576751DF5D54F14A /* GenreStyleResolverTests.swift in Sources */,
+				ED50FA88094C8A786CB6C9A2 /* GlyphRasterCJKColdFrameTests.swift in Sources */,
 				D06C8B0A786C8F284DF08A1E /* GlyphRasterCacheTests.swift in Sources */,
 				248BE96A2BB1BE62AD3DF3DC /* GlyphRasterColdFrameTests.swift in Sources */,
 				17C79DE6A8458CC78A37FCEA /* GlyphRasterFidelityTests.swift in Sources */,
