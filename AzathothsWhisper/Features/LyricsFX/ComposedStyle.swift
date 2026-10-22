@@ -120,6 +120,8 @@ enum ComposedStyle {
     static let trailAlpha = 0.3
     /// 新一行開始唱後，前一行（退場或殘留）在這段時間內淡到不可見（讀得到的檢查 G3，2026-10-20）
     static let handover = 0.35
+    /// 韓文行（`.plain`）的淡入秒數（⑤ 計劃 §4.3）
+    static let plainFade = 0.35
     /// 每幀粒子上限（G0 定案）；超過先砍字旁的冰屑
     static let maxParticles = 300
     /// thump：詞首 0.12 s 內整屏放大到 1.04（原型）
@@ -198,8 +200,14 @@ enum ComposedStyle {
         let visible = visibleLines(timeline.lines, time: time, exit: style.exit)
         var specks: [(Particle, Double)] = []
         for entry in visible {
+            let lineStyle = style.forLine(entry.line, language: timeline.cjkLanguage)
+            // 建 plan 前分流：韓文行只走「只有透明度」的畫法（⑤ 計劃 §4.3）
+            if LineRenderPolicy(entry.line) == .plain {
+                drawPlain(entry, time: time, size: size, style: lineStyle, measurer: measurer, into: &frame)
+                continue
+            }
             let first = frame.glyphs.count
-            draw(entry, time: time, size: size, style: style.forLine(entry.line, language: timeline.cjkLanguage), measurer: measurer, into: &frame, specks: &specks)
+            draw(entry, time: time, size: size, style: lineStyle, measurer: measurer, into: &frame, specks: &specks)
             // 光暈只給現行句：讓位中的舊句移到光暈層外（點陣與向量在淡字光暈邊緣會差幾個像素；霓虹描邊共用半徑但不受影響）
             if style.effects.contains(.glow), entry.yield < 1 {
                 frame.unlit += frame.glyphs[first...]
@@ -208,7 +216,8 @@ enum ComposedStyle {
         }
         // 先減粒子不減字：冰屑只用剩下的預算
         frame.back += ComposedBackdrop.particleLayers(specks.prefix(max(maxParticles - particleCount(frame.back), 0)), color: style.palette.fg)
-        let current = visible.first(where: { $0.exit == 0 && $0.trail == nil })
+        // 目前行是韓文：整格效果不觸發（上一句的整格狀態隨之立即結束，⑤ 計劃 §4.3）
+        let current = visible.first(where: { $0.exit == 0 && $0.trail == nil }).flatMap { LineRenderPolicy($0.line) == .composed ? $0 : nil }
         if style.effects.contains(.shake), let current {
             frame.shake = shake(current.line, time: time)
         }
@@ -296,6 +305,29 @@ enum ComposedStyle {
         }
         if split { groupSplitCopies(from: firstGhost, in: &frame) }
         frame.ghosts += groupedByOpacityLevel(weeps)
+    }
+
+    /// 韓文行：同一份折行、統一字級，只有整行透明度（進場 `plainFade` 秒淡入、退場與殘留照 recipe 的退場進度、讓位照舊）；
+    /// 不產生逐字變形、殘影、錯位、描邊、倒影、粒子；光暈配方下放在光暈層外
+    private static func drawPlain(_ entry: VisibleLine, time: Double, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring, into frame: inout FramePlan) {
+        let personalities = linePersonalities(line: entry.line, index: entry.index, style: style).1.map(\.plain)
+        let fit = fitted(entry.line, personalities: personalities, size: size, style: style, measurer: measurer, index: entry.index)
+        let alpha = FXEasing.clamp01(FXEasing.clamp01((time - entry.line.start) / plainFade) * (1 - entry.exit) * (entry.trail ?? 1) * entry.yield)
+        guard alpha > 0 else { return }
+        let rowHeight = fit.em * lineHeight
+        let baseY = size.height * baseYRatio - CGFloat(fit.laid.rowWidths.count) * rowHeight / 2 + rowHeight * 0.8
+        let ascent = measurer.ascent(face: style.face, fontSize: fit.em)
+        let glyphs = fit.laid.glyphs.map { glyph in
+            GlyphDraw(
+                text: glyph.character, face: style.face, fontSize: fit.em,
+                origin: CGPoint(
+                    x: (size.width - fit.laid.rowWidths[glyph.row]) / 2 + glyph.x + (glyph.width - glyph.advance) / 2,
+                    y: baseY + rowHeight * CGFloat(glyph.row) - ascent
+                ),
+                rotation: 0, scaleX: 1, scaleY: 1, opacity: alpha, color: .fg, stroke: 0
+            )
+        }
+        if style.effects.contains(.glow) || style.effects.contains(.neonstroke) { frame.unlit += glyphs } else { frame.glyphs += glyphs }
     }
 
     /// 繪製端相鄰同色、同量化透明度才合成一次填色。暈開的副本同色但每字透明度可能不同（燭火閃爍讓每個字各自明滅），
@@ -744,5 +776,24 @@ private enum FitCache {
             if cache.count >= capacity { cache.removeAll(keepingCapacity: true) }
             cache[key] = ratio
         }
+    }
+}
+
+/// 一行怎麼畫（⑤ 中日韓字型計劃 §4.3）：韓文行無特效（使用者 2026-10-22）
+enum LineRenderPolicy: Equatable {
+    case composed, plain
+
+    init(_ line: TimedLine) {
+        self = line.script == .hangul ? .plain : .composed
+    }
+}
+
+extension GlyphPersonality {
+    /// 無特效的行：統一字級、無偏移與旋轉（時間不動）
+    var plain: GlyphPersonality {
+        GlyphPersonality(
+            wordIndex: wordIndex, start: start, duration: duration, enter: enter, hold: .still, exit: exit, size: 1, dy: 0, rotation: 0,
+            dir: dir, phase: phase, scatterX: 0, scatterY: 0, angle: 0, bend: 0, wordX: wordX, wordY: wordY, wordRotation: 0, lifetime: lifetime
+        )
     }
 }
