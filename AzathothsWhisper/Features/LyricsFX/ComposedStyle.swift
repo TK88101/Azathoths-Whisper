@@ -120,7 +120,12 @@ enum ComposedStyle {
     static let trailAlpha = 0.3
     /// 新一行開始唱後，前一行（退場或殘留）在這段時間內淡到不可見（讀得到的檢查 G3，2026-10-20）
     static let handover = 0.35
-    /// 韓文行（`.plain`）的淡入秒數（⑤ 計劃 §4.3）
+    /// 一句的第一列基線：整句以畫面 `baseYRatio` 為中線垂直置中（draw、drawPlain、縮字量測共用）
+    static func firstBaseline(size: CGSize, rows: Int, em: CGFloat) -> CGFloat {
+        let rowHeight = em * lineHeight
+        return size.height * baseYRatio - CGFloat(rows) * rowHeight / 2 + rowHeight * 0.8
+    }
+    /// 韓文行（`.plain`）的淡入秒數（⑤ 計劃 §4.3）；與 `handover` 數值相同但各管各的（淡入／讓位）
     static let plainFade = 0.35
     /// 每幀粒子上限（G0 定案）；超過先砍字旁的冰屑
     static let maxParticles = 300
@@ -264,7 +269,7 @@ enum ComposedStyle {
         // 霓虹描邊寬跟著這一句實際的 em（含字型字級與縮字；原型 `st.em × 0.06`）。原型另隨逐字縮放，app 在畫布座標描邊、不隨（既有差異）
         let stroke = style.effects.contains(.neonstroke) ? em * strokeRatio : 0
         let rowHeight = em * lineHeight
-        let baseY = size.height * baseYRatio - CGFloat(laid.rowWidths.count) * rowHeight / 2 + rowHeight * 0.8
+        let baseY = firstBaseline(size: size, rows: laid.rowWidths.count, em: em)
         let misregistered = style.effects.contains(.misreg)
         let reflected = style.effects.contains(.reflect)
         let papered = style.effects.contains(.ransom)
@@ -312,10 +317,11 @@ enum ComposedStyle {
     private static func drawPlain(_ entry: VisibleLine, time: Double, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring, into frame: inout FramePlan) {
         let personalities = linePersonalities(line: entry.line, index: entry.index, style: style).1.map(\.plain)
         let fit = fitted(entry.line, personalities: personalities, size: size, style: style, measurer: measurer, index: entry.index)
-        let alpha = FXEasing.clamp01(FXEasing.clamp01((time - entry.line.start) / plainFade) * (1 - entry.exit) * (entry.trail ?? 1) * entry.yield)
+        let fadeIn = min(max((time - entry.line.start) / plainFade, 0), 1)
+        let alpha = FXEasing.clamp01(fadeIn * (1 - entry.exit) * (entry.trail ?? 1) * entry.yield)
         guard alpha > 0 else { return }
         let rowHeight = fit.em * lineHeight
-        let baseY = size.height * baseYRatio - CGFloat(fit.laid.rowWidths.count) * rowHeight / 2 + rowHeight * 0.8
+        let baseY = firstBaseline(size: size, rows: fit.laid.rowWidths.count, em: fit.em)
         let ascent = measurer.ascent(face: style.face, fontSize: fit.em)
         let glyphs = fit.laid.glyphs.map { glyph in
             GlyphDraw(
@@ -456,21 +462,16 @@ enum ComposedStyle {
         breakLongWords: Bool = false
     ) -> LineLayout {
         let items = laidCharacters(line, personalities: personalities, em: em, face: face, measurer: measurer)
-        // (字的序號, 是不是斷開的超寬詞的第一個字)
-        var groups: [(members: [Int], forcesNewRow: Bool)] = tokenGroups(items).map { ($0, false) }
-        var brokeWords = false
-        if breakLongWords {
-            groups = groups.flatMap { group -> [(members: [Int], forcesNewRow: Bool)] in
-                guard !items[group.members[0]].isCJK, group.members.map({ items[$0].width }).reduce(0, +) > maxWidth else { return [group] }
-                brokeWords = true
-                return group.members.enumerated().map { ([$0.element], $0.offset == 0) }
-            }
+        let width = { (members: Range<Int>) in items[members].reduce(0) { $0 + $1.width } }
+        // 超寬的非中日文詞逐字斷開，第一個字標成「所在列已有字就換列」
+        let groups: [(members: Range<Int>, forcesNewRow: Bool)] = tokenGroups(items).flatMap { group -> [(members: Range<Int>, forcesNewRow: Bool)] in
+            guard breakLongWords, !items[group.lowerBound].isCJK, width(group) > maxWidth else { return [(group, false)] }
+            return group.map { ($0..<$0 + 1, $0 == group.lowerBound) }
         }
         let tokens = groups.map { group in
             CJKLineBreak.Token(
-                width: group.members.map { items[$0].width }.reduce(0, +),
-                gapBefore: items[group.members[0]].spaceBefore ? wordGap * em : 0,
-                first: Character(items[group.members[0]].character), last: Character(items[group.members[group.members.count - 1]].character),
+                width: width(group.members), gapBefore: items[group.members.lowerBound].spaceBefore ? wordGap * em : 0,
+                leading: items[group.members.lowerBound].character, trailing: items[group.members.upperBound - 1].character,
                 forcesNewRow: group.forcesNewRow
             )
         }
@@ -478,18 +479,19 @@ enum ComposedStyle {
         var glyphs: [LaidGlyph] = []
         var rowWidths = [CGFloat](repeating: 0, count: (rowOf.max() ?? 0) + 1)
         var words = [(x: CGFloat, width: CGFloat)](repeating: (0, 0), count: line.words.count)
+        var placedWords = Set<Int>()
         for (offset, group) in groups.enumerated() {
             let row = rowOf[offset]
             if rowWidths[row] > 0 { rowWidths[row] += tokens[offset].gapBefore }
             for itemIndex in group.members {
                 let item = items[itemIndex]
-                if words[item.wordIndex].width == 0 { words[item.wordIndex].x = rowWidths[row] }
+                if placedWords.insert(item.wordIndex).inserted { words[item.wordIndex].x = rowWidths[row] }
                 words[item.wordIndex].width += item.width
                 glyphs.append(LaidGlyph(character: item.character, wordIndex: item.wordIndex, index: itemIndex, x: rowWidths[row], width: item.width, advance: item.width - face.spacing * em, row: row))
                 rowWidths[row] += item.width
             }
         }
-        return LineLayout(glyphs: glyphs, rowWidths: rowWidths, words: words, brokeWords: brokeWords)
+        return LineLayout(glyphs: glyphs, rowWidths: rowWidths, words: words, brokeWords: groups.contains { $0.forcesNewRow })
     }
 
     /// 排版前的一個字：顯示字、所屬的詞（時間歸屬）、含字距的寬
@@ -520,14 +522,14 @@ enum ComposedStyle {
         return items
     }
 
-    /// 字分成排版單位：原文空白處、中日文字前後都是邊界；其餘連續的字是一個單位（不從中切斷）
-    private static func tokenGroups(_ items: [LaidCharacter]) -> [[Int]] {
-        var groups: [[Int]] = []
-        for (index, item) in items.enumerated() {
-            let starts = index == 0 || item.spaceBefore || item.isCJK || items[index - 1].isCJK
-            if starts { groups.append([index]) } else { groups[groups.count - 1].append(index) }
+    /// 字分成排版單位（規則見 `CJKLineBreak.startsToken`）：回傳各單位的字序號範圍
+    private static func tokenGroups(_ items: [LaidCharacter]) -> [Range<Int>] {
+        var starts: [Int] = []
+        for (index, item) in items.enumerated()
+        where CJKLineBreak.startsToken(isCJK: item.isCJK, previousIsCJK: index == 0 ? nil : items[index - 1].isCJK, spaceBefore: item.spaceBefore) {
+            starts.append(index)
         }
-        return groups
+        return zip(starts, starts.dropFirst() + [items.count]).map { $0..<$1 }
     }
 
     private static func linePersonalities(line: TimedLine, index: Int, style: ResolvedStyle) -> (seed: UInt64, [GlyphPersonality]) {
@@ -608,7 +610,7 @@ enum ComposedStyle {
     private static func fits(_ laid: LineLayout, em: CGFloat, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring) -> Bool {
         let rows = CGFloat(laid.rowWidths.count)
         let rowHeight = em * lineHeight
-        let firstBaseline = size.height * baseYRatio - rows * rowHeight / 2 + rowHeight * 0.8
+        let firstBaseline = firstBaseline(size: size, rows: laid.rowWidths.count, em: em)
         let lastBaseline = firstBaseline + rowHeight * (rows - 1)
         let vary = style.personality.vary
         let largest = em * CGFloat(1 + vary.size * LinePersonalities.rawness) * holdScale

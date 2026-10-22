@@ -12,15 +12,17 @@ extension FontFace {
     /// 中日韓字身本身已含字間，只留一點
     static let cjkSpacing: CGFloat = 0.02
 
-    private static let postScriptNames: [CJKFaceRole: (japanese: String, chinese: String, korean: String)] = [
-        .composed: ("HiraginoSans-W6", "PingFangTC-Semibold", "AppleSDGothicNeo-SemiBold"),
-        .monoCurrent: ("HiraginoSans-W5", "PingFangTC-Medium", "AppleSDGothicNeo-Medium"),
-        .monoPreview: ("HiraginoSans-W4", "PingFangTC-Regular", "AppleSDGothicNeo-Regular"),
-    ]
+    private static func postScriptNames(_ role: CJKFaceRole) -> (japanese: String, chinese: String, korean: String) {
+        switch role {
+        case .composed: ("HiraginoSans-W6", "PingFangTC-Semibold", "AppleSDGothicNeo-SemiBold")
+        case .monoCurrent: ("HiraginoSans-W5", "PingFangTC-Medium", "AppleSDGothicNeo-Medium")
+        case .monoPreview: ("HiraginoSans-W4", "PingFangTC-Regular", "AppleSDGothicNeo-Regular")
+        }
+    }
 
     /// 這一行該換的字型；拉丁行回 nil（照用 `base`）。`uppercase` 跟著 `base`，只影響行內的拉丁字母
     static func lineFace(for script: LineScript, language: CJKLanguage, role: CJKFaceRole, base: FontFace) -> FontFace? {
-        guard let names = postScriptNames[role] else { return nil }
+        let names = postScriptNames(role)
         let name: String
         switch script {
         case .latin: return nil

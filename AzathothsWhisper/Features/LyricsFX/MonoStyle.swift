@@ -41,20 +41,23 @@ extension LyricsFXFrame.Mono {
         var currentRowCount = 1
         if let exiting = moment.exiting {
             let progress = eased((time - exiting.end) / exit)
-            let rows = rowsOf(exiting, fontSize, current(exiting), maxCurrentRows)
-            glyphs += block.glyphs(rows, top: top - progress * rise * fontSize, fontSize: fontSize, face: current(exiting), opacity: 1 - progress, color: .fg)
+            let face = current(exiting)
+            let rows = rowsOf(exiting, fontSize, face, maxCurrentRows)
+            glyphs += block.glyphs(rows, top: top - progress * rise * fontSize, fontSize: fontSize, face: face, opacity: 1 - progress, color: .fg)
         }
         if let line = moment.current {
             let progress = motion == .full ? eased((time - line.start) / enter) : 1
-            let rows = rowsOf(line, fontSize, current(line), maxCurrentRows)
+            let face = current(line)
+            let rows = rowsOf(line, fontSize, face, maxCurrentRows)
             currentRowCount = max(rows.count, 1)
-            glyphs += block.glyphs(rows, top: top + (1 - progress) * rise * fontSize, fontSize: fontSize, face: current(line), opacity: progress, color: .fg)
+            glyphs += block.glyphs(rows, top: top + (1 - progress) * rise * fontSize, fontSize: fontSize, face: face, opacity: progress, color: .fg)
         }
         if let next = moment.next {
             let previewSize = fontSize * previewScale
             let previewTop = top + CGFloat(currentRowCount) * lineHeight * fontSize + previewGap * fontSize
-            let rows = rowsOf(next, previewSize, preview(next), maxPreviewRows)
-            glyphs += block.glyphs(rows, top: previewTop, fontSize: previewSize, face: preview(next), opacity: previewOpacity, color: .dim)
+            let face = preview(next)
+            let rows = rowsOf(next, previewSize, face, maxPreviewRows)
+            glyphs += block.glyphs(rows, top: previewTop, fontSize: previewSize, face: face, opacity: previewOpacity, color: .dim)
         }
         return FramePlan(palette: .mono, glyphs: glyphs)
     }
@@ -101,18 +104,21 @@ enum MonoLayout {
     ) -> [String] {
         let width = { (candidate: String) in measurer.advances(of: candidate, face: face, fontSize: fontSize).last ?? 0 }
         let space = width(" ")
-        var pieces: [(text: String, token: CJKLineBreak.Token)] = []
+        var pieces: [(text: String, spaceBefore: Bool, token: CJKLineBreak.Token)] = []
         for piece in CJKLineBreak.tokens(of: text) {
             let gap = piece.spaceBefore ? space : 0
-            guard width(piece.text) > maxWidth, piece.text.count > 1 else {
-                pieces.append((piece.text, token(piece.text, gap: gap, width: width(piece.text))))
+            let pieceWidth = width(piece.text)
+            guard pieceWidth > maxWidth, piece.text.count > 1 else {
+                pieces.append((piece.text, piece.spaceBefore, CJKLineBreak.Token(width: pieceWidth, gapBefore: gap, leading: piece.text, trailing: piece.text)))
                 continue
             }
             // 超寬的詞逐字斷（所在列已有字就先換列）
             for (offset, character) in piece.text.enumerated() {
-                var split = token(String(character), gap: offset == 0 ? gap : 0, width: width(String(character)))
-                split.forcesNewRow = offset == 0
-                pieces.append((String(character), split))
+                let single = String(character)
+                let split = CJKLineBreak.Token(
+                    width: width(single), gapBefore: offset == 0 ? gap : 0, leading: single, trailing: single, forcesNewRow: offset == 0
+                )
+                pieces.append((single, offset == 0 && piece.spaceBefore, split))
             }
         }
         let rowOf = CJKLineBreak.assignRows(pieces.map(\.token), maxWidth: maxWidth)
@@ -121,13 +127,9 @@ enum MonoLayout {
             if rowOf[index] == rows.count {
                 rows.append(piece.text)
             } else {
-                rows[rows.count - 1] += (piece.token.gapBefore > 0 ? " " : "") + piece.text
+                rows[rows.count - 1] += (piece.spaceBefore ? " " : "") + piece.text
             }
         }
         return Array(rows.prefix(maxRows))
-    }
-
-    private static func token(_ text: String, gap: CGFloat, width: CGFloat) -> CJKLineBreak.Token {
-        CJKLineBreak.Token(width: width, gapBefore: gap, first: text.first ?? " ", last: text.last ?? " ")
     }
 }

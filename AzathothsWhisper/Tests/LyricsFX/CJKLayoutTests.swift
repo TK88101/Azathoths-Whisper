@@ -74,6 +74,17 @@ struct CJKLayoutTests {
         #expect(Set(latin.map(\.row)).count == 1)
     }
 
+    /// 全大寫字型下「ß」轉成兩個字的「SS」：斷行單位不得假設一個字（simcodex R1 P1，曾會閃退）
+    @Test func anUppercaseFaceExpandingOneLetterIntoTwoDoesNotCrash() throws {
+        let recipe = ComposedRecipe(
+            font: "Bebas", backdrop: "void", enter: "lash", exit: "fade", fx1: "none", fx2: "none", palette: "ice", seed: 7,
+            profile: SongProfile(axes: [.aggression: 0.5], tags: [])
+        )
+        let line = TimedLine(start: 0, end: 4, text: "ßtraße groß", isChorus: false)
+        let fit = try #require(ComposedStyle.fitReport(line: line, index: 0, recipe: recipe, size: CGSize(width: 900, height: 560), measurer: Self.measurer))
+        #expect(fit.glyphs.first?.text == "SS")
+    }
+
     // MARK: 素面
 
     private func monoRows(_ text: String, width: CGFloat) -> [String] {

@@ -14,46 +14,53 @@ enum CJKLineBreak {
         let width: CGFloat
         /// 與前一個 token 同列時要加的間距（原文空白處＝詞距，其餘 0）
         let gapBefore: CGFloat
-        let first: Character
-        let last: Character
+        /// 開頭是收尾標點（不能放列首）／結尾是開頭標點（不能放列尾）。存布林值：顯示字可能不止一個字素（「ß」大寫＝「SS」）
+        let cannotStartRow: Bool
+        let cannotEndRow: Bool
         /// 超寬詞逐字斷開的第一個字：所在列已有字就換列（沿用改動前的超寬詞行為）
         var forcesNewRow = false
+
+        init(width: CGFloat, gapBefore: CGFloat, leading: String, trailing: String, forcesNewRow: Bool = false) {
+            self.width = width
+            self.gapBefore = gapBefore
+            cannotStartRow = leading.first.map(closing.contains) ?? false
+            cannotEndRow = trailing.last.map(opening.contains) ?? false
+            self.forcesNewRow = forcesNewRow
+        }
     }
 
     static func isCJK(_ character: Character) -> Bool {
         character.unicodeScalars.contains(where: LyricsScript.isCJK)
     }
 
-    /// 字串切成 token：原文的空白是詞界；詞內的中日文字各自一個、其餘連續字一個（字素叢集為單位，不拆 emoji）
+    /// 這個字要不要開一個新 token（切 token 的唯一規則，組合與素面共用）：原文空白處、中日文字前後都是邊界；其餘連續的字同一個
+    static func startsToken(isCJK: Bool, previousIsCJK: Bool?, spaceBefore: Bool) -> Bool {
+        guard let previousIsCJK else { return true }
+        return spaceBefore || isCJK || previousIsCJK
+    }
+
+    /// 字串切成 token（字素叢集為單位，不拆 emoji）
     static func tokens(of text: String) -> [(text: String, spaceBefore: Bool)] {
         var result: [(text: String, spaceBefore: Bool)] = []
+        var previousIsCJK: Bool?
         for (wordIndex, word) in text.split(whereSeparator: \.isWhitespace).enumerated() {
-            var run = ""
-            var first = true
-            func flush() {
-                guard !run.isEmpty else { return }
-                result.append((run, first && wordIndex > 0))
-                first = false
-                run = ""
-            }
-            for character in word {
-                if isCJK(character) {
-                    flush()
-                    result.append((String(character), first && wordIndex > 0))
-                    first = false
+            for (offset, character) in word.enumerated() {
+                let cjk = isCJK(character)
+                let spaceBefore = offset == 0 && wordIndex > 0
+                if startsToken(isCJK: cjk, previousIsCJK: previousIsCJK, spaceBefore: spaceBefore) {
+                    result.append((String(character), spaceBefore))
                 } else {
-                    if let last = run.last, isCJK(last) { flush() }
-                    run.append(character)
+                    result[result.count - 1].text.append(character)
                 }
+                previousIsCJK = cjk
             }
-            flush()
         }
         return result
     }
 
     /// 兩個 token 之間可以斷嗎（禁則）
     static func canBreak(between before: Token, and after: Token) -> Bool {
-        !closing.contains(after.first) && !opening.contains(before.last)
+        !after.cannotStartRow && !before.cannotEndRow
     }
 
     /// 貪婪分列，回傳每個 token 的列號。放不下時往回找最近的允許斷點；找不到：收尾標點懸在列尾、開頭標點帶到下一列，其餘照寬度硬斷
@@ -98,8 +105,8 @@ enum CJKLineBreak {
             if canBreak(between: tokens[candidate - 1], and: tokens[candidate]) { return candidate }
             candidate -= 1
         }
-        if closing.contains(tokens[index].first) { return nil }
-        if opening.contains(tokens[index - 1].last), index - 1 > rowStart { return index - 1 }
+        if tokens[index].cannotStartRow { return nil }
+        if tokens[index - 1].cannotEndRow, index - 1 > rowStart { return index - 1 }
         return index
     }
 }
