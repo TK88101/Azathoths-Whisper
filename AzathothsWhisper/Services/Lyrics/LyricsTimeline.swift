@@ -19,6 +19,8 @@ struct TimedLine: Equatable, Sendable {
     /// 字出完的時刻（≤ `end`）：外部與內嵌 LRC 由 `WordPacing` 限速，其餘等於 `end`
     let revealEnd: Double
     let words: [TimedWord]
+    /// 這一行的文字種類（建行時算一次，繪製時不重掃）
+    let script: LineScript
 
     init(start: Double, end: Double, text: String, isChorus: Bool, revealEnd: Double? = nil) {
         self.start = start
@@ -27,6 +29,7 @@ struct TimedLine: Equatable, Sendable {
         self.isChorus = isChorus
         self.revealEnd = revealEnd ?? end
         self.words = TimedWord.split(text, start: start, end: self.revealEnd)
+        script = LyricsScript.line(text)
     }
 }
 
@@ -35,6 +38,15 @@ struct LyricsTimeline: Equatable, Sendable {
     let lines: [TimedLine]
     let source: TimingSource
     let duration: Double
+    /// 整首的中日文之分（只在 `.cjk` 行選字型時用）
+    let cjkLanguage: CJKLanguage
+
+    init(lines: [TimedLine], source: TimingSource, duration: Double) {
+        self.lines = lines
+        self.source = source
+        self.duration = duration
+        cjkLanguage = LyricsScript.language(of: lines.map(\.text))
+    }
 }
 
 extension TimedWord {
@@ -68,12 +80,6 @@ extension TimedWord {
 /// 假名與漢字的判定（曲風體系判定與逐字切分共用）
 enum JapaneseText {
     static func isKanaOrKanji(_ scalar: Unicode.Scalar) -> Bool {
-        switch scalar.value {
-        case 0x3040...0x309F, 0x30A0...0x30FF, 0x31F0...0x31FF,   // 平假名、片假名、片假名擴充
-             0x3400...0x4DBF, 0x4E00...0x9FFF:                     // CJK 擴充 A、基本漢字
-            return true
-        default:
-            return false
-        }
+        LyricsScript.isKana(scalar) || LyricsScript.isHan(scalar)
     }
 }
