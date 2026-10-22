@@ -4,7 +4,8 @@ import os
 
 /// 組合配方解析成的繪製參數（移植原型 `styleFromRecipe`，html:997-1003）
 struct ResolvedStyle: Sendable {
-    let face: FontFace
+    /// 樂團字型；含中日韓字的行由 `forLine` 換成那一行的字型
+    private(set) var face: FontFace
     let palette: FXPalette
     let backdrop: BackdropKind
     let enter: EnterSpec
@@ -45,6 +46,16 @@ struct ResolvedStyle: Sendable {
             vary: .init(size: 0.1 + aggression * 0.1, dy: 0.08 + elegance * 0.1, rotation: 0.03 + aggression * 0.05, scatter: 0.02 + elegance * 0.06),
             wordLevel: enter.wordLevel
         )
+    }
+}
+
+extension ResolvedStyle {
+    /// 這一行的繪製參數：含中日韓字的行整行換字型（⑤ 計劃 §4.2）。字型 id 進縮字快取鍵，換字型就不會命中別的字型的結果
+    func forLine(_ line: TimedLine, language: CJKLanguage) -> ResolvedStyle {
+        guard let lineFace = FontFace.lineFace(for: line.script, language: language, role: .composed, base: face) else { return self }
+        var copy = self
+        copy.face = lineFace
+        return copy
     }
 }
 
@@ -188,7 +199,7 @@ enum ComposedStyle {
         var specks: [(Particle, Double)] = []
         for entry in visible {
             let first = frame.glyphs.count
-            draw(entry, time: time, size: size, style: style, measurer: measurer, into: &frame, specks: &specks)
+            draw(entry, time: time, size: size, style: style.forLine(entry.line, language: timeline.cjkLanguage), measurer: measurer, into: &frame, specks: &specks)
             // 光暈只給現行句：讓位中的舊句移到光暈層外（點陣與向量在淡字光暈邊緣會差幾個像素；霓虹描邊共用半徑但不受影響）
             if style.effects.contains(.glow), entry.yield < 1 {
                 frame.unlit += frame.glyphs[first...]

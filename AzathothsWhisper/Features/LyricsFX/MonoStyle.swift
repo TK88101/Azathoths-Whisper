@@ -24,12 +24,15 @@ extension LyricsFXFrame.Mono {
     static let timing = LyricsFXFrame.MomentTiming(exit: exit, previewLead: previewLead)
 
     static func plan(
-        _ moment: LyricsFXFrame.Moment, time: Double, size: CGSize, motion: LyricsFXMotion, measurer: any TextMeasuring
+        _ moment: LyricsFXFrame.Moment, time: Double, size: CGSize, motion: LyricsFXMotion, language: CJKLanguage, measurer: any TextMeasuring
     ) -> FramePlan {
         let margin = MonoLayout.margin(width: size.width)
         let contentWidth = size.width - 2 * margin
         let fontSize = MonoLayout.currentFontSize(width: size.width)
         let top = size.height * currentTop
+        // 含中日韓字的行整行換字型（⑤ 計劃 §4.2）
+        let current = { (line: TimedLine) in FontFace.lineFace(for: line.script, language: language, role: .monoCurrent, base: .displayMedium) ?? .displayMedium }
+        let preview = { (line: TimedLine) in FontFace.lineFace(for: line.script, language: language, role: .monoPreview, base: .displayRegular) ?? .displayRegular }
         let rowsOf = { (line: TimedLine, size: CGFloat, face: FontFace, limit: Int) in
             MonoLayout.rows(of: line.text, fontSize: size, face: face, maxWidth: contentWidth, maxRows: limit, measurer: measurer)
         }
@@ -38,20 +41,20 @@ extension LyricsFXFrame.Mono {
         var currentRowCount = 1
         if let exiting = moment.exiting {
             let progress = eased((time - exiting.end) / exit)
-            let rows = rowsOf(exiting, fontSize, .displayMedium, maxCurrentRows)
-            glyphs += block.glyphs(rows, top: top - progress * rise * fontSize, fontSize: fontSize, face: .displayMedium, opacity: 1 - progress, color: .fg)
+            let rows = rowsOf(exiting, fontSize, current(exiting), maxCurrentRows)
+            glyphs += block.glyphs(rows, top: top - progress * rise * fontSize, fontSize: fontSize, face: current(exiting), opacity: 1 - progress, color: .fg)
         }
-        if let current = moment.current {
-            let progress = motion == .full ? eased((time - current.start) / enter) : 1
-            let rows = rowsOf(current, fontSize, .displayMedium, maxCurrentRows)
+        if let line = moment.current {
+            let progress = motion == .full ? eased((time - line.start) / enter) : 1
+            let rows = rowsOf(line, fontSize, current(line), maxCurrentRows)
             currentRowCount = max(rows.count, 1)
-            glyphs += block.glyphs(rows, top: top + (1 - progress) * rise * fontSize, fontSize: fontSize, face: .displayMedium, opacity: progress, color: .fg)
+            glyphs += block.glyphs(rows, top: top + (1 - progress) * rise * fontSize, fontSize: fontSize, face: current(line), opacity: progress, color: .fg)
         }
         if let next = moment.next {
             let previewSize = fontSize * previewScale
             let previewTop = top + CGFloat(currentRowCount) * lineHeight * fontSize + previewGap * fontSize
-            let rows = rowsOf(next, previewSize, .displayRegular, maxPreviewRows)
-            glyphs += block.glyphs(rows, top: previewTop, fontSize: previewSize, face: .displayRegular, opacity: previewOpacity, color: .dim)
+            let rows = rowsOf(next, previewSize, preview(next), maxPreviewRows)
+            glyphs += block.glyphs(rows, top: previewTop, fontSize: previewSize, face: preview(next), opacity: previewOpacity, color: .dim)
         }
         return FramePlan(palette: .mono, glyphs: glyphs)
     }

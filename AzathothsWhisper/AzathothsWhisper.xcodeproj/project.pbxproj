@@ -142,6 +142,7 @@
 		50848D1E125DCC50052C2C59 /* RockSalt-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C88F821CF8EFED9BBF640A18 /* RockSalt-Regular.ttf */; };
 		50B33541528DA38E53A6B4AF /* ArtworkMemoryCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF34EB747C48E439EE7FFCBA /* ArtworkMemoryCacheTests.swift */; };
 		5111266DA3608564346F3015 /* Bangers-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8AB5F48DFF5F7272FA39F59A /* Bangers-Regular.ttf */; };
+		521961AFAC68E302667D8256 /* CJKFaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA4E97EC372A5F6B60141F6 /* CJKFaceTests.swift */; };
 		52A44163BBFCEE887C30CBC7 /* LiveMusicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEF06B39685437649B718F6 /* LiveMusicTests.swift */; };
 		54815F1C308B4961BC1EC009 /* LyricsFXFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51EDBEDD0E4C8E435B93B461 /* LyricsFXFrame.swift */; };
 		5523D1C803E743405CC7CEB9 /* BatchRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0878F194D11E17598287D4 /* BatchRow.swift */; };
@@ -175,6 +176,7 @@
 		63C8297837078C7EFF8859D5 /* ShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1207833B927999FE4629D7C4 /* ShellUITests.swift */; };
 		64102DBE6696A711580088D5 /* LyricsFXRecipeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38FE39FBCD9EDB81041E2969 /* LyricsFXRecipeTests.swift */; };
 		65EA4BD9C610459A4E76C3B8 /* AccessibilityProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3696FA328C9BB26B4916183 /* AccessibilityProbe.swift */; };
+		694716352561D116D6EC7584 /* CJKFaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A2523D774D6E8936365C26A /* CJKFaces.swift */; };
 		69A00F59A928BE00AB3719C6 /* OFL-LilitaOne.txt in Resources */ = {isa = PBXBuildFile; fileRef = B892ABAAFDA815E87045B658 /* OFL-LilitaOne.txt */; };
 		69CE880B6D71810D19E1791A /* OFL-Bungee.txt in Resources */ = {isa = PBXBuildFile; fileRef = D928EF783940322F4C598369 /* OFL-Bungee.txt */; };
 		69E9C58C82DA0D567F4B4061 /* ArtworkFailureBackoffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDF3DD13262175B062024A47 /* ArtworkFailureBackoffTests.swift */; };
@@ -456,6 +458,7 @@
 		088DE4D5E615ED6616D23545 /* BatchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchViewModel.swift; sourceTree = "<group>"; };
 		08B38C59EC0043F3B2F28534 /* ArtworkServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkServiceTests.swift; sourceTree = "<group>"; };
 		09930CC7EB1CC3C06927852E /* CoverFlowViewModelSlideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowViewModelSlideTests.swift; sourceTree = "<group>"; };
+		0A2523D774D6E8936365C26A /* CJKFaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CJKFaces.swift; sourceTree = "<group>"; };
 		0B729E8D58B2DD1B2729A0C2 /* Catacombs.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Catacombs.ttf; sourceTree = "<group>"; };
 		0CC94BFC473EF47824CA3ADA /* GlyphPersonality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlyphPersonality.swift; sourceTree = "<group>"; };
 		0CEF425B7010677F55E70E1C /* TimingQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimingQuery.swift; sourceTree = "<group>"; };
@@ -696,6 +699,7 @@
 		9BD621C3665C0A624549C808 /* TimingTestDoubles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimingTestDoubles.swift; sourceTree = "<group>"; };
 		9C4C3BF11F56EE2C8B39EEE4 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		9C8FC487F8B9E24E38ED9D11 /* OFL-AlfaSlabOne.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-AlfaSlabOne.txt"; sourceTree = "<group>"; };
+		9CA4E97EC372A5F6B60141F6 /* CJKFaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CJKFaceTests.swift; sourceTree = "<group>"; };
 		9CBA8D561D582B0F4B004CEF /* LyricsFlowUITestAssemblyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFlowUITestAssemblyTests.swift; sourceTree = "<group>"; };
 		9D66B9811504A0DF72AEB23D /* LyricsFingerprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFingerprint.swift; sourceTree = "<group>"; };
 		9D76FC4760C2F214340628D8 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
@@ -980,6 +984,7 @@
 				4E6020C091AE72E483649865 /* B2BatchTwoEffectTests.swift */,
 				4C2B3108D17F2230CCF170B0 /* B2BatchTwoTests.swift */,
 				765A8A271367FB970BDD554B /* BusyLedgerTests.swift */,
+				9CA4E97EC372A5F6B60141F6 /* CJKFaceTests.swift */,
 				74EB71B13E68B9FC7C96C52D /* ComposedStyleFrameTests.swift */,
 				A1571B4330273170EFB8A34C /* ComposerTests.swift */,
 				60FC13E4D8B5627C53202503 /* ConfigStoreRaisedLayerStyleTests.swift */,
@@ -1447,6 +1452,7 @@
 		EEE1E8764600A07ACFE8BD1D /* LyricsFX */ = {
 			isa = PBXGroup;
 			children = (
+				0A2523D774D6E8936365C26A /* CJKFaces.swift */,
 				FB6D70C54D210955CEBEDDAB /* ComposedBackdrop.swift */,
 				F08EF0C25148474176ACF6BA /* ComposedStyle.swift */,
 				F5418D2D8A314CF129F314D4 /* FXSeed.swift */,
@@ -1799,6 +1805,7 @@
 				2ECE532039045B813A605A95 /* BatchViewModelTests.swift in Sources */,
 				9DE491949DBE697BCD8958E9 /* BatchWriteReportTests.swift in Sources */,
 				FF3DBC581CDEF7162CA528DE /* BusyLedgerTests.swift in Sources */,
+				521961AFAC68E302667D8256 /* CJKFaceTests.swift in Sources */,
 				1684F2038754D7BFE73A8061 /* CandidateRankingTests.swift in Sources */,
 				41E4C401554F86C1C2568605 /* CardDetailsReaderTests.swift in Sources */,
 				B98366A5E631F3558B92111A /* ComposedStyleFrameTests.swift in Sources */,
@@ -1963,6 +1970,7 @@
 				958B87B91D1E04C5F667EB58 /* BatchViewModel.swift in Sources */,
 				C900CBC274F34AAFDF35C9E5 /* BundleAssets.swift in Sources */,
 				875F1BC3029263DCD97A68EC /* BusyLedger.swift in Sources */,
+				694716352561D116D6EC7584 /* CJKFaces.swift in Sources */,
 				DEA21E201AACC06289B7BBC8 /* CandidateRanking.swift in Sources */,
 				5852A9AC08154BDAE4AB8F91 /* CardDetailsReader.swift in Sources */,
 				437F6CA90159C3C0891D63A6 /* ComposedBackdrop.swift in Sources */,

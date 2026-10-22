@@ -25,6 +25,8 @@ struct FontFace: Hashable, Sendable {
     var spacing: CGFloat = ComposedStyle.spacing
     /// false＝不走點陣快取、一律畫合併外框（批 4 遺留計劃 §2.3：Anton 放大後點陣偏離向量超出 I-46 門檻，研究出尺寸策略前暫走向量）
     var rasterizes = true
+    /// 有值時以 PostScript 名建字型（中日韓行的固定字重，`CJKFaces.swift`）；nil＝照 family＋weight
+    var postScriptName: String? = nil
 
     static let displayRegular = FontFace(id: "display-regular", family: "Space Grotesk", weight: .regular)
     static let displayMedium = FontFace(id: "display-medium", family: "Space Grotesk", weight: .medium)
@@ -226,7 +228,7 @@ enum LyricsFXFrame {
             assertionFailure("組合配方含目錄裡沒有的元件：\(composed.componentIDs.sorted())")
         }
         let moment = Moment(lines: timeline.lines, time: time, motion: motion, timing: Mono.timing)
-        return Mono.plan(moment, time: time, size: size, motion: motion, measurer: measurer)
+        return Mono.plan(moment, time: time, size: size, motion: motion, language: timeline.cjkLanguage, measurer: measurer)
     }
 
     /// 無障礙用：此刻正在唱的那一行（A2 計劃 §3.4）

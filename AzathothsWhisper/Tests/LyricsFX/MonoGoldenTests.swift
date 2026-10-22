@@ -3,7 +3,8 @@ import Testing
 
 @testable import AzathothsWhisper
 
-// B1 計劃 T2 DoD②：型別換形後，mono 的 plan 與換形前（e640d4b）錄下的 golden 逐欄相等
+// B1 計劃 T2 DoD②：型別換形後，mono 的 plan 與換形前（e640d4b）錄下的 golden 逐欄相等。
+// ⑤ 中日韓字型計劃：cjk 組的字型改為冬青黑體（目前行 W5、預覽 W4），「是不是目前行」改以角色比對，位置與字級不變
 @Suite("mono golden")
 struct MonoGoldenTests {
     @Test func theMonoPlanIsUnchangedByTheNewTypes() throws {
@@ -15,7 +16,7 @@ struct MonoGoldenTests {
                     actual += plan.glyphs.map { glyph in
                         MonoGolden.Row(
                             fixture: name, time: t, isFull: motion == .full, text: glyph.text, fontSize: glyph.fontSize,
-                            isMedium: glyph.face == .displayMedium, x: glyph.origin.x, y: glyph.origin.y,
+                            isMedium: glyph.face == .displayMedium || glyph.face.postScriptName == "HiraginoSans-W5", x: glyph.origin.x, y: glyph.origin.y,
                             opacity: glyph.opacity, isPrimary: glyph.color == .fg
                         )
                     }
