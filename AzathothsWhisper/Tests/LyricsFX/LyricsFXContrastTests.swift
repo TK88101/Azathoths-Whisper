@@ -18,16 +18,20 @@ struct LyricsFXContrastTests {
     static let timeline = LyricsTimeline(lines: [
         TimedLine(start: 1, end: 9, text: "lanterns over the quiet water", isChorus: false),
     ], source: .embeddedLRC, duration: 20)
+    /// ⑤ 中日韓字型計劃 §4.5：日文行（冬青黑體 W6，含全形標點與英文混排）
+    static let japanese = LyricsTimeline(lines: [
+        TimedLine(start: 1, end: 9, text: "「灯籠」が静かに流れる。lanterns", isChorus: false),
+    ], source: .embeddedLRC, duration: 20)
     /// 停穩的時刻（fadeUp 進場最長 0.6 s）
     static let settled = 5.0
 
     enum Layers { case all, backgroundOnly, mainTextAlone, nothing }
 
-    private static func render(_ recipe: ComposedRecipe, layers: Layers, at time: Double = settled) -> CGImage? {
+    private static func render(_ recipe: ComposedRecipe, layers: Layers, at time: Double = settled, lyrics: LyricsTimeline = timeline) -> CGImage? {
         let measurer = CoreTextMeasurer()
         let paths = GlyphPathCache()
         let view = Canvas { context, size in
-            var plan = LyricsFXFrame.plan(timeline: timeline, time: time, size: size, motion: .full, recipe: .composed(recipe), measurer: measurer)
+            var plan = LyricsFXFrame.plan(timeline: lyrics, time: time, size: size, motion: .full, recipe: .composed(recipe), measurer: measurer)
             if layers != .all { plan.ghosts = []; plan.boxes = [] }
             if layers == .mainTextAlone || layers == .nothing { plan.back = []; plan.underText = []; plan.front = []; plan.glow = 0 }
             // 只取完全顯示的主字（定格時句尾仍可能有字在淡入，那是 G2 的範圍）
@@ -71,9 +75,10 @@ struct LyricsFXContrastTests {
         }
     }
 
-    static func contrast(_ recipe: ComposedRecipe, at time: Double = settled) -> (ratio: Double, pixels: Int)? {
-        guard let full = render(recipe, layers: .all, at: time), let background = render(recipe, layers: .backgroundOnly, at: time),
-              let alone = render(recipe, layers: .mainTextAlone, at: time), let nothing = render(recipe, layers: .nothing, at: time) else { return nil }
+    static func contrast(_ recipe: ComposedRecipe, at time: Double = settled, lyrics: LyricsTimeline = timeline) -> (ratio: Double, pixels: Int)? {
+        guard let full = render(recipe, layers: .all, at: time, lyrics: lyrics), let background = render(recipe, layers: .backgroundOnly, at: time, lyrics: lyrics),
+              let alone = render(recipe, layers: .mainTextAlone, at: time, lyrics: lyrics), let nothing = render(recipe, layers: .nothing, at: time, lyrics: lyrics)
+        else { return nil }
         let a = rgba(full), b = rgba(background)
         var ratios = core(text: rgba(alone), empty: rgba(nothing), width: full.width, height: full.height).map { i in
             let l1 = luminance(a, i), l2 = luminance(b, i)
@@ -112,14 +117,28 @@ struct LyricsFXContrastTests {
     }()
 
     /// 量一組（背景, 配色）的主字對比；不及格回傳失敗說明（`who`＝抽得到它的團，可省）
-    static func readabilityFailure(backdrop: String, palette: String, fx: String = "none", who: [String] = [], at time: Double = settled) -> String? {
+    static func readabilityFailure(
+        backdrop: String, palette: String, fx: String = "none", who: [String] = [], at time: Double = settled, lyrics: LyricsTimeline = timeline
+    ) -> String? {
         let label = "\(palette)＋\(backdrop)" + (fx == "none" ? "" : "＋\(fx)") + (who.isEmpty ? "" : "（\(who.joined(separator: "、"))）") + (time == settled ? "" : "@\(time)")
-        guard let result = contrast(recipe(backdrop: backdrop, palette: palette, fx: fx), at: time) else { return "\(label)：量不到字" }
+        guard let result = contrast(recipe(backdrop: backdrop, palette: palette, fx: fx), at: time, lyrics: lyrics) else { return "\(label)：量不到字" }
         return result.ratio < minimum ? "\(label)：\(String(format: "%.2f", result.ratio))" : nil
     }
 
     @Test func mainTextStaysReadableOnEveryReachableBackdrop() {
         let failures = Self.reachablePairs.compactMap { Self.readabilityFailure(backdrop: $0.backdrop, palette: $0.palette) }
+        #expect(failures.isEmpty, "\(failures.joined(separator: "；"))")
+    }
+
+    /// ⑤ 中日韓字型計劃 §4.5：日文行（冬青黑體）在每組抽得到的（背景, 配色）上
+    @Test func japaneseMainTextStaysReadableOnEveryReachableBackdrop() {
+        let failures = Self.reachablePairs.compactMap { Self.readabilityFailure(backdrop: $0.backdrop, palette: $0.palette, lyrics: Self.japanese) }
+        #expect(failures.isEmpty, "\(failures.joined(separator: "；"))")
+    }
+
+    @Test(arguments: ["glow", "neonstroke", "rgbsplit", "misreg", "reflect"])
+    func japaneseMainTextStaysReadableWithEffectsThatTouchTheText(fx: String) {
+        let failures = Self.reachablePairs.compactMap { Self.readabilityFailure(backdrop: $0.backdrop, palette: $0.palette, fx: fx, lyrics: Self.japanese) }
         #expect(failures.isEmpty, "\(failures.joined(separator: "；"))")
     }
 

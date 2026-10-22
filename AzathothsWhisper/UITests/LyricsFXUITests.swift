@@ -178,6 +178,37 @@ final class LyricsFXUITests: AppUITestCase {
         waitForRecipe({ $0 == "mono" }, "Pop 不在 B1 的兩個家族內")
     }
 
+    // MARK: ⑤ 中日韓字型（docs/plans/2026-10-22-lyrics-fx-cjk-fonts.md §7）：預覽假歌詞第 19 秒是日文行
+
+    private func waitForLineFace(_ expected: String, file: StaticString = #filePath, line: UInt = #line) {
+        let probe = element(ID.lyricsFXLineFaceProbe)
+        XCTAssertTrue(probe.waitForExistence(timeout: Self.timeout), "行字型探針", file: file, line: line)
+        let deadline = Date().addingTimeInterval(Self.timeout)
+        while Date() < deadline, probe.value as? String != expected {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        XCTAssertEqual(probe.value as? String, expected, "日文行的字型", file: file, line: line)
+    }
+
+    /// I-64：素面的日文行用冬青黑體 W5
+    func testAJapaneseLineInMonoUsesHiragino() {
+        start(.lyricsFX, extra: [Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.previewAtVariable: "20"])
+        waitForStyle("lyricsFX")
+        waitForValue(element(ID.lyricsFXLayer), "灯籠が川を流れてゆく夜", timeout: Self.timeout, "20 秒處應是日文行")
+        waitForLineFace("HiraginoSans-W5")
+    }
+
+    /// I-64：有特效的樂團，日文行整行換成冬青黑體 W6（特效照樂團）
+    func testAJapaneseLineInAComposedStyleUsesHiragino() {
+        start(.lyricsFX, extra: [
+            Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.artistVariable: "AC/DC", LyricsFXPreviewFixture.previewAtVariable: "20",
+        ])
+        waitForStyle("lyricsFX")
+        waitForRecipe({ $0 != "mono" }, "AC/DC 應是組合樣式")
+        waitForValue(element(ID.lyricsFXLayer), "灯籠が川を流れてゆく夜", timeout: Self.timeout, "20 秒處應是日文行")
+        waitForLineFace("HiraginoSans-W6")
+    }
+
     /// I-21：減少動態效果一律 mono
     func testReducedMotionFallsBackToMono() {
         start(.lyricsFX, extra: [

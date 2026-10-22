@@ -4,7 +4,8 @@ import os
 
 /// 組合配方解析成的繪製參數（移植原型 `styleFromRecipe`，html:997-1003）
 struct ResolvedStyle: Sendable {
-    let face: FontFace
+    /// 樂團字型；含中日韓字的行由 `forLine` 換成那一行的字型
+    private(set) var face: FontFace
     let palette: FXPalette
     let backdrop: BackdropKind
     let enter: EnterSpec
@@ -45,6 +46,16 @@ struct ResolvedStyle: Sendable {
             vary: .init(size: 0.1 + aggression * 0.1, dy: 0.08 + elegance * 0.1, rotation: 0.03 + aggression * 0.05, scatter: 0.02 + elegance * 0.06),
             wordLevel: enter.wordLevel
         )
+    }
+}
+
+extension ResolvedStyle {
+    /// 這一行的繪製參數：含中日韓字的行整行換字型（⑤ 計劃 §4.2）。字型 id 進縮字快取鍵，換字型就不會命中別的字型的結果
+    func forLine(_ line: TimedLine, language: CJKLanguage) -> ResolvedStyle {
+        guard let lineFace = FontFace.lineFace(for: line.script, language: language, role: .composed, base: face) else { return self }
+        var copy = self
+        copy.face = lineFace
+        return copy
     }
 }
 
@@ -109,6 +120,13 @@ enum ComposedStyle {
     static let trailAlpha = 0.3
     /// 新一行開始唱後，前一行（退場或殘留）在這段時間內淡到不可見（讀得到的檢查 G3，2026-10-20）
     static let handover = 0.35
+    /// 一句的第一列基線：整句以畫面 `baseYRatio` 為中線垂直置中（draw、drawPlain、縮字量測共用）
+    static func firstBaseline(size: CGSize, rows: Int, em: CGFloat) -> CGFloat {
+        let rowHeight = em * lineHeight
+        return size.height * baseYRatio - CGFloat(rows) * rowHeight / 2 + rowHeight * 0.8
+    }
+    /// 韓文行（`.plain`）的淡入秒數（⑤ 計劃 §4.3）；與 `handover` 數值相同但各管各的（淡入／讓位）
+    static let plainFade = 0.35
     /// 每幀粒子上限（G0 定案）；超過先砍字旁的冰屑
     static let maxParticles = 300
     /// thump：詞首 0.12 s 內整屏放大到 1.04（原型）
@@ -187,8 +205,14 @@ enum ComposedStyle {
         let visible = visibleLines(timeline.lines, time: time, exit: style.exit)
         var specks: [(Particle, Double)] = []
         for entry in visible {
+            let lineStyle = style.forLine(entry.line, language: timeline.cjkLanguage)
+            // 建 plan 前分流：韓文行只走「只有透明度」的畫法（⑤ 計劃 §4.3）
+            if LineRenderPolicy(entry.line) == .plain {
+                drawPlain(entry, time: time, size: size, style: lineStyle, measurer: measurer, into: &frame)
+                continue
+            }
             let first = frame.glyphs.count
-            draw(entry, time: time, size: size, style: style, measurer: measurer, into: &frame, specks: &specks)
+            draw(entry, time: time, size: size, style: lineStyle, measurer: measurer, into: &frame, specks: &specks)
             // 光暈只給現行句：讓位中的舊句移到光暈層外（點陣與向量在淡字光暈邊緣會差幾個像素；霓虹描邊共用半徑但不受影響）
             if style.effects.contains(.glow), entry.yield < 1 {
                 frame.unlit += frame.glyphs[first...]
@@ -197,7 +221,8 @@ enum ComposedStyle {
         }
         // 先減粒子不減字：冰屑只用剩下的預算
         frame.back += ComposedBackdrop.particleLayers(specks.prefix(max(maxParticles - particleCount(frame.back), 0)), color: style.palette.fg)
-        let current = visible.first(where: { $0.exit == 0 && $0.trail == nil })
+        // 目前行是韓文：整格效果不觸發（上一句的整格狀態隨之立即結束，⑤ 計劃 §4.3）
+        let current = visible.first(where: { $0.exit == 0 && $0.trail == nil }).flatMap { LineRenderPolicy($0.line) == .composed ? $0 : nil }
         if style.effects.contains(.shake), let current {
             frame.shake = shake(current.line, time: time)
         }
@@ -244,7 +269,7 @@ enum ComposedStyle {
         // 霓虹描邊寬跟著這一句實際的 em（含字型字級與縮字；原型 `st.em × 0.06`）。原型另隨逐字縮放，app 在畫布座標描邊、不隨（既有差異）
         let stroke = style.effects.contains(.neonstroke) ? em * strokeRatio : 0
         let rowHeight = em * lineHeight
-        let baseY = size.height * baseYRatio - CGFloat(laid.rowWidths.count) * rowHeight / 2 + rowHeight * 0.8
+        let baseY = firstBaseline(size: size, rows: laid.rowWidths.count, em: em)
         let misregistered = style.effects.contains(.misreg)
         let reflected = style.effects.contains(.reflect)
         let papered = style.effects.contains(.ransom)
@@ -285,6 +310,29 @@ enum ComposedStyle {
         }
         if split { groupSplitCopies(from: firstGhost, in: &frame) }
         frame.ghosts += groupedByOpacityLevel(weeps)
+    }
+
+    /// 韓文行：同一份折行、統一字級，只有整行透明度（進場 `plainFade` 秒淡入、退場與殘留照 recipe 的退場進度、讓位照舊）；
+    /// 不產生逐字變形、殘影、錯位、描邊、倒影、粒子；光暈配方下放在光暈層外
+    private static func drawPlain(_ entry: VisibleLine, time: Double, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring, into frame: inout FramePlan) {
+        let personalities = linePersonalities(line: entry.line, index: entry.index, style: style).1.map(\.plain)
+        let fit = fitted(entry.line, personalities: personalities, size: size, style: style, measurer: measurer, index: entry.index)
+        let alpha = FXEasing.clamp01(FXEasing.clamp01((time - entry.line.start) / plainFade) * (1 - entry.exit) * (entry.trail ?? 1) * entry.yield)
+        guard alpha > 0 else { return }
+        let rowHeight = fit.em * lineHeight
+        let baseY = firstBaseline(size: size, rows: fit.laid.rowWidths.count, em: fit.em)
+        let ascent = measurer.ascent(face: style.face, fontSize: fit.em)
+        let glyphs = fit.laid.glyphs.map { glyph in
+            GlyphDraw(
+                text: glyph.character, face: style.face, fontSize: fit.em,
+                origin: CGPoint(
+                    x: (size.width - fit.laid.rowWidths[glyph.row]) / 2 + glyph.x + (glyph.width - glyph.advance) / 2,
+                    y: baseY + rowHeight * CGFloat(glyph.row) - ascent
+                ),
+                rotation: 0, scaleX: 1, scaleY: 1, opacity: alpha, color: .fg, stroke: 0
+            )
+        }
+        if style.effects.contains(.glow) || style.effects.contains(.neonstroke) { frame.unlit += glyphs } else { frame.glyphs += glyphs }
     }
 
     /// 繪製端相鄰同色、同量化透明度才合成一次填色。暈開的副本同色但每字透明度可能不同（燭火閃爍讓每個字各自明滅），
@@ -405,46 +453,82 @@ enum ComposedStyle {
         }
     }
 
-    /// 以詞為單位貪婪折行（原型 `layout`）：字寬依個性字級量、每字加該字型的 spacing、詞間 0.3 em。
-    /// `breakLongWords`：比折行寬還寬的詞按字（Swift `Character`＝extended grapheme cluster）斷到多列，仍是同一個詞（同 wordIndex、同時間）——只在縮到下限仍放不下時用
+    /// 貪婪折行（原型 `layout`）：字寬依個性字級量、每字加該字型的 spacing、原文空白處加詞距 0.3 em。
+    /// 中日文字一字一個排版單位、之間不加詞距、可在字間斷行並守最小禁則（⑤ 計劃 §4.4，`CJKLineBreak`）；純英文與改動前相同。
+    /// `breakLongWords`：比折行寬還寬的非中日文詞按字（Swift `Character`＝extended grapheme cluster）斷到多列，仍是同一個詞（同 wordIndex、同時間）——只在縮到下限仍放不下時用
     private static func layout(
         _ line: TimedLine, personalities: [GlyphPersonality], em: CGFloat, maxWidth: CGFloat, face: FontFace, measurer: any TextMeasuring,
         breakLongWords: Bool = false
     ) -> LineLayout {
+        let items = laidCharacters(line, personalities: personalities, em: em, face: face, measurer: measurer)
+        let width = { (members: Range<Int>) in items[members].reduce(0) { $0 + $1.width } }
+        // 超寬的非中日文詞逐字斷開，第一個字標成「所在列已有字就換列」
+        let groups: [(members: Range<Int>, forcesNewRow: Bool)] = tokenGroups(items).flatMap { group -> [(members: Range<Int>, forcesNewRow: Bool)] in
+            guard breakLongWords, !items[group.lowerBound].isCJK, width(group) > maxWidth else { return [(group, false)] }
+            return group.map { ($0..<$0 + 1, $0 == group.lowerBound) }
+        }
+        let tokens = groups.map { group in
+            CJKLineBreak.Token(
+                width: width(group.members), gapBefore: items[group.members.lowerBound].spaceBefore ? wordGap * em : 0,
+                leading: items[group.members.lowerBound].character, trailing: items[group.members.upperBound - 1].character,
+                forcesNewRow: group.forcesNewRow
+            )
+        }
+        let rowOf = CJKLineBreak.assignRows(tokens, maxWidth: maxWidth)
         var glyphs: [LaidGlyph] = []
-        var rowWidths: [CGFloat] = [0]
-        var words: [(x: CGFloat, width: CGFloat)] = []
-        let spacing = face.spacing
-        var brokeWords = false
-        var index = 0
-        for (wordIndex, word) in line.words.enumerated() {
-            let characters = word.text.filter { !$0.isWhitespace }.enumerated().map { offset, character in
-                display(character, isLineStart: wordIndex == 0 && offset == 0, face: face)
-            }
-            let widths = characters.enumerated().map { offset, character in
-                (measurer.advances(of: character, face: face, fontSize: em * CGFloat(personalities[index + offset].size)).last ?? 0) + spacing * em
-            }
-            let wordWidth = widths.reduce(0, +)
-            var row = rowWidths.count - 1
-            if rowWidths[row] > 0, rowWidths[row] + wordGap * em + wordWidth > maxWidth {
-                rowWidths.append(0)
-                row += 1
-            }
-            if rowWidths[row] > 0 { rowWidths[row] += wordGap * em }
-            words.append((rowWidths[row], wordWidth))
-            let breaks = breakLongWords && wordWidth > maxWidth
-            brokeWords = brokeWords || breaks
-            for (character, width) in zip(characters, widths) {
-                if breaks, rowWidths[row] > 0, rowWidths[row] + width > maxWidth {
-                    rowWidths.append(0)
-                    row += 1
-                }
-                glyphs.append(LaidGlyph(character: character, wordIndex: wordIndex, index: index, x: rowWidths[row], width: width, advance: width - spacing * em, row: row))
-                rowWidths[row] += width
-                index += 1
+        var rowWidths = [CGFloat](repeating: 0, count: (rowOf.max() ?? 0) + 1)
+        var words = [(x: CGFloat, width: CGFloat)](repeating: (0, 0), count: line.words.count)
+        var placedWords = Set<Int>()
+        for (offset, group) in groups.enumerated() {
+            let row = rowOf[offset]
+            if rowWidths[row] > 0 { rowWidths[row] += tokens[offset].gapBefore }
+            for itemIndex in group.members {
+                let item = items[itemIndex]
+                if placedWords.insert(item.wordIndex).inserted { words[item.wordIndex].x = rowWidths[row] }
+                words[item.wordIndex].width += item.width
+                glyphs.append(LaidGlyph(character: item.character, wordIndex: item.wordIndex, index: itemIndex, x: rowWidths[row], width: item.width, advance: item.width - face.spacing * em, row: row))
+                rowWidths[row] += item.width
             }
         }
-        return LineLayout(glyphs: glyphs, rowWidths: rowWidths, words: words, brokeWords: brokeWords)
+        return LineLayout(glyphs: glyphs, rowWidths: rowWidths, words: words, brokeWords: groups.contains { $0.forcesNewRow })
+    }
+
+    /// 排版前的一個字：顯示字、所屬的詞（時間歸屬）、含字距的寬
+    private struct LaidCharacter {
+        let character: String
+        let wordIndex: Int
+        let width: CGFloat
+        let isCJK: Bool
+        /// 原文在它前面有空白（詞距只加在這裡）
+        let spaceBefore: Bool
+    }
+
+    private static func laidCharacters(
+        _ line: TimedLine, personalities: [GlyphPersonality], em: CGFloat, face: FontFace, measurer: any TextMeasuring
+    ) -> [LaidCharacter] {
+        let spaced = line.text.contains(where: \.isWhitespace)
+        var items: [LaidCharacter] = []
+        for (wordIndex, word) in line.words.enumerated() {
+            for (offset, character) in word.text.filter({ !$0.isWhitespace }).enumerated() {
+                let shown = display(character, isLineStart: wordIndex == 0 && offset == 0, face: face)
+                let width = (measurer.advances(of: shown, face: face, fontSize: em * CGFloat(personalities[items.count].size)).last ?? 0) + face.spacing * em
+                items.append(LaidCharacter(
+                    character: shown, wordIndex: wordIndex, width: width, isCJK: CJKLineBreak.isCJK(character),
+                    spaceBefore: spaced && offset == 0 && wordIndex > 0
+                ))
+            }
+        }
+        return items
+    }
+
+    /// 字分成排版單位（規則見 `CJKLineBreak.startsToken`）：回傳各單位的字序號範圍
+    private static func tokenGroups(_ items: [LaidCharacter]) -> [Range<Int>] {
+        var starts: [Int] = []
+        for (index, item) in items.enumerated()
+        where CJKLineBreak.startsToken(isCJK: item.isCJK, previousIsCJK: index == 0 ? nil : items[index - 1].isCJK, spaceBefore: item.spaceBefore) {
+            starts.append(index)
+        }
+        return zip(starts, starts.dropFirst() + [items.count]).map { $0..<$1 }
     }
 
     private static func linePersonalities(line: TimedLine, index: Int, style: ResolvedStyle) -> (seed: UInt64, [GlyphPersonality]) {
@@ -525,15 +609,15 @@ enum ComposedStyle {
     private static func fits(_ laid: LineLayout, em: CGFloat, size: CGSize, style: ResolvedStyle, measurer: any TextMeasuring) -> Bool {
         let rows = CGFloat(laid.rowWidths.count)
         let rowHeight = em * lineHeight
-        let firstBaseline = size.height * baseYRatio - rows * rowHeight / 2 + rowHeight * 0.8
-        let lastBaseline = firstBaseline + rowHeight * (rows - 1)
+        let firstRowBaseline = firstBaseline(size: size, rows: laid.rowWidths.count, em: em)
+        let lastBaseline = firstRowBaseline + rowHeight * (rows - 1)
         let vary = style.personality.vary
         let largest = em * CGFloat(1 + vary.size * LinePersonalities.rawness) * holdScale
         // 字寬已含各字的 size 變化；呼吸的放大在旋轉前，一併算進去
         let widest = laid.glyphs.reduce(0) { max($0, $1.width) } * holdScale
         let reach = CGFloat(vary.dy + vary.scatter) * em + holdReach * em + holdJitter
             + widest * 0.5 * sin(CGFloat(vary.rotation) + holdRotation)
-        let top = firstBaseline - measurer.ascent(face: style.face, fontSize: largest) - reach
+        let top = firstRowBaseline - measurer.ascent(face: style.face, fontSize: largest) - reach
         let bottom = lastBaseline + measurer.descent(face: style.face, fontSize: largest) + reach
         let margin = size.height * fitMargin
         return top >= margin && bottom <= size.height - margin && laid.rowWidths.allSatisfy { $0 <= wrapWidth(size) }
@@ -693,5 +777,24 @@ private enum FitCache {
             if cache.count >= capacity { cache.removeAll(keepingCapacity: true) }
             cache[key] = ratio
         }
+    }
+}
+
+/// 一行怎麼畫（⑤ 中日韓字型計劃 §4.3）：韓文行無特效（使用者 2026-10-22）
+enum LineRenderPolicy: Equatable {
+    case composed, plain
+
+    init(_ line: TimedLine) {
+        self = line.script == .hangul ? .plain : .composed
+    }
+}
+
+extension GlyphPersonality {
+    /// 無特效的行：統一字級、無偏移與旋轉（時間不動）
+    var plain: GlyphPersonality {
+        GlyphPersonality(
+            wordIndex: wordIndex, start: start, duration: duration, enter: enter, hold: .still, exit: exit, size: 1, dy: 0, rotation: 0,
+            dir: dir, phase: phase, scatterX: 0, scatterY: 0, angle: 0, bend: 0, wordX: wordX, wordY: wordY, wordRotation: 0, lifetime: lifetime
+        )
     }
 }

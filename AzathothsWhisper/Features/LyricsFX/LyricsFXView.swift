@@ -328,8 +328,32 @@ struct LyricsFXView: View {
         .overlay(alignment: .topTrailing) {
             AccessibilityProbe(id: AccessibilityID.lyricsFXRecipeProbe, value: Self.recipeProbeValue(recipe, reduceMotion: motion == .reduced))
         }
+        .overlay(alignment: .bottomTrailing) {
+            AccessibilityProbe(
+                id: AccessibilityID.lyricsFXLineFaceProbe,
+                value: Self.lineFaceProbeValue(timeline: timeline, time: time, recipe: recipe, reduceMotion: motion == .reduced)
+            )
+        }
         #endif
     }
+
+    #if DEBUG
+    /// 目前這一行實際用的字型（⑤ 計劃 §7 E2E）：有 PostScript 名回它，否則回字型 id；沒有目前行回 `none`
+    static func lineFaceProbeValue(timeline: LyricsTimeline?, time: Double?, recipe: SessionRecipe, reduceMotion: Bool) -> String {
+        guard let timeline, let time,
+              let line = LyricsFXFrame.Moment(lines: timeline.lines, time: time, motion: .reduced, timing: LyricsFXFrame.Mono.timing).current
+        else {
+            return "none"
+        }
+        let face: FontFace
+        if !reduceMotion, case .composed(let composed) = recipe, let style = ResolvedStyle(composed) {
+            face = style.forLine(line, language: timeline.cjkLanguage).face
+        } else {
+            face = FontFace.lineFace(for: line.script, language: timeline.cjkLanguage, role: .monoCurrent, base: .displayMedium) ?? .displayMedium
+        }
+        return face.postScriptName ?? face.id
+    }
+    #endif
 
     /// 減少動態效果時畫的是 mono，探針跟著回 mono
     static func recipeProbeValue(_ recipe: SessionRecipe, reduceMotion: Bool) -> String {

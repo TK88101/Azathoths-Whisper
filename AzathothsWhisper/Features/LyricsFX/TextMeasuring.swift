@@ -30,6 +30,11 @@ final class FaceFonts {
     func font(_ face: FontFace, size: CGFloat) -> CTFont {
         let key = Key(face: face, size: size)
         if let font = fonts[key] { return font }
+        if let name = face.postScriptName {
+            let font = CTFontCreateWithName(name as CFString, size, nil)
+            fonts[key] = font
+            return font
+        }
         var attributes: [NSFontDescriptor.AttributeName: Any] = [.family: face.family]
         var traits: [NSFontDescriptor.TraitKey: Any] = [:]
         if let weight = face.weight { traits[.weight] = weight.nsWeight }

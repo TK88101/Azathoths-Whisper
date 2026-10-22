@@ -18,6 +18,8 @@ enum AccessibilityID {
     static let raisedStyleProbe = "lyricsflow-raised-style"
     /// DEBUG 限定的配方探針：value＝組合配方的字型元件 id，或 `mono`（B1 計劃 §5）
     static let lyricsFXRecipeProbe = "lyricsflow-lyricsfx-recipe"
+    /// DEBUG 限定的行字型探針：value＝目前行實際用的字型（PostScript 名或字型 id；⑤ 中日韓字型計劃 §7）
+    static let lyricsFXLineFaceProbe = "lyricsflow-lyricsfx-line-face"
     /// Cover Flow 層常駐（降下時只露把手），只看「存在」判斷不了升降
     static let coverFlowLayer = "lyricsflow-coverflow"
     /// DEBUG 限定的升降探針：value＝`raised`／`lowered`。容器（`children: .contain`）上的 value

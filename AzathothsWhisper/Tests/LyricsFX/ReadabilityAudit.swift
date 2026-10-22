@@ -184,7 +184,8 @@ enum ReadabilityAudit {
     static var fixtures: [(name: String, timeline: LyricsTimeline)] {
         [
             ("en", LyricsTimelineBuilder.build(lyrics: LyricsFXPreviewFixture.lyrics, duration: LyricsFXPreviewFixture.duration)!),
-            ("ja", LyricsTimelineBuilder.build(lyrics: "[00:02.00]夜明けの鐘が遠くで鳴る\n[00:06.00]川の上を灯りが流れていく\n[00:10.50]紙の舟は朝を待っている\n[00:15.00]", duration: 20)!),
+            // ⑤ 中日韓字型計劃 §4.5：加一行全形標點與英文混排（冬青黑體整行）
+            ("ja", LyricsTimelineBuilder.build(lyrics: "[00:02.00]夜明けの鐘が遠くで鳴る\n[00:06.00]川の上を灯りが流れていく\n[00:10.50]紙の舟は朝を待っている\n[00:15.00]「灯籠」が、静かに流れる。lanterns drift\n[00:19.50]", duration: 24)!),
             ("long", LyricsTimelineBuilder.build(lyrics: "[00:01.00]Lanterns drifting slowly over the silent river while the paper boats keep waiting for the dawn to come\n[00:09.00]Ash in the wind\n[00:12.00]", duration: 15)!),
         ]
     }

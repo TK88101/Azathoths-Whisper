@@ -3,9 +3,15 @@ import Testing
 
 @testable import AzathothsWhisper
 
-// B1 計劃 T2 DoD②：型別換形後，mono 的 plan 與換形前（e640d4b）錄下的 golden 逐欄相等
+// B1 計劃 T2 DoD②：型別換形後，mono 的 plan 與換形前（e640d4b）錄下的 golden 逐欄相等。
+// ⑤ 中日韓字型計劃：cjk 組的字型改為冬青黑體（目前行 W5、預覽 W4），「是不是目前行」改以角色比對，位置與字級不變
 @Suite("mono golden")
 struct MonoGoldenTests {
+    /// 「目前行」的字型：英文 Space Grotesk Medium，含中日韓字的行換成同角色的字型（依 CJKFaces 的對照表，不寫死名稱）
+    static let currentRowFaces = Set([FontFace.displayMedium] + [LineScript.cjk, .hangul].flatMap { script in
+        [CJKLanguage.japanese, .chinese].compactMap { FontFace.lineFace(for: script, language: $0, role: .monoCurrent, base: .displayMedium) }
+    })
+
     @Test func theMonoPlanIsUnchangedByTheNewTypes() throws {
         var actual: [MonoGolden.Row] = []
         for (name, timeline, size) in MonoGoldenFixtures.cases {
@@ -15,7 +21,7 @@ struct MonoGoldenTests {
                     actual += plan.glyphs.map { glyph in
                         MonoGolden.Row(
                             fixture: name, time: t, isFull: motion == .full, text: glyph.text, fontSize: glyph.fontSize,
-                            isMedium: glyph.face == .displayMedium, x: glyph.origin.x, y: glyph.origin.y,
+                            isMedium: Self.currentRowFaces.contains(glyph.face), x: glyph.origin.x, y: glyph.origin.y,
                             opacity: glyph.opacity, isPrimary: glyph.color == .fg
                         )
                     }
