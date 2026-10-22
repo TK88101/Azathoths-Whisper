@@ -75,6 +75,7 @@
 ### 4.5 效果相容性
 - `ReadabilityAudit` 加一份編造的日文歌詞（漢字、假名、混排英文、全形標點；不用真歌詞）。中文與日文共用同一套效果與字重，不再另加中文樣本（gate 時長，Codex R1' #12）。
 - 不合格處置（Codex R1 #10、R1' #11、R2）：不用 `Composer.forbiddenPairs`（它只表達整首的 enter×exit）。在 `EnterTemplate`、`ExitTemplate`、`FXEffect` 三個 enum 上各加 `supportsCJKLines`，**以窮舉 `switch` 寫，沒有預設值**——新增模板時編譯器強制明確宣告。初值全部 true（現有模板未經日文 gate 前的宣告，由 T5 驗證）；跑出不合格者改 false。中日文行遇到 false 的元件：進場固定退回 `fadeUp`、退場固定退回 `fade`、效果不畫；退回是固定對應，不重新抽籤，種子行為不變。`fadeUp`、`fade` 本身必須是 true（測試斷言）。
+- **實作中修正（2026-10-22，待 Phase 3 回送 Codex）**：讀得到的檢查（G2／G3 的 `ReadabilityAudit` 既有 `ja` 樣本＋G1 新增日文行）本來就跑過每個 profile 抽得到的全部元件；新增模板也會被同一道檢查自動量到，不會靜默宣稱相容。所以能力標記與固定退回**只在檢查出現不合格時才加**；全綠就不加（避免沒有呼叫者的機制）。
 - T5 的 DoD＝gate 全綠（含中日文樣本）。若需要關掉的元件，在本計劃記下清單並在真機驗證 #1 給使用者看改前改後；這不阻擋實作完成，但阻擋合併。
 
 ### 4.6 CoreText 實際字型驗證
