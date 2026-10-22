@@ -133,3 +133,31 @@ struct CJKFaceTests {
         #expect(glyphs.allSatisfy { $0.face == .displayMedium })
     }
 }
+
+// ⑤ 計劃 §7 E2E：DEBUG 限定的「目前行字型」探針值（UI 測試讀它，因為 Canvas 畫的字型讀不到）
+@Suite("CJK line face probe")
+struct CJKLineFaceProbeTests {
+    static let timeline = LyricsTimeline(lines: [
+        TimedLine(start: 1, end: 4, text: "Paper boats", isChorus: false),
+        TimedLine(start: 4, end: 8, text: "灯籠が川を流れる", isChorus: false),
+    ], source: .embeddedLRC, duration: 60)
+    static let composed = SessionRecipe.composed(ComposedRecipe(
+        font: "Bebas", backdrop: "void", enter: "lash", exit: "fade", fx1: "none", fx2: "none", palette: "ice", seed: 7,
+        profile: SongProfile(axes: [.aggression: 0.5], tags: [])
+    ))
+
+    @Test func aJapaneseLineReportsHiraginoInEitherStyle() {
+        #expect(LyricsFXView.lineFaceProbeValue(timeline: Self.timeline, time: 5, recipe: Self.composed, reduceMotion: false) == "HiraginoSans-W6")
+        #expect(LyricsFXView.lineFaceProbeValue(timeline: Self.timeline, time: 5, recipe: .mono, reduceMotion: false) == "HiraginoSans-W5")
+        #expect(LyricsFXView.lineFaceProbeValue(timeline: Self.timeline, time: 5, recipe: Self.composed, reduceMotion: true) == "HiraginoSans-W5")
+    }
+
+    @Test func anEnglishLineReportsTheStyleFace() {
+        #expect(LyricsFXView.lineFaceProbeValue(timeline: Self.timeline, time: 2, recipe: Self.composed, reduceMotion: false) == "Bebas")
+        #expect(LyricsFXView.lineFaceProbeValue(timeline: Self.timeline, time: 2, recipe: .mono, reduceMotion: false) == FontFace.displayMedium.id)
+    }
+
+    @Test func noCurrentLineReportsNothing() {
+        #expect(LyricsFXView.lineFaceProbeValue(timeline: Self.timeline, time: 0.5, recipe: Self.composed, reduceMotion: false) == "none")
+    }
+}

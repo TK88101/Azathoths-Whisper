@@ -156,4 +156,5 @@ R2：
 - /simcodex 2 輪：R1 修 P1——全大寫字型下「ß」→「SS」以 `Character(String)` 閃退（T3 引入，已加回歸測試並重現閃退後修）；切 token 規則收斂為 `CJKLineBreak.startsToken`；P2 數條。駁回：Altitude「韓文另開路徑」（計劃 R2 要求在建 plan 前分流）、「不複製 style」（複製讓縮字快取鍵自動含行字型）；Codex R1「CJKFaceRole 非 Hashable 編不過」與事實不符（無關聯值 enum 自動 Hashable，已編譯通過；改 switch 後不再適用）。R2：Codex P2「無空格長韓文行被當超長單字」——韓文音節改為可斷（同 CSS word-break: normal）；其「無空格韓文很常見」之說不實（韓文有分寫），pile 進場目錄已無。
 - 全量單元 1557 條綠（2973 s，略過已知 flaky 一條）；coverage_gate Services＋Infra 96.0 %（LyricsScript 100 %、CJKFaces 100 %、CJKLineBreak 92.4 %、ComposedStyle 95.7 %、MonoStyle 99.1 %）；no_playback_gate 通過；Scripts Python 333 條綠。
 - 遺留 P2：語言併進 `TimedLine`（現由 timeline 傳入）；測試共用配方 helper；`placedWords` 每次排版配置一個 Set；`plainFade` 與 `handover` 同值各自獨立（刻意）。
-- 待使用者在場：`LyricsFXUITests`；真機 #1 Yorushika 改前改後、#2 Coldplay X BTS〈My Universe〉韓文段。
+- 使用者在場（2026-10-22）：`LyricsFXUITests` 13／13（加日文前）→ 補 E2E 兩條（DEBUG 限定「行字型探針」，因 Canvas 字型讀不到 AX）後 15／15；真機 #1 Yorushika 改前（main 暫存建置）改後依序看：「改後的好」，字間斷行（例：「投／げ捨てて」）接受；#2〈My Universe〉英文行照原效果、韓文行只淡入淡出、交接「不閃 不跳 沒問題」。
+- 真機中途事故：同時開兩個簽名不同的 Debug 版 → 鑰匙圈授權框輪流彈；改用 `AZW_UNIT_TEST_HOST=1` 會連 Music 都換成替身（讀不到歌）→ 改為一次只開一個版本。
