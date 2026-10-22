@@ -145,3 +145,15 @@ R2：
 | 能力標記預設 true 會靜默宣稱相容 | 採納 | 窮舉 switch、無預設 |
 | 曲風標籤注入路徑未定 | 修改 | 不注入，只看歌詞；R3 Codex 同意，並指出 T1 殘留舊寫法（已修） |
 | 切向量後需重跑基準 | 採納 | §7 |
+
+## 10. 實作記錄（2026-10-22，未在真機驗證）
+- T1 紅（型別不存在）→ 綠 19 條；`JapaneseText` 改由 `LyricsScript` 推出，語意不變。
+- T2 紅 → 綠：CoreText 實排驗證代表字集全為指定 PostScript 字型；素面 golden 改以角色比對（位置字級不變）。實測現況：英文環境下日文漢字原被替代成蘋方-簡。
+- T3：先錄英文版面指紋（組合＋素面，真實 CoreText），改後兩個指紋完全相同；中日文 9 條紅 → 綠；LyricsFX 83 suite 535 條綠。
+- T4 紅（22 個問題）→ 綠。
+- T5：讀得到的檢查（G2／G3 的 ja 樣本補全形標點與英文混排、G1 新增日文行）全綠 → 計劃 §4.5 的能力標記不做（修正已記於 §4.5）。
+- 效能（-O＋AZW_PERF=1）：完全冷整幀 1.5–2.6 ms、整首 432 字每句首幀最壞 2.7 ms（門檻 8.3 ms），點陣快取到 16.7 MB 後 LRU 正常；測試行程第一次載入冬青黑體曾量到 12.2 ms（一次性字型載入，非點陣冷幀）。
+- /simcodex 2 輪：R1 修 P1——全大寫字型下「ß」→「SS」以 `Character(String)` 閃退（T3 引入，已加回歸測試並重現閃退後修）；切 token 規則收斂為 `CJKLineBreak.startsToken`；P2 數條。駁回：Altitude「韓文另開路徑」（計劃 R2 要求在建 plan 前分流）、「不複製 style」（複製讓縮字快取鍵自動含行字型）；Codex R1「CJKFaceRole 非 Hashable 編不過」與事實不符（無關聯值 enum 自動 Hashable，已編譯通過；改 switch 後不再適用）。R2：Codex P2「無空格長韓文行被當超長單字」——韓文音節改為可斷（同 CSS word-break: normal）；其「無空格韓文很常見」之說不實（韓文有分寫），pile 進場目錄已無。
+- 全量單元 1557 條綠（2973 s，略過已知 flaky 一條）；coverage_gate Services＋Infra 96.0 %（LyricsScript 100 %、CJKFaces 100 %、CJKLineBreak 92.4 %、ComposedStyle 95.7 %、MonoStyle 99.1 %）；no_playback_gate 通過；Scripts Python 333 條綠。
+- 遺留 P2：語言併進 `TimedLine`（現由 timeline 傳入）；測試共用配方 helper；`placedWords` 每次排版配置一個 Set；`plainFade` 與 `handover` 同值各自獨立（刻意）。
+- 待使用者在場：`LyricsFXUITests`；真機 #1 Yorushika 改前改後、#2 Coldplay X BTS〈My Universe〉韓文段。
