@@ -82,6 +82,13 @@ struct SourceGateTests {
         #expect(try await probe.value.statusCode == 200)
     }
 
+    /// 替身契約：`release()` 搶在被擱置的請求登記之前也不能漏放（上一條在全量平行下曾 300 s 逾時）
+    @Test(.timeLimit(.minutes(1))) func aReleaseThatArrivesBeforeTheHoldParksStillLetsItThrough() async throws {
+        let client = ScriptedHTTPClient([.hold(200)])
+        client.release()
+        #expect(try await client.send(Self.get()).statusCode == 200)
+    }
+
     @Test func retryAfterSecondsOn429KeepsTheSourceClosedThatLong() async throws {
         let clock = FakeTimingClock()
         let client = ScriptedHTTPClient([.respond(429, headers: ["retry-after": "120"]), .respond(200)])

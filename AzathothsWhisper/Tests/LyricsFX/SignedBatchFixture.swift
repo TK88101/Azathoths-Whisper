@@ -73,7 +73,7 @@ enum SignedBatchChecks {
         for band in file.bands {
             #expect(band.tags.allSatisfy { FXTag(rawValue: $0) != nil }, "\(band.name) 有 app 不認得的標籤")
             for name in [band.name] + band.aliases {
-                #expect(SongProfileResolver.resolve(artist: name, genre: nil) == .profile(band.profile), "\(name)")
+                #expect(SongProfileResolver.resolve(artist: name, genre: nil, lyrics: .text(isJapanese: false)) == .signedBand(band.profile), "\(name)")
             }
         }
     }

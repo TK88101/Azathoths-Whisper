@@ -232,6 +232,21 @@ enum LyricsFXCanvas {
             var layer = context
             layer.opacity = opacity
             layer.fill(Path(path), with: .color(color.color))
+        case .sparkles(let sparkles, let color, let opacity):
+            for sparkle in sparkles {
+                var star = context
+                star.opacity = opacity * sparkle.alpha
+                star.fill(fourPointStar(sparkle), with: .color(color.color))
+            }
+        case .semicircle(let center, let radius, let top, let bottom, let opacity):
+            let origin = CGPoint(x: center.x * bounds.width, y: center.y * bounds.height)
+            let reach = radius * bounds.height
+            let path = Path { $0.addArc(center: origin, radius: reach, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false) }
+            var layer = context
+            layer.opacity = opacity
+            layer.fill(path, with: .linearGradient(
+                Gradient(colors: [top.color, bottom.color]),
+                startPoint: CGPoint(x: origin.x, y: origin.y - reach), endPoint: origin))
         }
     }
 }
@@ -378,6 +393,23 @@ struct LyricsFXView: View {
 extension LyricsFXCanvas {
     static func gradient(_ stops: [GlowStop]) -> Gradient {
         Gradient(stops: stops.map { Gradient.Stop(color: $0.color.color.opacity($0.opacity), location: $0.location) })
+    }
+
+    /// 四芒星：上下左右四個尖、斜向收腰到半徑的 0.3（原型 `sparkles`）
+    static func fourPointStar(_ sparkle: Sparkle) -> Path {
+        let (x, y, r) = (sparkle.x, sparkle.y, sparkle.radius)
+        let waist = r * 0.3
+        return Path { path in
+            path.move(to: CGPoint(x: x, y: y - r))
+            path.addLine(to: CGPoint(x: x + waist, y: y - waist))
+            path.addLine(to: CGPoint(x: x + r, y: y))
+            path.addLine(to: CGPoint(x: x + waist, y: y + waist))
+            path.addLine(to: CGPoint(x: x, y: y + r))
+            path.addLine(to: CGPoint(x: x - waist, y: y + waist))
+            path.addLine(to: CGPoint(x: x - r, y: y))
+            path.addLine(to: CGPoint(x: x - waist, y: y - waist))
+            path.closeSubpath()
+        }
     }
 }
 

@@ -22,6 +22,8 @@ enum LyricsFXPreviewFixture {
     static let vectorReferenceVariable = "AZW_LYRICSFX_VECTOR_REFERENCE"
     /// "1"＝欄位放純文字（去掉時間標籤）：畫面走估算、角落出 `~`（C 段 E2E）
     static let plainLyricsVariable = "AZW_LYRICSFX_PREVIEW_PLAIN"
+    /// "1"＝改用以日文為主的預覽歌詞（⑥a J-Pop E2E；含假名的行 ≥ 3 成）
+    static let japaneseLyricsVariable = "AZW_LYRICSFX_PREVIEW_JAPANESE"
     /// 注入假的時間軸退路鏈（C 段 E2E，不連網）："found"＝回「找到」（時間＝本檔 LRC 的時間點）；"notFound"＝回「沒有」
     static let fakeTimingVariable = "AZW_TIMING_FAKE"
     static let duration: Double = 60
@@ -54,8 +56,22 @@ enum LyricsFXPreviewFixture {
     static let denseCurrent = "Lanterns over water, salt along the rope, gulls above the ferry, bells across the bay, and paper boats beside the pier tonight"
     static let denseNext = "Morning finds the harbor quiet and the tide returning slowly to the stones beneath the old pier under pale grey sky"
 
+    /// 8 行中 7 行日文（自編句子）
+    static let japaneseLyrics = """
+    [00:02.00]紙の舟が港の灯りを過ぎてゆく
+    [00:06.00]ロープに塩、夕暮れの鐘
+    [00:10.00]潮が戻るまでかもめを数える
+    [00:14.00]灯籠が川を流れてゆく夜
+    [00:18.00]Lanterns low, lanterns slow
+    [00:22.00]静かな港、静かな手
+    [00:26.00]朝が紙の舟を見つける
+    [00:30.00]渡し舟が名もない歌をうたう
+    [00:34.00]
+    """
+
     static func lyrics(in environment: [String: String]) -> String {
         if environment[plainLyricsVariable] == "1" { return plainLyrics }
+        if environment[japaneseLyricsVariable] == "1" { return japaneseLyrics }
         return environment[denseVariable] == "1" ? denseLyrics : lyrics
     }
 

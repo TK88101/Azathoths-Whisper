@@ -108,6 +108,13 @@ enum LyricsFXCatalog {
              .font(FontFace(id: "RockSalt", family: "Rock Salt", weight: nil, sizeScale: 0.085 / 0.12))),
         make(.font, "ShadowsLight", [.warm: 0.45, .elegance: 0.4, .raw: 0.4, .theatrical: 0.45, .aggression: 0.3], [.indieemo, .emo, .emopop],
              .font(FontFace(id: "ShadowsLight", family: "Shadows Into Light", weight: nil))),
+        // ⑥a J-Pop（docs/plans/2026-10-23-lyrics-fx-jpop.md §4.3）：每個元件只帶一個變體的私有標籤；日文行一律冬青黑體，這裡只管拉丁字
+        make(.font, "jpKiraLilita", [.bounce: 0.8, .bright: 0.85, .warm: 0.65], [.jpopKira],
+             .font(FontFace(id: "Lilita", family: "Lilita One", weight: nil))),
+        make(.font, "jpCityArchivo", [.elegance: 0.6, .bright: 0.7, .cold: 0.35], [.jpopCity],
+             .font(FontFace(id: "Archivo", family: "Archivo Black", weight: nil))),
+        make(.font, "jpBalladCormorant", [.elegance: 0.85, .speed: 0.15, .warm: 0.6], [.jpopBallad],
+             .font(FontFace(id: "CormorantIt", family: "Cormorant Garamond", weight: .semibold, italic: true))),
     ]
 
     // composer.js:36-40,43
@@ -164,6 +171,10 @@ enum LyricsFXCatalog {
         // B2 批 4（emo 群；原型 composer.js 的 B2 批 4 段）。標籤只收本批私有的（emo／posthardcore／indieemo／emopop）
         make(.backdrop, "bluehour", [.cold: 0.55, .elegance: 0.6, .bright: 0.4, .speed: 0.15], [.indieemo, .emo],
              .backdrop(.bluehour)),
+        // ⑥a J-Pop
+        make(.backdrop, "jpKiraSparkle", [.bright: 0.9, .bounce: 0.8], [.jpopKira], .backdrop(.sparkle)),
+        make(.backdrop, "jpCityNeon", [.bright: 0.7, .elegance: 0.6, .theatrical: 0.55], [.jpopCity], .backdrop(.cityNeon)),
+        make(.backdrop, "jpBalladPaper", [.elegance: 0.8, .warm: 0.6, .speed: 0.15], [.jpopBallad], .backdrop(.paper)),
     ]
 
     // composer.js:55,57-61,64。淡入型（condense、smoke、rise）的時長依 P12 縮短 40%（使用者 2026-10-06：「漸入漸出稍長，字發虛」）
@@ -222,6 +233,14 @@ enum LyricsFXCatalog {
              .enter(EnterSpec(weights: [(.fling, 3), (.stamp, 2), (.slant, 1)], duration: 0.12...0.26))),
         make(.enter, "scrawl", [.raw: 0.6, .speed: 0.6, .theatrical: 0.5, .aggression: 0.5], [.emo, .posthardcore],
              .enter(EnterSpec(weights: [(.type, 3), (.slant, 2), (.fadeUp, 1)], duration: 0.1...0.24))),
+        // ⑥a J-Pop：原型 jpop 三變體的 enter。ballad 是淡入型，時長依 P12 縮 40%（原型 0.8–1.4）
+        make(.enter, "jpKiraPop", [.bounce: 0.85, .speed: 0.65], [.jpopKira],
+             .enter(EnterSpec(weights: [(.pop, 2), (.fadeUp, 2), (.grow, 1)], duration: 0.25...0.5))),
+        // 原型是 slide 3；slide 從遠處滑入會橫越已到位的鄰字，使用者 2026-10-23 看並排比較選短距離的 sidle（不列 G3 豁免）
+        make(.enter, "jpCitySlide", [.speed: 0.5, .elegance: 0.6], [.jpopCity],
+             .enter(EnterSpec(weights: [(.sidle, 3), (.fadeUp, 2)], duration: 0.3...0.6))),
+        make(.enter, "jpBalladFade", [.elegance: 0.85, .speed: 0.15], [.jpopBallad],
+             .enter(EnterSpec(weights: [(.fadeUp, 3), (.smoke, 1)], duration: 0.48...0.84))),
     ]
 
     // composer.js:73-75,77
@@ -263,6 +282,11 @@ enum LyricsFXCatalog {
              .exit(ExitSpec(weights: [(.fall, 1), (.fade, 2)], duration: 0.8))),
         make(.exit, "wither", [.decay: 0.6, .theatrical: 0.5, .aggression: 0.4], [.emo],
              .exit(ExitSpec(weights: [(.shrink, 2), (.fall, 1), (.fade, 1)], duration: 0.6))),
+        // ⑥a J-Pop
+        make(.exit, "jpKiraUp", [.bounce: 0.6, .speed: 0.6], [.jpopKira], .exit(ExitSpec(weights: [(.up, 1)], duration: 0.5))),
+        make(.exit, "jpCitySlideOut", [.speed: 0.5, .elegance: 0.6], [.jpopCity], .exit(ExitSpec(weights: [(.slideOut, 1)], duration: 0.6))),
+        make(.exit, "jpBalladFadeOut", [.elegance: 0.85, .speed: 0.1], [.jpopBallad],
+             .exit(ExitSpec(weights: [(.fade, 1)], duration: 1.4, trail: true))),
     ]
 
     // composer.js:87,88,92,101
@@ -304,6 +328,10 @@ enum LyricsFXCatalog {
         // B2 批 4（emo 群；原型 composer.js 的 B2 批 4 段）。標籤只收本批私有的（emo／posthardcore／indieemo／emopop）
         make(.fx, "weep", [.theatrical: 0.7, .decay: 0.6, .elegance: 0.3, .raw: 0.4], [.emo],
              .fx(.weep)),
+        // ⑥a J-Pop：kira 的停留是彈跳與呼吸；city 的字帶光暈（代原型粉紅 shadowBlur）；ballad 只有共用的 none
+        make(.fx, "jpKiraBob", [.bounce: 0.85, .bright: 0.85], [.jpopKira], .fx(.bob)),
+        make(.fx, "jpKiraBreathe", [.bounce: 0.7, .elegance: 0.45], [.jpopKira], .fx(.breathe)),
+        make(.fx, "jpCityGlow", [.elegance: 0.65, .bright: 0.7, .theatrical: 0.55], [.jpopCity], .fx(.glow)),
     ]
 
     // composer.js:104-107,110,113
@@ -398,5 +426,12 @@ enum LyricsFXCatalog {
              req: [.theatrical: 0.7], .palette(FXPalette(bg: RGB(hex: 0x0A0A0B), fg: RGB(hex: 0xE6E6E6), acc: RGB(hex: 0xB9BDC4), dim: RGB(hex: 0x5F6166)))),
         make(.palette, "revenge", [.theatrical: 0.8, .aggression: 0.65, .decay: 0.5, .bright: 0.15], [.emo, .posthardcore],
              .palette(FXPalette(bg: RGB(hex: 0x0B0B0C), fg: RGB(hex: 0xF2F0EA), acc: RGB(hex: 0xC1121F), dim: RGB(hex: 0x6E6A66)))),
+        // ⑥a J-Pop：原型三變體的 bg／fg／a1；dim 取原型 a2（ballad 同）
+        make(.palette, "jpKira", [.bright: 0.9, .warm: 0.7], [.jpopKira],
+             .palette(FXPalette(bg: RGB(hex: 0xEAF6FF), fg: RGB(hex: 0x2E3A59), acc: RGB(hex: 0xFF7AB6), dim: RGB(hex: 0x6EC6FF)))),
+        make(.palette, "jpCity", [.bright: 0.7, .elegance: 0.65], [.jpopCity],
+             .palette(FXPalette(bg: RGB(hex: 0x1B1040), fg: RGB(hex: 0xFFF3E0), acc: RGB(hex: 0xFF6AA0), dim: RGB(hex: 0x4FD3FF)))),
+        make(.palette, "jpBallad", [.elegance: 0.85, .warm: 0.6], [.jpopBallad],
+             .palette(FXPalette(bg: RGB(hex: 0xF7F4EE), fg: RGB(hex: 0x3B3A44), acc: RGB(hex: 0xC96A7A), dim: RGB(hex: 0x8FA6C9)))),
     ]
 }

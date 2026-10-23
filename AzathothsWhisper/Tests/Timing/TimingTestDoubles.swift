@@ -48,6 +48,8 @@ final class ScriptedHTTPClient: HTTPClient, @unchecked Sendable {
     private var steps: [Step]
     private var sent: [HTTPRequest] = []
     private var holds: [CheckedContinuation<Void, Never>] = []
+    /// 放行後一直放行：請求記帳（`requests`）與登記擱置之間有空窗，`release()` 落在空窗內也不能漏放
+    private var released = false
 
     init(_ steps: [Step]) { self.steps = steps }
 
@@ -60,6 +62,7 @@ final class ScriptedHTTPClient: HTTPClient, @unchecked Sendable {
         lock.lock()
         let waiting = holds
         holds = []
+        released = true
         lock.unlock()
         waiting.forEach { $0.resume() }
     }
@@ -76,7 +79,12 @@ final class ScriptedHTTPClient: HTTPClient, @unchecked Sendable {
             throw error
         case .hold(let status):
             await withCheckedContinuation { continuation in
-                lock.withLock { holds.append(continuation) }
+                let parked = lock.withLock {
+                    if released { return false }
+                    holds.append(continuation)
+                    return true
+                }
+                if !parked { continuation.resume() }
             }
             return HTTPResponse(statusCode: status, body: "")
         }

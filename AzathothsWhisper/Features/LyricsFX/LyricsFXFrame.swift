@@ -153,6 +153,18 @@ enum LayerDraw: Equatable, Sendable {
     case hairlines(spacing: CGFloat, color: RGB, opacity: Double)
     /// 一批同色的實心矩形（畫布座標）：速度線、影印橫紋、棋盤格
     case rects([CGRect], RGB, opacity: Double)
+    /// 四芒星（⑥a きらきら）：畫布座標（點），每顆自帶透明度
+    case sparkles([Sparkle], RGB, opacity: Double)
+    /// 上半圓、由上到下兩色漸層（⑥a シティポップ的夕陽）：中心以畫布寬、高為單位，半徑以畫布高為單位
+    case semicircle(center: CGPoint, radius: CGFloat, top: RGB, bottom: RGB, opacity: Double)
+}
+
+/// 一顆四芒星：中心與半徑是畫布座標（點）
+struct Sparkle: Equatable, Sendable {
+    let x: CGFloat
+    let y: CGFloat
+    let radius: CGFloat
+    let alpha: Double
 }
 
 /// 影印負片時字後的一塊色塊（原型 html:1040）

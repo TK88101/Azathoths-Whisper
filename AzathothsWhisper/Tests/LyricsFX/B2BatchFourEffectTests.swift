@@ -88,7 +88,7 @@ struct B2BatchFourEffectTests {
 struct B2BatchFourContrastTests {
     /// 同一團連抽 400 次（帶「排除上一次」）用到的所有元件
     private func drawn(_ artist: String) -> Set<String> {
-        guard case .profile(let profile) = SongProfileResolver.resolve(artist: artist, genre: nil) else {
+        guard let profile = SongProfileResolver.resolve(artist: artist, genre: nil, lyrics: .text(isJapanese: false)).profile else {
             Issue.record("\(artist) 不在覆寫表"); return []
         }
         var ids: Set<String> = []
@@ -120,6 +120,6 @@ struct B2BatchFourContrastTests {
 
     /// 合作寫法使用者沒指定歸屬：不套兩團的任何一個（對照檔 `unassigned`）
     @Test func theCollaborationSpellingStaysUnassigned() {
-        #expect(SongProfileResolver.resolve(artist: "The Used & My Chemical Romance", genre: "Alternative") == .mono)
+        #expect(SongProfileResolver.resolve(artist: "The Used & My Chemical Romance", genre: "Alternative", lyrics: .text(isJapanese: false)) == .noMatch)
     }
 }

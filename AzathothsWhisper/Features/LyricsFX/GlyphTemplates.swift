@@ -63,6 +63,12 @@ enum EnterTemplate: String, CaseIterable, Sendable {
     case tumble
     /// B2 批 3（Nu-metal）
     case drop, type, flip
+    /// ⑥a J-Pop シティポップ（使用者 2026-10-23 看並排比較選定）：只從旁邊 0.3 字寬處水平挪進來，
+    /// 不像 slide 從遠處橫越已到位的鄰字（讀得到的檢查 G3：slide 0.64 s → sidle 0.20 s）
+    case sidle
+
+    /// sidle 的起點距離（字寬倍數）
+    static let sidleReach: CGFloat = 0.3
 
     func transform(progress p: Double, context c: GlyphContext) -> GlyphTransform {
         let em = Double(c.em)
@@ -134,6 +140,9 @@ enum EnterTemplate: String, CaseIterable, Sendable {
             return GlyphTransform(scale: CGFloat(1.08 - 0.08 * FXEasing.outCubic(p)))
         case .flip:
             return GlyphTransform(scaleY: CGFloat(max(0.01, FXEasing.outCubic(p))))
+        case .sidle:
+            // 方向逐字；前半段淡入，看得見時已離落點不遠
+            return GlyphTransform(dx: CGFloat(1 - FXEasing.outCubic(p)) * c.em * Self.sidleReach * c.dir, alpha: min(1, p * 2))
         }
     }
 }

@@ -19,12 +19,16 @@ enum FXTag: String, CaseIterable, Sendable {
     /// B2 批 4（emo 群）：**本批私有**標籤（計劃 §2.2 E1）。`posthardcore`、`emopop` 看起來像一般曲風名，但不是公共曲風標籤——
     /// 日後的團要重用，得重走連帶預檢、簽字與基線流程
     case emo, posthardcore, indieemo, emopop
+    /// ⑥a J-Pop：三變體各一個私有標籤；J-Pop 元件只帶其中一個（計劃 §4.2、§4.3）
+    case jpopKira, jpopCity, jpopBallad
 
     /// Nu 系標籤：任何一個都不得與 `industrial` 掛在同一個元件上（P10；B2 批 3 計劃 §2.4 N1）。新立的 Nu 系子標籤要加進來
     static let nuFamily: Set<FXTag> = [.nu, .altmetal, .rapmetal, .cybermetal, .horrormetal, .gothmetal, .latinmetal]
 
     /// B2 批 4（emo 群）的私有標籤：本批新團只帶這些、新元件也只帶這些，既有團一個都不帶（B2 批 4 計劃 §2.2 E1）。
     static let emoFamily: Set<FXTag> = [.emo, .posthardcore, .indieemo, .emopop]
+
+    static let jpopFamily: Set<FXTag> = [.jpopKira, .jpopCity, .jpopBallad]
 }
 
 /// 歌曲目標值
@@ -33,14 +37,54 @@ struct SongProfile: Equatable, Sendable {
     let tags: Set<FXTag>
 }
 
-/// `pending`＝genre 還沒讀到（會等）；`mono`＝讀到了但無已知關鍵字（定論）
-enum ProfileResolution: Equatable, Sendable {
-    case pending
-    case mono
-    case profile(SongProfile)
+/// 歌詞這一層的證據（⑥a J-Pop 計劃 §4.1）：`unknown`＝還沒讀到（含讀取失敗）；空白歌詞判不成日文歌，同 `.text(isJapanese: false)`
+enum LyricsEvidence: Equatable, Sendable {
+    case unknown
+    case text(isJapanese: Bool)
+
+    /// 日文＝`LyricsScript.isJapaneseSong`（含假名的行 ≥ 3 成）
+    static func of(_ lyrics: String?) -> LyricsEvidence {
+        lyrics.map { .text(isJapanese: LyricsScript.isJapaneseSong($0)) } ?? .unknown
+    }
 }
 
-/// 歌曲目標值的來源（B1 計劃 §3.5）：樂團覆寫表 → genre 關鍵字合成
+/// 定論的來源；VM 只在來源改變時重組已定格的配方（⑥a 計劃 §4.4）
+enum ProfileSource: Equatable, Sendable {
+    case signedBand, jpopPolicy, genreRow, noMatch
+
+    /// 由歌詞內容決定的來源：寫入或改詞可能讓它出現或消失
+    var dependsOnLyrics: Bool { self == .jpopPolicy }
+}
+
+/// `pending`＝還在等 genre 或歌詞（會等，沒有來源）；其餘是定論，各自帶來源
+enum ProfileResolution: Equatable, Sendable {
+    case pending
+    case signedBand(SongProfile)
+    /// 日文歌一律 J-Pop（使用者 2026-10-22）；變體由 VM 選（`JPopPolicy`）
+    case jpop
+    case genreRow(SongProfile)
+    /// 讀到了 genre 但無已知關鍵字：素面
+    case noMatch
+
+    var source: ProfileSource? {
+        switch self {
+        case .pending: nil
+        case .signedBand: .signedBand
+        case .jpop: .jpopPolicy
+        case .genreRow: .genreRow
+        case .noMatch: .noMatch
+        }
+    }
+
+    var profile: SongProfile? {
+        switch self {
+        case .signedBand(let profile), .genreRow(let profile): profile
+        case .pending, .jpop, .noMatch: nil
+        }
+    }
+}
+
+/// 歌曲目標值的來源（B1 計劃 §3.5；⑥a 計劃 §4.1）：樂團覆寫表 → 歌詞未知＝pending → 日文詞＝J-Pop → genre 關鍵字合成
 enum SongProfileResolver {
     struct KeywordRow: Sendable {
         let keywords: [String]
@@ -143,10 +187,12 @@ enum SongProfileResolver {
     /// 硬軸取 max：一個「狠」的曲風不得被溫柔的曲風稀釋（P11）；其餘軟軸取平均
     static let hardAxes: Set<FXAxis> = [.raw, .aggression, .speed, .decay, .cold, .theatrical]
 
-    static func resolve(artist: String, genre: String?) -> ProfileResolution {
-        if let profile = overrides[normalizedArtist(artist)] { return .profile(profile) }
+    static func resolve(artist: String, genre: String?, lyrics: LyricsEvidence) -> ProfileResolution {
+        if let profile = overrides[normalizedArtist(artist)] { return .signedBand(profile) }
+        if lyrics == .unknown { return .pending }
+        if lyrics == .text(isJapanese: true) { return .jpop }
         guard let genre else { return .pending }
-        return compose(genre: genre, rows: keywordRows).map(ProfileResolution.profile) ?? .mono
+        return compose(genre: genre, rows: keywordRows).map(ProfileResolution.genreRow) ?? .noMatch
     }
 
     /// genre 命中的所有關鍵字列合成一個目標值；無命中＝nil

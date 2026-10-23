@@ -80,7 +80,35 @@ enum ComposedBackdrop {
         // B2 批 4（原型 html 組合模式 draw：藍調時刻；只用光與質感。雨絲 2026-10-14 使用者在 T7 撤掉）
         case .bluehour:
             return [band(CGPoint(x: 0.5, y: 0.3), CGPoint(x: 0.5, y: 1), 0x3C6EAA, from: 0, to: 0.34), glow(0.22, 0.2, radius: 0.7 * aspect(size), 0xFFD6A0, 0.08)]
+        // ⑥a J-Pop（原型 lyrics-fx-preview.html:747-749 jpop 家族 draw）
+        case .sparkle:
+            return [band(CGPoint(x: 0.5, y: 0), CGPoint(x: 0.5, y: 1), 0xFFFFFF, from: 0.2, to: 0), .sparkles(sparkles(size: size, time: time), palette.acc, opacity: 1)]
+        case .cityNeon:
+            let lines = neonLines(size: size)
+            return [band(CGPoint(x: 0.5, y: 0.55), CGPoint(x: 0.5, y: 1), 0xFF6AA0, from: 0, to: 0.35),
+                    .rects(lines.pink, RGB(hex: 0xFF6AA0), opacity: 0.5), .rects(lines.cyan, RGB(hex: 0x4FD3FF), opacity: 0.5),
+                    .semicircle(center: CGPoint(x: 0.5, y: 0.55), radius: 0.28, top: RGB(hex: 0xFFB347), bottom: RGB(hex: 0xFF6AA0), opacity: 0.35)]
         }
+    }
+
+    /// きらきら的星數（原型 `40*(0.4+density)`，density 0.6）
+    static let sparkleCount = 40
+
+    /// 四芒星：位置與大小由固定種子決定、不移動，透明度依時間正弦閃爍（各自的相位）
+    static func sparkles(size: CGSize, time: Double) -> [Sparkle] {
+        var random = SplitMix64(seed: 47)
+        return (0..<sparkleCount).map { _ in
+            let x = CGFloat(random.unit()) * size.width, y = CGFloat(random.unit()) * size.height
+            let radius = CGFloat(3 + random.unit() * 4)
+            let phase = random.unit() * 2 * .pi
+            return Sparkle(x: x, y: y, radius: radius, alpha: 0.35 + 0.65 * (0.5 + 0.5 * sin(time * 2 + phase)))
+        }
+    }
+
+    /// シティポップ的 6 條霓虹橫線：y＝H·(0.62＋0.06i)、高 2 點；偶數條粉紅、奇數條青色（`.rects` 一層一色）
+    static func neonLines(size: CGSize) -> (pink: [CGRect], cyan: [CGRect]) {
+        let rects = (0..<6).map { CGRect(x: 0, y: size.height * (0.62 + 0.06 * CGFloat($0)), width: size.width, height: 2) }
+        return (rects.enumerated().filter { $0.offset.isMultiple(of: 2) }.map(\.element), rects.enumerated().filter { !$0.offset.isMultiple(of: 2) }.map(\.element))
     }
 
     /// 網格的格距（點）與漂移速度（點／秒）：原型 `gridBG(…, 36, 0.5)`
@@ -216,7 +244,7 @@ enum ComposedBackdrop {
             return [.grain(opacity: 0.05, frame: grainFrame, overlay: false)]
         case .xerox:
             return [.grain(opacity: 0.16, frame: grainFrame, overlay: false)]
-        case .halftone, .sunset, .flat, .checker, .skyGrad:
+        case .halftone, .sunset, .flat, .checker, .skyGrad, .sparkle, .cityNeon:
             return []
         }
     }
