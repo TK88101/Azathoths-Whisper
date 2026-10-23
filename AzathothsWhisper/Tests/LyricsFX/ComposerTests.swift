@@ -3,7 +3,7 @@ import Testing
 @testable import AzathothsWhisper
 
 private func band(_ name: String) throws -> SongProfile {
-    guard case .profile(let profile) = SongProfileResolver.resolve(artist: name, genre: nil) else {
+    guard let profile = SongProfileResolver.resolve(artist: name, genre: nil, lyrics: .text(isJapanese: false)).profile else {
         Issue.record("覆寫表沒有 \(name)")
         throw CancellationError()
     }
@@ -153,7 +153,7 @@ struct ComposerTests {
 @Suite("Composer sampling")
 struct ComposerSamplingTests {
     private func black() throws -> SongProfile {
-        guard case .profile(let profile) = SongProfileResolver.resolve(artist: "x", genre: "Black Metal") else { throw CancellationError() }
+        guard let profile = SongProfileResolver.resolve(artist: "x", genre: "Black Metal", lyrics: .text(isJapanese: false)).profile else { throw CancellationError() }
         return profile
     }
 

@@ -17,7 +17,8 @@ enum Composer {
         for (axis, threshold) in component.forbid {
             if let value = profile.axes[axis], value >= threshold { return 0 }
         }
-        let shared = component.vector.compactMap { axis, value in profile.axes[axis].map { value - $0 } }
+        // 依固定軸序加總：字典走訪順序每次啟動都不同，數學上相等的貼合度會差在最後一位、讓同分排序翻轉（⑥a 計劃 T0 發現）
+        let shared = FXAxis.allCases.compactMap { axis in component.vector[axis].flatMap { value in profile.axes[axis].map { value - $0 } } }
         guard !shared.isEmpty else { return neutralFit }
         let squared = shared.reduce(0) { $0 + $1 * $1 }
         return exp(-squared / (2 * sigma * sigma * Double(shared.count)))

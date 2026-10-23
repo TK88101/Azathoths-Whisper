@@ -24,7 +24,7 @@ struct LyricsFXProbeRenderTests {
 
     /// 同一首歌連播：每次排除上一次的字型（與 VM 的字型歷史同一條規則）
     static func recipe(genre: String, nonce: UInt64, avoiding previous: ComposedRecipe?) throws -> ComposedRecipe {
-        guard case .profile(let profile) = SongProfileResolver.resolve(artist: "Paper Lantern Ensemble", genre: genre),
+        guard let profile = SongProfileResolver.resolve(artist: "Paper Lantern Ensemble", genre: genre, lyrics: .text(isJapanese: false)).profile,
               case .composed(let recipe) = Composer.compose(profile: profile, seed: FXHash.fnv1a64("probe") ^ nonce, avoiding: previous) else {
             Issue.record("\(genre) 沒有組合配方")
             throw CancellationError()

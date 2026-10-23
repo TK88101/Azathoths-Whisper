@@ -209,6 +209,15 @@ final class LyricsFXUITests: AppUITestCase {
         waitForLineFace("HiraginoSans-W6")
     }
 
+    /// I-65：不在樂團表的日文歌一律 J-Pop——曲風寫 Black Metal 也不走黑金屬，字型是 J-Pop 三變體之一
+    func testAJapaneseSongByAnUnknownArtistGetsJPop() {
+        start(.lyricsFX, extra: [
+            Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.genreVariable: "Black Metal", LyricsFXPreviewFixture.japaneseLyricsVariable: "1",
+        ])
+        waitForStyle("lyricsFX")
+        waitForRecipe({ ["jpKiraLilita", "jpCityArchivo", "jpBalladCormorant"].contains($0) }, "日文歌應抽到 J-Pop 字型，不是黑金屬")
+    }
+
     /// I-21：減少動態效果一律 mono
     func testReducedMotionFallsBackToMono() {
         start(.lyricsFX, extra: [

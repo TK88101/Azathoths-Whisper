@@ -56,6 +56,24 @@ enum LyricsScript {
 
     /// 只看歌詞：有任一假名＝日文，否則中文（全漢字日文歌判成中文是已知限制，計劃 §4.1）
     static func language(of texts: [String]) -> CJKLanguage {
-        texts.contains { $0.unicodeScalars.contains(where: isKana) } ? .japanese : .chinese
+        texts.contains(where: containsKana) ? .japanese : .chinese
     }
+
+    /// 有任一假名（選中日文字型用：只要有一個假名，CJK 行就用冬青黑體）
+    static func containsKana(_ text: String) -> Bool {
+        text.unicodeScalars.contains(where: isKana)
+    }
+
+    /// 日文歌（J-Pop 政策用，⑥a 計劃 §4.1）：畫面上的歌詞行中，有字母的行裡含假名的占 ≥ 3 成。
+    /// 行集合與畫面一致——LRC 走 `LRCParser`（略過 ID 標籤、剝時間標籤），否則走 `LyricsLines`（略過段落標題）；
+    /// 只有漢字的行進分母不進分子（全漢字日文歌判不出，同 ⑤ 已知限制）；只有符號、數字的行不算
+    static func isJapaneseSong(_ lyrics: String) -> Bool {
+        let texts = LRCParser.isLRC(lyrics) ? LRCParser.parse(lyrics).map(\.text) : LyricsLines.lyricTexts(lyrics)
+        let lettered = texts.filter { $0.contains(where: \.isLetter) }
+        let kana = lettered.filter(containsKana).count
+        return !lettered.isEmpty && kana * 10 >= lettered.count * japaneseLineTenths
+    }
+
+    /// 日文歌門檻：含假名的行至少 3／10（曲庫 2026-10-23：英文歌夾日文最多 0.19、日文歌最少 0.44）
+    static let japaneseLineTenths = 3
 }

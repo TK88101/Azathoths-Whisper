@@ -54,8 +54,8 @@ final class LyricsFXViewModel {
     /// 已為哪一份詞發過查找：顯示切換、曲長晚到（revision +1 但詞沒變）都不重發。鍵與 resolver 相同＝(pid, 指紋)
     @ObservationIgnored private var requestedTiming: (persistentID: String, fingerprint: LyricsFingerprint)?
     @ObservationIgnored private var sessionNonce: UInt64 = 0
-    /// recipe 已定格（得到 profile 或確定是 mono）：之後同一 session 內不再重組
-    @ObservationIgnored private var isRecipeSettled = false
+    /// recipe 定格時的判定來源；nil＝還沒定格。同一 session 內只在來源改變時重組（⑥a 計劃 §4.4）
+    @ObservationIgnored private var settledSource: ProfileSource?
 
     /// 同一首歌上一次的配方：下次每槽排除它（生產＝`StoredRecipeHistory`，由 AppModel 注入）
     @ObservationIgnored private let recipeHistory: any LyricsFXRecipeHistory
@@ -92,6 +92,7 @@ final class LyricsFXViewModel {
         let new = LyricsFingerprint.of(text)
         guard new != fingerprint else { return }
         apply(persistentID: persistentID, lyrics: text)
+        reconcileRecipe()
     }
 
     /// 同一首的 genre／曲長後來才讀到或被改了（A2 計劃 §3.0）：時間軸與風格隨之重建，revision +1
@@ -99,7 +100,7 @@ final class LyricsFXViewModel {
         guard let identity, identity.persistentID == persistentID, metadata != self.metadata else { return }
         self.metadata = metadata
         apply(persistentID: persistentID, lyrics: lyrics)
-        settleRecipeIfNeeded()
+        reconcileRecipe()
     }
 
     /// 可見性由 A2 的切換接上；不可見或沒有詞時時鐘不讀 Music
@@ -140,7 +141,7 @@ final class LyricsFXViewModel {
         guard !isSameSnapshot else { return }
         positionClock.setTrack(track.persistentID.isEmpty ? nil : track.persistentID)
         apply(persistentID: track.persistentID, lyrics: lyrics)
-        settleRecipeIfNeeded()
+        reconcileRecipe()
     }
 
     private func apply(persistentID: String, lyrics: String?) {
@@ -199,6 +200,7 @@ final class LyricsFXViewModel {
         statusText = text
         sessionSignature = nil
         recipe = .mono
+        settledSource = nil
         positionClock.setTrack(nil)
         updateClock()
     }
@@ -209,32 +211,42 @@ final class LyricsFXViewModel {
         sessionArtist = track.artist
         sessionTitle = track.title
         sessionNonce = nonceSource.next()
-        isRecipeSettled = false
+        settledSource = nil
         recipe = .mono
     }
 
-    /// 第一次得到可用的目標值時組一次並定格；genre 還沒讀到（pending）就先維持 mono 等下次
-    private func settleRecipeIfNeeded() {
-        guard !isRecipeSettled, let signature = sessionSignature else { return }
-        switch SongProfileResolver.resolve(artist: sessionArtist, genre: metadata.genre) {
-        case .pending:
-            return
-        case .mono:
+    /// 第一次得到定論時組一次並定格；之後同一 session 只在「進出 J-Pop」時重組——那是唯一由歌詞決定的來源
+    /// （例：缺詞歌依曲風定格後寫入日文詞）。曲風換了、詞改了但仍同一邊，不重組，維持 B1 §3.7 的定格。
+    /// pending（genre 或歌詞還沒讀到）先維持現狀等下次
+    private func reconcileRecipe() {
+        guard let signature = sessionSignature else { return }
+        let resolution = SongProfileResolver.resolve(artist: sessionArtist, genre: metadata.genre, lyrics: LyricsEvidence.of(lyrics))
+        guard let source = resolution.source, Self.shouldCompose(settled: settledSource, now: source) else { return }
+        let seed = FXHash.fnv1a64(signature) ^ sessionNonce ^ Self.recipeSchemaVersion
+        let previous = recipeHistory.lastPicks(forTrack: signature)
+        switch resolution {
+        case .pending, .noMatch:
             recipe = .mono
-        case .profile(let profile):
+        case .jpop:
+            let variant = JPopPolicy.variant(seed: FXHash.fnv1a64("jpop|\(signature)") ^ sessionNonce, previous: previous.flatMap { JPopVariant(paletteID: $0.palette) })
+            recipe = Composer.compose(profile: variant.profile, seed: seed, catalog: JPopPolicy.catalog(variant), avoiding: previous?.asPrevious)
+        case .signedBand(let profile), .genreRow(let profile):
             #if DEBUG
             if let forced = recipeOverride?(profile) {
                 recipe = .composed(forced)
                 break
             }
             #endif
-            recipe = Composer.compose(
-                profile: profile, seed: FXHash.fnv1a64(signature) ^ sessionNonce ^ Self.recipeSchemaVersion,
-                avoiding: recipeHistory.lastPicks(forTrack: signature)?.asPrevious
-            )
+            recipe = Composer.compose(profile: profile, seed: seed, avoiding: previous?.asPrevious)
         }
         if case .composed(let composed) = recipe { recipeHistory.record(RecipePicks(composed), forTrack: signature) }
-        isRecipeSettled = true
+        settledSource = source
+    }
+
+    /// 還沒定格就組；已定格只在來源跨過 J-Pop 的邊界時重組
+    static func shouldCompose(settled: ProfileSource?, now: ProfileSource) -> Bool {
+        guard let settled else { return true }
+        return settled != now && (settled == .jpopPolicy || now == .jpopPolicy)
     }
 
     /// 目錄或抽樣規則改版時加 1：同 nonce 也抽出不同配方

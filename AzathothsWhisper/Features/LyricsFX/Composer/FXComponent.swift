@@ -15,13 +15,15 @@ enum BackdropKind: String, Sendable {
     case scan, grid
     /// B2 批 4（emo 群）：bluehour＝低處冷藍微光＋左上一點暖光（雨絲 rain 2026-10-14 使用者在 T7 撤掉）
     case bluehour
+    /// ⑥a J-Pop：sparkle＝淡天藍漸層＋閃爍四芒星（きらきら）；cityNeon＝粉紅漸層＋霓虹橫線＋半個夕陽（シティポップ）
+    case sparkle, cityNeon
 
     /// 這個背景要配暗底還是亮底的配色（nil＝都可以）；組合器在背景之後抽配色時先濾成相容者（B2 計劃 §7.3）。
     /// sunset、shafts 會把整面塗成淺色／深色漸層，等於自帶底色（T3 對比測試抓到：配錯邊時字幾乎看不見）
     var tone: BackdropTone? {
         switch self {
-        case .ampGlow, .spot, .smokeHaze, .prism, .stars, .shafts, .gig, .bokeh, .bluehour: .dark
-        case .halftone, .sunset: .light
+        case .ampGlow, .spot, .smokeHaze, .prism, .stars, .shafts, .gig, .bokeh, .bluehour, .cityNeon: .dark
+        case .halftone, .sunset, .sparkle: .light
         case .void, .film, .snow, .ash, .crimsonFog, .embers, .haze, .paper, .tapeLeak, .flat, .xerox, .checker, .skyGrad, .scan, .grid: nil
         }
     }

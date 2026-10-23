@@ -34,7 +34,7 @@ struct B2BatchTwoSignedFixtureTests {
 struct B2BatchTwoContrastTests {
     /// 同一團連抽 400 次（帶「排除上一次」）用到的所有元件
     private func drawn(_ artist: String) throws -> Set<String> {
-        guard case .profile(let profile) = SongProfileResolver.resolve(artist: artist, genre: nil) else {
+        guard let profile = SongProfileResolver.resolve(artist: artist, genre: nil, lyrics: .text(isJapanese: false)).profile else {
             Issue.record("\(artist) 不在覆寫表"); return []
         }
         var ids: Set<String> = []
