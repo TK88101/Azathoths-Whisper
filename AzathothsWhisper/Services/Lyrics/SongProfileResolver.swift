@@ -37,22 +37,23 @@ struct SongProfile: Equatable, Sendable {
     let tags: Set<FXTag>
 }
 
-/// 歌詞這一層的證據（⑥a J-Pop 計劃 §4.1）：`unknown`＝還沒讀到（含讀取失敗）；`none`＝讀到了但空白
+/// 歌詞這一層的證據（⑥a J-Pop 計劃 §4.1）：`unknown`＝還沒讀到（含讀取失敗）；空白歌詞判不成日文歌，同 `.text(isJapanese: false)`
 enum LyricsEvidence: Equatable, Sendable {
     case unknown
-    case none
     case text(isJapanese: Bool)
 
     /// 日文＝`LyricsScript.isJapaneseSong`（含假名的行 ≥ 3 成）
     static func of(_ lyrics: String?) -> LyricsEvidence {
-        guard let lyrics else { return .unknown }
-        return LyricsText.isBlank(lyrics) ? .none : .text(isJapanese: LyricsScript.isJapaneseSong(lyrics))
+        lyrics.map { .text(isJapanese: LyricsScript.isJapaneseSong($0)) } ?? .unknown
     }
 }
 
 /// 定論的來源；VM 只在來源改變時重組已定格的配方（⑥a 計劃 §4.4）
 enum ProfileSource: Equatable, Sendable {
     case signedBand, jpopPolicy, genreRow, noMatch
+
+    /// 由歌詞內容決定的來源：寫入或改詞可能讓它出現或消失
+    var dependsOnLyrics: Bool { self == .jpopPolicy }
 }
 
 /// `pending`＝還在等 genre 或歌詞（會等，沒有來源）；其餘是定論，各自帶來源

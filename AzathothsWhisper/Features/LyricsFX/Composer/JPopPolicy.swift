@@ -42,6 +42,13 @@ enum JPopPolicy {
         LyricsFXCatalog.all.filter { $0.tags == [variant.tag] || ($0.slot == .fx && $0.id == FXEffect.none.rawValue) }
     }
 
+    /// 這一次播放的 J-Pop 目標：選變體（排除上一次配色所屬的變體）→ 該變體的目標值與鎖定目錄。
+    /// 變體的亂數與組合器的亂數串分開（同一 session 種子加鹽），不改組合器的取樣位置
+    static func target(signature: String, nonce: UInt64, previousPalette: String?) -> (profile: SongProfile, catalog: [FXComponent]) {
+        let chosen = variant(seed: FXHash.fnv1a64("jpop|\(signature)") ^ nonce, previous: previousPalette.flatMap(JPopVariant.init(paletteID:)))
+        return (chosen.profile, catalog(chosen))
+    }
+
     /// 均勻抽一個變體，先排除上一次的（使用者：「每次都給我感覺變了」）
     static func variant(seed: UInt64, previous: JPopVariant?) -> JPopVariant {
         let pool = JPopVariant.allCases.filter { $0 != previous }

@@ -129,12 +129,13 @@ struct JPopResolutionTests {
     }
 
     @Test func blankLyricsFallThroughToTheGenre() {
-        #expect(SongProfileResolver.resolve(artist: "Paper Lantern Ensemble", genre: nil, lyrics: LyricsEvidence.none) == .pending)
-        #expect(SongProfileResolver.resolve(artist: "Paper Lantern Ensemble", genre: "Black Metal", lyrics: LyricsEvidence.none).source == .genreRow)
+        let blank = LyricsEvidence.of(" \n\t")
+        #expect(SongProfileResolver.resolve(artist: "Paper Lantern Ensemble", genre: nil, lyrics: blank) == .pending)
+        #expect(SongProfileResolver.resolve(artist: "Paper Lantern Ensemble", genre: "Black Metal", lyrics: blank).source == .genreRow)
     }
 
     @Test(arguments: [
-        (String?.none, LyricsEvidence.unknown), (" \n\t", LyricsEvidence.none), ("walking down the river", .text(isJapanese: false)),
+        (String?.none, LyricsEvidence.unknown), (" \n\t", .text(isJapanese: false)), ("walking down the river", .text(isJapanese: false)),
         ("ひかりの道を歩く", .text(isJapanese: true)), ("Sunday morning ねむいけど", .text(isJapanese: true)),
     ])
     func evidenceComesFromTheRawLyrics(lyrics: String?, expected: LyricsEvidence) {

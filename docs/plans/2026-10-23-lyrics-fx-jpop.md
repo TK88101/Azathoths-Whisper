@@ -204,3 +204,25 @@
 - **日文歌判準修訂（動到驗收標準 → 回 Phase 1 快速複審，Codex 1 輪）**：實作中跑 UI 預覽歌詞（10 行 1 行日文）時發現「任一假名」會把它判成 J-Pop；osascript 唯讀掃描曲庫：含假名的歌依歌手最小行占比 Gorillaz 0.10、My Chemical Romance 0.19（在樂團表）、Nogizaka46 0.44、其餘 0.71–1.00。改為 `LyricsScript.isJapaneseSong`：畫面上的歌詞行（LRC 走 `LRCParser`、否則 `LyricsLines`，略過段落標題與 ID 標籤）中，有字母的行裡含假名的 ≥ 3 成（整數比較 `kana*10 >= lettered*3`）。Codex 採納並補：只有漢字的行進分母不進分子、符號數字行不算、LRC metadata 不算、1–2 行短詞照比例（已知限制：英文歌只有一句日文客串、而全曲只有 1–2 行時會誤判）、`language(of:)` 維持任一假名（選字型是另一語義）。真值表 12 例，先紅（未定義）後綠。
 - **G3 不合格兩項（J-Pop 實際配方 6 種子 × 3 歌詞）**：①ballad 0.62 s——換進場、退場都不變，是字位移（elegance 0.85 → dy 0.165、scatter 0.071，約原型兩倍）；elegance 0.85／0.6／0.4／0.2／0 → 0.62／0.62／0.62／0.50／0.28 s。改為由原型 vary 反推 elegance（kira 0.2、city 0、ballad 0；原型 ballad dy 0.08、scatter 0.02 恰為公式在 0 的值），§4.2 的軸值表依此更新。②city 0.64 s——進場換 fadeUp 降到 0.20 s，成因是 slide 模板（同 I-60）。/thecure 1 輪：Codex 反對直接延伸 I-60 豁免（簽字是逐元件 id、新元件與日文寬字形未經使用者看過），建議並排比較；做了本機比較頁（原型 slide vs 短距離 sidle 0.3 em，sidle G3 0.20 s），使用者選 2 → 正式加回 `EnterTemplate.sidle`（ffb055a 曾移除），`jpCitySlide` 改 sidle 3／fadeUp 2，豁免名單不變。`JPopCitySidleTests` 2 條是實作後才寫（未先跑紅燈）。
 - **T6**：DEBUG 預覽加 `AZW_LYRICSFX_PREVIEW_JAPANESE`（8 行 7 行日文，自編）；`LyricsFXUITests.testAJapaneseSongByAnUnknownArtistGetsJPop`（曲風 Black Metal 仍得 J-Pop 字型）——建置通過，待使用者在場跑。
+
+## 附錄 F simcodex（2026-10-23，2 輪，第 2 輪提前結束）
+| 輪 | 來源 | 意見 | 處置 |
+|---|---|---|---|
+| 1 | Codex review --base main | 無可動作問題 | — |
+| 1 | simplify 簡化 P1 | `LyricsEvidence.none` 與 `.text(isJapanese: false)` 行為相同 | 採納：刪除；空白歌詞經 `isJapaneseSong` 為 false |
+| 1 | simplify 簡化 P1 | 刪 `ProfileSource`，VM 只存「是不是 J-Pop」 | 駁回：計劃 R2 要求結果與來源分開，⑧ 要逐首列來源 |
+| 1 | simplify 層級 P1-1 | J-Pop 選變體與加鹽種子寫在 VM；重組規則點名 `.jpopPolicy` | 採納：`JPopPolicy.target(signature:nonce:previousPalette:)`；`ProfileSource.dependsOnLyrics`；VM 拆出 `sessionRecipe(for:signature:)`（行為不變） |
+| 1 | simplify 層級 P1-2 | `isJapaneseSong` 另解析一次行，應改由 `LyricsTimeline` 算 | 駁回（附證據）：曲長未知時 `LyricsTimelineEstimator.estimate` 回 nil（`guard duration > 0`），日文純文字歌會先被判非日文、依曲風定格，曲長到後中途換成 J-Pop |
+| 1 | simplify 層級 P1-3 | 收成 `resolved(source, target)` | 駁回：現行列舉讓不合法組合（如署名樂團＋素面）寫不出來 |
+| 1 | simplify 效率／重用 | 全 P2（見下） | 延後 |
+| 2 | simplify 四角度 | 無 P1 | — |
+| 2 | Codex review --uncommitted | [P1] 未追蹤的 `.claude/`（1.1 GB，本機 worktree 與設定）不得進提交、建議加 ignore | 非本次改動（一直逐檔 add，從未納入）；加 `.gitignore` 屬設定改動，交使用者決定 |
+
+遺留 P2：①signed band 短路時仍先算歌詞證據（每次事件約 0.1–1 ms）；②`sessionRecipe` 在 pending／noMatch 也先查歷史與算種子；③sparkle 每幀重算 40 顆位置（可依尺寸快取）、每顆一次 context 複製與 Path；④`neonLines` 兩次 enumerated().filter；⑤`JPopPolicy.catalog` 每次過濾整份目錄、`tags == [tag]` 建 Set；⑥測試重複：`playedRecipes` 可併入 `ReadabilityAudit.recipes(catalog:)`、`existingProfiles` 與 `ReadabilityAudit.profiles` 同式、VM 測試的 `model`／`composed` 與 `LyricsFXRecipeTests` 重複、`lyrics: .text(isJapanese: false)` 散在約 10 處；⑦兩個「日文」定義並存（`GenreStyleResolver.japaneseRatio` 字元比例、畫面不用；`isJapaneseSong` 行比例），可加互指註解；⑧elegance 被當作 vary 旋鈕（變體目錄元件的 elegance 與 profile 不一致；根本修法是讓變體直接提供 vary，動共用基礎，延後）；⑨`.sparkles` 的 opacity 參數恆為 1；⑩`previousPalette` 以字串傳入再反推變體，可在 `RecipePicks` 提供型別化的上次變體。
+
+## 附錄 G 全量單元（2026-10-23）
+- 第 1 次（`-skip-testing` 已知 flaky 的 `BatchOverlappingLoadTests.overlappingLoad…()`）：紅 3 條。
+  - `B2BatchFourIsolationTests` 2 條：它把「基線（c6e0a53）之後新增的元件」一律當批 4（emo 群）檢查，⑥a 的 J-Pop 元件也落在這裡。改為依標籤分屬兩批：emo 照舊須屬 emo 私有標籤、本批團抽得到；J-Pop 須恰帶一個變體私有標籤、且在該變體目錄內抽得到（斷言未放寬，只多認一批）。綠。
+  - `SourceGateTests.whileTheProbeIsInFlightOthersAreTurnedAway` 300 s 逾時：本分支未動 `Services/Lyrics/Timing`、`Tests/Timing`（diff 空）；單獨連跑 5 次全綠。推測：測試以 `while client.requests.count < 4 { await Task.yield() }` 空轉等待，全量平行＋同機另一 session 跑 iOS 模擬器測試時被餓住。**未證實，不當結案理由**；看第 2 次全量是否重現。
+- 第 2 次（同上 skip，`-enableCodeCoverage`）：**1601 條／199 suite 全綠**（3050 s）；`whileTheProbeIsInFlightOthersAreTurnedAway` 0.001 s 綠，**未重現**。coverage_gate（傳該 xcresult）：Services+Infra 96.0 %。
+- 根因（未重現仍不靠重跑結案）：讀碼發現 `ScriptedHTTPClient` 的 `.hold` 先在鎖內記帳（`requests.count` 變 4），之後才在另一次加鎖登記 continuation；測試看到 count==4 就往下走並 `release()`，若落在這段空窗，`release()` 拿到空陣列、之後登記的 continuation 永遠沒人 resume → `probe.value` 永掛。已核事實：新測試 `aReleaseThatArrivesBeforeTheHoldParksStillLetsItThrough`（先 release 再送 hold）紅＝60 s 時限觸發。修（只動替身）：`release()` 之後一直放行，判斷與登記在同一次加鎖內。修後 SourceGate 17 條 × 5 次綠。第 1 次的 300 s 逾時是否正是此空窗：**推測**（機制吻合「只在全量平行負載下、單獨跑必綠」），無法事後證實。

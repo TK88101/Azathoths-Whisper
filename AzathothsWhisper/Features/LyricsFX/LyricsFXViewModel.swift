@@ -215,38 +215,39 @@ final class LyricsFXViewModel {
         recipe = .mono
     }
 
-    /// 第一次得到定論時組一次並定格；之後同一 session 只在「進出 J-Pop」時重組——那是唯一由歌詞決定的來源
-    /// （例：缺詞歌依曲風定格後寫入日文詞）。曲風換了、詞改了但仍同一邊，不重組，維持 B1 §3.7 的定格。
+    /// 第一次得到定論時組一次並定格；之後同一 session 只在「由歌詞決定的來源」出現或消失時重組
+    /// （例：缺詞歌依曲風定格後寫入日文詞→J-Pop）。曲風換了、詞改了但來源同一邊，不重組，維持 B1 §3.7 的定格。
     /// pending（genre 或歌詞還沒讀到）先維持現狀等下次
     private func reconcileRecipe() {
         guard let signature = sessionSignature else { return }
         let resolution = SongProfileResolver.resolve(artist: sessionArtist, genre: metadata.genre, lyrics: LyricsEvidence.of(lyrics))
         guard let source = resolution.source, Self.shouldCompose(settled: settledSource, now: source) else { return }
-        let seed = FXHash.fnv1a64(signature) ^ sessionNonce ^ Self.recipeSchemaVersion
-        let previous = recipeHistory.lastPicks(forTrack: signature)
-        switch resolution {
-        case .pending, .noMatch:
-            recipe = .mono
-        case .jpop:
-            let variant = JPopPolicy.variant(seed: FXHash.fnv1a64("jpop|\(signature)") ^ sessionNonce, previous: previous.flatMap { JPopVariant(paletteID: $0.palette) })
-            recipe = Composer.compose(profile: variant.profile, seed: seed, catalog: JPopPolicy.catalog(variant), avoiding: previous?.asPrevious)
-        case .signedBand(let profile), .genreRow(let profile):
-            #if DEBUG
-            if let forced = recipeOverride?(profile) {
-                recipe = .composed(forced)
-                break
-            }
-            #endif
-            recipe = Composer.compose(profile: profile, seed: seed, avoiding: previous?.asPrevious)
-        }
+        recipe = sessionRecipe(for: resolution, signature: signature)
         if case .composed(let composed) = recipe { recipeHistory.record(RecipePicks(composed), forTrack: signature) }
         settledSource = source
     }
 
-    /// 還沒定格就組；已定格只在來源跨過 J-Pop 的邊界時重組
+    private func sessionRecipe(for resolution: ProfileResolution, signature: String) -> SessionRecipe {
+        let previous = recipeHistory.lastPicks(forTrack: signature)
+        let seed = FXHash.fnv1a64(signature) ^ sessionNonce ^ Self.recipeSchemaVersion
+        switch resolution {
+        case .pending, .noMatch:
+            return .mono
+        case .jpop:
+            let target = JPopPolicy.target(signature: signature, nonce: sessionNonce, previousPalette: previous?.palette)
+            return Composer.compose(profile: target.profile, seed: seed, catalog: target.catalog, avoiding: previous?.asPrevious)
+        case .signedBand(let profile), .genreRow(let profile):
+            #if DEBUG
+            if let forced = recipeOverride?(profile) { return .composed(forced) }
+            #endif
+            return Composer.compose(profile: profile, seed: seed, avoiding: previous?.asPrevious)
+        }
+    }
+
+    /// 還沒定格就組；已定格只在由歌詞決定的來源出現或消失時重組
     static func shouldCompose(settled: ProfileSource?, now: ProfileSource) -> Bool {
         guard let settled else { return true }
-        return settled != now && (settled == .jpopPolicy || now == .jpopPolicy)
+        return settled != now && (settled.dependsOnLyrics || now.dependsOnLyrics)
     }
 
     /// 目錄或抽樣規則改版時加 1：同 nonce 也抽出不同配方
