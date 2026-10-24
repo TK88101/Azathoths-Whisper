@@ -16,8 +16,8 @@ struct ArtistStyleStore: Sendable {
     }
 
     static let schemaVersion = 1
-    /// 416 位約 100 KB；超過這個不讀（防整檔讀進記憶體）
-    static let maxFileBytes = 4 << 20
+    /// 416 位約 100 KB；超過這個不讀（防整檔讀進記憶體；計劃 §4.4 上限 1 MiB）
+    static let maxFileBytes = 1 << 20
     static let fileName = "artists.json"
 
     static let defaultDirectory: URL = FileManager.default

@@ -250,31 +250,32 @@ struct MusicAppleEventsClient: MusicControlling {
 
     func libraryArtistAlbums() async throws -> [LibraryArtistAlbum] {
         try await run { app in
-            let budget = AEBudget(total: Self.libraryBudget, start: .now)
-            let sbApp = app as? SBApplication
-            let setTimeout: (Int) -> Void = { sbApp?.timeout = $0 }
-            guard budget.spend(setTimeout: setTimeout), let all = app.tracks?() else { return [] }
-            let selectors = [#selector(getter: MusicTrackProto.artist), #selector(getter: MusicTrackProto.album)]
-            guard let columns = budget.readColumns(selectors, setTimeout: setTimeout, read: { all.array(byApplying: $0) }),
-                  columns.count == 2, columns[0].count == columns[1].count
-            else { return [] }
-            return zip(columns[0], columns[1]).map { LibraryArtistAlbum(artist: $0 as? String ?? "", album: $1 as? String ?? "") }
+            Self.readPairs(app, #selector(getter: MusicTrackProto.artist), #selector(getter: MusicTrackProto.album)) { $0 }
+                .map { LibraryArtistAlbum(artist: $0, album: $1) }
         }
     }
 
     func artistTracks(artist: String) async throws -> [ArtistTrack] {
         try await run { app in
-            let budget = AEBudget(total: Self.libraryBudget, start: .now)
-            let sbApp = app as? SBApplication
-            let setTimeout: (Int) -> Void = { sbApp?.timeout = $0 }
-            guard budget.spend(setTimeout: setTimeout), let all = app.tracks?() else { return [] }
-            guard let matches = (all.filtered(using: NSPredicate(format: "artist == %@", artist)) as NSArray) as? SBElementArray else { return [] }
-            let selectors = [#selector(getter: MusicTrackProto.album), #selector(getter: MusicTrackProto.lyrics)]
-            guard let columns = budget.readColumns(selectors, setTimeout: setTimeout, read: { matches.array(byApplying: $0) }),
-                  columns.count == 2, columns[0].count == columns[1].count
-            else { return [] }
-            return zip(columns[0], columns[1]).map { ArtistTrack(album: $0 as? String ?? "", lyrics: $1 as? String ?? "") }
+            Self.readPairs(app, #selector(getter: MusicTrackProto.album), #selector(getter: MusicTrackProto.lyrics)) { all in
+                (all.filtered(using: NSPredicate(format: "artist == %@", artist)) as NSArray) as? SBElementArray
+            }
+            .map { ArtistTrack(album: $0, lyrics: $1) }
         }
+    }
+
+    /// ⑥b：在 `libraryBudget` 內對（篩選後的）整庫讀兩欄字串；兩欄長度不一＝整批作廢
+    private static func readPairs(
+        _ app: MusicAppProto, _ first: Selector, _ second: Selector, elements: (SBElementArray) -> SBElementArray?
+    ) -> [(String, String)] {
+        let budget = AEBudget(total: libraryBudget, start: .now)
+        let sbApp = app as? SBApplication
+        let setTimeout: (Int) -> Void = { sbApp?.timeout = $0 }
+        guard budget.spend(setTimeout: setTimeout), let all = app.tracks?(), let chosen = elements(all),
+              let columns = budget.readColumns([first, second], setTimeout: setTimeout, read: { chosen.array(byApplying: $0) }),
+              columns.count == 2, columns[0].count == columns[1].count
+        else { return [] }
+        return zip(columns[0], columns[1]).map { ($0 as? String ?? "", $1 as? String ?? "") }
     }
 
     private func run<T: Sendable>(

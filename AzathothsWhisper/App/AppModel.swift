@@ -371,10 +371,11 @@ final class AppModel {
             self?.lyricsFX.positionClock.resync()
         }
         lyricsFlow.startPolling()
-        startArtistStyles()
 
         try? await Task.sleep(for: splashDuration)
         isSplashVisible = false
+        // 閃屏結束才開始：整庫掃描與逐歌手讀歌詞都佔 AE 佇列，不跟啟動時第一輪播放讀取搶（simcodex R1 效率）
+        startArtistStyles()
     }
 
     /// ⑥b：背景查一輪（只啟動一次）；每查完一位就換 snapshot

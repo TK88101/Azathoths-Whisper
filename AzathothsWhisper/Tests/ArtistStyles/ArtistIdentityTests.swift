@@ -92,8 +92,15 @@ struct ArtistIdentityTests {
         #expect(judge("Velvet Lanterns", library: ["", " - Single"], [only]) == .unresolved(.noAlbumMatch))
     }
 
-    /// 送出前的專輯清單：正規化後去重、去空白、保留第一次出現的原始寫法
-    @Test func outgoingAlbumNamesAreDeduplicated() {
-        #expect(ArtistIdentity.outgoingAlbums(["Night Ferry", "Night Ferry - Single", "", "Paper Harbour"]) == ["Night Ferry", "Paper Harbour"])
+    /// 比對用的專輯清單：正規化後去重、去空白、保留第一次出現的原始寫法
+    @Test func albumNamesAreDeduplicated() {
+        #expect(ArtistIdentity.distinctAlbums(["Night Ferry", "Night Ferry - Single", "", "Paper Harbour"]) == ["Night Ferry", "Paper Harbour"])
+    }
+
+    @Test func onlyAlbumsWithNonJapaneseSongsAreCompared() {
+        let japanese = "かみのふねがながれる\nあめのおとをおぼえてる"
+        #expect(ArtistIdentity.albumsToCompare([ArtistTrack(album: "Ame", lyrics: japanese)]) == nil)
+        #expect(ArtistIdentity.albumsToCompare([]) == nil)
+        #expect(ArtistIdentity.albumsToCompare([ArtistTrack(album: "Ame", lyrics: japanese), ArtistTrack(album: "Quiet", lyrics: "")]) == ["Quiet"])
     }
 }

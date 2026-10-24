@@ -188,4 +188,21 @@ struct ArtistStyleSyncTests {
         #expect(await recorder.asked.isEmpty)
         #expect(store.load().book.hasRecord(forArtist: "Velvet Lanterns") == false)
     }
+
+    /// simcodex R1（Codex）：掃描時才發現的撞鍵要立刻發布，不能讓這次啟動繼續套舊的 MB 曲風
+    @Test func aCollisionFoundDuringTheScanIsPublishedRightAway() async throws {
+        let store = tempStore()
+        try store.save(ArtistStyleBook().recording(
+            .verified(id: "mb-1", matchedReleaseGroups: [], genres: [.init(name: "black metal", count: 1)]), forSpelling: "AC/DX", at: Self.now
+        ))
+        let music = MockMusicClient()
+        await music.setLibrary(library([("AC/DX", "A"), ("ACDX", "B")]))
+        let recorder = Recorder()
+        await sync(music, recorder, store: store).run()
+        let published = await recorder.published
+        #expect(published.first?.genres(forArtist: "AC/DX") == .verified(["black metal"]), "載入時照舊")
+        #expect(published.last?.genres(forArtist: "AC/DX") == .unresolved)
+        #expect(published.last?.genres(forArtist: "ACDX") == .unresolved)
+        #expect(await recorder.asked.isEmpty)
+    }
 }

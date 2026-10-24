@@ -221,3 +221,25 @@
 - **T8**：`about_genre_credit` 三語＋MusicBrainz、授權兩個連結；`AppInfoTests` 驗連結與三語 bundle 字串。
 - **全量單元**（skip 已知 flaky `overlappingLoad…()`，-enableCodeCoverage）：1,676 條／207 suite，紅 1＝`RecipeGoldenTests`——它把所有曲風列算進「既有」摘要，新列必然改變摘要。修：範圍改回 `bandTable`＋`originalRows`，**錄好的摘要值 `2f80…` 不動**→ 綠（＝既有 61 團與兩條舊列的配方逐行不變）。其餘 1,675 條綠。
 - **coverage_gate**：Services+Infra 96.2 %；但豁免檔 `MusicAppleEventsClient.swift` 可執行行數 408→468 超預算 410 → 失敗。/thecure（Codex 1 輪，支持調預算、反對為過閘門重構既有 AE 程式碼）→ 使用者 2026-10-24 批准 **`EXEMPT_LINE_BUDGET` 410→470**。之後 gate 綠；`Scripts/test_coverage_gate.py` 寫死的 411／410 跟著改成 471／470（仍驗「超預算即失敗」），Scripts 333 條綠。`no_playback_gate.sh` 綠。
+
+## 附錄 F simcodex（2026-10-24，2 輪，第 2 輪提前結束）
+| 輪 | 來源 | 意見 | 處置 |
+|---|---|---|---|
+| 1 | security-reviewer | 無 CRITICAL／HIGH；LOW：搜尋回的 id 進下一個路徑、TOCTOU、`outgoingAlbums` 命名誤導（專輯名其實只在本機比對、不送出）、票數 1e300 會 trap | 採納 3 條（UUID 驗證、改名 `albumsToCompare`／`distinctAlbums`、`Int(exactly:)`）；TOCTOU 延後（與 `TimingStore` 同級，需本機寫入權） |
+| 1 | simplify 效率 P1 | 曲風比對每個關鍵字重做正規化（~3 ms／次、換歌約 10 ms 主執行緒） | 採納：`GenreStyleResolver.NormalizedGenre`，每個 genre 只正規化一次 |
+| 1 | simplify 效率 P1 | 背景同步與啟動第一輪播放讀取搶 AE 佇列 | 採納：閃屏結束才 `startArtistStyles()` |
+| 1 | simplify 簡化／層級 P1 | 撞鍵規則分散在 Sync 與 Book 四處 | 採納：`ArtistStyleBook.reconcilingLibrary` 為唯一入口；Record 兩個複製函式合一 |
+| 1 | simplify 簡化／層級 P1 | 同名篩選與候選上限在 client 與 `judge` 各寫一次；兩個迴圈 | 採納：`ArtistIdentity.namesakes` 唯一定義；client 單趟＋`spend()` |
+| 1 | simplify 簡化／重用 P1 | AE 兩欄讀取樣板重複 | 採納：`readPairs` |
+| 1 | simplify 重用 P1 | `spellingFamily` 與 `TrackMatcher.exactKey` 同式 | 採納：直接用 `exactKey`（去掉 private） |
+| 1 | simplify 層級 P1 | 樂團表排除、日文過濾寫在 Sync | 採納：`SongProfileResolver.needsArtistGenres`、`ArtistIdentity.albumsToCompare` |
+| 1 | simplify 簡化 P1 | 刪 `matchedReleaseGroups` | 駁回：計劃 §4.4 指定存（日後使用者指定歌手用） |
+| 1 | simplify 簡化 P1 | 刪 `compose(genre:rows:)` | 駁回：仍有 4 處呼叫（ReadabilityAudit、RecipeGolden、ComposerTests、GenreRowTests） |
+| 1 | simplify 重用 P1 | 與 `TimingStore` 共用檔案安全邏輯 | 延後：要改已驗證的 `TimingStore`，超出本 diff |
+| 1 | Codex review --base main [P2] | 掃描時發現的撞鍵沒發布到 snapshot | 採納：`prepareQueue` 有變就 publish；新測試 `aCollisionFoundDuringTheScanIsPublishedRightAway` |
+| 1 | Codex review [P2] | 存檔上限 `4 << 20` 不是計劃的 1 MiB（它說是 16 MiB，實為 4 MiB） | 採納：改 `1 << 20` |
+| 2 | simplify 四角度 | 無 P1；P2：樂團表查詢兩處寫、`prepareQueue` 未先去重、第一個請求的預算寫法 | 採納這 3 條（便宜）；其餘 P2 延後 |
+| 2 | Codex review --uncommitted [P2] | 單趟 lookup→browse 可能在看到後面的候選前用光預算 | 駁回（附證據）：要判「已驗證」必須看完每位同名者，兩種順序需要的請求總數相同；新測試 `aLaterNamesakeIsStillInspectedAfterEarlierOnesAreBrowsed`（4 位、前 3 位第一頁滿未中、第 4 位中）＝verified、8 個請求 |
+
+遺留 P2：①`ArtistStyleStore` 與 `TimingStore` 的檔案安全邏輯可抽共用；②讀檔 TOCTOU（`O_NOFOLLOW`＋`fstat`）；③每查完一位就整檔重寫（背景、約 2 s CPU／416 位）；④`ExternalServices` 把 timing 與 artistStyles 的 live／none 收成一處；⑤新增列的第二份配方摘要；⑥`hasRecord`、`genre(_: String?, matches:)` 只剩測試在用；⑦`readPairs` 的 identity closure；⑧`TimingJSON.integer` 可上移；⑨`spellingFamily` 依賴 `TrackMatcher.exactKey`（若時間軸改規則會連帶）。
+- **simcodex 後全量單元**（同上 skip，-enableCodeCoverage）：**1,681 條／207 suite 全綠**（3,687 s）；coverage_gate Services+Infra 96.2 %（豁免 453／470 行——`readPairs` 抽出後由 468 降為 453）。

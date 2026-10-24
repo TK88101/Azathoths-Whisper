@@ -60,11 +60,9 @@ struct ArtistStyleBook: Equatable, Sendable {
         SongProfileResolver.normalizedArtist(artist)
     }
 
-    /// 同一歌手的寫法：只折疊大小寫、全半形、變音與多餘空白，保留標點（`AC/DC` 與 `ACDC` 不同）
+    /// 同一歌手的寫法：只折疊大小寫、全半形、變音與多餘空白，保留標點（`AC/DC` 與 `ACDC` 不同）——與時間軸比對的「完全一致」同一個定義
     static func spellingFamily(_ artist: String) -> String {
-        let posix = Locale(identifier: "en_US_POSIX")
-        return artist.lowercased(with: posix).folding(options: [.diacriticInsensitive, .widthInsensitive], locale: posix)
-            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        TrackMatcher.exactKey(artist)
     }
 
     func record(forArtist artist: String) -> Record? {
@@ -85,7 +83,7 @@ struct ArtistStyleBook: Equatable, Sendable {
     func recording(_ lookup: Lookup, forSpelling spelling: String, at date: Date) -> ArtistStyleBook {
         let key = Self.key(spelling)
         if let existing = records[key], !Self.isVariant(spelling, of: existing) {
-            return replacing(key, with: existing.markedAsCollision(adding: spelling))
+            return replacing(key, with: existing.adding(spelling, reason: .collision))
         }
         let spellings = Set((records[key]?.spellings ?? []) + [spelling]).sorted()
         let record: Record
@@ -103,10 +101,19 @@ struct ArtistStyleBook: Equatable, Sendable {
         spellings.reduce(self) { book, spelling in
             let key = Self.key(spelling)
             guard let existing = book.records[key], !existing.spellings.contains(spelling) else { return book }
-            let updated = Self.isVariant(spelling, of: existing)
-                ? existing.adding(spelling)
-                : existing.markedAsCollision(adding: spelling)
-            return book.replacing(key, with: updated)
+            return book.replacing(key, with: existing.adding(spelling, reason: Self.isVariant(spelling, of: existing) ? existing.reason : .collision))
+        }
+    }
+
+    /// 整庫掃描的寫法（撞鍵規則的唯一入口，simcodex R1）：已有記錄的鍵照 `noting`；
+    /// 還沒有記錄的鍵上出現不同的寫法＝撞鍵，直接記下、不查
+    func reconcilingLibrary(_ spellings: [String], at date: Date) -> ArtistStyleBook {
+        let noted = noting(spellings: spellings)
+        let fresh = Dictionary(grouping: Set(spellings).filter { !Self.key($0).isEmpty && noted.records[Self.key($0)] == nil }, by: Self.key)
+        return fresh.values.reduce(noted) { book, group in
+            let sorted = group.sorted()
+            guard Set(sorted.map(Self.spellingFamily)).count > 1, let first = sorted.first else { return book }
+            return book.recording(.unresolved(.collision), forSpelling: first, at: date).noting(spellings: Array(sorted.dropFirst()))
         }
     }
 
@@ -125,11 +132,8 @@ struct ArtistStyleBook: Equatable, Sendable {
 }
 
 private extension ArtistStyleBook.Record {
-    func adding(_ spelling: String) -> Self {
+    /// 併入一個寫法；撞鍵時只改原因，不覆寫 mbid
+    func adding(_ spelling: String, reason: ArtistIdentity.UnresolvedReason?) -> Self {
         Self(spellings: Set(spellings + [spelling]).sorted(), mbid: mbid, matchedReleaseGroups: matchedReleaseGroups, genres: genres, reason: reason, fetchedAt: fetchedAt)
-    }
-
-    func markedAsCollision(adding spelling: String) -> Self {
-        Self(spellings: Set(spellings + [spelling]).sorted(), mbid: mbid, matchedReleaseGroups: matchedReleaseGroups, genres: genres, reason: .collision, fetchedAt: fetchedAt)
     }
 }

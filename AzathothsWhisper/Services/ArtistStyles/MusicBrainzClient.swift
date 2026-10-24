@@ -20,48 +20,43 @@ struct MusicBrainzClient: Sendable {
 
     func identify(artist: String, albums: [String]) async throws(ProviderFailure) -> ArtistStyleBook.Lookup {
         guard ArtistIdentity.isQueryable(artist) else { return .unresolved(.emptyName) }
-        var budget = Self.requestBudget
-        budget -= 1
-        let hits = try Self.searchHits(try await get("artist", [("query", "artist:\"\(Self.phraseEscaped(artist))\""), ("limit", String(Self.searchLimit))]))
-        let namesakes = hits.filter { hit in ([hit.name] + hit.aliases).contains { ArtistIdentity.isSameName($0, artist) } }
-        guard !namesakes.isEmpty else { return .unresolved(.notFound) }
-        guard namesakes.count <= ArtistIdentity.maximumCandidates else { return .unresolved(.ambiguous) }
-
-        let library = Set(albums.map(ArtistIdentity.albumKey).filter { !$0.isEmpty })
-        var looked: [(hit: SearchHit, genres: [ArtistStyleBook.Genre], groups: [ArtistIdentity.ReleaseGroup])] = []
-        for hit in namesakes {
-            guard budget > 0 else { return .unresolved(.ambiguous) }
-            budget -= 1
-            let detail = try Self.lookup(try await get("artist/\(hit.id)", [("inc", "genres+release-groups")]))
-            looked.append((hit, detail.genres, detail.groups))
+        var remaining = Self.requestBudget - 1   // 搜尋本身
+        func spend() -> Bool {
+            guard remaining > 0 else { return false }
+            remaining -= 1
+            return true
         }
+        let hits = try Self.searchHits(try await get("artist", [("query", "artist:\"\(Self.phraseEscaped(artist))\""), ("limit", String(Self.searchLimit))]))
+        guard let namesakes = ArtistIdentity.namesakes(of: artist, in: hits, names: { [$0.name] + $0.aliases }) else { return .unresolved(.ambiguous) }
+        guard !namesakes.isEmpty else { return .unresolved(.notFound) }
+
+        // 每位候選：lookup（曲風＋第一頁 release-group），第一頁滿了還沒對上才 browse；預算用完＝無法確認
+        let library = Set(albums.map(ArtistIdentity.albumKey).filter { !$0.isEmpty })
         var candidates: [ArtistIdentity.Candidate] = []
-        for entry in looked {
-            var groups = entry.groups
+        var genresByID: [String: [ArtistStyleBook.Genre]] = [:]
+        for hit in namesakes {
+            guard spend() else { return .unresolved(.ambiguous) }
+            let detail = try Self.lookup(try await get("artist/\(hit.id)", [("inc", "genres+release-groups")]))
+            genresByID[hit.id] = detail.genres
+            var groups = detail.groups
             if groups.count >= Self.lookupPageSize, !Self.matches(groups, library) {
-                var offset = 0
-                var page = 0
                 groups = []
-                repeat {
-                    guard budget > 0 else { return .unresolved(.ambiguous) }
-                    budget -= 1
+                for page in 0..<Self.maximumBrowsePages {
+                    guard spend() else { return .unresolved(.ambiguous) }
                     let browse = try Self.browse(try await get("release-group", [
-                        ("artist", entry.hit.id), ("limit", String(Self.browsePageSize)), ("offset", String(offset)),
+                        ("artist", hit.id), ("limit", String(Self.browsePageSize)), ("offset", String(page * Self.browsePageSize)),
                     ]))
                     groups += browse.groups
-                    offset += Self.browsePageSize
-                    page += 1
-                    if Self.matches(groups, library) || offset >= browse.total || browse.groups.isEmpty { break }
-                } while page < Self.maximumBrowsePages
+                    if Self.matches(groups, library) || (page + 1) * Self.browsePageSize >= browse.total || browse.groups.isEmpty { break }
+                }
             }
-            candidates.append(ArtistIdentity.Candidate(id: entry.hit.id, name: entry.hit.name, aliases: entry.hit.aliases, releaseGroups: groups))
+            candidates.append(ArtistIdentity.Candidate(id: hit.id, name: hit.name, aliases: hit.aliases, releaseGroups: groups))
         }
         switch ArtistIdentity.judge(artist: artist, libraryAlbums: albums, candidates: candidates) {
         case .unresolved(let reason):
             return .unresolved(reason)
         case .verified(let id, let groups):
-            let genres = looked.first { $0.hit.id == id }?.genres ?? []
-            return .verified(id: id, matchedReleaseGroups: groups, genres: genres)
+            return .verified(id: id, matchedReleaseGroups: groups, genres: genresByID[id] ?? [])
         }
     }
 
@@ -103,7 +98,8 @@ struct MusicBrainzClient: Sendable {
         let root = try TimingJSON.dictionary(body)
         let artists = root["artists"] as? [[String: Any]] ?? []
         return artists.compactMap { artist in
-            guard let id = TimingJSON.string(artist["id"]), let name = TimingJSON.string(artist["name"]) else { return nil }
+            // MBID 會進下一個請求的路徑：只收 UUID 形狀（安全評審 LOW-1）
+            guard let id = TimingJSON.string(artist["id"]), UUID(uuidString: id) != nil, let name = TimingJSON.string(artist["name"]) else { return nil }
             let aliases = (artist["aliases"] as? [[String: Any]] ?? []).compactMap { TimingJSON.string($0["name"]) }
             return SearchHit(id: id, name: name, aliases: aliases)
         }
@@ -113,7 +109,7 @@ struct MusicBrainzClient: Sendable {
         let root = try TimingJSON.dictionary(body)
         let genres = (root["genres"] as? [[String: Any]] ?? []).compactMap { genre -> ArtistStyleBook.Genre? in
             guard let name = TimingJSON.string(genre["name"]) else { return nil }
-            return ArtistStyleBook.Genre(name: name, count: Int(TimingJSON.double(genre["count"]) ?? 0))
+            return ArtistStyleBook.Genre(name: name, count: integer(genre["count"]) ?? 0)
         }
         return (genres, releaseGroups(root["release-groups"]))
     }
@@ -121,7 +117,12 @@ struct MusicBrainzClient: Sendable {
     static func browse(_ body: String) throws(ProviderFailure) -> (groups: [ArtistIdentity.ReleaseGroup], total: Int) {
         let root = try TimingJSON.dictionary(body)
         let groups = releaseGroups(root["release-groups"])
-        return (groups, Int(TimingJSON.double(root["release-group-count"]) ?? Double(groups.count)))
+        return (groups, integer(root["release-group-count"]) ?? groups.count)
+    }
+
+    /// 非有限或超出 Int 範圍的數字當沒有（不得 trap，安全評審 LOW-4）
+    private static func integer(_ value: Any?) -> Int? {
+        TimingJSON.double(value).flatMap { $0.isFinite ? Int(exactly: $0.rounded()) : nil }
     }
 
     private static func releaseGroups(_ value: Any?) -> [ArtistIdentity.ReleaseGroup] {

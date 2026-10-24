@@ -225,7 +225,7 @@ enum SongProfileResolver {
     static func resolve(
         artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown, rows: [KeywordRow] = keywordRows
     ) -> ProfileResolution {
-        if let profile = overrides[normalizedArtist(artist)] { return .signedBand(profile) }
+        if let profile = signedProfile(artist) { return .signedBand(profile) }
         if lyrics == .unknown { return .pending }
         if lyrics == .text(isJapanese: true) { return .jpop }
         // MB 還沒查、認不出、或碰不到任何列：不等，落到 Apple 曲風（只升不降，⑥b §4.3）
@@ -234,6 +234,15 @@ enum SongProfileResolver {
         }
         guard let genre else { return .pending }
         return playable(compose(genres: [genre], rows: rows)).map(ProfileResolution.genreRow) ?? .noMatch
+    }
+
+    /// 要不要為這位歌手查 MB：樂團表的團一律以表為準（與 `resolve` 的第一層同一個判斷）
+    static func needsArtistGenres(_ artist: String) -> Bool {
+        signedProfile(artist) == nil
+    }
+
+    private static func signedProfile(_ artist: String) -> SongProfile? {
+        overrides[normalizedArtist(artist)]
     }
 
     /// 組不出六槽的目標值不算命中（⑥b R3-4）：讓下一層有機會，而不是靜默變成素面
@@ -248,7 +257,8 @@ enum SongProfileResolver {
 
     /// 每個 genre 各自比對 → 命中的列去重 → 整體套一次 generic 抑制 → 合成。順序與重複不影響結果（⑥b R3-2）
     static func compose(genres: [String], rows: [KeywordRow] = keywordRows) -> SongProfile? {
-        let hits = rows.filter { row in genres.contains { genre in row.keywords.contains { GenreStyleResolver.genre(genre, matches: $0) } } }
+        let normalized = genres.map(GenreStyleResolver.normalized)
+        let hits = rows.filter { row in row.keywords.contains { keyword in normalized.contains { GenreStyleResolver.genre($0, matches: keyword) } } }
         let specific = hits.filter { !$0.isGeneric }
         return compose(rows: specific.isEmpty ? hits : specific)
     }

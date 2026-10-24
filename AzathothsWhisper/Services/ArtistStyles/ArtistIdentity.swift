@@ -68,8 +68,15 @@ enum ArtistIdentity {
         return String(folded.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map(Character.init))
     }
 
-    /// 送給 MB 的專輯名：正規化後去重、去掉空的，保留第一次出現的寫法
-    static func outgoingAlbums(_ titles: [String]) -> [String] {
+    /// 拿來和 MB 比對的曲庫專輯（只在本機比對，不送出）：只取非日文歌所在的專輯（日文歌一律 J-Pop、不靠 MB，R1-2）。
+    /// nil＝沒有曲或全是日文歌，這位不查
+    static func albumsToCompare(_ tracks: [ArtistTrack]) -> [String]? {
+        let nonJapanese = tracks.filter { !LyricsScript.isJapaneseSong($0.lyrics) }
+        return nonJapanese.isEmpty ? nil : distinctAlbums(nonJapanese.map(\.album))
+    }
+
+    /// 正規化後去重、去掉空的，保留第一次出現的寫法
+    static func distinctAlbums(_ titles: [String]) -> [String] {
         var seen: Set<String> = []
         return titles.filter { title in
             let key = albumKey(title)
@@ -77,12 +84,18 @@ enum ArtistIdentity {
         }
     }
 
+    /// 同名篩選與候選上限的唯一定義（client 決定要不要 lookup、`judge` 下結論都用它）：
+    /// 空＝沒有同名者；nil＝超過上限（ambiguous）
+    static func namesakes<Item>(of artist: String, in items: [Item], names: (Item) -> [String]) -> [Item]? {
+        let matching = items.filter { item in names(item).contains { isSameName($0, artist) } }
+        return matching.count <= maximumCandidates ? matching : nil
+    }
+
     static func judge(artist: String, libraryAlbums: [String], candidates: [Candidate]) -> Outcome {
         let artistKey = SongProfileResolver.normalizedArtist(artist)
         guard !artistKey.isEmpty else { return .unresolved(.emptyName) }
-        let namesakes = candidates.filter { candidate in ([candidate.name] + candidate.aliases).contains { isSameName($0, artist) } }
+        guard let namesakes = Self.namesakes(of: artist, in: candidates, names: { [$0.name] + $0.aliases }) else { return .unresolved(.ambiguous) }
         guard !namesakes.isEmpty else { return .unresolved(.notFound) }
-        guard namesakes.count <= maximumCandidates else { return .unresolved(.ambiguous) }
 
         let library = Set(libraryAlbums.map(albumKey).filter { !$0.isEmpty })
         let matched = namesakes.compactMap { candidate -> (Candidate, [ReleaseGroup])? in

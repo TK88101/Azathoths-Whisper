@@ -66,7 +66,7 @@ enum TrackMatcher {
     }
 
     /// 「完全一致」的比較鍵：folding 後去頭尾空白、連續空白收成一個（不去標點，`AC/DC` 與 `ACDC` 不算完全一致）
-    private static func exactKey(_ text: String) -> String {
+    static func exactKey(_ text: String) -> String {
         folded(text).split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 

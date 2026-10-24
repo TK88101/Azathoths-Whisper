@@ -50,7 +50,8 @@ actor ArtistStyleSync {
             syncLog.error("library scan failed; will retry next launch")
             return
         }
-        prepareQueue(library)
+        // 掃描時記下的撞鍵也要立刻生效，不能等下次啟動（simcodex R1 Codex）
+        if prepareQueue(library) { await publish(book) }
         syncLog.info("artist styles queued=\(self.queued.count, privacy: .public) stored=\(self.book.records.count, privacy: .public)")
         while !Task.isCancelled, !queued.isEmpty {
             let next = queued.removeFirst()
@@ -63,24 +64,22 @@ actor ArtistStyleSync {
         syncLog.info("artist styles verified=\(summary.verified, privacy: .public) unresolved=\(summary.unresolved, privacy: .public) remaining=\(self.queued.count, privacy: .public)")
     }
 
-    /// 依鍵分組：已有記錄的併寫法（或記撞鍵）；新鍵上有不同寫法＝撞鍵、不查；其餘排隊，曲多的先
-    private func prepareQueue(_ library: [LibraryArtistAlbum]) {
-        let spellingsByKey = Dictionary(grouping: library.map(\.artist).filter { !$0.isEmpty }, by: ArtistStyleBook.key)
+    /// 樂團表的團不查；寫法與撞鍵交給 book（`reconcilingLibrary`）；其餘還沒記錄的鍵排隊，曲多的先。true＝book 有變
+    private func prepareQueue(_ library: [LibraryArtistAlbum]) -> Bool {
+        // 先依寫法去重（曲庫幾萬首、寫法幾百個），之後的正規化都只做在寫法上
+        let tracksBySpelling = Dictionary(library.map { ($0.artist, 1) }, uniquingKeysWith: +)
+            .filter { !$0.key.isEmpty && SongProfileResolver.needsArtistGenres($0.key) }
         let before = book
-        book = book.noting(spellings: Array(Set(library.map(\.artist))))
-        var pending: [(key: String, spellings: [String], tracks: Int)] = []
-        for (key, spellings) in spellingsByKey where !key.isEmpty && !book.hasRecord(forArtist: spellings[0]) {
-            guard SongProfileResolver.overrides[key] == nil else { continue }
-            let distinct = Set(spellings).sorted()
-            let families = Set(distinct.map(ArtistStyleBook.spellingFamily))
-            if families.count > 1 {
-                book = book.recording(.unresolved(.collision), forSpelling: distinct[0], at: now()).noting(spellings: Array(distinct.dropFirst()))
-                continue
-            }
-            pending.append((key, distinct, spellings.count))
+        book = book.reconcilingLibrary(Array(tracksBySpelling.keys), at: now())
+        let byKey: [String: [String]] = Dictionary(grouping: tracksBySpelling.keys, by: ArtistStyleBook.key)
+        let pending: [(key: String, spellings: [String], tracks: Int)] = byKey.compactMap { key, spellings in
+            guard !key.isEmpty, book.records[key] == nil else { return nil }
+            return (key, spellings.sorted(), spellings.reduce(0) { $0 + (tracksBySpelling[$1] ?? 0) })
         }
         queued = pending.sorted { $0.tracks != $1.tracks ? $0.tracks > $1.tracks : $0.key < $1.key }.map { ($0.key, $0.spellings) }
-        if book != before { persist() }
+        guard book != before else { return false }
+        persist()
+        return true
     }
 
     /// false＝本次停下（熔斷或取消）
@@ -90,10 +89,7 @@ actor ArtistStyleSync {
             guard let read = try? await music.artistTracks(artist: spelling) else { return true }
             tracks += read
         }
-        guard let artist = spellings.first, !tracks.isEmpty else { return true }
-        let nonJapanese = tracks.filter { !LyricsScript.isJapaneseSong($0.lyrics) }
-        guard !nonJapanese.isEmpty else { return true }
-        let albums = ArtistIdentity.outgoingAlbums(nonJapanese.map(\.album))
+        guard let artist = spellings.first, let albums = ArtistIdentity.albumsToCompare(tracks) else { return true }
         do {
             let lookup = try await identify(artist, albums)
             book = book.recording(lookup, forSpelling: artist, at: now()).noting(spellings: Array(spellings.dropFirst()))
