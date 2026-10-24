@@ -11,7 +11,6 @@ struct GenreRowTests {
         "death": (["Cannibal Corpse", "Fleshgod Apocalypse"], [.death, .grind, .symphonic, .thrash]),
         "gothic": (["Type O Negative", "Cradle of Filth"], [.black, .doom, .gothic, .symphonic]),
         "doom": (["Type O Negative", "Burzum"], [.black, .doom, .gothic]),
-        "heavypower": (["Iron Maiden", "Nightwish"], [.heavy, .power, .symphonic]),
         "thrash": (["Slayer", "Arch Enemy"], [.death, .melodeath, .thrash]),
         "hardrock": (["AC/DC", "Guns N' Roses"], [.glam, .hardrock]),
         "classicrock": (["The Beatles", "Pink Floyd", "Queen"], [.arena, .britpop, .classicrock, .glam, .psych]),
@@ -23,21 +22,23 @@ struct GenreRowTests {
         "metalcore": (["Hatebreed"], [.hardcore, .nu]),
         "nu": (["Korn"], [.nu]),
         "metal": (["Iron Maiden", "Slayer"], [.death, .heavy, .power, .thrash]),
-        "rock": (["AC/DC", "The Beatles"], [.britpop, .classicrock, .hardrock]),
     ]
+
+    /// 使用者 2026-10-24 真機逐列看過、整列拿掉的列（不調軸值；計劃附錄 E）
+    static let removedRows: [String: String] = [
+        "heavypower": "Iron Maiden＋Nightwish 抽到哥德／交響元件，不像重金屬；這類歌改走 metal*",
+        "rock": "generic rock 套在 folk rock 上不像；只命中它的歌回到 Apple 曲風",
+    ]
+
+    @Test func theRemovedRowsStayRemoved() {
+        for id in Self.removedRows.keys { #expect(!SongProfileResolver.keywordRows.contains { $0.id == id }, "\(id)") }
+        #expect(SongProfileResolver.compose(genres: ["power metal"]) == SongProfileResolver.compose(genres: ["metal"]), "power metal 改走 metal*")
+        #expect(SongProfileResolver.compose(genres: ["folk rock"]) == nil)
+    }
 
     /// 曲庫出現過的列組合（2026-10-24 探查：驗證者的 MB 前 3 曲風，以同一套關鍵字規則換算；只存列 id）＋R3-3 的固定代表組合
     static let libraryCombinations: [[String]] = [
-        ["altindie", "arena"], ["altindie", "classicrock"], ["altindie", "gothic"], ["altindie", "nu"], ["altindie", "punk"], ["altindie", "symphonic"],
-        ["arena", "classicrock"], ["black", "death"], ["black", "death", "melodeath"], ["black", "death", "symphonic"], ["black", "death", "thrash"],
-        ["black", "doom"], ["black", "gothic"], ["black", "gothic", "symphonic"], ["black", "heavypower", "thrash"], ["black", "symphonic"],
-        ["black", "thrash"], ["classicrock", "death"], ["classicrock", "doom"], ["classicrock", "hardrock"], ["classicrock", "punk"],
-        ["death", "doom"], ["death", "doom", "melodeath"], ["death", "melodeath"], ["death", "melodeath", "metalcore"], ["death", "melodeath", "symphonic"],
-        ["death", "metalcore"], ["doom", "gothic"], ["doom", "hardrock", "heavypower"], ["doom", "heavypower"], ["doom", "metalcore"],
-        ["gothic", "hardrock", "nu"], ["gothic", "nu"], ["gothic", "punk"], ["gothic", "symphonic"], ["hardrock", "heavypower"],
-        ["hardrock", "heavypower", "thrash"], ["hardrock", "nu"], ["heavypower", "metalcore", "nu"], ["heavypower", "metalcore", "thrash"],
-        ["heavypower", "nu"], ["heavypower", "symphonic"], ["heavypower", "thrash"], ["metalcore", "thrash"],
-        ["symphonic", "death"], ["altindie", "rock"], ["metal"],
+        ["altindie", "arena"], ["altindie", "classicrock"], ["altindie", "gothic"], ["altindie", "nu"], ["altindie", "punk"], ["altindie", "symphonic"], ["arena", "classicrock"], ["black", "death"], ["black", "death", "melodeath"], ["black", "death", "symphonic"], ["black", "death", "thrash"], ["black", "doom"], ["black", "gothic"], ["black", "gothic", "symphonic"], ["black", "symphonic"], ["black", "thrash"], ["classicrock", "death"], ["classicrock", "doom"], ["classicrock", "hardrock"], ["classicrock", "punk"], ["death", "doom"], ["death", "doom", "melodeath"], ["death", "melodeath"], ["death", "melodeath", "metalcore"], ["death", "melodeath", "symphonic"], ["death", "metalcore"], ["doom", "gothic"], ["doom", "metalcore"], ["gothic", "hardrock", "nu"], ["gothic", "nu"], ["gothic", "punk"], ["gothic", "symphonic"], ["hardrock", "nu"], ["metalcore", "thrash"], ["symphonic", "death"], ["metal"],
     ]
 
     private func row(_ id: String) throws -> SongProfileResolver.KeywordRow {

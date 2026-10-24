@@ -8,7 +8,8 @@ import Testing
 @Suite("LyricsFX artist genres")
 struct LyricsFXArtistGenreTests {
     static let lyrics = "[Verse]\nLanterns over the river\nAsh in the wind"
-    static let rock = TrackMetadata(genre: "Rock", duration: 200)
+    /// Apple 曲風命中 altindie 列（不含黑金屬元件）
+    static let rock = TrackMetadata(genre: "Alternative Rock", duration: 200)
 
     final class Box { var genres: ArtistGenres = .unknown }
 
@@ -28,11 +29,11 @@ struct LyricsFXArtistGenreTests {
         let track = TrackInfo.fixture(id: "A", artist: "Velvet Lanterns")
         vm.handle(.trackChanged(track, existingLyrics: Self.lyrics, metadata: Self.rock))
         let appleTags = try #require(tags(vm.recipe))
-        #expect(!appleTags.contains(.black), "先依 Apple 曲風（Rock）")
+        #expect(!appleTags.contains(.black), "先依 Apple 曲風（Alternative Rock）")
 
         box.genres = .verified(["black metal"])
         vm.handle(.lyricsChanged(persistentID: "A", lyrics: Self.lyrics + "\nPaper boats at dawn"))
-        vm.handle(.metadataChanged(persistentID: "A", metadata: TrackMetadata(genre: "Rock", duration: 201)))
+        vm.handle(.metadataChanged(persistentID: "A", metadata: TrackMetadata(genre: "Alternative Rock", duration: 201)))
         #expect(tags(vm.recipe) == appleTags, "同一次播放不重組")
 
         vm.handle(.notPlaying)

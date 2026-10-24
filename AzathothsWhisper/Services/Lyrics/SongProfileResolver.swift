@@ -195,13 +195,14 @@ enum SongProfileResolver {
         legacyRow("symphonic", ["symphon", "neoclassic", "classical", "religious", "soundtrack", "score"], ["Nightwish", "Epica"], tags: [.symphonic]),
     ]
 
-    /// ⑥b 計劃 §4.7（使用者 2026-10-24 選範圍 B）。`metal`、`rock` 是 generic
+    /// ⑥b 計劃 §4.7（使用者 2026-10-24 選範圍 B）。`metal` 是 generic。
+    /// 使用者 2026-10-24 真機逐列看過後整列拿掉兩列（不調軸值）：heavypower（Iron Maiden＋Nightwish，抽到哥德／交響元件，不像重金屬）、
+    /// rock*（AC/DC＋The Beatles，套在 folk rock 上不像）——見 `GenreRowTests.removedRows`
     static let expandedRows: [KeywordRow] = [
         row("melodeath", ["melodic death"], ["Arch Enemy"]),
         row("death", ["death metal", "deathcore", "grind", "brutal death"], ["Cannibal Corpse", "Fleshgod Apocalypse"]),
         row("gothic", ["gothic", "goth rock", "darkwave"], ["Type O Negative", "Cradle of Filth"]),
         row("doom", ["doom", "sludge"], ["Type O Negative", "Burzum"]),
-        row("heavypower", ["heavy metal", "power metal", "speed metal", "nwobhm"], ["Iron Maiden", "Nightwish"]),
         row("thrash", ["thrash", "groove metal"], ["Slayer", "Arch Enemy"]),
         row("hardrock", ["hard rock", "glam", "heavy rock"], ["AC/DC", "Guns N' Roses"]),
         row("classicrock", ["classic rock", "blues rock", "psychedelic", "progressive rock", "art rock"], ["The Beatles", "Pink Floyd", "Queen"]),
@@ -213,7 +214,6 @@ enum SongProfileResolver {
         row("metalcore", ["metalcore", "hardcore"], ["Hatebreed"]),
         row("nu", ["nu metal", "alternative metal", "rap metal", "rap rock"], ["Korn"]),
         row("metal", ["metal"], ["Iron Maiden", "Slayer"], isGeneric: true),
-        row("rock", ["rock"], ["AC/DC", "The Beatles"], isGeneric: true),
     ]
 
     /// 曲風列不得帶的標籤（⑥b R3-1）：emo 群、J-Pop 與批 3 的 Nu 系子標籤是各批私有，重用要重簽；`.nu`（B1 原型）不在此列

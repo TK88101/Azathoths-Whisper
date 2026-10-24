@@ -243,3 +243,10 @@
 
 遺留 P2：①`ArtistStyleStore` 與 `TimingStore` 的檔案安全邏輯可抽共用；②讀檔 TOCTOU（`O_NOFOLLOW`＋`fstat`）；③每查完一位就整檔重寫（背景、約 2 s CPU／416 位）；④`ExternalServices` 把 timing 與 artistStyles 的 live／none 收成一處；⑤新增列的第二份配方摘要；⑥`hasRecord`、`genre(_: String?, matches:)` 只剩測試在用；⑦`readPairs` 的 identity closure；⑧`TimingJSON.integer` 可上移；⑨`spellingFamily` 依賴 `TrackMatcher.exactKey`（若時間軸改規則會連帶）。
 - **simcodex 後全量單元**（同上 skip，-enableCodeCoverage）：**1,681 條／207 suite 全綠**（3,687 s）；coverage_gate Services+Infra 96.2 %（豁免 453／470 行——`readPairs` 抽出後由 468 降為 453）。
+
+## 附錄 G 使用者在場（2026-10-24）
+- #1 `LyricsFXUITests` 17／17 綠（含 `testAnArtistVerifiedAsBlackMetalGetsBlackMetalEvenIfAppleSaysRock` 9.3 s）。
+- #2 首次背景查詢（Debug 建置、真連 MB）：15:23 啟動、15:44:54 `remaining=0`，約 22 分鐘（停損 60 分鐘內）；存檔 414 位（278 確認、136 無法確認），3 次 `server503` 未寫、下次補查。曲多的先查，後段 60 位多為 noAlbumMatch／notFound（曲庫只有一兩首、多來自合輯）。重啟：`queued=9`（3 位 503 補查＋全日文歌手只在本機讀歌詞後跳過）、18 s 結束，存檔 418 位（281 確認、137 無法確認），已查者不重查。附帶發現：監看腳本用 zsh 的 `log`（內建指令）讀不到日誌，要用 `/usr/bin/log`。
+- #3 逐列看（每列曲庫一首，只命中該列、有詞、非日文、MB 已確認）：death、gothic、doom、hardrock、classicrock、altindie、punk、metalcore、nu、metal*「沒問題」；**heavypower「不像」**（Iron Maiden＋Nightwish 的聯集帶進 symphonic，抽到哥德黑體金字與暗紅光柱，與 gothic 相近）、**rock*「不像」**（Blackmore's Night 的 folk rock 套 AC/DC＋The Beatles）。依 §4.7 整列拿掉、不調軸值：heavy／power metal 改走 metal*；只命中 rock* 的歌回到 Apple 曲風（Apple 寫 Rock 者回到素面，同 ⑥b 前）。melodeath（只與 death 同現）、thrash、arena、poppunk、ska 在曲庫中沒有只命中它們的歌，未單看。
+- 拿掉兩列：`expandedRows` 17→15；`GenreRowTests.removedRows` 釘住、組合 fixture 去掉含這兩列的組合；`LyricsFXArtistGenreTests` 的 Apple 曲風由 Rock 改 Alternative Rock（Rock 現在不命中任何列）。
+- 拿掉兩列後全量單元（同上 skip）：**1,682 條／207 suite 全綠**（3,641 s）；coverage_gate 96.2 %（豁免 453／470）。
