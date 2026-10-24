@@ -245,6 +245,37 @@ struct MusicAppleEventsClient: MusicControlling {
     /// 卡片詳情一批的**總**時限（AC8d；約 7 個 AE，S6 實測整批 p95 76ms）：與 artwork 同為 1.5 秒，
     /// monitor 最多多等一批（見 `AEBudget`）
     static let detailsBudget: Duration = .milliseconds(1500)
+    /// ⑥b 整庫兩欄、單一歌手兩欄的預算：實測 0.15 s／0.11 s（附錄 E），超過整批作廢、下次啟動再讀
+    static let libraryBudget: Duration = .milliseconds(1500)
+
+    func libraryArtistAlbums() async throws -> [LibraryArtistAlbum] {
+        try await run { app in
+            let budget = AEBudget(total: Self.libraryBudget, start: .now)
+            let sbApp = app as? SBApplication
+            let setTimeout: (Int) -> Void = { sbApp?.timeout = $0 }
+            guard budget.spend(setTimeout: setTimeout), let all = app.tracks?() else { return [] }
+            let selectors = [#selector(getter: MusicTrackProto.artist), #selector(getter: MusicTrackProto.album)]
+            guard let columns = budget.readColumns(selectors, setTimeout: setTimeout, read: { all.array(byApplying: $0) }),
+                  columns.count == 2, columns[0].count == columns[1].count
+            else { return [] }
+            return zip(columns[0], columns[1]).map { LibraryArtistAlbum(artist: $0 as? String ?? "", album: $1 as? String ?? "") }
+        }
+    }
+
+    func artistTracks(artist: String) async throws -> [ArtistTrack] {
+        try await run { app in
+            let budget = AEBudget(total: Self.libraryBudget, start: .now)
+            let sbApp = app as? SBApplication
+            let setTimeout: (Int) -> Void = { sbApp?.timeout = $0 }
+            guard budget.spend(setTimeout: setTimeout), let all = app.tracks?() else { return [] }
+            guard let matches = (all.filtered(using: NSPredicate(format: "artist == %@", artist)) as NSArray) as? SBElementArray else { return [] }
+            let selectors = [#selector(getter: MusicTrackProto.album), #selector(getter: MusicTrackProto.lyrics)]
+            guard let columns = budget.readColumns(selectors, setTimeout: setTimeout, read: { matches.array(byApplying: $0) }),
+                  columns.count == 2, columns[0].count == columns[1].count
+            else { return [] }
+            return zip(columns[0], columns[1]).map { ArtistTrack(album: $0 as? String ?? "", lyrics: $1 as? String ?? "") }
+        }
+    }
 
     private func run<T: Sendable>(
         aeTimeoutTicks: Int? = nil,

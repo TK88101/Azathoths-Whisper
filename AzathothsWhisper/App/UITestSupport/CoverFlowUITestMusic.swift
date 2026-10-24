@@ -44,6 +44,10 @@ struct CoverFlowUITestMusic: MusicControlling {
         }
     }
 
+    /// ⑥b：UI 測試不做整庫掃描
+    func libraryArtistAlbums() async throws -> [LibraryArtistAlbum] { [] }
+    func artistTracks(artist: String) async throws -> [ArtistTrack] { [] }
+
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] {
         try await Task.sleep(for: albumDelay)
         guard artist == Fixture.artist, album == Fixture.album else { return [] }

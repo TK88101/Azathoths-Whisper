@@ -13,5 +13,7 @@ struct InertMusicClient: MusicControlling {
     func setLyrics(persistentID: String, lyrics: String) async throws -> Bool { false }
     func artworkData(persistentID: String) async throws -> Data? { nil }
     func playbackPosition() async throws -> PlaybackPosition? { nil }
+    func libraryArtistAlbums() async throws -> [LibraryArtistAlbum] { [] }
+    func artistTracks(artist: String) async throws -> [ArtistTrack] { [] }
 }
 #endif

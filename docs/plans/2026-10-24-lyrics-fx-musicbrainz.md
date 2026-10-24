@@ -213,3 +213,6 @@
 - **§4.1 讀法改為（不動驗收）**：`libraryArtistAlbums()`＝整庫 artist、album 兩欄（同一個 run，約 0.15 s）；`artistTracks(artist:)`＝`whose artist == X` 讀 album、lyrics 兩欄，sync 在查該歌手的 MB 前才呼叫、只對還沒存檔的歌手。每次占住佇列 ≤ 約 0.15 s；416 位合計約 20–40 s，分散在 25 分鐘的 MB 查詢之間。真 client 的實機耗時在使用者在場時以日誌核對（單元測試宿主不碰真 Music，D11）。
 - **T1**：紅燈＝`ArtistIdentity` 未定義（編譯失敗）→ 綠 15 條（含參數化）。
 - **T2 紅燈步驟漏做**：測試與實作寫完才一起跑，第一次即綠（28 條＝T1＋T2）。如實記錄，未補做。`ArtistStyleBook`（不可變值，兼作 snapshot）＋`ArtistStyleStore`（單檔、防線同 TimingStore）。
+- **T3**：紅燈＝`MusicBrainzClient` 未定義 → 綠 11 條。修正測試一處：`SourceGate` 換算 Duration 讓間隔量到 1.101 s，期望改為 ±10 ms（測試寫死了浮點值，非放寬行為）。
+- **T0 介面**：`MusicControlling` 加 `libraryArtistAlbums()`、`artistTracks(artist:)`（只用既有選擇器 `tracks`／`artist`／`album`／`lyrics`）；真 client 各帶 1.5 s AE 預算；5 個替身補齊。行為由 T4 驗（單元宿主不碰真 Music）。
+- **T4**：紅燈＝`ArtistStyleSync` 未定義 → 第一次綠 11／12：大小寫變體只用一種寫法讀歌詞，替身讀不到另一種 → 改為同鍵每種寫法都讀再合併 → 綠 12 條。

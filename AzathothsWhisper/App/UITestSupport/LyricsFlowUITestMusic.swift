@@ -60,6 +60,10 @@ actor LyricsFlowUITestMusic: MusicControlling {
     }
 
     /// 只有 batchImport 有專輯可載；其他場景維持空列表，不擾動既有的 Batch／外殼 UITests
+    /// ⑥b：UI 測試不做整庫掃描
+    func libraryArtistAlbums() async throws -> [LibraryArtistAlbum] { [] }
+    func artistTracks(artist: String) async throws -> [ArtistTrack] { [] }
+
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] {
         guard scenario == .batchImport else { return [] }
         return (0..<Fixture.trackCount).map { index in
