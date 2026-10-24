@@ -226,3 +226,10 @@
   - `SourceGateTests.whileTheProbeIsInFlightOthersAreTurnedAway` 300 s 逾時：本分支未動 `Services/Lyrics/Timing`、`Tests/Timing`（diff 空）；單獨連跑 5 次全綠。推測：測試以 `while client.requests.count < 4 { await Task.yield() }` 空轉等待，全量平行＋同機另一 session 跑 iOS 模擬器測試時被餓住。**未證實，不當結案理由**；看第 2 次全量是否重現。
 - 第 2 次（同上 skip，`-enableCodeCoverage`）：**1601 條／199 suite 全綠**（3050 s）；`whileTheProbeIsInFlightOthersAreTurnedAway` 0.001 s 綠，**未重現**。coverage_gate（傳該 xcresult）：Services+Infra 96.0 %。
 - 根因（未重現仍不靠重跑結案）：讀碼發現 `ScriptedHTTPClient` 的 `.hold` 先在鎖內記帳（`requests.count` 變 4），之後才在另一次加鎖登記 continuation；測試看到 count==4 就往下走並 `release()`，若落在這段空窗，`release()` 拿到空陣列、之後登記的 continuation 永遠沒人 resume → `probe.value` 永掛。已核事實：新測試 `aReleaseThatArrivesBeforeTheHoldParksStillLetsItThrough`（先 release 再送 hold）紅＝60 s 時限觸發。修（只動替身）：`release()` 之後一直放行，判斷與登記在同一次加鎖內。修後 SourceGate 17 條 × 5 次綠。第 1 次的 300 s 逾時是否正是此空窗：**推測**（機制吻合「只在全量平行負載下、單獨跑必綠」），無法事後證實。
+
+## 附錄 H 收官與使用者在場（2026-10-24）
+- 合併：a9a837e → main 06fc417（`Merge: 歌詞特效日文歌 J-Pop —— Azathoth's Whisper v2.0.2`），wip/lyrics-fx-classify 本機與遠端已刪。
+- 在場 #1：`LyricsFXUITests` 16／16 綠（`testAJapaneseSongByAnUnknownArtistGetsJPop` 9.2 s）。首次嘗試因 YSE session 的 Debug 版同開、鑰匙圈授權框輪流彈出而暫停，關掉後重跑。
+- 在場 #2：真機 Yorushika／YOASOBI 連播，三變體都出現，使用者：シティポップ、きらきら（星星暗亮漸變）、バラード皆「沒問題」。
+- 在場 #3：缺詞日文歌寫入日文詞後升回是きらきら（星光），非素面。
+- ACCEPTANCE I-65 → ✅。
