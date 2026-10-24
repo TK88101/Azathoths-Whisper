@@ -185,6 +185,22 @@ protocol MusicControlling: Sendable {
     func artworkData(persistentID: String) async throws -> Data?
     /// 歌詞特效的位置讀數（母計劃 §2.2）：沒在播或讀的途中換了歌＝nil
     func playbackPosition() async throws -> PlaybackPosition?
+    /// ⑥b（計劃 §4.1、附錄 E）：整庫每首的歌手與專輯（兩欄、一次讀完，約 0.15 s）
+    func libraryArtistAlbums() async throws -> [LibraryArtistAlbum]
+    /// ⑥b：某位歌手所有曲的專輯與歌詞（`whose artist == X`，曲數最多的歌手實測 ≤ 0.11 s）
+    func artistTracks(artist: String) async throws -> [ArtistTrack]
+}
+
+/// 整庫掃描的一列（⑥b）
+struct LibraryArtistAlbum: Equatable, Sendable {
+    let artist: String
+    let album: String
+}
+
+/// 某位歌手的一首曲（⑥b）：判日文歌與挑送出的專輯名用
+struct ArtistTrack: Equatable, Sendable {
+    let album: String
+    let lyrics: String
 }
 
 // Cover Flow 的穩定排序（Plan §4.8，M2 審查 M12）：disc → track → AE 返回序

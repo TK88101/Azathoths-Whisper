@@ -86,11 +86,24 @@ enum GenreStyleResolver {
         return Double(japanese.count) / Double(letters.count)
     }
 
+    /// 已正規化的 genre：同一個字串要對很多關鍵字比對時只正規化一次（⑥b 曲風列 × 3 個 MB 曲風，simcodex R1 效率）
+    struct NormalizedGenre: Sendable {
+        let tag: String
+        let tokens: Set<String>
+    }
+
+    static func normalized(_ genre: String?) -> NormalizedGenre {
+        let tag = normalizedTag(genre)
+        return NormalizedGenre(tag: tag, tokens: Set(tag.components(separatedBy: separators).filter { !$0.isEmpty }))
+    }
+
     /// 同一套切詞＋整詞規則判斷 genre 是否命中關鍵字（歌曲目標值 `SongProfileResolver` 共用；B1 計劃 §3.5）
     static func genre(_ genre: String?, matches keyword: String) -> Bool {
-        let tag = normalizedTag(genre)
-        let tokens = Set(tag.components(separatedBy: separators).filter { !$0.isEmpty })
-        return matches(keyword, tag: tag, tokens: tokens)
+        self.genre(normalized(genre), matches: keyword)
+    }
+
+    static func genre(_ genre: NormalizedGenre, matches keyword: String) -> Bool {
+        matches(keyword, tag: genre.tag, tokens: genre.tokens)
     }
 
     /// 去頭尾空白、小寫、日文曲風名換成英文（兩個入口共用的唯一定義）

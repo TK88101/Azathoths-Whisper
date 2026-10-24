@@ -24,6 +24,10 @@ actor MockMusicClient: MusicControlling {
     private(set) var trackDetailsCompleted = 0
     private(set) var writes: [String: String] = [:]
     private var albumTracksResult: [AlbumTrack] = []
+    /// ⑥b：整庫掃描與逐歌手讀取
+    private var libraryResult: Result<[LibraryArtistAlbum], MusicError> = .success([])
+    private var artistTracksResult: [String: [ArtistTrack]] = [:]
+    private(set) var artistTracksRequests: [String] = []
     private(set) var albumTracksCalls = 0
     /// 最後一次 albumTracks 的查詢參數——驗「用事件的 albumKey 而非重讀 currentTrack」
     private(set) var lastAlbumTracksQuery: (artist: String, album: String)?
@@ -204,6 +208,19 @@ actor MockMusicClient: MusicControlling {
         }
         trackDetailsCompleted += 1
         return try outcome.get()
+    }
+
+    func setLibrary(_ entries: [LibraryArtistAlbum]) { libraryResult = .success(entries) }
+    func failLibrary(_ error: MusicError) { libraryResult = .failure(error) }
+    func setArtistTracks(_ tracks: [ArtistTrack], for artist: String) { artistTracksResult[artist] = tracks }
+
+    func libraryArtistAlbums() async throws -> [LibraryArtistAlbum] {
+        try libraryResult.get()
+    }
+
+    func artistTracks(artist: String) async throws -> [ArtistTrack] {
+        artistTracksRequests.append(artist)
+        return artistTracksResult[artist] ?? []
     }
 
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] {

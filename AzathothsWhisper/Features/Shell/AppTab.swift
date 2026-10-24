@@ -30,4 +30,8 @@ enum AppInfo {
     static let email = "toadeater731@gmail.com"
     static let repository = "TK88101/Azathoths-Whisper"
     static let repositoryURL = URL(string: "https://github.com/TK88101/Azathoths-Whisper")!
+    /// ⑥b：曲風資料的來源與授權（歌手掛的曲風屬 MusicBrainz supplementary data，CC BY-NC-SA 3.0 要求註明來源與授權連結）
+    static let musicBrainzURL = URL(string: "https://musicbrainz.org")!
+    static let genreDataLicense = "CC BY-NC-SA 3.0"
+    static let genreDataLicenseURL = URL(string: "https://creativecommons.org/licenses/by-nc-sa/3.0/")!
 }

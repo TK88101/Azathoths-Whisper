@@ -1,6 +1,29 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "about_genre_credit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genre data comes from MusicBrainz under CC BY-NC-SA 3.0. This app filters and sorts it before use."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ジャンル情報は MusicBrainz のデータ（CC BY-NC-SA 3.0）を、本アプリで絞り込み・並べ替えて使っています。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "曲風資料來自 MusicBrainz，依 CC BY-NC-SA 3.0 授權；本 app 會篩選與排序後使用。"
+          }
+        }
+      }
+    },
     "about_text": {
       "extractionState": "manual",
       "localizations": {

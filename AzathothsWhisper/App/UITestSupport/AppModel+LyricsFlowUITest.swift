@@ -53,6 +53,9 @@ extension AppModel {
             model.lyricsFX.nonceSource = FixedNonceSource(nonce)
         }
         model.lyricsFX.recipeOverride = { LyricsFXPreviewRecipe.forced(in: environment, profile: $0) }
+        if let genres = LyricsFXPreviewFixture.artistGenres(in: environment) {
+            model.lyricsFX.artistGenres = { _ in .verified(genres) }
+        }
         return model
     }
 }

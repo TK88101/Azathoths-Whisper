@@ -14,10 +14,11 @@ struct RecipeGoldenTests {
     /// e0818da＋fit 軸序修正上 `digest()` 的值（逐行與本分支的 `printTheLines()` 輸出比對一致）
     static let recordedDigest: UInt64 = 0x2f80_4412_4f79_d4dc
 
-    /// 只取既有的 profile（樂團表＋曲風列）；不用 `ReadabilityAudit.profiles`——它之後會加入 J-Pop 變體
+    /// 只取既有的 profile（樂團表＋B1 的兩條曲風列）；不用 `ReadabilityAudit.profiles`——它之後會加入 J-Pop 變體。
+    /// ⑥b 新增的 17 列不屬「既有」（它們的可玩與對比由 `GenreRowTests`、`LyricsFXContrastTests` 把關），摘要值不變
     static let existingProfiles: [(name: String, profile: SongProfile)] =
         SongProfileResolver.bandTable.map { ($0.name, $0.profile) }
-            + SongProfileResolver.keywordRows.compactMap { row in
+            + SongProfileResolver.originalRows.compactMap { row in
                 SongProfileResolver.compose(genre: row.keywords[0], rows: [row]).map { ("genre:\(row.keywords[0])", $0) }
             }
 

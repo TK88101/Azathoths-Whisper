@@ -31,6 +31,14 @@ enum Composer {
         return sorted.prefix(shortlist).map(\.0)
     }
 
+    /// 組得出來＝五個必選槽各有合格候選（`compose` 回 mono 的唯一條件；配色與退場的相容過濾都會在沒有合格者時退回整份，
+    /// 所以只要該槽整體有合格者就夠）。⑥b resolver 用它判斷某一層能不能用（R3-4）
+    static func isComposable(_ profile: SongProfile, catalog: [FXComponent] = LyricsFXCatalog.all) -> Bool {
+        [FXSlot.font, .backdrop, .enter, .exit, .palette].allSatisfy { slot in
+            catalog.contains { $0.slot == slot && fit($0, profile) > 0 }
+        }
+    }
+
     /// 從前幾名中以 fit 為權重抽一個（只取一次亂數）；沒有候選＝nil。
     /// 原型是 fit²（composer.js:163），最合身者一家獨大；2026-10-06 使用者經 /thecure＋Jev 收斂改為 fit（不平方）。
     /// `avoiding` 先從前幾名裡拿掉，拿掉後沒有候選才允許它——同一次取樣，不重抽（Codex 字型辯論 R2）

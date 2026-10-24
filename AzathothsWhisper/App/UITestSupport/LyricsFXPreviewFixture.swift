@@ -24,6 +24,12 @@ enum LyricsFXPreviewFixture {
     static let plainLyricsVariable = "AZW_LYRICSFX_PREVIEW_PLAIN"
     /// "1"＝改用以日文為主的預覽歌詞（⑥a J-Pop E2E；含假名的行 ≥ 3 成）
     static let japaneseLyricsVariable = "AZW_LYRICSFX_PREVIEW_JAPANESE"
+    /// 預覽歌手的 MB 曲風（逗號分隔；⑥b E2E，不連網）：設了＝當作已驗證、MB 回這幾個曲風
+    static let artistGenresVariable = "AZW_LYRICSFX_PREVIEW_ARTIST_GENRES"
+
+    static func artistGenres(in environment: [String: String]) -> [String]? {
+        environment[artistGenresVariable].map { raw in raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } }
+    }
     /// 注入假的時間軸退路鏈（C 段 E2E，不連網）："found"＝回「找到」（時間＝本檔 LRC 的時間點）；"notFound"＝回「沒有」
     static let fakeTimingVariable = "AZW_TIMING_FAKE"
     static let duration: Double = 60
