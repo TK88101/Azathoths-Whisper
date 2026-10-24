@@ -34,6 +34,9 @@ struct AboutModalView: View {
                 linkRow(label: "GitHub", value: AppInfo.repository, url: AppInfo.repositoryURL)
             }
 
+            genreCredit
+                .padding(.top, 16)
+
             closeButton
                 .padding(.top, 32)
         }
@@ -82,6 +85,21 @@ struct AboutModalView: View {
         .background(Color.black.opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: 8))           // rounded-lg
         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.Gray.g800.opacity(0.5), lineWidth: 1))
+    }
+
+    /// ⑥b：曲風資料的來源註明（三語；連結標籤照既有兩列寫死英文）
+    private var genreCredit: some View {
+        VStack(spacing: 8) {
+            Text("about_genre_credit")
+                .font(Theme.Fonts.display(10))
+                .foregroundStyle(Theme.Gray.g600)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                linkRow(label: "MusicBrainz", value: AppInfo.musicBrainzURL.host() ?? "", url: AppInfo.musicBrainzURL)
+                linkRow(label: "License", value: AppInfo.genreDataLicense, url: AppInfo.genreDataLicenseURL)
+            }
+        }
     }
 
     private func linkRow(label: String, value: String, url: URL?) -> some View {

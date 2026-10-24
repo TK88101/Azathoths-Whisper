@@ -216,3 +216,8 @@
 - **T3**：紅燈＝`MusicBrainzClient` 未定義 → 綠 11 條。修正測試一處：`SourceGate` 換算 Duration 讓間隔量到 1.101 s，期望改為 ±10 ms（測試寫死了浮點值，非放寬行為）。
 - **T0 介面**：`MusicControlling` 加 `libraryArtistAlbums()`、`artistTracks(artist:)`（只用既有選擇器 `tracks`／`artist`／`album`／`lyrics`）；真 client 各帶 1.5 s AE 預算；5 個替身補齊。行為由 T4 驗（單元宿主不碰真 Music）。
 - **T4**：紅燈＝`ArtistStyleSync` 未定義 → 第一次綠 11／12：大小寫變體只用一種寫法讀歌詞，替身讀不到另一種 → 改為同鍵每種寫法都讀再合併 → 綠 12 條。
+- **T5／T6b**：紅燈＝新 API 未定義（`artistGenreRow`、`genreRowPrivateTags`、`isComposable`、`KeywordRow.id／representatives` 等）→ 綠 27 條。17 列各自可玩、曲庫 47 種組合（含固定代表組合）全部可玩 → **`GenreRowDecisions` 無刪除列**（決策表即 `expandedRows` 全部保留）。`Composer.isComposable` 為 production 定義，與測試側 `PlayableSpace` 對全部樂團與列結論一致（`isComposableAgreesWithThePlayableSpace`）。既有 `SongProfileResolverTests` 一處只改 `KeywordRow` 初始化簽名（加 id、representatives），斷言不動。
+- **T6 紅燈步驟漏做**：VM `artistGenres` 回呼、`AppModel` 接線（`startArtistStyles`、換歌插隊、`stop` 取消）與其測試一起寫，第一次跑即綠。正式組裝改為**所有自動化測試（單元與 UI，`isAutomatedTest`）都不查 MB**——UI 測試走 `AppUITestCase` 的 "0" 也會進正式組裝。E2E `testAnArtistVerifiedAsBlackMetalGetsBlackMetalEvenIfAppleSaysRock`（DEBUG `AZW_LYRICSFX_PREVIEW_ARTIST_GENRES` 注入），待使用者在場跑。
+- **T8**：`about_genre_credit` 三語＋MusicBrainz、授權兩個連結；`AppInfoTests` 驗連結與三語 bundle 字串。
+- **全量單元**（skip 已知 flaky `overlappingLoad…()`，-enableCodeCoverage）：1,676 條／207 suite，紅 1＝`RecipeGoldenTests`——它把所有曲風列算進「既有」摘要，新列必然改變摘要。修：範圍改回 `bandTable`＋`originalRows`，**錄好的摘要值 `2f80…` 不動**→ 綠（＝既有 61 團與兩條舊列的配方逐行不變）。其餘 1,675 條綠。
+- **coverage_gate**：Services+Infra 96.2 %；但豁免檔 `MusicAppleEventsClient.swift` 可執行行數 408→468 超預算 410 → 失敗。/thecure（Codex 1 輪，支持調預算、反對為過閘門重構既有 AE 程式碼）→ 使用者 2026-10-24 批准 **`EXEMPT_LINE_BUDGET` 410→470**。之後 gate 綠；`Scripts/test_coverage_gate.py` 寫死的 411／410 跟著改成 471／470（仍驗「超預算即失敗」），Scripts 333 條綠。`no_playback_gate.sh` 綠。

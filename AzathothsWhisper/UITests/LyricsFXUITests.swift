@@ -218,6 +218,16 @@ final class LyricsFXUITests: AppUITestCase {
         waitForRecipe({ ["jpKiraLilita", "jpCityArchivo", "jpBalladCormorant"].contains($0) }, "日文歌應抽到 J-Pop 字型，不是黑金屬")
     }
 
+    /// ⑥b I-66：MB 驗證過的歌手曲風優先於 Apple 曲風——Apple 寫 Rock、MB 是 black metal，抽到黑金屬群字型
+    func testAnArtistVerifiedAsBlackMetalGetsBlackMetalEvenIfAppleSaysRock() {
+        start(.lyricsFX, extra: [
+            Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.genreVariable: "Rock",
+            LyricsFXPreviewFixture.artistGenresVariable: "black metal",
+        ])
+        waitForStyle("lyricsFX")
+        waitForRecipe({ ["Catacombs", "Grimoire", "Fraktur", "Cenobyte", "DarkMetal", "Mirage"].contains($0) }, "MB 是 black metal 應抽到黑金屬群字型")
+    }
+
     /// I-21：減少動態效果一律 mono
     func testReducedMotionFallsBackToMono() {
         start(.lyricsFX, extra: [

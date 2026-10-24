@@ -50,7 +50,8 @@ enum LyricsEvidence: Equatable, Sendable {
 
 /// 定論的來源；VM 只在來源改變時重組已定格的配方（⑥a 計劃 §4.4）
 enum ProfileSource: Equatable, Sendable {
-    case signedBand, jpopPolicy, genreRow, noMatch
+    /// `verifiedArtistGenre`＝MB 驗證過的歌手曲風命中曲風列（⑥b 計劃 §4.3）；`genreRow`＝Apple 曲風命中
+    case signedBand, jpopPolicy, verifiedArtistGenre, genreRow, noMatch
 
     /// 由歌詞內容決定的來源：寫入或改詞可能讓它出現或消失
     var dependsOnLyrics: Bool { self == .jpopPolicy }
@@ -62,6 +63,8 @@ enum ProfileResolution: Equatable, Sendable {
     case signedBand(SongProfile)
     /// 日文歌一律 J-Pop（使用者 2026-10-22）；變體由 VM 選（`JPopPolicy`）
     case jpop
+    /// MB 驗證過的歌手曲風命中曲風列（⑥b）
+    case artistGenreRow(SongProfile)
     case genreRow(SongProfile)
     /// 讀到了 genre 但無已知關鍵字：素面
     case noMatch
@@ -71,6 +74,7 @@ enum ProfileResolution: Equatable, Sendable {
         case .pending: nil
         case .signedBand: .signedBand
         case .jpop: .jpopPolicy
+        case .artistGenreRow: .verifiedArtistGenre
         case .genreRow: .genreRow
         case .noMatch: .noMatch
         }
@@ -78,16 +82,20 @@ enum ProfileResolution: Equatable, Sendable {
 
     var profile: SongProfile? {
         switch self {
-        case .signedBand(let profile), .genreRow(let profile): profile
+        case .signedBand(let profile), .artistGenreRow(let profile), .genreRow(let profile): profile
         case .pending, .jpop, .noMatch: nil
         }
     }
 }
 
-/// 歌曲目標值的來源（B1 計劃 §3.5；⑥a 計劃 §4.1）：樂團覆寫表 → 歌詞未知＝pending → 日文詞＝J-Pop → genre 關鍵字合成
+/// 歌曲目標值的來源（B1 計劃 §3.5；⑥a 計劃 §4.1；⑥b 計劃 §4.3）：樂團覆寫表 → 歌詞未知＝pending → 日文詞＝J-Pop →
+/// MB 驗證過的歌手曲風 → genre 關鍵字合成。每一層合成後組不出六槽就當沒命中、落下一層
 enum SongProfileResolver {
     struct KeywordRow: Sendable {
+        let id: String
         let keywords: [String]
+        /// 軸值的來源：樂團表裡的代表團（⑥b 計劃 §4.7「列的軸值＝署名代表團平均」）
+        let representatives: [String]
         let tags: Set<FXTag>
         let axes: [FXAxis: Double]
         /// generic（metal、rock…）只在沒有任何非 generic 命中時才貢獻
@@ -178,28 +186,75 @@ enum SongProfileResolver {
         return Dictionary(table.flatMap { band in band.keys.map { ($0, band.profile) } }, uniquingKeysWith: { first, _ in first })
     }
 
-    /// 單一關鍵字列的軸值由覆寫表中該曲風的代表樂團平均而來（可追溯，不另行手填）；B1 只填黑金屬與交響兩列，其餘 genre＝mono
-    static let keywordRows: [KeywordRow] = [
-        KeywordRow(keywords: ["black", "pagan", "depressive", "heathen"], tags: [.black], axes: mean(of: ["Mayhem", "Immortal", "Darkthrone"]), isGeneric: false),
-        KeywordRow(keywords: ["symphon", "neoclassic", "classical", "religious", "soundtrack", "score"], tags: [.symphonic], axes: mean(of: ["Nightwish", "Epica"]), isGeneric: false),
+    /// 單一關鍵字列的軸值由覆寫表中該曲風的代表樂團平均而來（可追溯，不另行手填）。
+    /// B1 的黑金屬、交響兩列標籤是手定的，為不變基線（⑥b R3-6）；⑥b 新增的列標籤＝代表團標籤聯集扣 `genreRowPrivateTags`
+    static let keywordRows: [KeywordRow] = originalRows + expandedRows
+
+    static let originalRows: [KeywordRow] = [
+        legacyRow("black", ["black", "pagan", "depressive", "heathen"], ["Mayhem", "Immortal", "Darkthrone"], tags: [.black]),
+        legacyRow("symphonic", ["symphon", "neoclassic", "classical", "religious", "soundtrack", "score"], ["Nightwish", "Epica"], tags: [.symphonic]),
     ]
+
+    /// ⑥b 計劃 §4.7（使用者 2026-10-24 選範圍 B）。`metal`、`rock` 是 generic
+    static let expandedRows: [KeywordRow] = [
+        row("melodeath", ["melodic death"], ["Arch Enemy"]),
+        row("death", ["death metal", "deathcore", "grind", "brutal death"], ["Cannibal Corpse", "Fleshgod Apocalypse"]),
+        row("gothic", ["gothic", "goth rock", "darkwave"], ["Type O Negative", "Cradle of Filth"]),
+        row("doom", ["doom", "sludge"], ["Type O Negative", "Burzum"]),
+        row("heavypower", ["heavy metal", "power metal", "speed metal", "nwobhm"], ["Iron Maiden", "Nightwish"]),
+        row("thrash", ["thrash", "groove metal"], ["Slayer", "Arch Enemy"]),
+        row("hardrock", ["hard rock", "glam", "heavy rock"], ["AC/DC", "Guns N' Roses"]),
+        row("classicrock", ["classic rock", "blues rock", "psychedelic", "progressive rock", "art rock"], ["The Beatles", "Pink Floyd", "Queen"]),
+        row("altindie", ["alternative rock", "indie rock", "grunge", "post-grunge", "britpop", "indie"], ["Blur", "Weezer", "Oasis"]),
+        row("arena", ["pop rock", "piano rock", "soft rock", "arena rock"], ["Coldplay", "The Killers"]),
+        row("poppunk", ["pop punk", "pop-punk"], ["Blink-182", "Green Day", "Sum 41", "Fall Out Boy", "Good Charlotte"]),
+        row("punk", ["punk"], ["Ramones", "Sex Pistols", "The Offspring", "NOFX"]),
+        row("ska", ["ska"], ["The Interrupters"]),
+        row("metalcore", ["metalcore", "hardcore"], ["Hatebreed"]),
+        row("nu", ["nu metal", "alternative metal", "rap metal", "rap rock"], ["Korn"]),
+        row("metal", ["metal"], ["Iron Maiden", "Slayer"], isGeneric: true),
+        row("rock", ["rock"], ["AC/DC", "The Beatles"], isGeneric: true),
+    ]
+
+    /// 曲風列不得帶的標籤（⑥b R3-1）：emo 群、J-Pop 與批 3 的 Nu 系子標籤是各批私有，重用要重簽；`.nu`（B1 原型）不在此列
+    static let genreRowPrivateTags: Set<FXTag> = FXTag.emoFamily.union(FXTag.jpopFamily).union(FXTag.nuFamily.subtracting([.nu]))
 
     /// 硬軸取 max：一個「狠」的曲風不得被溫柔的曲風稀釋（P11）；其餘軟軸取平均
     static let hardAxes: Set<FXAxis> = [.raw, .aggression, .speed, .decay, .cold, .theatrical]
 
-    static func resolve(artist: String, genre: String?, lyrics: LyricsEvidence) -> ProfileResolution {
+    static func resolve(
+        artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown, rows: [KeywordRow] = keywordRows
+    ) -> ProfileResolution {
         if let profile = overrides[normalizedArtist(artist)] { return .signedBand(profile) }
         if lyrics == .unknown { return .pending }
         if lyrics == .text(isJapanese: true) { return .jpop }
+        // MB 還沒查、認不出、或碰不到任何列：不等，落到 Apple 曲風（只升不降，⑥b §4.3）
+        if case .verified(let genres) = artistGenres, let profile = playable(compose(genres: genres, rows: rows)) {
+            return .artistGenreRow(profile)
+        }
         guard let genre else { return .pending }
-        return compose(genre: genre, rows: keywordRows).map(ProfileResolution.genreRow) ?? .noMatch
+        return playable(compose(genres: [genre], rows: rows)).map(ProfileResolution.genreRow) ?? .noMatch
+    }
+
+    /// 組不出六槽的目標值不算命中（⑥b R3-4）：讓下一層有機會，而不是靜默變成素面
+    private static func playable(_ profile: SongProfile?) -> SongProfile? {
+        profile.flatMap { Composer.isComposable($0) ? $0 : nil }
     }
 
     /// genre 命中的所有關鍵字列合成一個目標值；無命中＝nil
     static func compose(genre: String, rows: [KeywordRow]) -> SongProfile? {
-        let hits = rows.filter { row in row.keywords.contains { GenreStyleResolver.genre(genre, matches: $0) } }
+        compose(genres: [genre], rows: rows)
+    }
+
+    /// 每個 genre 各自比對 → 命中的列去重 → 整體套一次 generic 抑制 → 合成。順序與重複不影響結果（⑥b R3-2）
+    static func compose(genres: [String], rows: [KeywordRow] = keywordRows) -> SongProfile? {
+        let hits = rows.filter { row in genres.contains { genre in row.keywords.contains { GenreStyleResolver.genre(genre, matches: $0) } } }
         let specific = hits.filter { !$0.isGeneric }
-        let chosen = specific.isEmpty ? hits : specific
+        return compose(rows: specific.isEmpty ? hits : specific)
+    }
+
+    /// 指定的列直接合成（不比對、不抑制 generic）；空＝nil
+    static func compose(rows chosen: [KeywordRow]) -> SongProfile? {
         guard !chosen.isEmpty else { return nil }
         var axes: [FXAxis: Double] = [:]
         for axis in FXAxis.allCases {
@@ -219,8 +274,24 @@ enum SongProfileResolver {
         return String(folded.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map(Character.init))
     }
 
+    /// B1 的兩列：關鍵字、標籤照舊手定
+    private static func legacyRow(_ id: String, _ keywords: [String], _ representatives: [String], tags: Set<FXTag>) -> KeywordRow {
+        KeywordRow(id: id, keywords: keywords, representatives: representatives, tags: tags, axes: mean(of: representatives), isGeneric: false)
+    }
+
+    /// ⑥b 的列：標籤＝代表團聯集扣私有家族，軸值＝代表團平均
+    private static func row(_ id: String, _ keywords: [String], _ representatives: [String], isGeneric: Bool = false) -> KeywordRow {
+        let tags = representatives.compactMap(bandProfile).reduce(into: Set<FXTag>()) { $0.formUnion($1.tags) }.subtracting(genreRowPrivateTags)
+        return KeywordRow(id: id, keywords: keywords, representatives: representatives, tags: tags, axes: mean(of: representatives), isGeneric: isGeneric)
+    }
+
+    /// 以正式名精確查樂團表；每團恰算一次（⑥b R3-5）
+    private static func bandProfile(_ name: String) -> SongProfile? {
+        bandTable.first { $0.name == name }?.profile
+    }
+
     private static func mean(of artists: [String]) -> [FXAxis: Double] {
-        let profiles = artists.compactMap { name in bandTargets.first { $0.0 == name }?.1 }
+        let profiles = artists.compactMap(bandProfile)
         var axes: [FXAxis: Double] = [:]
         for axis in FXAxis.allCases {
             let values = profiles.compactMap { $0.axes[axis] }

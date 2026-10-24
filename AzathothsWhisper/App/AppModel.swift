@@ -44,6 +44,13 @@ final class AppModel {
     @ObservationIgnored private var pendingReturnToEditor: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
     private var didStart = false
+    /// ⑥b：背景查 MB 的組裝（nil＝不查——單元測試與 UI 測試組裝的預設，絕不連網）
+    typealias ArtistStylesFactory = (@escaping @Sendable (ArtistStyleBook) async -> Void) -> ArtistStyleSync
+    private let makeArtistStyles: ArtistStylesFactory?
+    private var artistStyles: ArtistStyleSync?
+    private var artistStylesTask: Task<Void, Never>?
+    /// ⑥b：最新的查詢結果 snapshot（R1-6）；歌詞特效同步讀它
+    @ObservationIgnored private(set) var artistBook = ArtistStyleBook()
 
     init(
         configStore: ConfigStore,
@@ -71,7 +78,9 @@ final class AppModel {
         positionPollClock: any PollClock = SystemPollClock(),
         isMusicRunning: @escaping () -> Bool = MusicProcess.isRunning,
         /// 外部時間軸查找（C 段）。nil＝不查——單元測試與 UI 測試組裝的預設，絕不連網
-        timing: (any TimingResolving)? = nil
+        timing: (any TimingResolving)? = nil,
+        /// ⑥b 歌手曲風。nil＝不查
+        artistStyles: ArtistStylesFactory? = nil
     ) {
         self.configStore = configStore
         self.httpClient = httpClient
@@ -84,6 +93,7 @@ final class AppModel {
         self.playerSignal = playerSignal
         self.batchSwitchClock = batchSwitchClock
         self.timing = timing
+        self.makeArtistStyles = artistStyles
         self.editor = EditorViewModel(
             lyricsService: Self.makeLyricsService(client: httpClient, token: initialToken),
             music: music
@@ -148,6 +158,7 @@ final class AppModel {
         // D8：Editor 只拿唯讀判斷式與回報出口，不持有標記 store 與狀態機
         editor.isMarkedNoLyrics = { [weak self] in self?.lyricsFlow.isMarkedNoLyrics($0) ?? false }
         lyricsFX.isMarkedNoLyrics = { [weak self] in self?.lyricsFlow.isMarkedNoLyrics($0) ?? false }
+        lyricsFX.artistGenres = { [weak self] artist in self?.artistBook.genres(forArtist: artist) ?? .unknown }
         editor.onSaved = { [weak self] persistentID, text in
             self?.lyricsFlow.saved(persistentID: persistentID, text: text)
             self?.lyricsFX.lyricsUpdated(persistentID: persistentID, text: text)
@@ -290,6 +301,12 @@ final class AppModel {
         #else
         let queueDirectory: URL? = QueueFileSource.defaultDirectory
         #endif
+        #if DEBUG
+        // 自動化測試（單元與 UI）一律不連外網查歌手曲風、不掃使用者的曲庫
+        let artistStyles: ArtistStylesFactory? = isAutomatedTest ? nil : liveArtistStyles(music: music)
+        #else
+        let artistStyles: ArtistStylesFactory? = liveArtistStyles(music: music)
+        #endif
         return AppModel(
             configStore: store,
             httpClient: client,
@@ -302,8 +319,23 @@ final class AppModel {
             initialLanguage: store.language,
             artworkDiskDirectory: artworkCacheDirectory,
             queueDirectory: queueDirectory,
-            timing: timing
+            timing: timing,
+            artistStyles: artistStyles
         )
+    }
+
+    /// ⑥b 正式組裝：MB 專用、不收不送 cookie 的連線；結果存 Application Support
+    static func liveArtistStyles(music: any MusicControlling) -> ArtistStylesFactory {
+        let client = URLSessionHTTPClient(session: URLSession(configuration: URLSessionHTTPClient.cookielessConfiguration()))
+        let musicBrainz = MusicBrainzClient(gate: SourceGate(policy: MusicBrainzClient.policy, client: client))
+        let store = ArtistStyleStore(directory: ArtistStyleStore.defaultDirectory)
+        return { publish in
+            ArtistStyleSync(
+                music: music, store: store,
+                identify: { artist, albums throws(ProviderFailure) in try await musicBrainz.identify(artist: artist, albums: albums) },
+                publish: publish
+            )
+        }
     }
 
     #if DEBUG
@@ -339,9 +371,27 @@ final class AppModel {
             self?.lyricsFX.positionClock.resync()
         }
         lyricsFlow.startPolling()
+        startArtistStyles()
 
         try? await Task.sleep(for: splashDuration)
         isSplashVisible = false
+    }
+
+    /// ⑥b：背景查一輪（只啟動一次）；每查完一位就換 snapshot
+    func startArtistStyles() {
+        guard artistStyles == nil, let makeArtistStyles else { return }
+        let sync = makeArtistStyles { [weak self] book in await self?.receiveArtistBook(book) }
+        artistStyles = sync
+        artistStylesTask = Task(priority: .utility) { await sync.run() }
+    }
+
+    /// 測試用：等背景這一輪跑完
+    func waitForArtistStyles() async {
+        await artistStylesTask?.value
+    }
+
+    private func receiveArtistBook(_ book: ArtistStyleBook) {
+        artistBook = book
     }
 
     /// 只接上事件分發、不啟動輪詢。整合測試以 `monitor.tick()` 逐次驅動（計劃 Q0）；
@@ -352,6 +402,9 @@ final class AppModel {
             guard let self else { return }
             // D7：editor → lyricsFlow（同步）→ lyricsFX（同步）→ batch；迴圈內不 await 任何 AE
             for await event in self.monitor.events {
+                if case .trackChanged(let track, _, _) = event, let artistStyles = self.artistStyles {
+                    Task { await artistStyles.prioritize(artist: track.artist) }
+                }
                 self.editor.handle(event)
                 self.lyricsFlow.handle(event)
                 self.lyricsFX.handle(event)
@@ -363,6 +416,7 @@ final class AppModel {
     func stop() {
         eventTask?.cancel()
         eventTask = nil
+        artistStylesTask?.cancel()
         lyricsFlow.stopPolling()
         lyricsFX.setVisible(false)
         playerSignal.stop()

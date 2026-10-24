@@ -67,8 +67,8 @@ struct SongProfileResolverTests {
 
     @Test func genericKeywordsOnlyCountWithoutASpecificOne() {
         let rows: [SongProfileResolver.KeywordRow] = [
-            .init(keywords: ["metal"], tags: [.heavy], axes: [.aggression: 0.5, .bright: 0.9], isGeneric: true),
-            .init(keywords: ["black"], tags: [.black], axes: [.aggression: 0.9], isGeneric: false),
+            .init(id: "metal", keywords: ["metal"], representatives: [], tags: [.heavy], axes: [.aggression: 0.5, .bright: 0.9], isGeneric: true),
+            .init(id: "black", keywords: ["black"], representatives: [], tags: [.black], axes: [.aggression: 0.9], isGeneric: false),
         ]
         #expect(SongProfileResolver.compose(genre: "Black Metal", rows: rows) == SongProfile(axes: [.aggression: 0.9], tags: [.black]))
         #expect(SongProfileResolver.compose(genre: "Metal", rows: rows) == SongProfile(axes: [.aggression: 0.5, .bright: 0.9], tags: [.heavy]))
