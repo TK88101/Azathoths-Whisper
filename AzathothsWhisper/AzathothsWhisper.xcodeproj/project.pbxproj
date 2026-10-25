@@ -181,6 +181,7 @@
 		6394CB1C7B4DC30818E6B108 /* Oswald-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 29B1739504887037D8B53AEC /* Oswald-Variable.ttf */; };
 		63C8297837078C7EFF8859D5 /* ShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1207833B927999FE4629D7C4 /* ShellUITests.swift */; };
 		64102DBE6696A711580088D5 /* LyricsFXRecipeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38FE39FBCD9EDB81041E2969 /* LyricsFXRecipeTests.swift */; };
+		64D0654B371A911A47652F06 /* RecipeReplayExpectations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0093094223A096213C306CD4 /* RecipeReplayExpectations.swift */; };
 		65EA4BD9C610459A4E76C3B8 /* AccessibilityProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3696FA328C9BB26B4916183 /* AccessibilityProbe.swift */; };
 		694716352561D116D6EC7584 /* CJKFaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A2523D774D6E8936365C26A /* CJKFaces.swift */; };
 		69A00F59A928BE00AB3719C6 /* OFL-LilitaOne.txt in Resources */ = {isa = PBXBuildFile; fileRef = B892ABAAFDA815E87045B658 /* OFL-LilitaOne.txt */; };
@@ -462,6 +463,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0093094223A096213C306CD4 /* RecipeReplayExpectations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeReplayExpectations.swift; sourceTree = "<group>"; };
 		00EE1BA3EC41C32F76D6B638 /* ThemeMotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeMotionTests.swift; sourceTree = "<group>"; };
 		0108B557706B2EFF9018B1F4 /* Cinzel-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Cinzel-Variable.ttf"; sourceTree = "<group>"; };
 		013F6B182C10F54B89E70104 /* OFL-BlackOpsOne.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-BlackOpsOne.txt"; sourceTree = "<group>"; };
@@ -1206,6 +1208,7 @@
 				58C02EBBD0929808F2D86024 /* MockMusicClient.swift */,
 				85498F01ED945437E6CA6B8A /* PreviewImageWriter.swift */,
 				3828620C6995683FE945BE7C /* QueueFixtures.swift */,
+				0093094223A096213C306CD4 /* RecipeReplayExpectations.swift */,
 				A71C935E227D4254FED6BE12 /* SelectorAllowList.swift */,
 				779624D54FEDE9B890CAB935 /* SerialAEQueueMusicClient.swift */,
 				E5EDBED3C33AED07C30D09C1 /* SpyLyricsNotifier.swift */,
@@ -2014,6 +2017,7 @@
 				CFD27B1B5115E4BEAF355220 /* ReadabilityAudit.swift in Sources */,
 				CFE07B03B29B0249EE57706C /* ReadabilityGateTests.swift in Sources */,
 				390724B33D82473F5D27D033 /* RecipeGoldenTests.swift in Sources */,
+				64D0654B371A911A47652F06 /* RecipeReplayExpectations.swift in Sources */,
 				A5F34C43C13F0D023D1F00DD /* SelectorAllowList.swift in Sources */,
 				5FE1DF33D780A35ADAD78130 /* SerialAEQueueMusicClient.swift in Sources */,
 				070BFA6FE12F38EC022F62ED /* SettingsViewModelTests.swift in Sources */,

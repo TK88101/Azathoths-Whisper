@@ -83,28 +83,22 @@ struct GenericLayerTests {
         #expect(tags(resolve("ポップ", mb: .verified(["industrial"]))) == [.genIndustrial])
     }
 
-    /// §4.2：曲庫實際出現的 14 種通用家族組合（T0；§9-1 選 a），各自組得出、每次播放每槽都換
+    /// §4.2：曲庫實際出現的通用家族組合（T0，§9-1 選 a：14 種＋工業單獨），再補上每一族單獨——各自組得出、每次播放每槽都換
     static let libraryCombinations: [[String]] = [
         ["pop"], ["electronic", "experimental", "pop"], ["experimental", "industrial"], ["folk"], ["electronic", "pop"],
         ["experimental", "pop"], ["ambient", "electronic"], ["hiphop"], ["folk", "pop"], ["folk", "sacred"],
         ["darkwave", "folk", "sacred"], ["electronic", "industrial"], ["electronic"], ["darkwave"], ["industrial"],
     ]
+    static let combinationsToCheck: [[String]] = SongProfileResolver.genericRows.map { [$0.id] }
+        .reduce(into: libraryCombinations) { all, single in if !all.contains(single) { all.append(single) } }
 
-    @Test(arguments: libraryCombinations)
-    func everyLibraryCombinationComposesAndChangesEverySlot(ids: [String]) throws {
+    @Test(arguments: combinationsToCheck)
+    func everyCombinationComposesAndChangesEverySlot(ids: [String]) throws {
         let rows = SongProfileResolver.genericRows.filter { ids.contains($0.id) }
         try #require(rows.count == ids.count, "\(ids)：有家族不存在")
         let profile = try #require(SongProfileResolver.compose(rows: rows))
         #expect(Composer.isComposable(profile), "\(ids)")
-        for seed in UInt64(0)..<256 {
-            guard case .composed(let first) = Composer.compose(profile: profile, seed: seed),
-                  case .composed(let next) = Composer.compose(profile: profile, seed: seed &+ 1, avoiding: first) else {
-                Issue.record("\(ids) seed \(seed)：應有組合配方")
-                continue
-            }
-            #expect(next.font != first.font && next.backdrop != first.backdrop && next.enter != first.enter, "\(ids) seed \(seed)")
-            #expect(next.exit != first.exit && next.fx1 != first.fx1 && next.palette != first.palette, "\(ids) seed \(seed)")
-        }
+        expectReplayChangesEverySlot(profile, ids.joined(separator: "+"))
     }
 
     // MARK: 通用列
@@ -117,34 +111,4 @@ struct GenericLayerTests {
         }
     }
 
-    @Test func eachGenericRowIsComposable() {
-        for row in SongProfileResolver.genericRows {
-            let profile = SongProfileResolver.compose(rows: [row])
-            #expect(profile.map { Composer.isComposable($0) } == true, "\(row.id)")
-        }
-    }
-
-    /// §4.4：沿用 `ComposerTests.avoidingThePreviousRecipeChangesEverySlotThatHasAnAlternative` 的相鄰配對標準（fx2 不在要求內）
-    @Test func everyReplayChangesEverySlot() throws {
-        for row in SongProfileResolver.genericRows {
-            let profile = try #require(SongProfileResolver.compose(rows: [row]))
-            for seed in UInt64(0)..<256 {
-                guard case .composed(let first) = Composer.compose(profile: profile, seed: seed),
-                      case .composed(let next) = Composer.compose(profile: profile, seed: seed &+ 1, avoiding: first) else {
-                    Issue.record("\(row.id) seed \(seed)：應有組合配方")
-                    continue
-                }
-                #expect(next.font != first.font && next.backdrop != first.backdrop && next.enter != first.enter, "\(row.id) seed \(seed)")
-                #expect(next.exit != first.exit && next.fx1 != first.fx1 && next.palette != first.palette, "\(row.id) seed \(seed)")
-            }
-        }
-    }
-
-    @Test func genericComponentsOnlyServeTheirOwnFamily() {
-        let generic = LyricsFXCatalog.all.filter { !$0.tags.isDisjoint(with: FXTag.genericFamily) }
-        #expect(!generic.isEmpty)
-        for component in generic {
-            #expect(component.tags.count == 1, "\(component.id)")
-        }
-    }
 }

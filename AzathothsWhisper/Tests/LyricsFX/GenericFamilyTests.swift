@@ -10,8 +10,11 @@ struct GenericFamilyTests {
         FXComponent(id: id, slot: .fx, vector: [:], tags: tags, req: [:], forbid: [:], payload: .fx(.none))
     }
 
-    @Test func thereAreNineGenericFamilies() {
-        #expect(FXTag.genericFamily == [.genExperimental, .genElectronic, .genPop, .genFolk, .genIndustrial, .genAmbient, .genSacred, .genDarkwave, .genHipHop])
+    /// 標籤集合與通用列一一對應：每個通用標籤恰有一條列，沒有孤兒標籤
+    @Test func genericFamilyTagsMatchTheGenericRowsOneToOne() {
+        let rowTags = SongProfileResolver.genericRows.flatMap(\.tags)
+        #expect(Set(rowTags) == FXTag.genericFamily)
+        #expect(rowTags.count == FXTag.genericFamily.count)
     }
 
     @Test func signedBandsCarryNoGenericTag() {

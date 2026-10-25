@@ -80,7 +80,7 @@ struct B2BatchFourIsolationTests {
     }
 
     private func genericRow(of component: FXComponent) -> SongProfileResolver.KeywordRow? {
-        SongProfileResolver.genericRows.first { component.tags == $0.tags && $0.tags.isSubset(of: FXTag.genericFamily) }
+        SongProfileResolver.genericRows.first { component.tags == $0.tags }
     }
 
     /// 新元件沒標籤＝人人可抽、帶舊標籤＝舊團被連帶；兩者都不准（計劃評審 R1 #1）

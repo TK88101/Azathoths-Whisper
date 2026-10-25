@@ -271,18 +271,16 @@ enum SongProfileResolver {
         if lyrics == .unknown { return .pending }
         if lyrics == .text(isJapanese: true) { return .jpop }
         // MB 還沒查、認不出、或碰不到任何列：不等，落到 Apple 曲風（只升不降，⑥b §4.3）
-        if case .verified(let genres) = artistGenres, let profile = playable(compose(genres: genres, rows: rows)) {
-            return .artistGenreRow(profile)
-        }
+        // 每個曲風字串只正規化一次，四層共用（⑦ simcodex 效率）
+        let mb: [GenreStyleResolver.NormalizedGenre]? = if case .verified(let genres) = artistGenres { genres.map(GenreStyleResolver.normalized) } else { nil }
+        if let mb, let profile = playable(compose(normalized: mb, rows: rows)) { return .artistGenreRow(profile) }
+        // genre nil＝讀取失敗、還不知道：要等它，Apple 的既有列優先於通用列（⑦ 計劃 §4.1）
         guard let genre else { return .pending }
-        if let profile = playable(compose(genres: [genre], rows: rows)) { return .genreRow(profile) }
-        return genericProfile(artistGenres: artistGenres, genre: genre, rows: genericRows).map(ProfileResolution.genericRow) ?? .noMatch
-    }
-
-    /// 通用層：先 MB 曲風（比 Apple 細），沒命中再用 Apple 曲風（⑦ 計劃 §4.1）
-    private static func genericProfile(artistGenres: ArtistGenres, genre: String, rows: [KeywordRow]) -> SongProfile? {
-        if case .verified(let genres) = artistGenres, let profile = playable(compose(genres: genres, rows: rows)) { return profile }
-        return playable(compose(genres: [genre], rows: rows))
+        let apple = [GenreStyleResolver.normalized(genre)]
+        if let profile = playable(compose(normalized: apple, rows: rows)) { return .genreRow(profile) }
+        // 通用層：先 MB（比 Apple 細），再 Apple
+        if let mb, let profile = playable(compose(normalized: mb, rows: genericRows)) { return .genericRow(profile) }
+        return playable(compose(normalized: apple, rows: genericRows)).map(ProfileResolution.genericRow) ?? .noMatch
     }
 
     /// 要不要為這位歌手查 MB：樂團表的團一律以表為準（與 `resolve` 的第一層同一個判斷）
@@ -306,7 +304,10 @@ enum SongProfileResolver {
 
     /// 每個 genre 各自比對 → 命中的列去重 → 整體套一次 generic 抑制 → 合成。順序與重複不影響結果（⑥b R3-2）
     static func compose(genres: [String], rows: [KeywordRow] = keywordRows) -> SongProfile? {
-        let normalized = genres.map(GenreStyleResolver.normalized)
+        compose(normalized: genres.map(GenreStyleResolver.normalized), rows: rows)
+    }
+
+    private static func compose(normalized: [GenreStyleResolver.NormalizedGenre], rows: [KeywordRow]) -> SongProfile? {
         let hits = rows.filter { row in row.keywords.contains { keyword in normalized.contains { GenreStyleResolver.genre($0, matches: keyword) } } }
         let specific = hits.filter { !$0.isGeneric }
         return compose(rows: specific.isEmpty ? hits : specific)

@@ -262,3 +262,19 @@ T3 是 T4 的子集先行（工業家族用到的 resolver 改動在 T3 一起�
 - **T6 曲庫不變式**：改前有樣式 11,320 首，改後逐首（判定＋十軸＋標籤＋固定 seed 配方 id）0 首改變；素面 951 → 394（＝§7 凍結目標）。
 - **T7**：ACCEPTANCE I-67（待使用者簽字）。
 - **全量單元（第 1 次）**：1,706 條，紅 4 條，全屬 ⑦ 連帶：①`B2BatchFourIsolationTests` 兩條（基線之後的新元件只認批 4／J-Pop 兩批）→ 依 ⑥a 先例加「⑦ 通用族」分支（恰一個通用標籤＋其通用列抽得到），檢查強度不變；②`SongProfileResolverTests`／`JPopResolutionTests` 3 處以「Experimental Foo」當未知曲風，experimental 已成實驗族關鍵字 → 改為「Glimmerwave Foo」，斷言不動。修後 3 suite 25 條綠；其餘 1,702 條該輪已綠。coverage 96.2 %（豁免 453／470）；`no_playback_gate.sh` exit 0。
+- **更正**：全量單元（第 1 次）實際紅 6 條，不是 4 條——參數化測試的失敗行前面有零寬字元，原先的過濾指令沒抓到 `ArtistGenreResolutionTests.noUsableMBEvidenceFallsToTheAppleGenre(mb:)`（同屬「Experimental」過時字串）。已改為「Glimmerwave Foo」，斷言不動。
+
+## 附錄 E simcodex（2026-10-25，2 輪，第 2 輪提前結束）
+| 輪 | 來源 | 意見 | 處置 |
+|---|---|---|---|
+| 1 | codex review --base main [P2] | Apple genre 為 nil 時先回 pending，MB 通用列輪不到 | **駁回**：nil＝AE 讀取失敗（`MusicAppleEventsClient.swift:79` `unlessFailed`；讀成功但無曲風是空字串），屬暫態、補讀會合併；若先套 MB 通用列，Apple 其實會命中既有列時會被通用列搶先定格，違反 §3「現有樣式不變」。註解寫明原因 |
+| 1 | simplify 簡化＋重用 P1 | 「每次換一套」的 256 seed 迴圈三處各寫一份 | **採納**：`Tests/Support/RecipeReplayExpectations.swift` 唯一定義；`ComposerTests`、`GenericLayerTests` 改用；組合測試併入各族單獨，刪 `everyReplayChangesEverySlot`、`eachGenericRowIsComposable` |
+| 1 | 效率＋簡化＋重用＋層級 P2 | 曲風字串在四層各正規化一次；通用層重複「先 MB 再 Apple」邏輯 | **採納**：`resolve()` 只正規化一次、四層共用私有 `compose(normalized:rows:)`，刪 `genericProfile`；曲庫不變式重跑與重構前逐行相同 |
+| 1 | 簡化 P2 | `genericComponentsOnlyServeTheirOwnFamily` 與目錄檢查重複；家族數測試只是抄常數；批 4 謂詞多餘；組合數註解寫錯 | **採納** |
+| 1 | 層級 P2 | 私有標籤家族的知識分散四處（`genreRowPrivateTags`、驗證器、隔離測試、GenericFamilyTests），宜統一定義 | **延後**：會改到 emo 的驗證語意，超出本計劃；目前由 `GenericFamilyTests` 守住 |
+| 1 | 重用 P2 | 測試元件建構 helper 第三份 | **延後** |
+| 1 | 效率 P2 | `isComposable` 與 `compose` 重複掃目錄；`bySlot` 快取 | **延後**：每次換歌一次、亞毫秒 |
+| 2 | codex review --uncommitted | 無 finding | — |
+| 2 | 綜合審查（Sonnet） | 0 P1；P2：「Glimmerwave Foo」兩檔各寫、註解帶審查輪次、一行式稍長 | **延後**（註解記計劃出處是專案慣例） |
+- 驗證：受影響 12 suite 81 條綠；曲庫不變式（重構後）與重構前逐行相同。
+- **收尾全量單元（2026-10-25）**：1,703 條／209 suite 全綠（已知 flaky 1 條 skip），4,362 s；coverage 96.2 %；`no_playback_gate.sh` exit 0。
