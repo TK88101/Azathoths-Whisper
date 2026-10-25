@@ -107,7 +107,7 @@ class AppUITestCase: XCTestCase {
         }
     }
 
-    /// splash 3.5 秒後在同一視窗切主 UI（A-02）。timeout 取值理由見類註解。
+    /// 等主 UI 出現（A-01／A-02）。timeout 取值理由見類註解。
     func waitForMainUI(
         _ editorLabel: String = "EDITOR",
         file: StaticString = #filePath, line: UInt = #line
@@ -115,7 +115,7 @@ class AppUITestCase: XCTestCase {
         let editor = navButton("editor")
         XCTAssertTrue(
             editor.waitForExistence(timeout: Self.mainUITimeout),
-            "splash 後應出現主 UI 導航",
+            "應出現主 UI 導航",
             file: file, line: line
         )
         assertNavLabel(editor, editorLabel, file: file, line: line)

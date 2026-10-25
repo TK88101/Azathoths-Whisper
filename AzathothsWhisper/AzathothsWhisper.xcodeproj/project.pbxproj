@@ -81,7 +81,6 @@
 		2D9E186B10A098EE4C6A9334 /* LyricsFXViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9DB187F7F3837A12A6E75DE /* LyricsFXViewModelTests.swift */; };
 		2DAAE161D065379561EDAFFE /* CoverFlowSlideSpikeS9Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F1C5B13ED17F9135FA23613 /* CoverFlowSlideSpikeS9Tests.swift */; };
 		2DDCF1CE3894EB9EBE4A8A5C /* B2BatchFourLeftoverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76E40B05AEEBFAE365222851 /* B2BatchFourLeftoverTests.swift */; };
-		2E285F746A70A58DA42E5D12 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D76FC4760C2F214340628D8 /* SplashView.swift */; };
 		2E7B58956B0648C793807039 /* StubLyricsSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6063CCF5ABA3EC58B6A8404F /* StubLyricsSource.swift */; };
 		2ECE532039045B813A605A95 /* BatchViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA23FF62ADA9D3B2A52E4117 /* BatchViewModelTests.swift */; };
 		2EF03340DB55ACB9FE68BB01 /* HTTPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B73C3152A3FAEE8005D4686 /* HTTPClient.swift */; };
@@ -328,6 +327,7 @@
 		BDB5721EBA5DF9149D2DD047 /* AboutLogo.png in Resources */ = {isa = PBXBuildFile; fileRef = 869CACD3F359C692710F276F /* AboutLogo.png */; };
 		BDBC40280EAC808D00CFF84A /* OFL-CormorantGaramond.txt in Resources */ = {isa = PBXBuildFile; fileRef = 03DB5CEF2F76C20559218E73 /* OFL-CormorantGaramond.txt */; };
 		BFD7D7F75E9D29EC97E731AE /* CoverFlowSlidePlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF6A29B59968A7FAAA9AB990 /* CoverFlowSlidePlanTests.swift */; };
+		BFED9333DB1D8BA4E112A775 /* HexagonLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C081008DC6AE32901F79B758 /* HexagonLogo.swift */; };
 		C002CD79C0F951217AF5D928 /* CoverFlowMarksFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8575F16A3A5A87F67499C2FF /* CoverFlowMarksFormat.swift */; };
 		C094C29487585BEFEFBD7BC7 /* CoverFlowCenterLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7984B065A3700D3EAD1D526F /* CoverFlowCenterLabel.swift */; };
 		C279C2DE6E2E03D14A29D44F /* B2BatchOneTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1171E8E92D40821F02D20451 /* B2BatchOneTests.swift */; };
@@ -738,7 +738,6 @@
 		9CA4E97EC372A5F6B60141F6 /* CJKFaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CJKFaceTests.swift; sourceTree = "<group>"; };
 		9CBA8D561D582B0F4B004CEF /* LyricsFlowUITestAssemblyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFlowUITestAssemblyTests.swift; sourceTree = "<group>"; };
 		9D66B9811504A0DF72AEB23D /* LyricsFingerprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFingerprint.swift; sourceTree = "<group>"; };
-		9D76FC4760C2F214340628D8 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 		9DC9EF24B02FBACDAD8C3FF8 /* OFL-DelaGothicOne.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-DelaGothicOne.txt"; sourceTree = "<group>"; };
 		9EE9244A95FDA2EA815B8A8F /* PlaybackPositionClockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackPositionClockTests.swift; sourceTree = "<group>"; };
 		9EEE31994799A8A6681370FD /* LanguageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
@@ -787,6 +786,7 @@
 		BC3845E8AC633F1D37B0BE14 /* GrimoireOfDeath-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GrimoireOfDeath-Regular.ttf"; sourceTree = "<group>"; };
 		C005FD3CABC2C3E9E04FD970 /* BebasNeue-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BebasNeue-Regular.ttf"; sourceTree = "<group>"; };
 		C05FFC669BAA4C49A2C4EF7E /* ConfettiPhysicsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfettiPhysicsTests.swift; sourceTree = "<group>"; };
+		C081008DC6AE32901F79B758 /* HexagonLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HexagonLogo.swift; sourceTree = "<group>"; };
 		C19AF113BE1149A7D970ACDC /* LyricsFXCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFXCatalog.swift; sourceTree = "<group>"; };
 		C2042248839B92C8571BF152 /* CoverFlowMarksFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowMarksFormatTests.swift; sourceTree = "<group>"; };
 		C207B43C1ACA4C7F46C87E81 /* LyricsLines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsLines.swift; sourceTree = "<group>"; };
@@ -1144,7 +1144,6 @@
 				EEE1E8764600A07ACFE8BD1D /* LyricsFX */,
 				C79469AC2C5004479F256098 /* Settings */,
 				990C0225B35B0D3E4A66E820 /* Shell */,
-				7555D5155FF469C8687A7856 /* Splash */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -1186,14 +1185,6 @@
 				D44F448D75E8EFC0FE87FC28 /* YouTubeMusicProviderTests.swift */,
 			);
 			path = Timing;
-			sourceTree = "<group>";
-		};
-		7555D5155FF469C8687A7856 /* Splash */ = {
-			isa = PBXGroup;
-			children = (
-				9D76FC4760C2F214340628D8 /* SplashView.swift */,
-			);
-			path = Splash;
 			sourceTree = "<group>";
 		};
 		7D7AF4FF7444B66CF80881C9 /* Support */ = {
@@ -1324,6 +1315,7 @@
 				E3696FA328C9BB26B4916183 /* AccessibilityProbe.swift */,
 				452924C5DA3B362F5A2F4ADE /* ActionButton.swift */,
 				85BF3B881B244A008A553BFA /* ConfettiView.swift */,
+				C081008DC6AE32901F79B758 /* HexagonLogo.swift */,
 				748E387ADDA437C553314752 /* MaterialSymbol.swift */,
 				120F3323C4973B80132A3602 /* ModalScrim.swift */,
 				5722615532845937BFFD060D /* NoiseOverlay.swift */,
@@ -2120,6 +2112,7 @@
 				F4A90A048982A26FAF21CE39 /* GlyphTemplates.swift in Sources */,
 				0C184008ADCCB6EB8711BF52 /* HTMLText.swift in Sources */,
 				2EF03340DB55ACB9FE68BB01 /* HTTPClient.swift in Sources */,
+				BFED9333DB1D8BA4E112A775 /* HexagonLogo.swift in Sources */,
 				AA07A7190A69CDCDBB405D84 /* HistorySnapshot.swift in Sources */,
 				60DA3FA65BF61E612478E378 /* InertMusicClient.swift in Sources */,
 				B9FFA14A49D496409B695538 /* JPopPolicy.swift in Sources */,
@@ -2187,7 +2180,6 @@
 				2F651DC058EA1947119D821B /* SettingsViewModel.swift in Sources */,
 				9016A8383954AF57A102E6E0 /* SongProfileResolver.swift in Sources */,
 				7156E5EAD945772473D8D7C8 /* SourceGate.swift in Sources */,
-				2E285F746A70A58DA42E5D12 /* SplashView.swift in Sources */,
 				9A722E6D19EAA5362C60E94D /* StatusText.swift in Sources */,
 				9CE8A0224F8ACA9A9F4F4DC1 /* TextMeasuring.swift in Sources */,
 				39853C18EA1BEF6AE5CBB6BA /* Theme.swift in Sources */,

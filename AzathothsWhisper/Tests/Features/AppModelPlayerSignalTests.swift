@@ -43,7 +43,7 @@ struct AppModelPlayerSignalTests {
             playerSignal: signal,
             initialToken: "",
             initialLanguage: .system,
-            splashDuration: .milliseconds(1),
+            artistStylesStartDelay: .milliseconds(1),
             lyricsFlowClock: GatedPollClock(),
             isMusicRunning: { true }
         )

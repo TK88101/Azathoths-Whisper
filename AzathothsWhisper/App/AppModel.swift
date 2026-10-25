@@ -10,7 +10,6 @@ final class AppModel {
     }
 
     private(set) var tab: AppTab = .editor
-    private(set) var isSplashVisible = true
     private(set) var activeModal: ModalKind?
     private(set) var token: String
     private(set) var language: AppLanguage
@@ -32,7 +31,9 @@ final class AppModel {
     private let configStore: ConfigStore
     private let httpClient: any HTTPClient
     private let monitor: NowPlayingMonitor
-    private let splashDuration: Duration
+    /// 啟動後先等一下才開始背景查 MB：暫時節流，讓第一輪播放讀取先用 AE 佇列（⑥b simcodex R1）。不保證第一輪讀取已完成
+    private let artistStylesStartDelay: Duration
+    private let artistStylesClock: any PollClock
     /// 歌詞寫入通知（計劃 2026-09-26-lyrics-notification §4.5）。**不給預設值**：漏注入＝編譯錯誤
     private let notifier: any LyricsNotifying
     /// Music 的換歌通知（F1，計劃 2026-09-27-coverflow-f1-f2 §3.1）。**不給預設值**：漏注入＝編譯錯誤
@@ -62,7 +63,8 @@ final class AppModel {
         playerSignal: any PlayerChangeSignaling,
         initialToken: String,
         initialLanguage: AppLanguage,
-        splashDuration: Duration = .milliseconds(3500),    // py:1896
+        artistStylesStartDelay: Duration = .milliseconds(3500),
+        artistStylesClock: any PollClock = SystemPollClock(),
         /// 封面磁碟快取的目錄。**nil＝純記憶體**——單元測試預設走這條，
         /// 絕不碰使用者真實的 Caches 目錄
         artworkDiskDirectory: URL? = nil,
@@ -88,7 +90,8 @@ final class AppModel {
         self.token = initialToken
         self.language = initialLanguage
         self.raisedLayerStyle = configStore.raisedLayerStyle
-        self.splashDuration = splashDuration
+        self.artistStylesStartDelay = artistStylesStartDelay
+        self.artistStylesClock = artistStylesClock
         self.notifier = notifier
         self.playerSignal = playerSignal
         self.batchSwitchClock = batchSwitchClock
@@ -372,9 +375,7 @@ final class AppModel {
         }
         lyricsFlow.startPolling()
 
-        try? await Task.sleep(for: splashDuration)
-        isSplashVisible = false
-        // 閃屏結束才開始：整庫掃描與逐歌手讀歌詞都佔 AE 佇列，不跟啟動時第一輪播放讀取搶（simcodex R1 效率）
+        try? await artistStylesClock.sleep(for: artistStylesStartDelay)
         startArtistStyles()
     }
 

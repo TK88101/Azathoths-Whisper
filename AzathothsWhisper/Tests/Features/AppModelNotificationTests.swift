@@ -59,7 +59,7 @@ struct AppModelNotificationTests {
             playerSignal: SpyPlayerChangeSignal(),
             initialToken: "",
             initialLanguage: .system,
-            splashDuration: .milliseconds(1),
+            artistStylesStartDelay: .milliseconds(1),
             lyricsFlowClock: riseClock,
             batchSwitchClock: switchClock,
             isMusicRunning: { true }

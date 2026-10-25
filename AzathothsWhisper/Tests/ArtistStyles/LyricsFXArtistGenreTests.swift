@@ -69,7 +69,7 @@ struct AppModelArtistStylesTests {
             configStore: ConfigStore(secrets: EphemeralSecretStore(), defaults: UserDefaults(suiteName: suiteName)!),
             httpClient: MockHTTPClient(), music: music, monitor: NowPlayingMonitor(music: music, clock: GatedPollClock()),
             validator: AlwaysValidValidator(), notifier: SpyLyricsNotifier(), playerSignal: SpyPlayerChangeSignal(),
-            initialToken: "", initialLanguage: .system, splashDuration: .milliseconds(1), lyricsFlowClock: GatedPollClock(),
+            initialToken: "", initialLanguage: .system, artistStylesStartDelay: .milliseconds(1), lyricsFlowClock: GatedPollClock(),
             positionPollClock: GatedPollClock(), isMusicRunning: { true },
             artistStyles: { publish in
                 ArtistStyleSync(
@@ -84,5 +84,42 @@ struct AppModelArtistStylesTests {
         model.startArtistStyles()
         await model.waitForArtistStyles()
         #expect(model.lyricsFX.artistGenres("Velvet Lanterns") == .verified(["black metal"]))
+    }
+
+    final class FactoryCalls { var count = 0 }
+
+    /// 去掉開場畫面計劃 S2：啟動後先等 3.5 s 才開始背景查 MB（⑥b simcodex R1 的節流），等待期間不建 sync、放行後恰建一次
+    @Test func startWaitsForTheDelayBeforeStartingArtistStyles() async {
+        let suiteName = "AppModelArtistStylesTests-\(UUID().uuidString)"
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let music = MockMusicClient(script: [.notPlaying], repeatLast: true)
+        let store = ArtistStyleStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent("azw-appmodel-\(UUID().uuidString)"))
+        let artistStylesClock = GatedPollClock()
+        let calls = FactoryCalls()
+        let model = AppModel(
+            configStore: ConfigStore(secrets: EphemeralSecretStore(), defaults: UserDefaults(suiteName: suiteName)!),
+            httpClient: MockHTTPClient(), music: music, monitor: NowPlayingMonitor(music: music, clock: GatedPollClock()),
+            validator: AlwaysValidValidator(), notifier: SpyLyricsNotifier(), playerSignal: SpyPlayerChangeSignal(),
+            initialToken: "", initialLanguage: .system, artistStylesClock: artistStylesClock, lyricsFlowClock: GatedPollClock(),
+            positionPollClock: GatedPollClock(), isMusicRunning: { true },
+            artistStyles: { publish in
+                calls.count += 1
+                return ArtistStyleSync(
+                    music: music, store: store,
+                    identify: { _, _ throws(ProviderFailure) in .unresolved(.notFound) },
+                    publish: publish
+                )
+            }
+        )
+        defer { model.stop() }
+        let starting = Task { await model.start() }
+
+        await artistStylesClock.waitUntilPending(1)
+        #expect(await artistStylesClock.requested == [.milliseconds(3500)])
+        #expect(calls.count == 0, "等待期間不得開始背景查詢")
+
+        await artistStylesClock.releaseNext()
+        await starting.value
+        #expect(calls.count == 1)
     }
 }

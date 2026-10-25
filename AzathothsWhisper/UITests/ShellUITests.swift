@@ -33,17 +33,21 @@ final class ShellUITests: AppUITestCase {
 
     // MARK: 外殼
 
-    /// A-01：啟動首屏＝splash（同一視窗，稍後換成主 UI）
+    /// A-01／A-02 ⚠️（2026-10-25 拿掉開場畫面）：可被觀察之後即是主 UI、立即可操作、單一視窗。
+    /// 名稱受 H-02 凍結契約約束（`Scripts/h02_gate_profile_gen.py` 的 `UI_EXPECTED_TESTS`），語義已改為新版 A-01。
+    /// 「啟動最初幾秒沒有 splash」的主證據是結構（`SplashView` 已刪）；本用例只驗 launch 返回之後——
+    /// 新建置首次啟動 AX 就緒要 18.9 s（見 `AppUITestCase`），舊版 3.5 s 的 splash 可能在那之前就結束了
     func testSplashIsShownBeforeMainUI() {
         launchShell()
-        let splashSubtitle = app.staticTexts["INITIALIZING CORE LOGIC"]
-        XCTAssertTrue(splashSubtitle.waitForExistence(timeout: 5), "首屏應為 splash")
-        attach("splash")
-
         waitForMainUI()
-        // splash 以 0.2s 淡出；主 UI 已在 AX 樹上時它可能還在淡出途中
-        XCTAssertTrue(splashSubtitle.waitForNonExistence(timeout: 2), "主 UI 出現後 splash 應消失")
-        XCTAssertEqual(app.windows.count, 1, "A-02：同窗切換，不得開新視窗")
+        XCTAssertFalse(app.staticTexts["INITIALIZING CORE LOGIC"].exists, "不得再有開場畫面")
+
+        // 主 UI 一出現就能操作：切到 Batch 再切回 Editor
+        navButton("batch").click()
+        XCTAssertTrue(app.staticTexts["ARTIST"].waitForExistence(timeout: 10), "切到 Batch")
+        navButton("editor").click()
+        XCTAssertTrue(app.staticTexts["NOW EDITING"].waitForExistence(timeout: 10), "切回 Editor")
+        XCTAssertEqual(app.windows.count, 1, "單一視窗（回歸檢查）")
     }
 
     /// A-03／A-04：預設 1200×800、標題固定英文
@@ -57,6 +61,7 @@ final class ShellUITests: AppUITestCase {
         XCTAssertEqual(window.frame.height, 800, accuracy: 30, "含標題列高度")
     }
 
+    /// 名稱受 H-02 凍結契約約束（同上）；2026-10-25 起已沒有開場畫面，「AfterSplash」只是歷史名稱
     func testLaunchShowsEditorShellAfterSplash() {
         launchShell()
         waitForMainUI()

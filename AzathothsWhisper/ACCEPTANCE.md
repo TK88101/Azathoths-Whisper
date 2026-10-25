@@ -10,8 +10,8 @@
 
 | ID | 行為描述 | 依據 | 驗證方式 | 狀態 |
 |---|---|---|---|---|
-| A-01 | 啟動首屏＝splash：黑底六角形 logo＋標題副標，淡入淡出時序（container 3s／logo 1s@0.5s／text 1s@1.5s） | splash.py:3-90 | `ShellUITests.testSplashIsShownBeforeMainUI`（首屏元素＋截圖附件）；時序參數照 splash.py 1:1 實作，動畫觀感待 M8 並排目視 | ✅ M5 |
-| A-02 | splash 3.5s 後同窗切換主 UI（非開新窗） | py:1896 | 同上（`windows.count == 1`＋splash 元素消失） | ✅ M5 |
+| A-01 | 修正⚠️ 啟動後第一個畫面就是可操作的 Editor 外殼，無 splash。<br>~~原：啟動首屏＝splash：黑底六角形 logo＋標題副標，淡入淡出時序（container 3s／logo 1s@0.5s／text 1s@1.5s）~~——已由 2026-10-25 決策取代（M5 時驗的是 splash） | splash.py:3-90（偏離） | 結構：`SplashView`／`isSplashVisible` 已刪（`docs/plans/2026-10-25-remove-splash.md`）；E2E：`ShellUITests.testSplashIsShownBeforeMainUI`（名稱受 H-02 凍結契約約束，內容已改為驗無 splash＋立即可操作） | ⚠️ 使用者 2026-10-25 批准（理由：「完全沒有任何用處」） |
+| A-02 | 修正⚠️ 單一視窗顯示主 UI。<br>~~原：splash 3.5s 後同窗切換主 UI（非開新窗）~~——已由 2026-10-25 決策取代 | py:1896（偏離） | 同上（`windows.count == 1` 為回歸檢查）；背景查 MB 仍在啟動 3.5 s 後才開始：`AppModelArtistStylesTests.startWaitsForTheDelayBeforeStartingArtistStyles` | ⚠️ 使用者 2026-10-25 批准 |
 | A-03 | 主窗默認 1200×800、可縮放 | py:1863-1871 | `testWindowGeometryAndTitle` | ✅ M5 |
 | A-04 | 窗口標題 "Azathoth's Whisper" | py:1864 | 同上（`windows["Azathoth's Whisper"]`） | ✅ M5 |
 | A-05 | 菜單 Settings → Token Settings... / Language Settings... 開對應 modal | py:1909-1918 | `testSettingsMenuOpensTokenModal`／`testSettingsMenuOpensLanguageModal` | ✅ M5 |
