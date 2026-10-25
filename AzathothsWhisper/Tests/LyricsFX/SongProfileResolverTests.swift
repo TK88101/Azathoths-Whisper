@@ -35,7 +35,7 @@ struct SongProfileResolverTests {
     }
 
     @Test func anUnknownGenreIsSettledAsMono() {
-        #expect(resolve("Paper Lantern Ensemble", "Experimental Foo") == .noMatch)
+        #expect(resolve("Paper Lantern Ensemble", "Glimmerwave Foo") == .noMatch)
         #expect(resolve("Paper Lantern Ensemble", "") == .noMatch)
     }
 
@@ -112,7 +112,7 @@ struct JPopResolutionTests {
     }
 
     @Test func englishLyricsWithoutAMatchingGenreAreNoMatch() {
-        let resolution = SongProfileResolver.resolve(artist: "Paper Lantern Ensemble", genre: "Experimental Foo", lyrics: english)
+        let resolution = SongProfileResolver.resolve(artist: "Paper Lantern Ensemble", genre: "Glimmerwave Foo", lyrics: english)
         #expect(resolution == .noMatch)
         #expect(resolution.source == .noMatch && resolution.profile == nil)
     }
@@ -120,7 +120,7 @@ struct JPopResolutionTests {
     @Test func hanOnlyLyricsAreNotJapanese() {
         let evidence = LyricsEvidence.of("春風細雨\n山高水長")
         #expect(evidence == .text(isJapanese: false))
-        #expect(SongProfileResolver.resolve(artist: "Paper Lantern Ensemble", genre: "Experimental Foo", lyrics: evidence) == .noMatch)
+        #expect(SongProfileResolver.resolve(artist: "Paper Lantern Ensemble", genre: "Glimmerwave Foo", lyrics: evidence) == .noMatch)
     }
 
     /// 使用者 2026-10-23：MONGOL800 照規則當 J-Pop，不開例外

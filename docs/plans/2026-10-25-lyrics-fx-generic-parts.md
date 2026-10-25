@@ -248,3 +248,17 @@ T3 是 T4 的子集先行（工業家族用到的 resolver 改動在 T3 一起�
 - **T3（工業）**：紅＝`genericRow`／`generic`／`genericRows` 未定義（編譯失敗）→ 綠（`GenericLayerTests` 全過）。resolver 新增通用層（Apple 之後、先 MB 再 Apple）、`ProfileResolution.genericRow`、`ProfileSource.generic`；VM `sessionRecipe` 接上；`ReadabilityAudit.profiles` 納入通用列（`generic:<id>`），可讀性與對比閘門自動涵蓋。元件 14 個（字型 2、背景 3、進場 2、退場 2、效果 2、配色 3），payload 全沿用既有種類。`recipeSchemaVersion` 不加（新元件對既有目標值 fit＝0，加了反而會改到既有配方）。`RecipeGoldenTests`（`2f80…`）、`ExistingBandCandidates`（`PlayableSpaceTests`）綠。
 - **曲庫實曲**：只命中工業的有詞曲 48 首，全屬 1 位歌手；「實驗＋工業」68 首待實驗族。
 - **T8 #1（工業單獨）**：使用者 2026-10-25 在試看版播放後回「特效沒問題」→ 保留。
+- **T8 在場（2026-10-25）**：有詞的通用組合實際 10 種（另 5 種曲庫裡沒有有詞曲，看不到特效）。#1 electronic＋experimental＋pop（85 首）：使用者「沒什麼大問題」→ 保留。
+  - #2 experimental＋industrial（48 首）：「沒問題」→ 保留。
+  - #3 folk（30 首／4 位）：「這個挺好 挺民謠的」→ 保留。
+  - #4 hiphop（21 首）：「沒問題」→ 保留。
+  - #5 experimental＋pop（20 首）：「沒問題」→ 保留。
+  - #6 folk＋pop（20 首）：「相當可以」→ 保留。
+  - #7 folk＋sacred（15 首；⑥b 時 rock* 被判不像的同一樂團）：「沒問題」→ 保留。
+  - #8 pop（12 首／3 位）：「沒問題」→ 保留。
+  - #9 electronic＋pop（4 首／2 位）：「算是沒什麼大問題吧」→ 保留。
+  - #10 ambient＋electronic（1 首）：「沒問題」→ 保留。**T8 全數 10／10 保留，無撤列、無具體度規則。**
+- **T3b（其餘 8 族）**：一次寫入 118 個元件（產生腳本，payload 全沿用；id 撞名 `genExpXerox` 背景／配色 → 配色改 `genExpPhotocopy`）＋8 條手定通用列。`GenericLayerTests` 擴充：每族關鍵字與反例、片假名ダークウェーブ不命中 gothic、MB 先於 Apple、曲庫 15 種組合可組且相鄰兩次每槽都換。38 條綠；可讀性＋對比 23 條綠（3,922 s）。
+- **T6 曲庫不變式**：改前有樣式 11,320 首，改後逐首（判定＋十軸＋標籤＋固定 seed 配方 id）0 首改變；素面 951 → 394（＝§7 凍結目標）。
+- **T7**：ACCEPTANCE I-67（待使用者簽字）。
+- **全量單元（第 1 次）**：1,706 條，紅 4 條，全屬 ⑦ 連帶：①`B2BatchFourIsolationTests` 兩條（基線之後的新元件只認批 4／J-Pop 兩批）→ 依 ⑥a 先例加「⑦ 通用族」分支（恰一個通用標籤＋其通用列抽得到），檢查強度不變；②`SongProfileResolverTests`／`JPopResolutionTests` 3 處以「Experimental Foo」當未知曲風，experimental 已成實驗族關鍵字 → 改為「Glimmerwave Foo」，斷言不動。修後 3 suite 25 條綠；其餘 1,702 條該輪已綠。coverage 96.2 %（豁免 453／470）；`no_playback_gate.sh` exit 0。
