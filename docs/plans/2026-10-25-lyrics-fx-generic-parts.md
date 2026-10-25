@@ -278,3 +278,6 @@ T3 是 T4 的子集先行（工業家族用到的 resolver 改動在 T3 一起�
 | 2 | 綜合審查（Sonnet） | 0 P1；P2：「Glimmerwave Foo」兩檔各寫、註解帶審查輪次、一行式稍長 | **延後**（註解記計劃出處是專案慣例） |
 - 驗證：受影響 12 suite 81 條綠；曲庫不變式（重構後）與重構前逐行相同。
 - **收尾全量單元（2026-10-25）**：1,703 條／209 suite 全綠（已知 flaky 1 條 skip），4,362 s；coverage 96.2 %；`no_playback_gate.sh` exit 0。
+- **合併前 UI 測試（使用者在場，2026-10-26）**：`LyricsFXUITests` 第 1 次 15／17，紅 2 條同一原因——UI 測試假 Music（`App/UITestSupport/LyricsFlowUITestMusic.swift`，僅 DEBUG）的預設曲風「Pop」已成流行族關鍵字，依賴「預設＝素面」的 `testAnUnknownGenreStaysMono`、`testAJapaneseLineInMonoUsesHiragino`（素面 W5 變組合樣式 W6）失準 → 預設改為虛構「Glimmerwave」，斷言不動。重建後使用者重新授權，第 2 次 **17／17 綠**；`LyricsFlowUITestAssemblyTests` 24 條綠。
+- **I-67 使用者 2026-10-25 簽字**（「簽」）。
+- 計劃 §6 E2E 的新 UI 用例未加：10 種組合已由使用者真機逐一確認、判定層有單元真值表，使用者同意直接以既有 17 條 UI 測試做回歸。
