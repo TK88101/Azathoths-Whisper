@@ -27,7 +27,8 @@ struct ArtistGenreResolutionTests {
     @Test(arguments: [ArtistGenres.unresolved, .unknown, .verified([])])
     func noUsableMBEvidenceFallsToTheAppleGenre(mb: ArtistGenres) {
         #expect(resolve(genre: "Black Metal", mb: mb) == .genreRow(SongProfileResolver.compose(genres: ["Black Metal"])!))
-        #expect(resolve(genre: "Experimental", mb: mb) == .noMatch)
+        // 沒有任何列（含 ⑦ 通用列）認得的虛構曲風；⑦ 之前這裡用 "Experimental"，它已是實驗族的關鍵字
+        #expect(resolve(genre: "Glimmerwave Foo", mb: mb) == .noMatch)
     }
 
     @Test func aVerifiedHitDoesNotWaitForTheAppleGenre() {

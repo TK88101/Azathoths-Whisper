@@ -175,7 +175,7 @@ final class LyricsFXUITests: AppUITestCase {
     func testAnUnknownGenreStaysMono() {
         start(.lyricsFX, extra: [Scenario.raisedStyleVariable: "lyricsFX"])
         waitForStyle("lyricsFX")
-        waitForRecipe({ $0 == "mono" }, "Pop 不在 B1 的兩個家族內")
+        waitForRecipe({ $0 == "mono" }, "預設曲風 Glimmerwave 不屬於任何曲風列或通用列")
     }
 
     // MARK: ⑤ 中日韓字型（docs/plans/2026-10-22-lyrics-fx-cjk-fonts.md §7）：預覽假歌詞第 19 秒是日文行

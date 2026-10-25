@@ -199,16 +199,7 @@ struct ComposerSamplingTests {
     }
 
     @Test func avoidingThePreviousRecipeChangesEverySlotThatHasAnAlternative() throws {
-        let profile = try black()
-        for seed in UInt64(0)..<256 {
-            guard let first = composed(Composer.compose(profile: profile, seed: seed)),
-                  let next = composed(Composer.compose(profile: profile, seed: seed &+ 1, avoiding: first)) else {
-                Issue.record("應有組合配方")
-                continue
-            }
-            #expect(next.font != first.font && next.backdrop != first.backdrop && next.enter != first.enter)
-            #expect(next.exit != first.exit && next.fx1 != first.fx1 && next.palette != first.palette)
-        }
+        expectReplayChangesEverySlot(try black(), "black")
     }
 
     /// 排除只改各槽自己的取樣：每槽恰一次亂數（Codex 字型辯論 R2 最擔心的一點）——只排除字型時，其餘五槽與種子不動

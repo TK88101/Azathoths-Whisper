@@ -240,7 +240,7 @@ final class LyricsFXViewModel {
         case .jpop:
             let target = JPopPolicy.target(signature: signature, nonce: sessionNonce, previousPalette: previous?.palette)
             return Composer.compose(profile: target.profile, seed: seed, catalog: target.catalog, avoiding: previous?.asPrevious)
-        case .signedBand(let profile), .artistGenreRow(let profile), .genreRow(let profile):
+        case .signedBand(let profile), .artistGenreRow(let profile), .genreRow(let profile), .genericRow(let profile):
             #if DEBUG
             if let forced = recipeOverride?(profile) { return .composed(forced) }
             #endif

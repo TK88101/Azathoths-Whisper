@@ -73,24 +73,32 @@ struct B2BatchFourIsolationTests {
         return new
     }
 
-    /// 基線之後加的元件分屬兩批：批 4（emo 群私有標籤）與 ⑥a J-Pop（恰一個變體私有標籤；docs/plans/2026-10-23-lyrics-fx-jpop.md）
+    /// 基線之後加的元件分屬三批：批 4（emo 群私有標籤）、⑥a J-Pop（恰一個變體私有標籤；docs/plans/2026-10-23-lyrics-fx-jpop.md）、
+    /// ⑦ 通用零件（恰一個通用家族標籤；docs/plans/2026-10-25-lyrics-fx-generic-parts.md）
     private func jpopVariant(of component: FXComponent) -> JPopVariant? {
         JPopVariant.allCases.first { component.tags == [$0.tag] }
+    }
+
+    private func genericRow(of component: FXComponent) -> SongProfileResolver.KeywordRow? {
+        SongProfileResolver.genericRows.first { component.tags == $0.tags }
     }
 
     /// 新元件沒標籤＝人人可抽、帶舊標籤＝舊團被連帶；兩者都不准（計劃評審 R1 #1）
     @Test func everyNewComponentCarriesOnlyTheBatchsPrivateTags() throws {
         for component in try newComponents() {
             let isEmo = !component.tags.isEmpty && component.tags.isSubset(of: FXTag.emoFamily)
-            #expect(isEmo || jpopVariant(of: component) != nil, "\(component.slot.rawValue):\(component.id) 的標籤 \(component.tags.map(\.rawValue).sorted())")
+            #expect(isEmo || jpopVariant(of: component) != nil || genericRow(of: component) != nil,
+                    "\(component.slot.rawValue):\(component.id) 的標籤 \(component.tags.map(\.rawValue).sorted())")
         }
     }
 
-    /// 不留抽不到的死元件（計劃評審 R2 #9）：emo 群的元件要有本批的團抽得到，J-Pop 的元件要在它那個變體的目錄裡抽得到
+    /// 不留抽不到的死元件（計劃評審 R2 #9）：emo 群的元件要有本批的團抽得到，J-Pop 的元件要在它那個變體的目錄裡抽得到，通用元件要它那條通用列抽得到
     @Test func everyNewComponentIsReachableByABandOfTheBatch() throws {
         for component in try newComponents() {
             let reachable = if let variant = jpopVariant(of: component) {
                 Composer.fit(component, variant.profile) > 0 && JPopPolicy.catalog(variant).contains { $0.id == component.id }
+            } else if let row = genericRow(of: component) {
+                SongProfileResolver.compose(rows: [row]).map { Composer.fit(component, $0) > 0 } ?? false
             } else {
                 SongProfileResolver.batchFive.contains { Composer.fit(component, $0.profile) > 0 }
             }

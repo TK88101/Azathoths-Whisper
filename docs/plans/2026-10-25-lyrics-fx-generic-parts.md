@@ -241,3 +241,43 @@ T3 是 T4 的子集先行（工業家族用到的 resolver 改動在 T3 一起�
 - **folk**：folk 54、neofolk 34、country & folk 31、neo-medieval folk 16、folk rock 16
 - 觀察：寬詞命中的都是名副其實的同類曲風，沒有明顯誤命中（例如沒有 `pop punk` 落到這裡，因為 poppunk 列在 MB／Apple 層就先命中了）。`j-pop` 37 首是歌詞非日文的日本歌手（日文歌已在 J-Pop 層攔下），會套通用流行；T8 樣本含一首。
 - 改前逐首基線：12,271 行（persistentID＋素面／有樣式＋判定與固定 seed 配方的 SHA-256 前 16 位），存 scratchpad `baseline-before.tsv`，不進 repo；T6 改後同法重算比對。
+
+## 附錄 D 實作記錄（2026-10-25，分支 `wip/lyrics-fx-generic-parts`，自 main 924e68e）
+- **T1**：紅＝`FXTag` 無 gen 家族成員、無 `genericFamily`（編譯失敗）→ 綠（`GenericFamilyTests` 6 條＋`CatalogValidatorTests` 2 條）。`CatalogValidator` 新規則「通用標籤混用」。`FXTag.allCases` 無遍歷者，新增 case 不影響既有測試。
+- **T2 流程調整**：不做網頁探針，改為直接做進 app、讓使用者在曲庫實曲上看（使用者要求加快；實曲比網頁模擬更準）。
+- **T3（工業）**：紅＝`genericRow`／`generic`／`genericRows` 未定義（編譯失敗）→ 綠（`GenericLayerTests` 全過）。resolver 新增通用層（Apple 之後、先 MB 再 Apple）、`ProfileResolution.genericRow`、`ProfileSource.generic`；VM `sessionRecipe` 接上；`ReadabilityAudit.profiles` 納入通用列（`generic:<id>`），可讀性與對比閘門自動涵蓋。元件 14 個（字型 2、背景 3、進場 2、退場 2、效果 2、配色 3），payload 全沿用既有種類。`recipeSchemaVersion` 不加（新元件對既有目標值 fit＝0，加了反而會改到既有配方）。`RecipeGoldenTests`（`2f80…`）、`ExistingBandCandidates`（`PlayableSpaceTests`）綠。
+- **曲庫實曲**：只命中工業的有詞曲 48 首，全屬 1 位歌手；「實驗＋工業」68 首待實驗族。
+- **T8 #1（工業單獨）**：使用者 2026-10-25 在試看版播放後回「特效沒問題」→ 保留。
+- **T8 在場（2026-10-25）**：有詞的通用組合實際 10 種（另 5 種曲庫裡沒有有詞曲，看不到特效）。#1 electronic＋experimental＋pop（85 首）：使用者「沒什麼大問題」→ 保留。
+  - #2 experimental＋industrial（48 首）：「沒問題」→ 保留。
+  - #3 folk（30 首／4 位）：「這個挺好 挺民謠的」→ 保留。
+  - #4 hiphop（21 首）：「沒問題」→ 保留。
+  - #5 experimental＋pop（20 首）：「沒問題」→ 保留。
+  - #6 folk＋pop（20 首）：「相當可以」→ 保留。
+  - #7 folk＋sacred（15 首；⑥b 時 rock* 被判不像的同一樂團）：「沒問題」→ 保留。
+  - #8 pop（12 首／3 位）：「沒問題」→ 保留。
+  - #9 electronic＋pop（4 首／2 位）：「算是沒什麼大問題吧」→ 保留。
+  - #10 ambient＋electronic（1 首）：「沒問題」→ 保留。**T8 全數 10／10 保留，無撤列、無具體度規則。**
+- **T3b（其餘 8 族）**：一次寫入 118 個元件（產生腳本，payload 全沿用；id 撞名 `genExpXerox` 背景／配色 → 配色改 `genExpPhotocopy`）＋8 條手定通用列。`GenericLayerTests` 擴充：每族關鍵字與反例、片假名ダークウェーブ不命中 gothic、MB 先於 Apple、曲庫 15 種組合可組且相鄰兩次每槽都換。38 條綠；可讀性＋對比 23 條綠（3,922 s）。
+- **T6 曲庫不變式**：改前有樣式 11,320 首，改後逐首（判定＋十軸＋標籤＋固定 seed 配方 id）0 首改變；素面 951 → 394（＝§7 凍結目標）。
+- **T7**：ACCEPTANCE I-67（待使用者簽字）。
+- **全量單元（第 1 次）**：1,706 條，紅 4 條，全屬 ⑦ 連帶：①`B2BatchFourIsolationTests` 兩條（基線之後的新元件只認批 4／J-Pop 兩批）→ 依 ⑥a 先例加「⑦ 通用族」分支（恰一個通用標籤＋其通用列抽得到），檢查強度不變；②`SongProfileResolverTests`／`JPopResolutionTests` 3 處以「Experimental Foo」當未知曲風，experimental 已成實驗族關鍵字 → 改為「Glimmerwave Foo」，斷言不動。修後 3 suite 25 條綠；其餘 1,702 條該輪已綠。coverage 96.2 %（豁免 453／470）；`no_playback_gate.sh` exit 0。
+- **更正**：全量單元（第 1 次）實際紅 6 條，不是 4 條——參數化測試的失敗行前面有零寬字元，原先的過濾指令沒抓到 `ArtistGenreResolutionTests.noUsableMBEvidenceFallsToTheAppleGenre(mb:)`（同屬「Experimental」過時字串）。已改為「Glimmerwave Foo」，斷言不動。
+
+## 附錄 E simcodex（2026-10-25，2 輪，第 2 輪提前結束）
+| 輪 | 來源 | 意見 | 處置 |
+|---|---|---|---|
+| 1 | codex review --base main [P2] | Apple genre 為 nil 時先回 pending，MB 通用列輪不到 | **駁回**：nil＝AE 讀取失敗（`MusicAppleEventsClient.swift:79` `unlessFailed`；讀成功但無曲風是空字串），屬暫態、補讀會合併；若先套 MB 通用列，Apple 其實會命中既有列時會被通用列搶先定格，違反 §3「現有樣式不變」。註解寫明原因 |
+| 1 | simplify 簡化＋重用 P1 | 「每次換一套」的 256 seed 迴圈三處各寫一份 | **採納**：`Tests/Support/RecipeReplayExpectations.swift` 唯一定義；`ComposerTests`、`GenericLayerTests` 改用；組合測試併入各族單獨，刪 `everyReplayChangesEverySlot`、`eachGenericRowIsComposable` |
+| 1 | 效率＋簡化＋重用＋層級 P2 | 曲風字串在四層各正規化一次；通用層重複「先 MB 再 Apple」邏輯 | **採納**：`resolve()` 只正規化一次、四層共用私有 `compose(normalized:rows:)`，刪 `genericProfile`；曲庫不變式重跑與重構前逐行相同 |
+| 1 | 簡化 P2 | `genericComponentsOnlyServeTheirOwnFamily` 與目錄檢查重複；家族數測試只是抄常數；批 4 謂詞多餘；組合數註解寫錯 | **採納** |
+| 1 | 層級 P2 | 私有標籤家族的知識分散四處（`genreRowPrivateTags`、驗證器、隔離測試、GenericFamilyTests），宜統一定義 | **延後**：會改到 emo 的驗證語意，超出本計劃；目前由 `GenericFamilyTests` 守住 |
+| 1 | 重用 P2 | 測試元件建構 helper 第三份 | **延後** |
+| 1 | 效率 P2 | `isComposable` 與 `compose` 重複掃目錄；`bySlot` 快取 | **延後**：每次換歌一次、亞毫秒 |
+| 2 | codex review --uncommitted | 無 finding | — |
+| 2 | 綜合審查（Sonnet） | 0 P1；P2：「Glimmerwave Foo」兩檔各寫、註解帶審查輪次、一行式稍長 | **延後**（註解記計劃出處是專案慣例） |
+- 驗證：受影響 12 suite 81 條綠；曲庫不變式（重構後）與重構前逐行相同。
+- **收尾全量單元（2026-10-25）**：1,703 條／209 suite 全綠（已知 flaky 1 條 skip），4,362 s；coverage 96.2 %；`no_playback_gate.sh` exit 0。
+- **合併前 UI 測試（使用者在場，2026-10-26）**：`LyricsFXUITests` 第 1 次 15／17，紅 2 條同一原因——UI 測試假 Music（`App/UITestSupport/LyricsFlowUITestMusic.swift`，僅 DEBUG）的預設曲風「Pop」已成流行族關鍵字，依賴「預設＝素面」的 `testAnUnknownGenreStaysMono`、`testAJapaneseLineInMonoUsesHiragino`（素面 W5 變組合樣式 W6）失準 → 預設改為虛構「Glimmerwave」，斷言不動。重建後使用者重新授權，第 2 次 **17／17 綠**；`LyricsFlowUITestAssemblyTests` 24 條綠。
+- **I-67 使用者 2026-10-25 簽字**（「簽」）。
+- 計劃 §6 E2E 的新 UI 用例未加：10 種組合已由使用者真機逐一確認、判定層有單元真值表，使用者同意直接以既有 17 條 UI 測試做回歸。

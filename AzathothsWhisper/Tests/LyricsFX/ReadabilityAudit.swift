@@ -166,6 +166,9 @@ enum ReadabilityAudit {
             + SongProfileResolver.keywordRows.compactMap { row in
                 SongProfileResolver.compose(genre: row.keywords[0], rows: [row]).map { ("genre:\(row.keywords[0])", $0) }
             }
+            + SongProfileResolver.genericRows.compactMap { row in
+                SongProfileResolver.compose(rows: [row]).map { ("generic:\(row.id)", $0) }
+            }
     }
 
     static let seeds = 6

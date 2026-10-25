@@ -115,6 +115,38 @@ enum LyricsFXCatalog {
              .font(FontFace(id: "Archivo", family: "Archivo Black", weight: nil))),
         make(.font, "jpBalladCormorant", [.elegance: 0.85, .speed: 0.15, .warm: 0.6], [.jpopBallad],
              .font(FontFace(id: "CormorantIt", family: "Cormorant Garamond", weight: .semibold, italic: true))),
+        // ⑦ 通用・工業（docs/plans/2026-10-25-lyrics-fx-generic-parts.md §4.4）：只帶 genIndustrial；payload 全部沿用既有種類
+        make(.font, "genIndBlackOps", [.aggression: 0.75, .cold: 0.6, .raw: 0.5], [.genIndustrial],
+             .font(FontFace(id: "BlackOps", family: "Black Ops One", weight: nil, uppercase: true))),
+        make(.font, "genIndSpaceMono", [.cold: 0.85, .speed: 0.6, .bounce: 0.2], [.genIndustrial],
+             .font(FontFace(id: "SpaceMono", family: "Space Mono", weight: .bold, uppercase: true))),
+        // ⑦ 通用・實驗：只帶 genExperimental
+        make(.font, "genExpElite", [.raw: 0.65, .decay: 0.6], [.genExperimental], .font(FontFace(id: "Elite", family: "Special Elite", weight: nil, uppercase: true))),
+        make(.font, "genExpCourierPrime", [.cold: 0.55, .elegance: 0.45], [.genExperimental], .font(FontFace(id: "CourierPrime", family: "Courier Prime", weight: .bold))),
+        // ⑦ 通用・電子：只帶 genElectronic
+        make(.font, "genEleGrotesk", [.cold: 0.55, .elegance: 0.5, .speed: 0.55], [.genElectronic], .font(FontFace(id: "Grotesk", family: "Space Grotesk", weight: .regular))),
+        make(.font, "genEleSyncopate", [.cold: 0.6, .theatrical: 0.55, .bright: 0.6], [.genElectronic], .font(FontFace(id: "Syncopate", family: "Syncopate", weight: .bold, uppercase: true))),
+        // ⑦ 通用・流行：只帶 genPop
+        make(.font, "genPopRubik", [.bright: 0.8, .bounce: 0.6, .warm: 0.6], [.genPop], .font(FontFace(id: "Rubik", family: "Rubik", weight: .bold))),
+        make(.font, "genPopLilita", [.bounce: 0.75, .bright: 0.85, .warm: 0.65], [.genPop], .font(FontFace(id: "Lilita", family: "Lilita One", weight: nil))),
+        make(.font, "genPopArchivo", [.bright: 0.7, .elegance: 0.4], [.genPop], .font(FontFace(id: "Archivo", family: "Archivo Black", weight: nil))),
+        // ⑦ 通用・民謠：只帶 genFolk
+        make(.font, "genFolkPlayfairIt", [.elegance: 0.6, .warm: 0.7], [.genFolk], .font(FontFace(id: "PlayfairIt", family: "Playfair Display", weight: .bold, italic: true))),
+        make(.font, "genFolkGochi", [.warm: 0.8, .raw: 0.35], [.genFolk], .font(FontFace(id: "Gochi", family: "Gochi Hand", weight: nil))),
+        make(.font, "genFolkShadowsLight", [.warm: 0.7, .elegance: 0.5], [.genFolk], .font(FontFace(id: "ShadowsLight", family: "Shadows Into Light", weight: nil))),
+        // ⑦ 通用・氛圍：只帶 genAmbient
+        make(.font, "genAmbCormorantIt", [.elegance: 0.85, .speed: 0.1], [.genAmbient], .font(FontFace(id: "CormorantIt", family: "Cormorant Garamond", weight: .semibold, italic: true))),
+        make(.font, "genAmbGrotesk", [.cold: 0.6, .elegance: 0.7], [.genAmbient], .font(FontFace(id: "Grotesk", family: "Space Grotesk", weight: .regular))),
+        // ⑦ 通用・古樂：只帶 genSacred
+        make(.font, "genSacFraktur", [.theatrical: 0.75, .elegance: 0.85], [.genSacred], .font(FontFace(id: "Fraktur", family: "UnifrakturMaguntia", weight: nil))),
+        make(.font, "genSacCinzel", [.elegance: 0.9, .theatrical: 0.7], [.genSacred], .font(FontFace(id: "Cinzel", family: "Cinzel", weight: .bold, uppercase: true))),
+        // ⑦ 通用・暗潮：只帶 genDarkwave
+        make(.font, "genDwMirage", [.cold: 0.7, .theatrical: 0.6, .elegance: 0.6], [.genDarkwave], .font(FontFace(id: "Mirage", family: "Mirage Gothic", weight: nil, uppercase: true))),
+        make(.font, "genDwSyncopate", [.cold: 0.75, .elegance: 0.6], [.genDarkwave], .font(FontFace(id: "Syncopate", family: "Syncopate", weight: .bold, uppercase: true))),
+        // ⑦ 通用・嘻哈：只帶 genHipHop
+        make(.font, "genHipAnton", [.aggression: 0.55, .bounce: 0.6, .raw: 0.5], [.genHipHop], .font(FontFace(id: "Anton", family: "Anton", weight: nil, uppercase: true, sizeScale: 0.15 / 0.12, rasterizes: false))),
+        make(.font, "genHipBebas", [.bounce: 0.7, .bright: 0.5], [.genHipHop], .font(FontFace(id: "Bebas", family: "Bebas Neue", weight: nil, uppercase: true))),
+        make(.font, "genHipMarker", [.raw: 0.55, .warm: 0.55, .bounce: 0.75], [.genHipHop], .font(FontFace(id: "Marker", family: "Permanent Marker", weight: nil, uppercase: true))),
     ]
 
     // composer.js:36-40,43
@@ -175,6 +207,42 @@ enum LyricsFXCatalog {
         make(.backdrop, "jpKiraSparkle", [.bright: 0.9, .bounce: 0.8], [.jpopKira], .backdrop(.sparkle)),
         make(.backdrop, "jpCityNeon", [.bright: 0.7, .elegance: 0.6, .theatrical: 0.55], [.jpopCity], .backdrop(.cityNeon)),
         make(.backdrop, "jpBalladPaper", [.elegance: 0.8, .warm: 0.6, .speed: 0.15], [.jpopBallad], .backdrop(.paper)),
+        // ⑦ 通用・工業（docs/plans/2026-10-25-lyrics-fx-generic-parts.md §4.4）：只帶 genIndustrial；payload 全部沿用既有種類
+        make(.backdrop, "genIndGrid", [.cold: 0.8, .aggression: 0.5], [.genIndustrial], .backdrop(.grid)),
+        make(.backdrop, "genIndScan", [.aggression: 0.65, .raw: 0.5, .bright: 0.15], [.genIndustrial], .backdrop(.scan)),
+        make(.backdrop, "genIndFilm", [.raw: 0.7, .decay: 0.6], [.genIndustrial], .backdrop(.film)),
+        // ⑦ 通用・實驗：只帶 genExperimental
+        make(.backdrop, "genExpXerox", [.raw: 0.7, .decay: 0.5], [.genExperimental], .backdrop(.xerox)),
+        make(.backdrop, "genExpFilm", [.raw: 0.75, .decay: 0.65], [.genExperimental], .backdrop(.film)),
+        make(.backdrop, "genExpHaze", [.cold: 0.5, .elegance: 0.45], [.genExperimental], .backdrop(.haze)),
+        // ⑦ 通用・電子：只帶 genElectronic
+        make(.backdrop, "genEleGrid", [.cold: 0.6, .speed: 0.65], [.genElectronic], .backdrop(.grid)),
+        make(.backdrop, "genEleHaze", [.elegance: 0.5, .bright: 0.55], [.genElectronic], .backdrop(.haze)),
+        make(.backdrop, "genElePrism", [.theatrical: 0.6, .bright: 0.65], [.genElectronic], .backdrop(.prism)),
+        // ⑦ 通用・流行：只帶 genPop
+        make(.backdrop, "genPopSkyGrad", [.bright: 0.8, .bounce: 0.55], [.genPop], .backdrop(.skyGrad)),
+        make(.backdrop, "genPopFlat", [.bright: 0.85, .bounce: 0.7], [.genPop], .backdrop(.flat)),
+        make(.backdrop, "genPopBokeh", [.elegance: 0.5, .warm: 0.65], [.genPop], .backdrop(.bokeh)),
+        // ⑦ 通用・民謠：只帶 genFolk
+        make(.backdrop, "genFolkPaper", [.warm: 0.75, .raw: 0.4], [.genFolk], .backdrop(.paper)),
+        make(.backdrop, "genFolkTapeLeak", [.warm: 0.8, .bright: 0.5], [.genFolk], .backdrop(.tapeLeak)),
+        make(.backdrop, "genFolkHaze", [.elegance: 0.55, .cold: 0.3], [.genFolk], .backdrop(.haze)),
+        // ⑦ 通用・氛圍：只帶 genAmbient
+        make(.backdrop, "genAmbHaze", [.elegance: 0.8, .cold: 0.55], [.genAmbient], .backdrop(.haze)),
+        make(.backdrop, "genAmbStars", [.elegance: 0.75, .bright: 0.45], [.genAmbient], .backdrop(.stars)),
+        make(.backdrop, "genAmbBluehour", [.cold: 0.65, .elegance: 0.7], [.genAmbient], .backdrop(.bluehour)),
+        // ⑦ 通用・古樂：只帶 genSacred
+        make(.backdrop, "genSacShafts", [.theatrical: 0.8, .elegance: 0.85], [.genSacred], .backdrop(.shafts)),
+        make(.backdrop, "genSacPaper", [.elegance: 0.8, .warm: 0.5], [.genSacred], .backdrop(.paper)),
+        make(.backdrop, "genSacAsh", [.theatrical: 0.6, .decay: 0.4], [.genSacred], .backdrop(.ash)),
+        // ⑦ 通用・暗潮：只帶 genDarkwave
+        make(.backdrop, "genDwSnow", [.cold: 0.8, .elegance: 0.5], [.genDarkwave], .backdrop(.snow)),
+        make(.backdrop, "genDwAsh", [.decay: 0.55, .theatrical: 0.6], [.genDarkwave], .backdrop(.ash)),
+        make(.backdrop, "genDwGrid", [.cold: 0.75, .speed: 0.45], [.genDarkwave], .backdrop(.grid)),
+        // ⑦ 通用・嘻哈：只帶 genHipHop
+        make(.backdrop, "genHipSpot", [.theatrical: 0.5, .bright: 0.5], [.genHipHop], .backdrop(.spot)),
+        make(.backdrop, "genHipSmokeHaze", [.raw: 0.5, .warm: 0.55], [.genHipHop], .backdrop(.smokeHaze)),
+        make(.backdrop, "genHipFlat", [.bounce: 0.8, .bright: 0.5], [.genHipHop], .backdrop(.flat)),
     ]
 
     // composer.js:55,57-61,64。淡入型（condense、smoke、rise）的時長依 P12 縮短 40%（使用者 2026-10-06：「漸入漸出稍長，字發虛」）
@@ -241,6 +309,35 @@ enum LyricsFXCatalog {
              .enter(EnterSpec(weights: [(.sidle, 3), (.fadeUp, 2)], duration: 0.3...0.6))),
         make(.enter, "jpBalladFade", [.elegance: 0.85, .speed: 0.15], [.jpopBallad],
              .enter(EnterSpec(weights: [(.fadeUp, 3), (.smoke, 1)], duration: 0.48...0.84))),
+        // ⑦ 通用・工業（docs/plans/2026-10-25-lyrics-fx-generic-parts.md §4.4）：只帶 genIndustrial；payload 全部沿用既有種類
+        make(.enter, "genIndStamp", [.aggression: 0.8, .speed: 0.65], [.genIndustrial],
+             .enter(EnterSpec(weights: [(.stamp, 4), (.type, 1)], duration: 0.1...0.25))),
+        make(.enter, "genIndType", [.cold: 0.7, .speed: 0.75, .raw: 0.5], [.genIndustrial],
+             .enter(EnterSpec(weights: [(.type, 5), (.flip, 1)], duration: 0.06...0.15))),
+        // ⑦ 通用・實驗：只帶 genExperimental
+        make(.enter, "genExpType", [.raw: 0.6, .speed: 0.55], [.genExperimental], .enter(EnterSpec(weights: [(.type, 3), (.slant, 2), (.fadeUp, 1)], duration: 0.1...0.24))),
+        make(.enter, "genExpNegative", [.raw: 0.7, .theatrical: 0.55], [.genExperimental], .enter(EnterSpec(weights: [(.negative, 3), (.fadeUp, 1)], duration: 0.2...0.35))),
+        // ⑦ 通用・電子：只帶 genElectronic
+        make(.enter, "genEleFlip", [.speed: 0.8, .cold: 0.55], [.genElectronic], .enter(EnterSpec(weights: [(.flip, 4), (.type, 1)], duration: 0.08...0.2))),
+        make(.enter, "genEleSidle", [.elegance: 0.5, .bounce: 0.55], [.genElectronic], .enter(EnterSpec(weights: [(.sidle, 3), (.fadeUp, 2)], duration: 0.3...0.6))),
+        // ⑦ 通用・流行：只帶 genPop
+        make(.enter, "genPopHop", [.bounce: 0.75, .bright: 0.8], [.genPop], .enter(EnterSpec(weights: [(.pop, 3), (.fallIn, 2), (.fadeUp, 1)], duration: 0.18...0.4))),
+        make(.enter, "genPopEase", [.elegance: 0.45, .warm: 0.6], [.genPop], .enter(EnterSpec(weights: [(.fadeUp, 3), (.pop, 1)], duration: 0.25...0.5))),
+        // ⑦ 通用・民謠：只帶 genFolk
+        make(.enter, "genFolkFadeUp", [.elegance: 0.55, .speed: 0.35], [.genFolk], .enter(EnterSpec(weights: [(.fadeUp, 4), (.grow, 1)], duration: 0.3...0.6))),
+        make(.enter, "genFolkBloom", [.elegance: 0.6, .warm: 0.7], [.genFolk], .enter(EnterSpec(weights: [(.grow, 3), (.fadeUp, 2)], duration: 0.6...1.2))),
+        // ⑦ 通用・氛圍：只帶 genAmbient
+        make(.enter, "genAmbBloom", [.elegance: 0.8, .speed: 0.1], [.genAmbient], .enter(EnterSpec(weights: [(.grow, 3), (.fadeUp, 2)], duration: 0.6...1.2))),
+        make(.enter, "genAmbRise", [.elegance: 0.8, .theatrical: 0.45], [.genAmbient], .enter(EnterSpec(weights: [(.rise, 4), (.grow, 1)], duration: 0.36...0.72))),
+        // ⑦ 通用・古樂：只帶 genSacred
+        make(.enter, "genSacRise", [.theatrical: 0.75, .elegance: 0.9], [.genSacred], .enter(EnterSpec(weights: [(.rise, 4), (.grow, 1)], duration: 0.36...0.72))),
+        make(.enter, "genSacSmoke", [.theatrical: 0.7, .elegance: 0.8], [.genSacred], .enter(EnterSpec(weights: [(.smoke, 4), (.fadeUp, 1)], duration: 0.36...0.78))),
+        // ⑦ 通用・暗潮：只帶 genDarkwave
+        make(.enter, "genDwSmoke", [.theatrical: 0.65, .cold: 0.7], [.genDarkwave], .enter(EnterSpec(weights: [(.smoke, 4), (.fadeUp, 1)], duration: 0.36...0.78))),
+        make(.enter, "genDwSwoop", [.theatrical: 0.6, .speed: 0.5], [.genDarkwave], .enter(EnterSpec(weights: [(.swoop, 3), (.orbit, 1)], duration: 0.3...0.6))),
+        // ⑦ 通用・嘻哈：只帶 genHipHop
+        make(.enter, "genHipKick", [.bounce: 0.8, .aggression: 0.55], [.genHipHop], .enter(EnterSpec(weights: [(.stamp, 3), (.pop, 2), (.slide, 1)], duration: 0.12...0.28))),
+        make(.enter, "genHipDrop", [.aggression: 0.55, .speed: 0.6], [.genHipHop], .enter(EnterSpec(weights: [(.drop, 4), (.stamp, 1)], duration: 0.18...0.4))),
     ]
 
     // composer.js:73-75,77
@@ -287,6 +384,33 @@ enum LyricsFXCatalog {
         make(.exit, "jpCitySlideOut", [.speed: 0.5, .elegance: 0.6], [.jpopCity], .exit(ExitSpec(weights: [(.slideOut, 1)], duration: 0.6))),
         make(.exit, "jpBalladFadeOut", [.elegance: 0.85, .speed: 0.1], [.jpopBallad],
              .exit(ExitSpec(weights: [(.fade, 1)], duration: 1.4, trail: true))),
+        // ⑦ 通用・工業（docs/plans/2026-10-25-lyrics-fx-generic-parts.md §4.4）：只帶 genIndustrial；payload 全部沿用既有種類
+        make(.exit, "genIndCut", [.aggression: 0.8, .raw: 0.6], [.genIndustrial], .exit(ExitSpec(weights: [(.cut, 1)], duration: 0))),
+        make(.exit, "genIndBands", [.cold: 0.7, .speed: 0.7], [.genIndustrial], .exit(ExitSpec(weights: [(.bands, 3), (.slideOut, 1)], duration: 0.3))),
+        // ⑦ 通用・實驗：只帶 genExperimental
+        make(.exit, "genExpScatter", [.cold: 0.6, .raw: 0.5], [.genExperimental], .exit(ExitSpec(weights: [(.scatter, 1)], duration: 0.7))),
+        make(.exit, "genExpDissolve", [.decay: 0.6, .elegance: 0.4], [.genExperimental], .exit(ExitSpec(weights: [(.dissolve, 1)], duration: 1.6, trail: true))),
+        // ⑦ 通用・電子：只帶 genElectronic
+        make(.exit, "genEleSlideOut", [.speed: 0.7, .bounce: 0.5], [.genElectronic], .exit(ExitSpec(weights: [(.slideOut, 1)], duration: 0.4))),
+        make(.exit, "genEleUp", [.elegance: 0.45, .bright: 0.65], [.genElectronic], .exit(ExitSpec(weights: [(.up, 1)], duration: 0.5))),
+        // ⑦ 通用・流行：只帶 genPop
+        make(.exit, "genPopSnapOut", [.bounce: 0.7, .speed: 0.55], [.genPop], .exit(ExitSpec(weights: [(.shrink, 3), (.up, 1)], duration: 0.3))),
+        make(.exit, "genPopDrift", [.elegance: 0.45, .warm: 0.6], [.genPop], .exit(ExitSpec(weights: [(.up, 2), (.fade, 1)], duration: 0.7))),
+        // ⑦ 通用・民謠：只帶 genFolk
+        make(.exit, "genFolkDrift", [.warm: 0.75, .elegance: 0.5], [.genFolk], .exit(ExitSpec(weights: [(.up, 2), (.fade, 1)], duration: 0.7))),
+        make(.exit, "genFolkFadeShort", [.elegance: 0.55, .speed: 0.35], [.genFolk], .exit(ExitSpec(weights: [(.fade, 1)], duration: 0.6))),
+        // ⑦ 通用・氛圍：只帶 genAmbient
+        make(.exit, "genAmbFade", [.elegance: 0.8, .speed: 0.1], [.genAmbient], .exit(ExitSpec(weights: [(.fade, 1)], duration: 1.2, trail: true))),
+        make(.exit, "genAmbFloatAway", [.elegance: 0.75, .cold: 0.55], [.genAmbient], .exit(ExitSpec(weights: [(.up, 2), (.scatter, 1)], duration: 1))),
+        // ⑦ 通用・古樂：只帶 genSacred
+        make(.exit, "genSacFade", [.elegance: 0.85, .speed: 0.15], [.genSacred], .exit(ExitSpec(weights: [(.fade, 1)], duration: 1.2, trail: true))),
+        make(.exit, "genSacDissolve", [.decay: 0.4, .elegance: 0.8], [.genSacred], .exit(ExitSpec(weights: [(.dissolve, 1)], duration: 1.6, trail: true))),
+        // ⑦ 通用・暗潮：只帶 genDarkwave
+        make(.exit, "genDwDissolve", [.cold: 0.75, .decay: 0.55], [.genDarkwave], .exit(ExitSpec(weights: [(.dissolve, 1)], duration: 1.6, trail: true))),
+        make(.exit, "genDwFade", [.elegance: 0.6, .theatrical: 0.6], [.genDarkwave], .exit(ExitSpec(weights: [(.fade, 1)], duration: 1.2, trail: true))),
+        // ⑦ 通用・嘻哈：只帶 genHipHop
+        make(.exit, "genHipDropOut", [.bounce: 0.75, .speed: 0.6], [.genHipHop], .exit(ExitSpec(weights: [(.fall, 2), (.shrink, 2)], duration: 0.45))),
+        make(.exit, "genHipSlideOut", [.speed: 0.6, .aggression: 0.5], [.genHipHop], .exit(ExitSpec(weights: [(.slideOut, 1)], duration: 0.4))),
     ]
 
     // composer.js:87,88,92,101
@@ -332,6 +456,35 @@ enum LyricsFXCatalog {
         make(.fx, "jpKiraBob", [.bounce: 0.85, .bright: 0.85], [.jpopKira], .fx(.bob)),
         make(.fx, "jpKiraBreathe", [.bounce: 0.7, .elegance: 0.45], [.jpopKira], .fx(.breathe)),
         make(.fx, "jpCityGlow", [.elegance: 0.65, .bright: 0.7, .theatrical: 0.55], [.jpopCity], .fx(.glow)),
+        // ⑦ 通用・工業（docs/plans/2026-10-25-lyrics-fx-generic-parts.md §4.4）：只帶 genIndustrial；payload 全部沿用既有種類
+        make(.fx, "genIndShake", [.aggression: 0.85], [.genIndustrial], .fx(.shake)),
+        make(.fx, "genIndRgbsplit", [.cold: 0.7, .speed: 0.65], [.genIndustrial], .fx(.rgbsplit)),
+        // ⑦ 通用・實驗：只帶 genExperimental
+        make(.fx, "genExpMisreg", [.raw: 0.75, .decay: 0.55], [.genExperimental], .fx(.misreg)),
+        make(.fx, "genExpJitter", [.raw: 0.6, .speed: 0.5], [.genExperimental], .fx(.jitter)),
+        make(.fx, "genExpFlicker", [.decay: 0.6, .theatrical: 0.55], [.genExperimental], .fx(.flicker)),
+        // ⑦ 通用・電子：只帶 genElectronic
+        make(.fx, "genEleNeonstroke", [.bright: 0.75, .theatrical: 0.5], [.genElectronic], .fx(.neonstroke)),
+        make(.fx, "genEleRgbsplit", [.speed: 0.7, .cold: 0.6], [.genElectronic], .fx(.rgbsplit)),
+        make(.fx, "genEleThump", [.bounce: 0.65, .speed: 0.65], [.genElectronic], .fx(.thump)),
+        // ⑦ 通用・流行：只帶 genPop
+        make(.fx, "genPopBob", [.bounce: 0.7, .warm: 0.65], [.genPop], .fx(.bob)),
+        make(.fx, "genPopTilt", [.bounce: 0.65, .bright: 0.8], [.genPop], .fx(.tilt)),
+        // ⑦ 通用・民謠：只帶 genFolk
+        make(.fx, "genFolkBreathe", [.elegance: 0.55, .speed: 0.3], [.genFolk], .fx(.breathe)),
+        make(.fx, "genFolkFlicker", [.warm: 0.8, .decay: 0.35], [.genFolk], .fx(.flicker)),
+        // ⑦ 通用・氛圍：只帶 genAmbient
+        make(.fx, "genAmbBreathe", [.elegance: 0.8, .speed: 0.1], [.genAmbient], .fx(.breathe)),
+        make(.fx, "genAmbReflect", [.elegance: 0.75, .cold: 0.55], [.genAmbient], .fx(.reflect)),
+        // ⑦ 通用・古樂：只帶 genSacred
+        make(.fx, "genSacGlow", [.theatrical: 0.75, .elegance: 0.85], [.genSacred], .fx(.glow)),
+        make(.fx, "genSacReflect", [.elegance: 0.85, .theatrical: 0.6], [.genSacred], .fx(.reflect)),
+        // ⑦ 通用・暗潮：只帶 genDarkwave
+        make(.fx, "genDwReflect", [.elegance: 0.6, .cold: 0.7], [.genDarkwave], .fx(.reflect)),
+        make(.fx, "genDwBreathe", [.theatrical: 0.6, .speed: 0.4], [.genDarkwave], .fx(.breathe)),
+        // ⑦ 通用・嘻哈：只帶 genHipHop
+        make(.fx, "genHipThump", [.bounce: 0.8, .speed: 0.6], [.genHipHop], .fx(.thump)),
+        make(.fx, "genHipWobble", [.bounce: 0.7, .raw: 0.5], [.genHipHop], .fx(.wobble)),
     ]
 
     // composer.js:104-107,110,113
@@ -433,5 +586,70 @@ enum LyricsFXCatalog {
              .palette(FXPalette(bg: RGB(hex: 0x1B1040), fg: RGB(hex: 0xFFF3E0), acc: RGB(hex: 0xFF6AA0), dim: RGB(hex: 0x4FD3FF)))),
         make(.palette, "jpBallad", [.elegance: 0.85, .warm: 0.6], [.jpopBallad],
              .palette(FXPalette(bg: RGB(hex: 0xF7F4EE), fg: RGB(hex: 0x3B3A44), acc: RGB(hex: 0xC96A7A), dim: RGB(hex: 0x8FA6C9)))),
+        // ⑦ 通用・工業（docs/plans/2026-10-25-lyrics-fx-generic-parts.md §4.4）：只帶 genIndustrial；payload 全部沿用既有種類
+        make(.palette, "genIndRust", [.raw: 0.6, .decay: 0.5, .warm: 0.2], [.genIndustrial],
+             .palette(FXPalette(bg: RGB(hex: 0x0B0C0D), fg: RGB(hex: 0xE6E6E3), acc: RGB(hex: 0xC2410C), dim: RGB(hex: 0x4B4F54)))),
+        make(.palette, "genIndHazard", [.aggression: 0.75, .bright: 0.3], [.genIndustrial],
+             .palette(FXPalette(bg: RGB(hex: 0x0D0D0D), fg: RGB(hex: 0xF2F2F2), acc: RGB(hex: 0xF5C400), dim: RGB(hex: 0x555555)))),
+        make(.palette, "genIndSteel", [.cold: 0.9, .elegance: 0.2], [.genIndustrial],
+             .palette(FXPalette(bg: RGB(hex: 0x101418), fg: RGB(hex: 0xDCE3EA), acc: RGB(hex: 0x7FA7C9), dim: RGB(hex: 0x3E4A56)))),
+        // ⑦ 通用・實驗：只帶 genExperimental
+        make(.palette, "genExpBone", [.raw: 0.6, .decay: 0.55], [.genExperimental],
+             .palette(FXPalette(bg: RGB(hex: 0x0A0A0A), fg: RGB(hex: 0xEDEAE4), acc: RGB(hex: 0xD7263D), dim: RGB(hex: 0x5C5A57)))),
+        make(.palette, "genExpPhotocopy", [.raw: 0.55, .bright: 0.5], [.genExperimental],
+             .palette(FXPalette(bg: RGB(hex: 0xEDEBE6), fg: RGB(hex: 0x141414), acc: RGB(hex: 0x1F4FFF), dim: RGB(hex: 0x8E8C88)))),
+        make(.palette, "genExpStatic", [.cold: 0.6, .theatrical: 0.55], [.genExperimental],
+             .palette(FXPalette(bg: RGB(hex: 0x0D1012), fg: RGB(hex: 0xE4E8EA), acc: RGB(hex: 0x8FD14F), dim: RGB(hex: 0x4A5257)))),
+        // ⑦ 通用・電子：只帶 genElectronic
+        make(.palette, "genEleNeon", [.cold: 0.65, .bright: 0.7], [.genElectronic],
+             .palette(FXPalette(bg: RGB(hex: 0x07081A), fg: RGB(hex: 0xF2F4FF), acc: RGB(hex: 0x00E5FF), dim: RGB(hex: 0x3A3F6B)))),
+        make(.palette, "genEleAcid", [.speed: 0.7, .bounce: 0.6], [.genElectronic],
+             .palette(FXPalette(bg: RGB(hex: 0x0A0F0A), fg: RGB(hex: 0xE8FFE8), acc: RGB(hex: 0xB6FF00), dim: RGB(hex: 0x3F5A3F)))),
+        make(.palette, "genEleMagenta", [.theatrical: 0.55, .warm: 0.35], [.genElectronic],
+             .palette(FXPalette(bg: RGB(hex: 0x120818), fg: RGB(hex: 0xFBEFFF), acc: RGB(hex: 0xFF3EC8), dim: RGB(hex: 0x5A3B66)))),
+        // ⑦ 通用・流行：只帶 genPop
+        make(.palette, "genPopCandy", [.bright: 0.85, .warm: 0.6], [.genPop],
+             .palette(FXPalette(bg: RGB(hex: 0xFFF0F5), fg: RGB(hex: 0x2A1B3D), acc: RGB(hex: 0xFF4F9A), dim: RGB(hex: 0xB49AB0)))),
+        make(.palette, "genPopLemon", [.bright: 0.85, .bounce: 0.7], [.genPop],
+             .palette(FXPalette(bg: RGB(hex: 0xFFF7D6), fg: RGB(hex: 0x1E2240), acc: RGB(hex: 0xFF6A3D), dim: RGB(hex: 0xB3AC8C)))),
+        make(.palette, "genPopNight", [.elegance: 0.5, .theatrical: 0.5], [.genPop],
+             .palette(FXPalette(bg: RGB(hex: 0x14102A), fg: RGB(hex: 0xFFF3FA), acc: RGB(hex: 0xFF7AC6), dim: RGB(hex: 0x4E4670)))),
+        make(.palette, "genPopTeal", [.bounce: 0.6, .warm: 0.55], [.genPop],
+             .palette(FXPalette(bg: RGB(hex: 0x0B1F24), fg: RGB(hex: 0xF0FFFC), acc: RGB(hex: 0xFFD24D), dim: RGB(hex: 0x3C5A5E)))),
+        // ⑦ 通用・民謠：只帶 genFolk
+        make(.palette, "genFolkLinen", [.warm: 0.75, .bright: 0.55], [.genFolk],
+             .palette(FXPalette(bg: RGB(hex: 0xF1E9DA), fg: RGB(hex: 0x2E2418), acc: RGB(hex: 0x9C4A1A), dim: RGB(hex: 0xA89A82)))),
+        make(.palette, "genFolkForest", [.warm: 0.6, .cold: 0.3], [.genFolk],
+             .palette(FXPalette(bg: RGB(hex: 0x15201A), fg: RGB(hex: 0xEDE6D3), acc: RGB(hex: 0xC9A54A), dim: RGB(hex: 0x55624F)))),
+        make(.palette, "genFolkHearth", [.warm: 0.85, .raw: 0.35], [.genFolk],
+             .palette(FXPalette(bg: RGB(hex: 0x1E140D), fg: RGB(hex: 0xF3E6CF), acc: RGB(hex: 0xE07A3A), dim: RGB(hex: 0x6B5240)))),
+        // ⑦ 通用・氛圍：只帶 genAmbient
+        make(.palette, "genAmbMist", [.cold: 0.6, .elegance: 0.8], [.genAmbient],
+             .palette(FXPalette(bg: RGB(hex: 0x0E1418), fg: RGB(hex: 0xE3ECF0), acc: RGB(hex: 0x9CC7D9), dim: RGB(hex: 0x48575F)))),
+        make(.palette, "genAmbDusk", [.elegance: 0.8, .warm: 0.35], [.genAmbient],
+             .palette(FXPalette(bg: RGB(hex: 0x14121F), fg: RGB(hex: 0xECE6F5), acc: RGB(hex: 0xB9A3E3), dim: RGB(hex: 0x575070)))),
+        make(.palette, "genAmbDeep", [.cold: 0.65, .speed: 0.1], [.genAmbient],
+             .palette(FXPalette(bg: RGB(hex: 0x081014), fg: RGB(hex: 0xDDE8EA), acc: RGB(hex: 0x6FB3B8), dim: RGB(hex: 0x35484C)))),
+        // ⑦ 通用・古樂：只帶 genSacred
+        make(.palette, "genSacGold", [.theatrical: 0.75, .warm: 0.5], [.genSacred],
+             .palette(FXPalette(bg: RGB(hex: 0x0F0B06), fg: RGB(hex: 0xF0DFB0), acc: RGB(hex: 0xD4A93A), dim: RGB(hex: 0x5E4E2C)))),
+        make(.palette, "genSacVellum", [.elegance: 0.85, .bright: 0.45], [.genSacred],
+             .palette(FXPalette(bg: RGB(hex: 0xEFE6D2), fg: RGB(hex: 0x2B1D12), acc: RGB(hex: 0x8E1B1B), dim: RGB(hex: 0xA2957C)))),
+        make(.palette, "genSacNight", [.elegance: 0.9, .cold: 0.45], [.genSacred],
+             .palette(FXPalette(bg: RGB(hex: 0x0B0E1A), fg: RGB(hex: 0xE8E2CC), acc: RGB(hex: 0xC9A86A), dim: RGB(hex: 0x41465E)))),
+        // ⑦ 通用・暗潮：只帶 genDarkwave
+        make(.palette, "genDwViolet", [.theatrical: 0.65, .cold: 0.7], [.genDarkwave],
+             .palette(FXPalette(bg: RGB(hex: 0x0D0A14), fg: RGB(hex: 0xE7E1F2), acc: RGB(hex: 0x9B6BFF), dim: RGB(hex: 0x463C5C)))),
+        make(.palette, "genDwCold", [.cold: 0.8, .elegance: 0.55], [.genDarkwave],
+             .palette(FXPalette(bg: RGB(hex: 0x080B10), fg: RGB(hex: 0xDDE4EE), acc: RGB(hex: 0x5FA8D3), dim: RGB(hex: 0x36404D)))),
+        make(.palette, "genDwRose", [.decay: 0.55, .theatrical: 0.65], [.genDarkwave],
+             .palette(FXPalette(bg: RGB(hex: 0x120A10), fg: RGB(hex: 0xF0E2EA), acc: RGB(hex: 0xD6457A), dim: RGB(hex: 0x56404D)))),
+        // ⑦ 通用・嘻哈：只帶 genHipHop
+        make(.palette, "genHipGold", [.bounce: 0.75, .bright: 0.5], [.genHipHop],
+             .palette(FXPalette(bg: RGB(hex: 0x0B0B0B), fg: RGB(hex: 0xF5F5F5), acc: RGB(hex: 0xF2C230), dim: RGB(hex: 0x555555)))),
+        make(.palette, "genHipRed", [.aggression: 0.55, .warm: 0.55], [.genHipHop],
+             .palette(FXPalette(bg: RGB(hex: 0x120909), fg: RGB(hex: 0xF7EDE6), acc: RGB(hex: 0xE53935), dim: RGB(hex: 0x5E4642)))),
+        make(.palette, "genHipPurple", [.theatrical: 0.5, .bounce: 0.7], [.genHipHop],
+             .palette(FXPalette(bg: RGB(hex: 0x100A1A), fg: RGB(hex: 0xF4EEFF), acc: RGB(hex: 0xA66BFF), dim: RGB(hex: 0x4F456B)))),
     ]
 }

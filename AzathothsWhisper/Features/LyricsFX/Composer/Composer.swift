@@ -118,6 +118,9 @@ enum CatalogValidator {
         // P10：工業金屬與 Nu-Metal（含 Nu 系子標籤）不共用任何元件
         let industrialNu = catalog.filter { $0.tags.contains(.industrial) && !$0.tags.isDisjoint(with: FXTag.nuFamily) }
         if !industrialNu.isEmpty { problems.append("industrial 與 Nu 系共用：\(industrialNu.map(\.id))") }
+        // ⑦：通用元件只帶恰一個通用家族標籤，不與其他標籤混用（⑦ 計劃 §4.4）
+        let mixedGeneric = catalog.filter { !$0.tags.isDisjoint(with: FXTag.genericFamily) && $0.tags.count != 1 }
+        if !mixedGeneric.isEmpty { problems.append("通用標籤混用：\(mixedGeneric.map(\.id))") }
         let required = FXSlot.allCases.filter { $0 != .fx }
         for slot in required where !catalog.contains(where: { $0.slot == slot }) { problems.append("\(slot)：沒有任何元件") }
         if !catalog.contains(where: { $0.slot == .fx && $0.id == FXEffect.none.rawValue }) && catalog.contains(where: { $0.slot == .fx }) {

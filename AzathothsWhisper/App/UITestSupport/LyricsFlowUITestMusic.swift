@@ -38,7 +38,8 @@ actor LyricsFlowUITestMusic: MusicControlling {
 
     func nowPlaying() async throws -> NowPlayingRead? {
         guard var track = try await currentTrack() else { return nil }
-        let metadata = scenario == .lyricsFX ? TrackMetadata(genre: previewGenre ?? "Pop", duration: LyricsFXPreviewFixture.duration) : .unknown
+        // 預設曲風要是任何列（含 ⑦ 通用列）都認不得的，沿用預設的測試才是素面；⑦ 之前這裡是 "Pop"，它已是流行族的關鍵字
+        let metadata = scenario == .lyricsFX ? TrackMetadata(genre: previewGenre ?? "Glimmerwave", duration: LyricsFXPreviewFixture.duration) : .unknown
         if scenario == .lyricsFX, let previewArtist {
             track = TrackInfo(
                 persistentID: track.persistentID, artist: previewArtist, title: track.title, album: track.album,
