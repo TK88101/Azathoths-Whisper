@@ -241,3 +241,10 @@ T3 是 T4 的子集先行（工業家族用到的 resolver 改動在 T3 一起�
 - **folk**：folk 54、neofolk 34、country & folk 31、neo-medieval folk 16、folk rock 16
 - 觀察：寬詞命中的都是名副其實的同類曲風，沒有明顯誤命中（例如沒有 `pop punk` 落到這裡，因為 poppunk 列在 MB／Apple 層就先命中了）。`j-pop` 37 首是歌詞非日文的日本歌手（日文歌已在 J-Pop 層攔下），會套通用流行；T8 樣本含一首。
 - 改前逐首基線：12,271 行（persistentID＋素面／有樣式＋判定與固定 seed 配方的 SHA-256 前 16 位），存 scratchpad `baseline-before.tsv`，不進 repo；T6 改後同法重算比對。
+
+## 附錄 D 實作記錄（2026-10-25，分支 `wip/lyrics-fx-generic-parts`，自 main 924e68e）
+- **T1**：紅＝`FXTag` 無 gen 家族成員、無 `genericFamily`（編譯失敗）→ 綠（`GenericFamilyTests` 6 條＋`CatalogValidatorTests` 2 條）。`CatalogValidator` 新規則「通用標籤混用」。`FXTag.allCases` 無遍歷者，新增 case 不影響既有測試。
+- **T2 流程調整**：不做網頁探針，改為直接做進 app、讓使用者在曲庫實曲上看（使用者要求加快；實曲比網頁模擬更準）。
+- **T3（工業）**：紅＝`genericRow`／`generic`／`genericRows` 未定義（編譯失敗）→ 綠（`GenericLayerTests` 全過）。resolver 新增通用層（Apple 之後、先 MB 再 Apple）、`ProfileResolution.genericRow`、`ProfileSource.generic`；VM `sessionRecipe` 接上；`ReadabilityAudit.profiles` 納入通用列（`generic:<id>`），可讀性與對比閘門自動涵蓋。元件 14 個（字型 2、背景 3、進場 2、退場 2、效果 2、配色 3），payload 全沿用既有種類。`recipeSchemaVersion` 不加（新元件對既有目標值 fit＝0，加了反而會改到既有配方）。`RecipeGoldenTests`（`2f80…`）、`ExistingBandCandidates`（`PlayableSpaceTests`）綠。
+- **曲庫實曲**：只命中工業的有詞曲 48 首，全屬 1 位歌手；「實驗＋工業」68 首待實驗族。
+- **T8 #1（工業單獨）**：使用者 2026-10-25 在試看版播放後回「特效沒問題」→ 保留。

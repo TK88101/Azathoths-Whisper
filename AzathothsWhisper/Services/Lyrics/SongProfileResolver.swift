@@ -21,6 +21,8 @@ enum FXTag: String, CaseIterable, Sendable {
     case emo, posthardcore, indieemo, emopop
     /// ⑥a J-Pop：三變體各一個私有標籤；J-Pop 元件只帶其中一個（計劃 §4.2、§4.3）
     case jpopKira, jpopCity, jpopBallad
+    /// ⑦ 通用家族：每族一個私有標籤，只給通用元件與通用列；樂團表的團、既有曲風列一個都不帶（⑦ 計劃 §4.2）
+    case genExperimental, genElectronic, genPop, genFolk, genIndustrial, genAmbient, genSacred, genDarkwave, genHipHop
 
     /// Nu 系標籤：任何一個都不得與 `industrial` 掛在同一個元件上（P10；B2 批 3 計劃 §2.4 N1）。新立的 Nu 系子標籤要加進來
     static let nuFamily: Set<FXTag> = [.nu, .altmetal, .rapmetal, .cybermetal, .horrormetal, .gothmetal, .latinmetal]
@@ -29,6 +31,8 @@ enum FXTag: String, CaseIterable, Sendable {
     static let emoFamily: Set<FXTag> = [.emo, .posthardcore, .indieemo, .emopop]
 
     static let jpopFamily: Set<FXTag> = [.jpopKira, .jpopCity, .jpopBallad]
+
+    static let genericFamily: Set<FXTag> = [.genExperimental, .genElectronic, .genPop, .genFolk, .genIndustrial, .genAmbient, .genSacred, .genDarkwave, .genHipHop]
 }
 
 /// 歌曲目標值
@@ -50,8 +54,9 @@ enum LyricsEvidence: Equatable, Sendable {
 
 /// 定論的來源；VM 只在來源改變時重組已定格的配方（⑥a 計劃 §4.4）
 enum ProfileSource: Equatable, Sendable {
-    /// `verifiedArtistGenre`＝MB 驗證過的歌手曲風命中曲風列（⑥b 計劃 §4.3）；`genreRow`＝Apple 曲風命中
-    case signedBand, jpopPolicy, verifiedArtistGenre, genreRow, noMatch
+    /// `verifiedArtistGenre`＝MB 驗證過的歌手曲風命中曲風列（⑥b 計劃 §4.3）；`genreRow`＝Apple 曲風命中；
+    /// `generic`＝前面都組不出時命中通用列（⑦ 計劃 §4.1）
+    case signedBand, jpopPolicy, verifiedArtistGenre, genreRow, generic, noMatch
 
     /// 由歌詞內容決定的來源：寫入或改詞可能讓它出現或消失
     var dependsOnLyrics: Bool { self == .jpopPolicy }
@@ -66,6 +71,8 @@ enum ProfileResolution: Equatable, Sendable {
     /// MB 驗證過的歌手曲風命中曲風列（⑥b）
     case artistGenreRow(SongProfile)
     case genreRow(SongProfile)
+    /// MB 與 Apple 曲風都組不出既有列時，命中通用列（⑦）
+    case genericRow(SongProfile)
     /// 讀到了 genre 但無已知關鍵字：素面
     case noMatch
 
@@ -76,20 +83,21 @@ enum ProfileResolution: Equatable, Sendable {
         case .jpop: .jpopPolicy
         case .artistGenreRow: .verifiedArtistGenre
         case .genreRow: .genreRow
+        case .genericRow: .generic
         case .noMatch: .noMatch
         }
     }
 
     var profile: SongProfile? {
         switch self {
-        case .signedBand(let profile), .artistGenreRow(let profile), .genreRow(let profile): profile
+        case .signedBand(let profile), .artistGenreRow(let profile), .genreRow(let profile), .genericRow(let profile): profile
         case .pending, .jpop, .noMatch: nil
         }
     }
 }
 
 /// 歌曲目標值的來源（B1 計劃 §3.5；⑥a 計劃 §4.1；⑥b 計劃 §4.3）：樂團覆寫表 → 歌詞未知＝pending → 日文詞＝J-Pop →
-/// MB 驗證過的歌手曲風 → genre 關鍵字合成。每一層合成後組不出六槽就當沒命中、落下一層
+/// MB 驗證過的歌手曲風 → genre 關鍵字合成 → 通用列（先 MB、再 Apple）。每一層合成後組不出六槽就當沒命中、落下一層
 enum SongProfileResolver {
     struct KeywordRow: Sendable {
         let id: String
@@ -216,6 +224,39 @@ enum SongProfileResolver {
         row("metal", ["metal"], ["Iron Maiden", "Slayer"], isGeneric: true),
     ]
 
+    /// ⑦ 通用列（計劃 §4.2–4.3）：排在 Apple 曲風之後，只接住現在會素面的曲。十軸手定（政策列，同 J-Pop 先例 I-65），
+    /// 不借代表團；標籤只有該族的私有標籤，抽不到署名團的元件
+    static let genericRows: [KeywordRow] = [
+        // 冷、硬、機械：高 cold／aggression，低 bright／warm／elegance
+        policyRow("industrial", ["industrial", "ebm", "neue deutsche"], tag: .genIndustrial,
+                  axes: [.raw: 0.55, .theatrical: 0.5, .cold: 0.85, .aggression: 0.75, .speed: 0.6, .elegance: 0.15, .decay: 0.5, .bright: 0.15, .bounce: 0.3, .warm: 0.1]),
+        // 粗糙、不穩、偏冷：高 raw／decay，中等 theatrical
+        policyRow("experimental", ["experimental", "avant", "noise"], tag: .genExperimental,
+                  axes: [.raw: 0.6, .theatrical: 0.6, .cold: 0.6, .aggression: 0.5, .speed: 0.45, .elegance: 0.4, .decay: 0.6, .bright: 0.3, .bounce: 0.2, .warm: 0.25]),
+        // 亮、律動、冷色霓虹：高 speed／bright／bounce
+        policyRow("electronic", ["electronic", "electronica", "synth", "downtempo", "trip hop", "trip-hop", "edm", "dance", "house", "techno", "idm", "jungle", "dub"],
+                  tag: .genElectronic,
+                  axes: [.raw: 0.2, .theatrical: 0.5, .cold: 0.6, .aggression: 0.35, .speed: 0.7, .elegance: 0.45, .decay: 0.1, .bright: 0.7, .bounce: 0.6, .warm: 0.3]),
+        // 明亮、甜、彈跳：高 bright／bounce／warm，低 aggression
+        policyRow("pop", ["pop"], tag: .genPop,
+                  axes: [.raw: 0.1, .theatrical: 0.5, .cold: 0.15, .aggression: 0.15, .speed: 0.55, .elegance: 0.45, .decay: 0.05, .bright: 0.85, .bounce: 0.7, .warm: 0.65]),
+        // 溫暖、手寫、慢：高 warm／elegance
+        policyRow("folk", ["folk", "singer/songwriter", "singer-songwriter", "americana", "country"], tag: .genFolk,
+                  axes: [.raw: 0.35, .theatrical: 0.3, .cold: 0.25, .aggression: 0.15, .speed: 0.35, .elegance: 0.55, .decay: 0.3, .bright: 0.5, .bounce: 0.3, .warm: 0.8]),
+        // 慢、空、優雅：極低 speed／aggression，高 elegance
+        policyRow("ambient", ["ambient", "new age", "drone", "chillout"], tag: .genAmbient,
+                  axes: [.raw: 0.05, .theatrical: 0.45, .cold: 0.6, .aggression: 0.05, .speed: 0.1, .elegance: 0.8, .decay: 0.2, .bright: 0.45, .bounce: 0.05, .warm: 0.35]),
+        // 莊嚴、古典：高 theatrical／elegance，近乎不動
+        policyRow("sacred", ["chant", "gregorian", "medieval", "early music", "madrigal"], tag: .genSacred,
+                  axes: [.raw: 0.1, .theatrical: 0.75, .cold: 0.45, .aggression: 0.1, .speed: 0.15, .elegance: 0.9, .decay: 0.35, .bright: 0.4, .bounce: 0, .warm: 0.5]),
+        // 冷、暗、帶戲劇性：高 cold／theatrical，中等 decay
+        policyRow("darkwave", ["dark wave", "ダークウェーブ"], tag: .genDarkwave,
+                  axes: [.raw: 0.3, .theatrical: 0.65, .cold: 0.75, .aggression: 0.35, .speed: 0.45, .elegance: 0.6, .decay: 0.55, .bright: 0.2, .bounce: 0.2, .warm: 0.15]),
+        // 律動、街頭：高 bounce，中高 aggression／raw
+        policyRow("hiphop", ["hip hop", "hip-hop", "rap"], tag: .genHipHop,
+                  axes: [.raw: 0.5, .theatrical: 0.45, .cold: 0.25, .aggression: 0.55, .speed: 0.6, .elegance: 0.2, .decay: 0.25, .bright: 0.5, .bounce: 0.8, .warm: 0.55]),
+    ]
+
     /// 曲風列不得帶的標籤（⑥b R3-1）：emo 群、J-Pop 與批 3 的 Nu 系子標籤是各批私有，重用要重簽；`.nu`（B1 原型）不在此列
     static let genreRowPrivateTags: Set<FXTag> = FXTag.emoFamily.union(FXTag.jpopFamily).union(FXTag.nuFamily.subtracting([.nu]))
 
@@ -223,7 +264,8 @@ enum SongProfileResolver {
     static let hardAxes: Set<FXAxis> = [.raw, .aggression, .speed, .decay, .cold, .theatrical]
 
     static func resolve(
-        artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown, rows: [KeywordRow] = keywordRows
+        artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown,
+        rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows
     ) -> ProfileResolution {
         if let profile = signedProfile(artist) { return .signedBand(profile) }
         if lyrics == .unknown { return .pending }
@@ -233,7 +275,14 @@ enum SongProfileResolver {
             return .artistGenreRow(profile)
         }
         guard let genre else { return .pending }
-        return playable(compose(genres: [genre], rows: rows)).map(ProfileResolution.genreRow) ?? .noMatch
+        if let profile = playable(compose(genres: [genre], rows: rows)) { return .genreRow(profile) }
+        return genericProfile(artistGenres: artistGenres, genre: genre, rows: genericRows).map(ProfileResolution.genericRow) ?? .noMatch
+    }
+
+    /// 通用層：先 MB 曲風（比 Apple 細），沒命中再用 Apple 曲風（⑦ 計劃 §4.1）
+    private static func genericProfile(artistGenres: ArtistGenres, genre: String, rows: [KeywordRow]) -> SongProfile? {
+        if case .verified(let genres) = artistGenres, let profile = playable(compose(genres: genres, rows: rows)) { return profile }
+        return playable(compose(genres: [genre], rows: rows))
     }
 
     /// 要不要為這位歌手查 MB：樂團表的團一律以表為準（與 `resolve` 的第一層同一個判斷）
@@ -287,6 +336,11 @@ enum SongProfileResolver {
     /// B1 的兩列：關鍵字、標籤照舊手定
     private static func legacyRow(_ id: String, _ keywords: [String], _ representatives: [String], tags: Set<FXTag>) -> KeywordRow {
         KeywordRow(id: id, keywords: keywords, representatives: representatives, tags: tags, axes: mean(of: representatives), isGeneric: false)
+    }
+
+    /// ⑦ 通用列：手定十軸、只帶一個通用家族標籤、沒有代表團
+    private static func policyRow(_ id: String, _ keywords: [String], tag: FXTag, axes: [FXAxis: Double]) -> KeywordRow {
+        KeywordRow(id: id, keywords: keywords, representatives: [], tags: [tag], axes: axes, isGeneric: false)
     }
 
     /// ⑥b 的列：標籤＝代表團聯集扣私有家族，軸值＝代表團平均
