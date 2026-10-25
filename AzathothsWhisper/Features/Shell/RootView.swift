@@ -2,7 +2,7 @@ import SwiftUI
 
 // 外殼：頁首導航 → 內容 → 頁尾狀態列，外加噪點層／modal／confetti（py:126-263）
 //
-// 掛載結構（Cover Flow × 找歌詞 D2）：外殼從啟動起常駐，開場畫面是**覆蓋層**；Editor 頁（Editor＋Cover Flow）
+// 掛載結構（Cover Flow × 找歌詞 D2）：外殼從啟動起常駐（2026-10-25 起沒有開場畫面，A-01 ⚠️）；Editor 頁（Editor＋Cover Flow）
 // 常駐在分頁切換之外，Batch 以覆蓋層顯示。Cover Flow 條帶因此只建立一次（空牌組、無中心），
 // 此後只走運行時路徑，不再經過初始值路徑（H-02 缺陷 3 的觸發條件）。
 struct RootView: View {
@@ -13,15 +13,6 @@ struct RootView: View {
             Theme.background
 
             shell
-                // 開場期間外殼不可見、不可點、不在 AX 樹上（A-01／A-02：首屏＝splash，之後同窗換成主 UI）
-                .opacity(model.isSplashVisible ? 0 : 1)
-                .allowsHitTesting(!model.isSplashVisible)
-                .accessibilityHidden(model.isSplashVisible)
-
-            if model.isSplashVisible {
-                SplashView()
-                    .transition(.opacity)
-            }
 
             NoiseOverlay()
 
@@ -40,7 +31,6 @@ struct RootView: View {
         }
         .background(WindowConfigurator())
         .preferredColorScheme(.dark)
-        .animation(.easeInOut(duration: 0.2), value: model.isSplashVisible)
         .task { await model.start() }
     }
 
@@ -138,7 +128,7 @@ struct RootView: View {
                 lyricsFX: model.lyricsFX,
                 raisedStyle: model.raisedLayerStyle,
                 onSelectStyle: model.selectRaisedLayerStyle,
-                isActive: model.tab == .editor && !model.isSplashVisible
+                isActive: model.tab == .editor
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             footer

@@ -80,7 +80,7 @@ struct AppModelTimingTests {
         let model = AppModel(
             configStore: store, httpClient: MockHTTPClient(), music: music, monitor: monitor, validator: AlwaysValidValidator(),
             notifier: SpyLyricsNotifier(), playerSignal: SpyPlayerChangeSignal(), initialToken: "", initialLanguage: .system,
-            splashDuration: .milliseconds(1), lyricsFlowClock: GatedPollClock(), positionPollClock: GatedPollClock(),
+            artistStylesStartDelay: .milliseconds(1), lyricsFlowClock: GatedPollClock(), positionPollClock: GatedPollClock(),
             isMusicRunning: { true }, timing: timing
         )
         model.editor.isEditorTabActive = false
