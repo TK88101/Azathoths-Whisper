@@ -148,7 +148,7 @@
     chflags hidden "$STAGING/dmg_background.png"
 
     hdiutil create -volname "Azathoth's Whisper" -srcfolder "$STAGING" \
-      -format UDZO -ov "$WORK/Azathoths-Whisper-v2.0.2.dmg"
+      -format UDZO -ov "$WORK/Azathoths-Whisper-v2.1.0.dmg"
     ```
 
     卷名與各項目的檔名必須與上方完全一致——`.DS_Store` 按**名稱**解析背景圖與圖示位置。
