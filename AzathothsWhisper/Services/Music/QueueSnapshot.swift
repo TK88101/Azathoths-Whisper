@@ -14,9 +14,12 @@ struct QueueEntry: Equatable, Sendable {
 ///
 /// 選序列的規則（R4-5）：`shuffleMode == off` 讀 `items.list`；其餘一律讀 `items.shuffledList`，
 /// 缺失或壞型別就**整份不可用**——絕不退回 `list`（那是未打亂的原始順序，會顯示錯的「接下來」）。
+/// **唯一例外**（C′，`docs/plans/2026-10-14-yse/s6-61-cprime.md`）：捷徑起播的佇列（`simp` 且起播來源無
+/// `containerCD`）開隨機但 Music 沒寫 `shuffledList`＝Music 實際照 `list` 播（形狀 3/3、播放順序直接驗證 2 流程）。
 /// `shuffleMode` 本身不明（型別錯、兩處不一致，或沒寫卻有打乱序列）同樣不可用（對抗覆核 P1①）。
 struct QueueSnapshot: Equatable, Sendable {
     enum SequenceKind: String, Equatable, Sendable {
+        /// Music 實際照 `list` 播（隨機關閉，或 C′ 的捷徑起播例外——不等於「隨機關閉」）
         case ordered
         case shuffled
     }
@@ -33,8 +36,9 @@ struct QueueSnapshot: Equatable, Sendable {
               segments.count == 1,
               let items = segments[0]["items"] as? [String: Any]
         else { return nil }
+        let segment = segments[0]
 
-        guard let kind = sequenceKind(items: items, root: root) else { return nil }
+        guard let kind = sequenceKind(items: items, root: root, segment: segment) else { return nil }
         let listKey = kind == .ordered ? "list" : "shuffledList"
         guard let list = (items[listKey] as? [String: Any])?["items"] as? [String: Any],
               let raw = list["iar"] as? [[String: Any]]
@@ -49,14 +53,41 @@ struct QueueSnapshot: Equatable, Sendable {
     /// `shuffleMode` 寫在 items 與頂層兩處（實檔兩處皆有、值相同）。
     /// 兩處都沒寫時：只有 `list` 一支 → 順序；另有 `shuffledList` → 無從判斷正在播哪一支，不可用。
     /// （順序模式的實檔是否寫 `shuffleMode` 尚未實測，計劃 U10）
-    private static func sequenceKind(items: [String: Any], root: [String: Any]) -> SequenceKind? {
+    private static func sequenceKind(items: [String: Any], root: [String: Any], segment: [String: Any]) -> SequenceKind? {
         let fields = [items["shuffleMode"], root["shuffleMode"]].compactMap { $0 }
         let modes = fields.compactMap { $0 as? String }
         guard modes.count == fields.count, Set(modes).count <= 1 else { return nil }
         guard let mode = modes.first else {
             return items["shuffledList"] == nil ? .ordered : nil
         }
-        return mode == "off" ? .ordered : .shuffled
+        if mode == "off" { return .ordered }
+        if mode == "tracks", items["shuffledList"] == nil, isShortcutStart(root: root, segment: segment) { return .ordered }
+        return .shuffled
+    }
+
+    /// 捷徑起播的 4CC（`'simp'`）；Music 介面起播是 `'trls'`（計劃 s6-61-cprime.md §3-2）
+    private static let simplePlaylistKind: Int64 = 0x7369_6D70
+
+    /// 捷徑起播的形狀（13/13 樣本）：segment `subcKind == 'simp'`；root `spcl` 恰 1 筆、值為字典、
+    /// `id` 等於 segment 的 `spcID`、沒有 `containerCD`（Music 介面起播一律帶）。任一條不符＝不是
+    private static func isShortcutStart(root: [String: Any], segment: [String: Any]) -> Bool {
+        guard plistInteger(segment["subcKind"]) == simplePlaylistKind,
+              let sourceID = plistInteger(segment["spcID"]),
+              let sources = root["spcl"] as? [String: Any], sources.count == 1,
+              let source = sources.values.first as? [String: Any],
+              plistInteger(source["id"]) == sourceID,
+              source["containerCD"] == nil
+        else { return false }
+        return true
+    }
+
+    /// plist `<integer>` 才算：排除布林與浮點（`NSNumber` 橋接會把它們轉成整數，不可依賴）
+    private static func plistInteger(_ value: Any?) -> Int64? {
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID(),
+              !CFNumberIsFloatType(number)
+        else { return nil }
+        return number.int64Value
     }
 
     private static func entry(_ raw: [String: Any]) -> QueueEntry? {

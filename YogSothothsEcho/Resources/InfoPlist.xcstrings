@@ -1,0 +1,20 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSCameraUsageDescription" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Yog-Sothoth's Echo uses the camera only to scan the pairing code shown by Azathoth's Whisper on your Mac." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Yog-Sothoth's Echo はカメラを、Mac の Azathoth's Whisper に表示されたペアリングコードの読み取りにのみ使います。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Yog-Sothoth's Echo 只用相機掃描 Mac 上 Azathoth's Whisper 顯示的配對碼。" } }
+      }
+    },
+    "NSLocalNetworkUsageDescription" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Yog-Sothoth's Echo connects to Azathoth's Whisper on your Mac over the local network." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Yog-Sothoth's Echo はローカルネットワーク経由で Mac の Azathoth's Whisper に接続します。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Yog-Sothoth's Echo 會透過區域網路連接你 Mac 上的 Azathoth's Whisper。" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

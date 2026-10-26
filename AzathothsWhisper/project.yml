@@ -9,11 +9,15 @@ packages:
   SwiftSoup:
     url: https://github.com/scinfu/SwiftSoup
     from: 2.7.0
+  # Yog-Sothoth's Echo 的共用套件（docs/plans/2026-10-14-yse/02-basic-design.md §2）。
+  # 只許 App/Remote/** 與 App/AppModel.swift import（Scripts/no_playback_gate.sh R5）
+  EchoKit:
+    path: ../YogSothothsEcho/Packages/EchoKit
 
 settings:
   base:
-    MARKETING_VERSION: "2.1.0"
-    CURRENT_PROJECT_VERSION: "2000004"   # 建置號：只增不減的整數，每次打包 +1（2026-09-24 使用者拍板）
+    MARKETING_VERSION: "3.0.0"
+    CURRENT_PROJECT_VERSION: "2000005"   # 建置號：只增不減的整數，每次打包 +1（2026-09-24 使用者拍板）
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_IDENTITY: "-"
@@ -36,6 +40,12 @@ targets:
         buildPhase: resources
     dependencies:
       - package: SwiftSoup
+      - package: EchoKit
+        product: RemoteProtocol
+      - package: EchoKit
+        product: RemoteTransport
+      - package: EchoKit
+        product: MusicRemoteBridge
     settings:
       base:
         PRODUCT_NAME: "Azathoth's Whisper"
@@ -54,6 +64,8 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSHighResolutionCapable: true
         NSAppleEventsUsageDescription: "Azathoths Whisper needs access to Music to detect the currently playing song."
+        # S3（sprint-3-detail.md §4.10）：ITLibrary 沒有這個鍵會直接失敗（4097）；三語在 Resources/InfoPlist.xcstrings
+        NSAppleMusicUsageDescription: "Azathoth's Whisper reads your Music library (read only) only when the iPad remote is turned on, so Yog-Sothoth's Echo can show your albums."
         ATSApplicationFontsPath: "."
         NSAppTransportSecurity:
           NSExceptionDomains:

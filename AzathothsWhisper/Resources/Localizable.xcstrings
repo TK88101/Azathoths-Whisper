@@ -1151,6 +1151,98 @@
         }
       }
     },
+    "relay_genius_explanation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genius on your iPad needs Azathoth's Whisper to be allowed in Accessibility."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad で Genius を使うには、「アクセシビリティ」で Azathoth's Whisper を許可してください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要在 iPad 上用 Genius，需在「輔助使用」中允許 Azathoth's Whisper。"
+          }
+        }
+      }
+    },
+    "relay_genius_status_needs_accessibility": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genius: not allowed yet"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genius：未許可"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genius：尚未允許"
+          }
+        }
+      }
+    },
+    "relay_genius_status_ready": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genius: allowed"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genius：許可済み"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genius：已允許"
+          }
+        }
+      }
+    },
+    "relay_open_accessibility_privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Accessibility Settings"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アクセシビリティ設定を開く"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟輔助使用設定"
+          }
+        }
+      }
+    },
     "save_btn": {
       "extractionState": "manual",
       "localizations": {
@@ -1745,6 +1837,1110 @@
           "stringUnit": {
             "state": "translated",
             "value": "寫入 iTunes"
+          }
+        }
+      }
+    },
+    "relay_allow_button": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "許可"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允許"
+          }
+        }
+      }
+    },
+    "relay_cancel_button": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャンセル"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        }
+      }
+    },
+    "relay_done_button": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完了"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        }
+      }
+    },
+    "relay_generate_new_code": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generate new code"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しいコードを生成"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新產生"
+          }
+        }
+      }
+    },
+    "relay_keychain_explanation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azathoth's Whisper was updated or rebuilt. Click below, then enter your Mac login password in the Keychain prompt and choose Always Allow."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azathoth's Whisper が更新または再ビルドされました。下のボタンを押し、キーチェーンのダイアログで Mac のログインパスワードを入力して「常に許可」を選んでください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azathoth's Whisper 剛更新或重新建置。請按下方按鈕，在鑰匙圈視窗輸入 Mac 登入密碼並選「永遠允許」。"
+          }
+        }
+      }
+    },
+    "relay_pair_new_ipad": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair new iPad"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しい iPad をペアリング"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配對新 iPad"
+          }
+        }
+      }
+    },
+    "relay_paired_devices": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paired iPads"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ペアリング済みの iPad"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已配對的 iPad"
+          }
+        }
+      }
+    },
+    "relay_reject_button": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reject"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拒否"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拒絕"
+          }
+        }
+      }
+    },
+    "relay_result_approved": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paired. The iPad will connect automatically from now on."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ペアリングしました。今後は iPad が自動で接続します。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配對完成，之後 iPad 會自動連上。"
+          }
+        }
+      }
+    },
+    "relay_result_cancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pairing cancelled."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ペアリングをキャンセルしました。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消配對。"
+          }
+        }
+      }
+    },
+    "relay_result_expired": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The code expired."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コードの有効期限が切れました。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這個碼已過期。"
+          }
+        }
+      }
+    },
+    "relay_result_rejected": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pairing rejected."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ペアリングを拒否しました。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已拒絕配對。"
+          }
+        }
+      }
+    },
+    "relay_retry_authorization": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authorize on this Mac"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この Mac で許可する"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在這台 Mac 上授權"
+          }
+        }
+      }
+    },
+    "relay_revoke_button": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解除"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解除"
+          }
+        }
+      }
+    },
+    "relay_revoke_confirm_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove this iPad?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この iPad を解除しますか？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要解除這台 iPad 嗎？"
+          }
+        }
+      }
+    },
+    "relay_scan_instruction": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan this code with Yog-Sothoth's Echo on your iPad"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad の Yog-Sothoth's Echo でこのコードを読み取ってください"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 iPad 上的 Yog-Sothoth's Echo 掃描這個碼"
+          }
+        }
+      }
+    },
+    "relay_section_label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad remote"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad リモート"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad 遙控"
+          }
+        }
+      }
+    },
+    "relay_toggle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow Yog-Sothoth's Echo on iPad to control Music"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad の Yog-Sothoth's Echo からの Music 操作を許可"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允許 iPad 上的 Yog-Sothoth's Echo 遙控 Music"
+          }
+        }
+      }
+    },
+    "login_item_toggle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Azathoth's Whisper at login"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ログイン時に Azathoth's Whisper を開く"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登入時開啟 Azathoth's Whisper"
+          }
+        }
+      }
+    },
+    "login_item_requires_approval": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow it in System Settings ▸ General ▸ Login Items."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「システム設定 ▸ 一般 ▸ ログイン項目」で許可してください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請在「系統設定 ▸ 一般 ▸ 登入項目」中允許。"
+          }
+        }
+      }
+    },
+    "login_item_unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS couldn't register this app as a login item."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS がこの App をログイン項目に登録できませんでした。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 無法將此 App 登記為登入項目。"
+          }
+        }
+      }
+    },
+    "login_item_open_settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Login Items Settings"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ログイン項目の設定を開く"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打開登入項目設定"
+          }
+        }
+      }
+    },
+    "login_item_failed %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't change the login item (%@)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ログイン項目を変更できませんでした（%@）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法變更登入項目（%@）。"
+          }
+        }
+      }
+    },
+    "relay_unverified_request_body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The iPad that just scanned the code wants to pair. Allow only if the 4 characters below match the ones on your iPad."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コードを読み取った iPad がペアリングを求めています。下の 4 文字が iPad の表示と一致する場合のみ許可してください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剛掃描的 iPad 正在請求配對。只有在下面 4 碼與 iPad 上顯示的一致時才允許。"
+          }
+        }
+      }
+    },
+    "relay_unverified_request_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unverified device request"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未確認のデバイスからのリクエスト"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未驗證的裝置請求"
+          }
+        }
+      }
+    },
+    "relay_library_unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azathoth's Whisper can't read your Music library, so the iPad can't show your albums. Allow Azathoth's Whisper in System Settings › Privacy & Security › Media & Apple Music. If the iPad still can't load the library, quit and reopen Azathoth's Whisper."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azathoth's Whisper がミュージックライブラリを読み込めないため、iPad にアルバムを表示できません。システム設定 › プライバシーとセキュリティ › メディアと Apple Music で Azathoth's Whisper を許可してください。それでも iPad で読み込めない場合は、Azathoth's Whisper を終了して開き直してください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azathoth's Whisper 讀不到你的 Music 曲庫，iPad 無法顯示專輯。請到「系統設定 › 隱私權與安全性 › 媒體與 Apple Music」允許 Azathoth's Whisper。若 iPad 仍讀不到，請結束 Azathoth's Whisper 後重新打開。"
+          }
+        }
+      }
+    },
+    "relay_open_media_privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Privacy Settings"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プライバシー設定を開く"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打開隱私權設定"
+          }
+        }
+      }
+    },
+    "relay_playback_section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Music Control"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ミュージックの操作"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Music 控制"
+          }
+        }
+      }
+    },
+    "relay_shortcut_explanation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you pick a song on the iPad, Azathoth's Whisper runs the “YSE Play v1” shortcut so the rest of the album plays after it. Without the shortcut, only the song you picked plays."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad で曲を選ぶと、Azathoth's Whisper は「YSE Play v1」ショートカットを実行して、その曲のあとにアルバムの残りを続けて再生します。ショートカットがない場合は、選んだ曲だけが再生されます。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 iPad 點歌時，Azathoth's Whisper 會執行「YSE Play v1」捷徑，讓這首之後接著播專輯剩下的歌。沒有這個捷徑時，只會播你點的那一首。"
+          }
+        }
+      }
+    },
+    "relay_music_not_authorized": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Mac hasn't allowed Azathoth's Whisper to control Music, so the iPad's playback buttons won't work. Turn on Music for Azathoth's Whisper in System Settings › Privacy & Security › Automation."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この Mac は Azathoth's Whisper にミュージックの操作を許可していないため、iPad の再生ボタンは使えません。システム設定 › プライバシーとセキュリティ › オートメーションで、Azathoth's Whisper の「ミュージック」をオンにしてください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這台 Mac 尚未允許 Azathoth's Whisper 控制 Music，iPad 上的播放按鈕暫時無法使用。請到「系統設定 › 隱私權與安全性 › 自動化」，在 Azathoth's Whisper 底下打開 Music。"
+          }
+        }
+      }
+    },
+    "relay_open_automation_privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Automation Settings"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オートメーション設定を開く"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟自動化設定"
+          }
+        }
+      }
+    },
+    "relay_shortcut_install": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install Shortcut"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットを追加"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安裝捷徑"
+          }
+        }
+      }
+    },
+    "relay_shortcut_reinstall": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reinstall Shortcut"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットを追加し直す"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新安裝捷徑"
+          }
+        }
+      }
+    },
+    "relay_shortcut_recheck": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check Again"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "もう一度確認"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新檢查"
+          }
+        }
+      }
+    },
+    "relay_shortcut_status_saved": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shortcut installed earlier. Click Check Again to confirm it's still there."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以前にショートカットを追加済みです。まだあるかは「もう一度確認」で確かめられます。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "之前已安裝捷徑。按「重新檢查」確認它還在。"
+          }
+        }
+      }
+    },
+    "relay_shortcut_status_none": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shortcut not installed yet."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットはまだ追加されていません。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未安裝捷徑。"
+          }
+        }
+      }
+    },
+    "relay_shortcut_status_bound": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shortcut is installed."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットは追加されています。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "捷徑已安裝。"
+          }
+        }
+      }
+    },
+    "relay_shortcut_status_missing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The shortcut is gone. Install it again to keep album playback."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットが見つかりません。アルバムを続けて再生するには、もう一度追加してください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "捷徑不見了。請重新安裝，才能接著播整張專輯。"
+          }
+        }
+      }
+    },
+    "relay_shortcut_checking": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認中…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檢查中…"
+          }
+        }
+      }
+    },
+    "relay_shortcut_waiting_for_add": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the Shortcuts app, click “Add Shortcut”."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカット App で「ショートカットを追加」をクリックしてください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請在「捷徑」App 裡按「加入捷徑」。"
+          }
+        }
+      }
+    },
+    "relay_shortcut_confirming": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If Shortcuts asks whether to allow sharing, choose “Always Allow”."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカット App で共有を許可するか聞かれたら、「常に許可」を選んでください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如果「捷徑」App 詢問是否允許分享，請選「永遠允許」。"
+          }
+        }
+      }
+    },
+    "relay_shortcut_installed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shortcut installed. If Shortcuts asked about sharing, make sure you chose “Always Allow”."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットを追加しました。共有の許可を聞かれた場合は、「常に許可」を選んだか確認してください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "捷徑安裝完成。若「捷徑」App 問過是否允許分享，請確認選的是「永遠允許」。"
+          }
+        }
+      }
+    },
+    "relay_shortcut_share_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If Shortcuts asks again about sharing when you pick a song on iPad, choose “Always Allow”."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad で曲を選んだときに、ショートカット App が共有の許可をもう一度聞いてきたら、「常に許可」を選んでください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "從 iPad 點歌時，如果「捷徑」App 再次詢問是否允許分享，請選「永遠允許」。"
+          }
+        }
+      }
+    },
+    "relay_shortcut_failed_list": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't read the list of shortcuts. Try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットの一覧を読み込めませんでした。もう一度お試しください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "讀不到捷徑清單，請再試一次。"
+          }
+        }
+      }
+    },
+    "relay_shortcut_failed_sign": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't prepare the shortcut. Try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカットを準備できませんでした。もう一度お試しください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法準備捷徑，請再試一次。"
+          }
+        }
+      }
+    },
+    "relay_shortcut_failed_open": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open the Shortcuts app."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカット App を開けませんでした。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法開啟「捷徑」App。"
+          }
+        }
+      }
+    },
+    "relay_shortcut_not_detected": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No new shortcut showed up within 30 seconds. Try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 秒以内に新しいショートカットが見つかりませんでした。もう一度お試しください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 秒內沒有偵測到新的捷徑，請再試一次。"
+          }
+        }
+      }
+    },
+    "relay_shortcut_name_taken": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A shortcut named “YSE Play v1” already exists. Delete the old one in the Shortcuts app, then install again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「YSE Play v1」という名前のショートカットがすでにあります。ショートカット App で古いほうを削除してから、もう一度追加してください。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已經有名為「YSE Play v1」的捷徑。請先在「捷徑」App 刪掉舊的，再重新安裝。"
           }
         }
       }

@@ -32,6 +32,29 @@ FORBIDDEN = [
     ("Services/Music/MusicAppleEventsClient.swift", "tracks.add(obj)"),
     ("Services/Music/QueueFileSource.swift", "try data.write(to: url)"),
     ("Services/Music/QueueFileSource.swift", "try FileManager.default.removeItem(at: url)"),
+    # R5（Yog-Sothoth's Echo S1）：Remote 模組只許 App/Remote/** 與 App/AppModel.swift import
+    ("Features/Foo.swift", "import MusicRemoteBridge"),
+    ("Services/Foo.swift", "import RemoteTransport"),
+    ("UI/Foo.swift", "import RemoteProtocol"),
+    ("Infra/Foo.swift", "@testable import MusicRemoteBridge"),
+    ("App/AppDelegate.swift", "import MusicRemoteBridge"),
+    ("App/RemoteHelpers.swift", "import RemoteTransport"),
+    ("Features/Foo.swift", "@preconcurrency import MusicRemoteBridge"),
+    ("Services/Foo.swift", "internal import RemoteTransport"),
+    ("UI/Foo.swift", "@_exported import RemoteProtocol"),
+    ("Features/Foo.swift", "import struct MusicRemoteBridge.PlayContext"),
+    # R1-ax（CR-030；ACCEPTANCE H-20 ③）：Azathoth 本體禁輔助使用；Genius 只在 EchoKit 的 GeniusMenu.swift
+    ("App/Remote/Foo.swift", "let app = AXUIElementCreateApplication(pid)"),
+    ("Features/Settings/Foo.swift", "let trusted = AXIsProcessTrusted()"),
+    ("Services/Foo.swift", "let a = kAXPressAction"),
+    ("UI/Foo.swift", "import ApplicationServices"),
+    ("Infra/Foo.swift", "@preconcurrency import HIServices"),
+    ("App/Foo.swift", "AXUIElementPerformAction(e, kAXPressAction as CFString)"),
+    # simcodex G7 security LOW-2：底線私有 SPI、動態取符號
+    ("App/Remote/Foo.swift", "_AXUIElementGetWindow(w, &id)"),
+    ("Services/Foo.swift", 'let f = dlsym(RTLD_DEFAULT, "AXUI" + "ElementPerformAction")'),
+    ("Infra/Foo.swift", "let h = dlopen(path, RTLD_NOW)"),
+    ("Features/Foo.swift", '@_silgen_name("AESend") func send()'),
 ]
 
 
@@ -51,6 +74,12 @@ class NoPlaybackGateTests(unittest.TestCase):
             ("Services/Music/MusicAppleEventsClient.swift", 'let reference = artwork.value(forKey: "rawData")'),
             ("Services/Music/MusicAppleEventsClient.swift", "import ScriptingBridge"),
             ("Services/Music/QueueFileSource.swift", "let data = try Data(contentsOf: url)"),
+            ("App/Remote/RemoteModules.swift", "import MusicRemoteBridge"),
+            ("App/Remote/Host/RelayHost.swift", "import RemoteTransport"),
+            ("App/AppModel.swift", "import RemoteProtocol"),
+            # spike 不進 app target（同 R2 對 ScriptingBridge 的豁免）；註解提到 AX 不算
+            ("Scripts/spike/upnext_ax_spike.swift", "let app = AXUIElementCreateApplication(pid)"),
+            ("Features/Settings/Foo.swift", "// Genius 的 AXUIElement 只在 EchoKit"),
         ]
         for path, line in allowed:
             with self.subTest(path=path, line=line):

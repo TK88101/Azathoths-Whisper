@@ -1,0 +1,45 @@
+# N5 iPad 探針（丟棄式）。docs/plans/2026-10-14-yse/sprint-0-detail.md §4.6
+# 產生：xcodegen generate；不簽名建置見 s0-offline 計劃 T3（CODE_SIGNING_ALLOWED=NO 由命令列給）
+name: YSEProbe
+options:
+  bundleIdPrefix: com.ibridgezhao.yse
+  deploymentTarget:
+    iOS: "27.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  YSEProbe:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ibridgezhao.yse.probe
+        TARGETED_DEVICE_FAMILY: "2"
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: YSE Probe
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true   # 只橫屏時必須（iOS 26 起標記 deprecated，建置會有一則警告，可接受）
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSBonjourServices:
+          - _yse._tcp
+        NSLocalNetworkUsageDescription: 用來在同一個區域網路內找到並連上你的 Mac，測試側載後的區域網路與 Bonjour 是否可用。不會傳送個人資料。
+schemes:
+  YSEProbe:
+    build:
+      targets:
+        YSEProbe: all

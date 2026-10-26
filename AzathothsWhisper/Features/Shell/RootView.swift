@@ -23,6 +23,8 @@ struct RootView: View {
                         SettingsModalView(model: model.settings)
                     case .about:
                         AboutModalView(onClose: model.closeModal)
+                    case .remoteSettings:
+                        RelaySettingsView(host: model.relayHost, onClose: model.closeModal)
                     }
                 }
             }

@@ -21,14 +21,30 @@ enum QueueFixtures {
         let root: Any?
     }
 
+    /// 捷徑起播的佇列種類 4CC `'simp'`（C′；`s6-61-cprime.md` §3-2）
+    static let simp: Int64 = 0x7369_6D70
+    /// Music 介面起播的佇列種類 4CC `'trls'`
+    static let trls: Int64 = 0x7472_6C73
+
+    /// 捷徑起播時 `spcl` 的實際結構（13/13 樣本）：恰 1 筆、字典值、`id`＝segment 的 `spcID`、沒有 `containerCD`
+    static func shortcutSpcl(id: Int64) -> [String: Any] { ["1": ["id": id]] }
+    /// Music 介面起播：同結構另帶 `containerCD`
+    static func musicAppSpcl(id: Int64) -> [String: Any] { ["1": ["id": id, "containerCD": ["kind": "album"]]] }
+
     /// `shuffled` 為 nil ＝ 不寫 `shuffledList`；`shuffleMode` 寫在 items 與頂層兩處（與實檔同）；
-    /// `modeFields` 非 nil 時改寫這兩處（製造缺鍵、型別錯、兩處不一致）
+    /// `modeFields` 非 nil 時改寫這兩處（製造缺鍵、型別錯、兩處不一致）。
+    /// `subcKind`／`spcID`（segment）與 `spcl`（root）為 nil＝不寫該鍵；值可為非整數（C′ 型別測試）。
+    /// `shuffledListRaw` 非 nil 時原樣寫入 `shuffledList`（製造壞型別），優先於 `shuffled`
     static func queue(
         list: [Item],
         shuffled: [Item]? = nil,
         shuffleMode: String = "off",
         segments: Int = 1,
-        modeFields: ModeFields? = nil
+        modeFields: ModeFields? = nil,
+        subcKind: Any? = Int64(1),
+        spcID: Any? = nil,
+        spcl: Any? = nil,
+        shuffledListRaw: Any? = nil
     ) -> Data {
         let itemsMode = modeFields.map(\.items) ?? shuffleMode
         let rootMode = modeFields.map(\.root) ?? shuffleMode
@@ -43,12 +59,16 @@ enum QueueFixtures {
                 "shuffleTable": Array(0..<shuffled.count),
             ]
         }
-        let segment: [String: Any] = ["items": items, "scID": 1, "subcKind": 1]
+        if let shuffledListRaw { items["shuffledList"] = shuffledListRaw }
+        var segment: [String: Any] = ["items": items, "scID": 1]
+        if let subcKind { segment["subcKind"] = subcKind }
+        if let spcID { segment["spcID"] = spcID }
         var root: [String: Any] = [
             "sega": Array(repeating: segment, count: segments),
             "version": 1,
         ]
         if let rootMode { root["shuffleMode"] = rootMode }
+        if let spcl { root["spcl"] = spcl }
         return try! PropertyListSerialization.data(fromPropertyList: root, format: .xml, options: 0)
     }
 

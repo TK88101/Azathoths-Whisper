@@ -1,4 +1,6 @@
 import Foundation
+import OSLog
+import RemoteTransport
 
 // 根狀態與依賴容器：組裝服務、跑一次性遷移、訂閱輪詢事件、分發到各 ViewModel。
 @MainActor
@@ -7,6 +9,8 @@ final class AppModel {
     enum ModalKind: Equatable {
         case settings
         case about
+        /// Yog-Sothoth's Echo 中繼設定（S2 詳設 v1.1：獨立 modal，Settings feature 不改）
+        case remoteSettings
     }
 
     private(set) var tab: AppTab = .editor
@@ -22,6 +26,9 @@ final class AppModel {
     /// 歌詞特效（母計劃 §2.8）：狀態層與位置時鐘；畫面在 `LyricsFXView`
     let lyricsFX: LyricsFXViewModel
     private(set) var settings: SettingsViewModel!
+    /// iPad 遙控中繼（Yog-Sothoth's Echo）。只負責啟停與配對，不含播放控制；預設關（F-R-05）
+    let relayHost: RelayHost
+    @ObservationIgnored private let relayLifecycle: RelayLifecycleObserver?
     /// 升起層畫 Cover Flow 還是歌詞特效（A2 計劃 §3.1）；改它只換內容、不升降
     private(set) var raisedLayerStyle: RaisedLayerStyle
 
@@ -45,6 +52,9 @@ final class AppModel {
     @ObservationIgnored private var pendingReturnToEditor: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
     private var didStart = false
+    /// 中繼只發起一次：App 啟動（AppDelegate）與畫面 start() 都會呼叫（s6-61-login-launch.md §5）
+    @ObservationIgnored private var didStartRelay = false
+    private static let relayLog = Logger(subsystem: "com.ibridgezhao.azathothswhisper", category: "relay")
     /// ⑥b：背景查 MB 的組裝（nil＝不查——單元測試與 UI 測試組裝的預設，絕不連網）
     typealias ArtistStylesFactory = (@escaping @Sendable (ArtistStyleBook) async -> Void) -> ArtistStyleSync
     private let makeArtistStyles: ArtistStylesFactory?
@@ -79,11 +89,16 @@ final class AppModel {
         /// 歌詞特效位置時鐘的輪詢節奏（母計劃 §2.3）
         positionPollClock: any PollClock = SystemPollClock(),
         isMusicRunning: @escaping () -> Bool = MusicProcess.isRunning,
+        /// 預設＝不碰 Keychain 與網路的關閉狀態（測試用）；正式由 `live()` 注入
+        relayHost: RelayHost = .inert(),
+        relayLifecycle: RelayLifecycleObserver? = nil,
         /// 外部時間軸查找（C 段）。nil＝不查——單元測試與 UI 測試組裝的預設，絕不連網
         timing: (any TimingResolving)? = nil,
         /// ⑥b 歌手曲風。nil＝不查
         artistStyles: ArtistStylesFactory? = nil
     ) {
+        self.relayHost = relayHost
+        self.relayLifecycle = relayLifecycle
         self.configStore = configStore
         self.httpClient = httpClient
         self.monitor = monitor
@@ -271,9 +286,14 @@ final class AppModel {
             ? ConfigStore(secrets: EphemeralSecretStore())
             : ConfigStore(secrets: KeychainStore())
         let shouldMigrate = !isTestHost
+        // 中繼：自動化測試不碰 Keychain 與網路（AZW_UNIT_TEST_HOST 慣例）
+        let relayHost = isAutomatedTest ? RelayHost.inert() : RelayLive.makeHost()
+        let relayLifecycle: RelayLifecycleObserver? = isAutomatedTest ? nil : RelayLifecycleObserver()
         #else
         let store = ConfigStore(secrets: KeychainStore())
         let shouldMigrate = true
+        let relayHost = RelayLive.makeHost()
+        let relayLifecycle: RelayLifecycleObserver? = RelayLifecycleObserver()
         let notifier: any LyricsNotifying = SystemLyricsNotifier(center: SystemNotificationCenter())
         let playerSignal: any PlayerChangeSignaling = MusicPlayerInfoSignal()
         #endif
@@ -322,6 +342,8 @@ final class AppModel {
             initialLanguage: store.language,
             artworkDiskDirectory: artworkCacheDirectory,
             queueDirectory: queueDirectory,
+            relayHost: relayHost,
+            relayLifecycle: relayLifecycle,
             timing: timing,
             artistStyles: artistStyles
         )
@@ -374,6 +396,7 @@ final class AppModel {
             self?.lyricsFX.positionClock.resync()
         }
         lyricsFlow.startPolling()
+        startRelay()
 
         try? await artistStylesClock.sleep(for: artistStylesStartDelay)
         startArtistStyles()
@@ -394,6 +417,18 @@ final class AppModel {
 
     private func receiveArtistBook(_ book: ArtistStyleBook) {
         artistBook = book
+    }
+
+    /// iPad 中繼：與視窗無關。登入時系統叫起 App 但不開視窗，`RootView.task` 不會跑——
+    /// 所以由 `AppDelegate.applicationDidFinishLaunching` 發起；之後視窗出現時 `start()` 再呼叫＝不重啟
+    func startRelay() {
+        guard !didStartRelay else { return }
+        didStartRelay = true
+        Self.relayLog.info("relay launch requested")
+        relayLifecycle?.start { [relayHost] event in
+            Task { await relayHost.handle(event) }
+        }
+        Task { [relayHost] in await relayHost.launch() }
     }
 
     /// 只接上事件分發、不啟動輪詢。整合測試以 `monitor.tick()` 逐次驅動（計劃 Q0）；
@@ -422,6 +457,8 @@ final class AppModel {
         lyricsFlow.stopPolling()
         lyricsFX.setVisible(false)
         playerSignal.stop()
+        relayLifecycle?.stop()
+        relayHost.shutdown()
         Task { await monitor.stop() }
         if let timing { Task { await timing.shutdown() } }
     }
@@ -494,7 +531,12 @@ final class AppModel {
         activeModal = .about
     }
 
+    func openRemoteSettings() {
+        activeModal = .remoteSettings
+    }
+
     func closeModal() {
+        if activeModal == .remoteSettings { relayHost.settingsClosed() }
         activeModal = nil
     }
 

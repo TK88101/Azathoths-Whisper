@@ -1,0 +1,44 @@
+name: S2ProbeHost
+options:
+  bundleIdPrefix: com.ibridgezhao.yse.s2probe
+packages:
+  S2Probe:
+    path: ..
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGNING_REQUIRED: "NO"
+    GENERATE_INFOPLIST_FILE: "YES"
+targets:
+  S2ProbeHost:
+    type: application
+    platform: iOS
+    sources: [Host]
+    dependencies:
+      - package: S2Probe
+        product: S2ProbeCore
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "2"
+        INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+  S2ProbeHostTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../Tests/S2ProbeCoreTests
+    dependencies:
+      - target: S2ProbeHost
+      - package: S2Probe
+        product: S2ProbeCore
+    settings:
+      base:
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/S2ProbeHost.app/S2ProbeHost"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+schemes:
+  S2ProbeHost:
+    build:
+      targets: {S2ProbeHost: all, S2ProbeHostTests: [test]}
+    test:
+      targets: [S2ProbeHostTests]

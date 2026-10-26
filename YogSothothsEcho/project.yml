@@ -1,0 +1,136 @@
+name: YogSothothsEcho
+# Yog-Sothoth's Echo（iPad）。XcodeGen 唯一真源；產物 .xcodeproj 一起 commit（docs/plans/2026-10-14-yse/sprint-1-detail.md §4.6）
+options:
+  bundleIdPrefix: com.ibridgezhao
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+
+packages:
+  EchoKit:
+    path: Packages/EchoKit
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "2"
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    TARGETED_DEVICE_FAMILY: "2"
+
+targets:
+  YogSothothsEcho:
+    type: application
+    platform: iOS
+    # Spike/ 不在任何 target 內
+    sources:
+      - path: App
+      - path: Features
+      - path: Services
+      - path: UI
+      - path: Resources
+        excludes:
+          - "VinylAssets.local/**"
+      # S5 D1：MD Vinyl 素材只放本機（Scripts/fetch_vinyl_assets.sh）；資料夾只追蹤 README.md，缺素材時畫後備圖形
+      - path: Resources/VinylAssets.local
+        type: folder
+    dependencies:
+      - package: EchoKit
+        product: RemoteProtocol
+      - package: EchoKit
+        product: RemoteTransport
+    settings:
+      base:
+        PRODUCT_NAME: "Yog-Sothoth's Echo"
+        PRODUCT_MODULE_NAME: YogSothothsEcho
+        PRODUCT_BUNDLE_IDENTIFIER: com.ibridgezhao.yogsothothsecho
+        # 只 iPad：xcodegen 的 iOS application 預設會在 target 層級寫 "1,2"，必須在這裡覆寫
+        TARGETED_DEVICE_FAMILY: "2"
+        LOCALIZATION_PREFERS_STRING_CATALOGS: "YES"
+      configs:
+        # Debug 專用的檔案分享腳本要改產物的 Info.plist：腳本沙盒會擋寫入，宣告為輸出又與 ProcessInfoPlistFile 衝突（2026-10-17 實測）。
+        # 只在 Debug 關沙盒，Release 保持開啟（simplify P2-5／security LOW）
+        Debug:
+          ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: "Yog-Sothoth's Echo"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, zh-Hant, ja]
+        UILaunchScreen: {}
+        # CR-033（S6.5）：配對頁的 Space Grotesk（與 Mac Remote Settings 同字型；授權 Resources/OFL-SpaceGrotesk.txt）
+        UIAppFonts:
+          - SpaceGrotesk-Variable.ttf
+        UIRequiresFullScreen: true
+        # F-V-01：只橫屏
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSLocalNetworkUsageDescription: "Yog-Sothoth's Echo connects to Azathoth's Whisper on your Mac over the local network."
+        # CR-010 ⑦：配對以相機掃 QR（三語在 InfoPlist.xcstrings）
+        NSCameraUsageDescription: "Yog-Sothoth's Echo uses the camera only to scan the pairing code shown by Azathoth's Whisper on your Mac."
+        NSBonjourServices:
+          - _yse._tcp
+    # S3 T15（sprint-3-detail.md §4.11）：量測 JSON 經 Finder 取出——只有 Debug 開 UIFileSharingEnabled，Release 不含此鍵
+    postBuildScripts:
+      - name: "Debug-only file sharing for metrics"
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
+        outputFiles:
+          - $(DERIVED_FILE_DIR)/file-sharing.stamp
+        script: |
+          if [ "${CONFIGURATION}" = "Debug" ]; then
+            /usr/libexec/PlistBuddy -c "Delete :UIFileSharingEnabled" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :UIFileSharingEnabled bool true" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+          fi
+          touch "${DERIVED_FILE_DIR}/file-sharing.stamp"
+
+  YogSothothsEchoTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: YogSothothsEcho
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        TARGETED_DEVICE_FAMILY: "2"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Yog-Sothoth's Echo.app/Yog-Sothoth's Echo"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  YogSothothsEchoUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+      - path: UI/AccessibilityID.swift
+    dependencies:
+      - target: YogSothothsEcho
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        TARGETED_DEVICE_FAMILY: "2"
+        TEST_TARGET_NAME: YogSothothsEcho
+
+schemes:
+  YogSothothsEcho:
+    build:
+      targets:
+        YogSothothsEcho: all
+        YogSothothsEchoTests: [test]
+        YogSothothsEchoUITests: [test]
+    test:
+      gatherCoverageData: true
+      captureScreenshotsAutomatically: false
+      targets:
+        - name: YogSothothsEchoTests
+          parallelizable: false
+        - name: YogSothothsEchoUITests
+          parallelizable: false

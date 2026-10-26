@@ -16,5 +16,13 @@ AzathothsWhisper/Scripts/spike/music_spike
 *.profraw
 *.profdata
 
+# S5 D1：MD Vinyl 素材只放本機（Scripts/fetch_vinyl_assets.sh）
+YogSothothsEcho/Resources/VinylAssets.local/*
+!YogSothothsEcho/Resources/VinylAssets.local/README.md
+.build/
 # Claude Code 本機工作區（worktree、本機權限設定、交接筆記）：機器私有，不進 repo
 /.claude/
+# Yog-Sothoth's Echo 的計劃與量測文件只留本機、不公開（使用者 2026-10-26；完整歷史在本機 wip/yse-* 分支）
+docs/plans/2026-10-14-yse/
+docs/plans/2026-10-14-ipad-port.md
+docs/plans/2026-10-17-yse-f2-pairing-event-order.md

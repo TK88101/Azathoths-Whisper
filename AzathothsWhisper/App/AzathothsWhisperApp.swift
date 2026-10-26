@@ -6,8 +6,9 @@ import SwiftUI
 // 文案硬編碼英文、不隨語言變（ACCEPTANCE A-07）。
 @main
 struct AzathothsWhisperApp: App {
+    // AppModel 由 AppDelegate 持有（登入時無視窗也要起中繼，s6-61-login-launch.md §5）
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var model = AppModel.live()
+    private var model: AppModel { appDelegate.model }
 
     var body: some Scene {
         Window(AppInfo.title, id: "main") {
@@ -27,6 +28,10 @@ struct AzathothsWhisperApp: App {
                 }
                 Button { model.openSettings(.notifications) } label: {
                     Text(verbatim: "Notification Settings...")
+                }
+                // Yog-Sothoth's Echo 中繼（S2 詳設 v1.1；A-07：選單寫死英文）
+                Button { model.openRemoteSettings() } label: {
+                    Text(verbatim: "Remote Settings...")
                 }
             }
 

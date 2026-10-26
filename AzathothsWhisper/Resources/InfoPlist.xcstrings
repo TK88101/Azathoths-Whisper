@@ -1,0 +1,29 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    "NSAppleMusicUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azathoth's Whisper reads your Music library (read only) only when the iPad remote is turned on, so Yog-Sothoth's Echo can show your albums."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azathoth's Whisper は、iPad リモートをオンにしているときだけミュージックライブラリを読み取り（読み取り専用）、Yog-Sothoth's Echo にアルバムを表示します。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azathoth's Whisper 只在開啟 iPad 遙控時讀取你的 Music 曲庫（唯讀），讓 Yog-Sothoth's Echo 顯示你的專輯。"
+          }
+        }
+      }
+    }
+  }
+}

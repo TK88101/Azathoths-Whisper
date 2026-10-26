@@ -39,13 +39,24 @@ struct MusicSelectorAllowListTests {
         #expect(violations.count == 4, "\(violations)")
     }
 
-    /// 防「另開一個協議再 extension 到 SB 類別」繞過白名單
+    /// 防「另開一個協議再 extension 到 SB 類別」繞過白名單。
+    /// YSE S4（D12，sprint-1-detail.md §4.2；H-20／H-27）：允許集合擴充 EchoKit MusicRemoteBridge 的四個 AZWMusicRemote* 協定，
+    /// 與 Bridge 的 extension 同一個 commit；新增下方「採用集合完全等於」
     @Test func scriptingBridgeClassesCarryOnlyTheAllowedAppProtocols() {
-        let allowed: Set<String> = ["AZWMusicAppProto", "AZWMusicTrackProto"]
+        let allowed: Set<String> = ["AZWMusicAppProto", "AZWMusicTrackProto", "AZWMusicRemoteProto", "AZWMusicRemoteTrackProto",
+                                    "AZWMusicRemoteAirPlayProto", "AZWMusicRemoteLibraryProto"]
         for cls in [SBObject.self, SBApplication.self] as [AnyClass] {
             let found = Set(SelectorAllowList.protocols(on: cls, prefix: "AZW"))
             #expect(found.isSubset(of: allowed), "\(NSStringFromClass(cls)) 掛了 \(found.subtracting(allowed))")
         }
+    }
+
+    /// YSE S4（D12）：SB 類別採用的 AZW 協定集合**完全等於**指定集合（多一個、少一個都紅）
+    @Test func scriptingBridgeClassesAdoptExactlyTheSpecifiedProtocols() {
+        #expect(Set(SelectorAllowList.protocols(on: SBApplication.self, prefix: "AZW"))
+                == ["AZWMusicAppProto", "AZWMusicRemoteProto", "AZWMusicRemoteLibraryProto"])
+        #expect(Set(SelectorAllowList.protocols(on: SBObject.self, prefix: "AZW"))
+                == ["AZWMusicTrackProto", "AZWMusicRemoteTrackProto", "AZWMusicRemoteAirPlayProto"])
     }
 
     @Test func processNotFoundMapsToNotRunning() {

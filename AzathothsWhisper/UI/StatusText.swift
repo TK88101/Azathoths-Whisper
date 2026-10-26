@@ -81,4 +81,14 @@ enum StatusText {
     static let fakeLatency = "Lat: 12ms"
     static let nowEditing = "Now Editing"
     static let separator = "//"
+
+    // Yog-Sothoth's Echo 中繼（S2；與其他運行時狀態同為英文、勿本地化）
+    static let remoteSettingsTitle = "Remote Settings"
+    static let relayOff = "Off"
+    static let relayWaitingForKeychain = "Waiting for Keychain approval..."
+    static let relayNeedsKeychainApproval = "Keychain approval needed"
+    static let relayRunning = "Running"
+    static let relayPaused = "Paused (screen locked or asleep)"
+    static let relayFailed = "Could not start"
+    static func relayRunning(connected: Int) -> String { "Running · \(connected) connected" }
 }

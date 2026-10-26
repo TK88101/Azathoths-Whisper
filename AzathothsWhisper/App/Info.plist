@@ -39,6 +39,8 @@
 	</dict>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Azathoths Whisper needs access to Music to detect the currently playing song.</string>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Azathoth's Whisper reads your Music library (read only) only when the iPad remote is turned on, so Yog-Sothoth's Echo can show your albums.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>

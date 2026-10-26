@@ -138,12 +138,12 @@ final class ShellUITests: AppUITestCase {
         app.menuItems["About"].click()
 
         XCTAssertTrue(app.staticTexts["iBridge Zhao"].waitForExistence(timeout: 5))
-        // D-10：版本行＝「Version 2.1.0 (Build <建置號>)」；不寫死建置號，打包 +1 時免改測試
+        // D-10：版本行＝「Version 3.0.0 (Build <建置號>)」；不寫死建置號，打包 +1 時免改測試
         // SwiftUI 的 Text 在 macOS AX 樹上把文字放在 value、label 為空（見 AppUITestCase.staticText(containing:)），兩者都比
         XCTAssertTrue(
             app.staticTexts.matching(NSPredicate(
                 format: "(value BEGINSWITH[c] %@ OR label BEGINSWITH[c] %@) AND (value CONTAINS[c] %@ OR label CONTAINS[c] %@)",
-                "Version 2.1.0", "Version 2.1.0", "(Build ", "(Build "
+                "Version 3.0.0", "Version 3.0.0", "(Build ", "(Build "
             )).firstMatch.exists,
             "D-10：版本行應含建置號"
         )
@@ -209,6 +209,18 @@ final class ShellUITests: AppUITestCase {
         menuBar()["Settings"].click()
         XCTAssertTrue(app.menuItems["Notification Settings..."].waitForExistence(timeout: 2))
         menuBar()["Settings"].click()
+    }
+
+    /// H-30（S2 草稿；sprint-2-detail.md §4.11 v1.1）：日文冷啟動下 Settings 選單第四項仍為英文，點擊開中繼設定 modal（標題英文）。
+    /// 刻意不截圖：此 modal 之後可產生配對 QR（一次性秘密），證據包不留此畫面。
+    func testRemoteSettingsMenuIsEnglishAndOpensRemoteModal() {
+        launchShell(language: "ja")
+        waitForMainUI("エディタ")
+        menuBar()["Settings"].click()
+        let item = app.menuItems["Remote Settings..."]
+        XCTAssertTrue(item.waitForExistence(timeout: 2), "H-30：第四項寫死英文")
+        item.click()
+        XCTAssertTrue(app.staticTexts["REMOTE SETTINGS"].waitForExistence(timeout: 5))
     }
 
     /// E-04／E-07：繁中冷啟動

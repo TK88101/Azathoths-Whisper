@@ -1,0 +1,650 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%lld songs" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld song" } },
+              "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld songs" } }
+            }
+          }
+        },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "%lld 曲" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "%lld 首" } }
+      }
+    },
+    "Album Color" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Album Color" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アルバムカラー" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "專輯主色" } }
+      }
+    },
+    "Album Detail" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Album Detail" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アルバム詳細" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "專輯詳情" } }
+      }
+    },
+    "Album cover" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Album cover" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アルバムジャケット" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "專輯封面" } }
+      }
+    },
+    "Allow Azathoth's Whisper in Accessibility settings on your Mac." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Allow Azathoth's Whisper in Accessibility settings on your Mac." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac の「アクセシビリティ」設定で Azathoth's Whisper を許可してください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "請在 Mac 的「輔助使用」設定中允許 Azathoth's Whisper。" } }
+      }
+    },
+    "Appearance" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Appearance" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "外観" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "外觀" } }
+      }
+    },
+    "Background" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Background" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "背景" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "背景" } }
+      }
+    },
+    "Camera access is off. Turn it on to scan the pairing code." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Camera access is off. Turn it on to scan the pairing code." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カメラへのアクセスがオフです。ペアリングコードを読み取るにはオンにしてください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "相機權限已關閉。請打開才能掃描配對碼。" } }
+      }
+    },
+    "Can't reach your Mac." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Can't reach your Mac." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac に接続できません。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "連不上你的 Mac。" } }
+      }
+    },
+    "Can't reach your Mac. Make sure Remote Settings is on in Azathoth's Whisper." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Can't reach your Mac. Make sure Remote Settings is on in Azathoth's Whisper." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac に接続できません。Azathoth's Whisper の Remote Settings がオンか確認してください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "連不上你的 Mac。請確認 Azathoth's Whisper 的 Remote Settings 已開啟。" } }
+      }
+    },
+    "Can't reach your Mac. Showing the last list." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Can't reach your Mac. Showing the last list." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac に接続できません。最後に読み込んだ一覧を表示しています。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "連不上 Mac，顯示上次的清單。" } }
+      }
+    },
+    "Check the 4 characters on your Mac." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check the 4 characters on your Mac." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac に表示された 4 文字を確認してください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "核對 Mac 上的 4 個字元。" } }
+      }
+    },
+    "Choose **Pair new iPad**." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose **Pair new iPad**." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "「**新しい iPad をペアリング**」を選びます。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "按「**配對新 iPad**」。" } }
+      }
+    },
+    "Classic" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Classic" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラシック" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "經典" } }
+      }
+    },
+    "Clear" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "消去" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "清除" } }
+      }
+    },
+    "Close" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Close" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "閉じる" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "關閉" } }
+      }
+    },
+    "Connected" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connected" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "接続済み" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "已連線" } }
+      }
+    },
+    "Connecting to your Mac…" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connecting to your Mac…" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac に接続中…" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "正在連線到你的 Mac…" } }
+      }
+    },
+    "Couldn't confirm what's playing." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Couldn't confirm what's playing." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "いま再生中の内容を確認できませんでした。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法確認現在播放的內容。" } }
+      }
+    },
+    "Couldn't find your Mac on this network." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Couldn't find your Mac on this network." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このネットワーク上に Mac が見つかりません。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在這個網路上找不到你的 Mac。" } }
+      }
+    },
+    "Couldn't load the album list. Try again later." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Couldn't load the album list. Try again later." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アルバム一覧を読み込めませんでした。しばらくしてからもう一度お試しください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法載入專輯清單，請稍後再試。" } }
+      }
+    },
+    "Couldn't reach your Mac. Check that both are on the same Wi-Fi." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Couldn't reach your Mac. Check that both are on the same Wi-Fi." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac に接続できません。両方が同じ Wi-Fi にあるか確認してください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "連不上你的 Mac。請確認兩台在同一個 Wi-Fi。" } }
+      }
+    },
+    "Dark" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dark" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ダーク" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "暗色" } }
+      }
+    },
+    "Disc %lld" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Disc %lld" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ディスク %lld" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "第 %lld 張" } }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Done" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "完了" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "完成" } }
+      }
+    },
+    "Forest Haze" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Forest Haze" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "フォレスト・ヘイズ" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "森林藍調" } }
+      }
+    },
+    "Forget this Mac" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Forget this Mac" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この Mac の登録を解除" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "忘記這台 Mac" } }
+      }
+    },
+    "Forget this Mac?" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Forget this Mac?" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このMacの登録を解除しますか？" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "要忘記這台 Mac 嗎？" } }
+      }
+    },
+    "Genius" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Genius" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Genius" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Genius" } }
+      }
+    },
+    "Gradient" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Gradient" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "グラデーション" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "漸層" } }
+      }
+    },
+    "Hold this iPad up to the code on your Mac." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hold this iPad up to the code on your Mac." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "iPad を Mac に表示されたコードに向けます。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "把 iPad 對準 Mac 上的碼。" } }
+      }
+    },
+    "If they match, click Allow on your Mac." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "If they match, click Allow on your Mac." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "一致していれば、Mac で「許可」をクリックします。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "一致的話，在 Mac 上按「允許」。" } }
+      }
+    },
+    "Indigo Current" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Indigo Current" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "インディゴ・カレント" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "靛青深海" } }
+      }
+    },
+    "Light" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Light" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ライト" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "亮色" } }
+      }
+    },
+    "Loading albums… %lld of %lld" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Loading albums… %1$lld of %2$lld" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アルバムを読み込み中… %2$lld 件中 %1$lld 件" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "正在載入專輯… %1$lld／%2$lld" } }
+      }
+    },
+    "Marble" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Marble" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "マーブル" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "大理石" } }
+      }
+    },
+    "Midnight Aurora" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Midnight Aurora" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ミッドナイト・オーロラ" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "午夜極光" } }
+      }
+    },
+    "Moss Vinyl" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Moss Vinyl" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "モス・ヴァイナル" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "苔蘚唱片" } }
+      }
+    },
+    "Next" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Next" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "次の曲" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "下一首" } }
+      }
+    },
+    "No albums match %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No albums match “%@”" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "「%@」に一致するアルバムはありません" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "找不到符合「%@」的專輯" } }
+      }
+    },
+    "Now playing" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Now playing" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再生中" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "正在播放" } }
+      }
+    },
+    "On your Mac, open Azathoth's Whisper" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "On your Mac, open Azathoth's Whisper" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac で Azathoth's Whisper を開きます" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 Mac 上打開 Azathoth's Whisper" } }
+      }
+    },
+    "Open Music on your Mac." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Music on your Mac." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac でミュージックを開いてください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "請在 Mac 上開啟 Music。" } }
+      }
+    },
+    "Open Settings" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Settings" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "設定を開く" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "打開設定" } }
+      }
+    },
+    "Pair again" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pair again" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "もう一度ペアリング" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "重新配對" } }
+      }
+    },
+    "Pair with your Mac" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pair with your Mac" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac とペアリング" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "與 Mac 配對" } }
+      }
+    },
+    "Pairing was cancelled on your Mac." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pairing was cancelled on your Mac." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac でペアリングがキャンセルされました。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "配對已在 Mac 上取消。" } }
+      }
+    },
+    "Pause" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pause" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "一時停止" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "暫停" } }
+      }
+    },
+    "Picking a song from this album plays only that song." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Picking a song from this album plays only that song." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このアルバムで曲を選ぶと、その曲だけが再生されます。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在這張專輯點歌時，只會播你點的那一首。" } }
+      }
+    },
+    "Play" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再生" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "播放" } }
+      }
+    },
+    "Played only this song. The rest of the album didn't line up." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Played only this song. The rest of the album didn't line up." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この曲だけを再生しました。アルバムの残りの曲がうまく並びませんでした。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "只播了這首。專輯其餘的曲目沒有排好。" } }
+      }
+    },
+    "Played only this song. The shortcut on your Mac didn't run." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Played only this song. The shortcut on your Mac didn't run." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この曲だけを再生しました。Mac のショートカットが実行できませんでした。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "只播了這首。Mac 上的捷徑沒有執行成功。" } }
+      }
+    },
+    "Played only this song. This album can't be played in order from here." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Played only this song. This album can't be played in order from here." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この曲だけを再生しました。このアルバムはここから順番に続けて再生できません。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "只播了這首。這張專輯無法從這裡依序接著播。" } }
+      }
+    },
+    "Played only this song. Your Mac is missing the shortcut." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Played only this song. Your Mac is missing the shortcut." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この曲だけを再生しました。Mac にショートカットがありません。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "只播了這首。Mac 上缺少捷徑。" } }
+      }
+    },
+    "Preparing…" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preparing…" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "準備中…" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "準備中…" } }
+      }
+    },
+    "Previous" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Previous" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "前の曲" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "上一首" } }
+      }
+    },
+    "Random" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Random" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ランダム" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "隨機" } }
+      }
+    },
+    "Resync" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Resync" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再同期" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "重新同步" } }
+      }
+    },
+    "Retry" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Retry" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再試行" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "重試" } }
+      }
+    },
+    "Rose Graphite" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rose Graphite" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ローズ・グラファイト" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "玫瑰石墨" } }
+      }
+    },
+    "Scan again" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Scan again" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "もう一度読み取る" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "重新掃描" } }
+      }
+    },
+    "Search albums" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search albums" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アルバムを検索" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "搜尋專輯" } }
+      }
+    },
+    "Settings" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "設定" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "設定" } }
+      }
+    },
+    "Show as grid" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show as grid" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "グリッドで表示" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "以小圖顯示" } }
+      }
+    },
+    "Show as spines" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show as spines" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "背表紙で表示" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "以側封顯示" } }
+      }
+    },
+    "Silver Blue" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Silver Blue" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "シルバーブルー" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "霧銀藍" } }
+      }
+    },
+    "Something went wrong. Try again." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Something went wrong. Try again." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "問題が発生しました。もう一度お試しください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "發生問題，請再試一次。" } }
+      }
+    },
+    "Song picks are paused on your Mac for now. Try again in a moment." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Song picks are paused on your Mac for now. Try again in a moment." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac で曲の指定を一時的に止めています。少し待ってからもう一度お試しください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Mac 暫時停止接受點歌，請稍候再試。" } }
+      }
+    },
+    "Splash" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Splash" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "スプラッシュ" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "潑彩" } }
+      }
+    },
+    "System" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "System" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "システムに合わせる" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "跟隨系統" } }
+      }
+    },
+    "Terracotta Night" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Terracotta Night" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "テラコッタ・ナイト" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "陶土夜色" } }
+      }
+    },
+    "That code is no longer valid. Generate a new one on your Mac." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "That code is no longer valid. Generate a new one on your Mac." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このコードは無効になりました。Mac で新しいコードを生成してください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "這個碼已失效。請在 Mac 上重新產生。" } }
+      }
+    },
+    "That didn't take effect." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "That didn't take effect." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "今回は反映されませんでした。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "這次沒有生效。" } }
+      }
+    },
+    "That isn't an Azathoth's Whisper pairing code." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "That isn't an Azathoth's Whisper pairing code." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "これは Azathoth's Whisper のペアリングコードではありません。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "這不是 Azathoth's Whisper 的配對碼。" } }
+      }
+    },
+    "The Mac that answered isn't the one that showed this code." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The Mac that answered isn't the one that showed this code." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "応答した Mac は、このコードを表示した Mac ではありません。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "回應的 Mac 不是顯示這個碼的那台。" } }
+      }
+    },
+    "The pairing code was not accepted. Generate a new one on your Mac." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The pairing code was not accepted. Generate a new one on your Mac." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ペアリングコードが受け付けられませんでした。Mac で新しいコードを生成してください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "配對碼未被接受。請在 Mac 上重新產生。" } }
+      }
+    },
+    "This iPad can't scan codes with its camera." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This iPad can't scan codes with its camera." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この iPad はカメラでコードを読み取れません。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "這台 iPad 無法用相機掃描。" } }
+      }
+    },
+    "Tonearm" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Tonearm" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "トーンアーム" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "唱臂" } }
+      }
+    },
+    "Too fast. Wait a moment." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Too fast. Wait a moment." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "操作が速すぎます。少し待ってください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "切太快了，稍等一下。" } }
+      }
+    },
+    "Transparent" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Transparent" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クリア" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "透明" } }
+      }
+    },
+    "Turntable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Turntable" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ターンテーブル" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "唱機" } }
+      }
+    },
+    "Turntable Blur" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Turntable Blur" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ターンテーブル風ぼかし" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "唱機式模糊" } }
+      }
+    },
+    "Use this iPad as a remote for Music on your Mac." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Use this iPad as a remote for Music on your Mac." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この iPad を Mac のミュージックのリモコンとして使います。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "把這台 iPad 當成 Mac「音樂」的遙控器。" } }
+      }
+    },
+    "Waiting for your Mac… Turn on Remote Settings in Azathoth's Whisper." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Waiting for your Mac… Turn on Remote Settings in Azathoth's Whisper." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac を待っています… Azathoth's Whisper の Remote Settings をオンにしてください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "正在等你的 Mac… 請在 Azathoth's Whisper 打開 Remote Settings。" } }
+      }
+    },
+    "Your Mac can't read the Music library." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Your Mac can't read the Music library." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac がミュージックライブラリを読み込めません。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Mac 無法讀取 Music 曲庫。" } }
+      }
+    },
+    "Your Mac can't read the Music library. On your Mac, allow Azathoth's Whisper in Privacy & Security ▸ Media & Apple Music." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Your Mac can't read the Music library. On your Mac, allow Azathoth's Whisper in Privacy & Security ▸ Media & Apple Music." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac がミュージックライブラリを読み込めません。Mac のプライバシーとセキュリティ ▸ メディアと Apple Music で Azathoth's Whisper を許可してください。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Mac 讀不到 Music 曲庫。請在 Mac 的「隱私權與安全性 ▸ 媒體與 Apple Music」允許 Azathoth's Whisper。" } }
+      }
+    },
+    "Your Mac hasn't allowed control of Music." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Your Mac hasn't allowed control of Music." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac でミュージックの操作が許可されていません。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Mac 尚未允許控制 Music。" } }
+      }
+    },
+    "Your Mac no longer recognizes this iPad." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Your Mac no longer recognizes this iPad." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac がこの iPad を認識しなくなりました。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "你的 Mac 已不再認得這台 iPad。" } }
+      }
+    },
+    "Your Mac rejected the pairing." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Your Mac rejected the pairing." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac がペアリングを拒否しました。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "你的 Mac 拒絕了配對。" } }
+      }
+    },
+    "Your Mac's library is changing. It will refresh automatically." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Your Mac's library is changing. It will refresh automatically." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac のライブラリが変更中です。自動的に更新されます。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Mac 的曲庫正在變動，稍後會自動更新。" } }
+      }
+    },
+    "Waiting: %lld" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Waiting: %lld" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "待機中：%lld" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "等待中：%lld" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

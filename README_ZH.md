@@ -6,6 +6,16 @@
 
 它支持多種歌詞來源，並具有深色主題和多語言用戶界面。
 
+**3.0 新增：iPad 遙控器。** 這個 repo 現在會建置出兩個 App：
+
+| App | 平台 | 版本 | 用途 |
+|---|---|---|---|
+| **Azathoth's Whisper**（阿撒托斯的低語） | macOS | 3.0.0 | 上面的歌詞工具，外加可選的**中繼**，讓 iPad 控制這台 Mac 上的 Music |
+| **Yog-Sothoth's Echo**（尤格·索托斯的回響） | iPad | 1.0.0（pre-release） | 黑膠唱機造型的遙控器：在家裡任何地方瀏覽 Mac 的 Music 曲庫並控制播放 |
+
+iPad App 只會經由家中區網，連到你自己 Mac 上的 Azathoth's Whisper。詳見
+[iPad 遙控器：Yog-Sothoth's Echo](#ipad-遙控器yog-sothoths-echo)。
+
 ## 功能
 
 *   🎵 **自動同步：** 監控 iTunes 並在切換歌曲時自動獲取歌詞。
@@ -27,6 +37,7 @@
 *   🍎 **macOS 原生：** 以 Swift 6 / SwiftUI 撰寫，尊重系統語言設定，透過 Apple Events 與 Music.app 整合。
 *   📚 **批量處理：** 一次檢視整張專輯——批量補齊缺詞並寫回。
 *   🖼 **封面瀏覽：** 以 3D 旋轉木馬瀏覽當前專輯封面（純展示，無播放控制）。
+*   📱 **iPad 遙控（3.0）：** 可選的中繼把 Music 曲庫與播放控制提供給配套的 iPad App「Yog-Sothoth's Echo」。預設關閉。
 
 ## 前置要求
 
@@ -148,7 +159,7 @@
     chflags hidden "$STAGING/dmg_background.png"
 
     hdiutil create -volname "Azathoth's Whisper" -srcfolder "$STAGING" \
-      -format UDZO -ov "$WORK/Azathoths-Whisper-v2.1.0.dmg"
+      -format UDZO -ov "$WORK/Azathoths-Whisper-v3.0.0.dmg"
     ```
 
     卷名與各項目的檔名必須與上方完全一致——`.DS_Store` 按**名稱**解析背景圖與圖示位置。
@@ -166,6 +177,89 @@
     *   **自動模式 (Auto Mode)**：應用程序會檢測歌曲變化並嘗試自動查找歌詞。
     *   **手動模式**：點擊 "Fetch Lyrics" 強制搜索。
 5.  **語言設置**：通過 `Settings` -> `Language Settings` 切換界面語言。
+
+## iPad 遙控器：Yog-Sothoth's Echo
+
+Yog-Sothoth's Echo 把 iPad 變成黑膠唱機造型的遙控器，用來控制 Mac 上的 Music。音樂仍然**從 Mac 播出**
+（Mac 喇叭或它接的音響）；iPad 只負責控制。
+
+**在 iPad 上可以做的事**
+
+*   以 3D 側封或封面牆瀏覽 Mac 曲庫的全部專輯，並可搜尋。
+*   打開專輯、點一首歌——Mac 會從這首開始播，接著播這張專輯其後的歌。
+*   在唱機畫面點唱片暫停／繼續，左右甩動切換上一首／下一首。
+*   底部膠囊有上一首／播放暫停／下一首與 **Genius**（Music 自己的 Genius 隨機播放，和上面的 Genius *歌詞* token 無關）。
+*   可選唱片樣式（Random、Classic、Transparent、Splash、Marble）與亮色／暗色／跟隨系統的外觀。
+
+**需求**
+
+*   **iPadOS 18 以上**的 iPad，與 Mac 在同一個家用網路（Wi-Fi）。
+*   執行 **Azathoth's Whisper 3.0.0**、且開著 Music.app 的 Mac。
+
+### 安裝 iPad App
+
+iPad App 以 **pre-release** 的 `.ipa` 放在 [Releases 頁面](https://github.com/TK88101/Azathoths-Whisper/releases)。
+它**沒有簽名**、也不在 App Store 上，所以要用側載工具以你自己的 Apple ID 簽名後安裝，例如 **SideStore**、**AltStore** 或 **iLoader**。
+
+> 用免費 Apple ID 側載的 App **7 天**後會失效，屆時重新簽名／安裝即可（SideStore 可以自動續簽）。覆蓋安裝會保留配對。
+
+### 首次設定
+
+在 **Mac**（Azathoth's Whisper 3.0.0）上：
+
+1.  打開 **Settings → Remote Settings…**，開啟 **Allow Yog-Sothoth's Echo on iPad to control Music**。中繼**預設關閉**。
+2.  若跳出鑰匙圈授權框，輸入 Mac 登入密碼並選 **永遠允許**。每次更新後都會再問一次，因為每個建置的 ad-hoc 簽名都不同。
+3.  在 **Music Control** 下按 **Install Shortcut**，再到「捷徑」App 按 **加入捷徑**。這會安裝「YSE Play v1」捷徑，讓點的歌能接著播完整張專輯。若捷徑問到分享，選 **永遠允許**。
+4.  允許設定頁要求的權限：**自動化 → Music**、**媒體與 Apple Music**（讀取曲庫），以及——只有要用 Genius 鈕時才需要——**輔助使用**。
+5.  可選：開啟 **Open Azathoth's Whisper at login**，這樣不必先手動打開 App，iPad 也能連上。
+
+配對：
+
+1.  在 Mac 上按 **Pair new iPad**，會出現一個 60 秒有效的 QR 碼。
+2.  在 iPad 打開 Yog-Sothoth's Echo 掃碼。被問到時，允許相機與區域網路存取。
+3.  Mac 會顯示 **Unverified device request** 與 4 個字元。確認和 iPad 上的一樣，再按 **Allow**。
+
+之後 iPad 會自動重連，Mac 睡眠或 App 重開後也一樣。要解除配對，在 Mac 的 **Paired iPads** 裡移除該 iPad。
+
+### 已知限制
+
+*   點一首歌會把 Music 的「**接下來**」換成這張專輯從這首起的曲目，原本的佇列不保存、不還原。點下去約 1.5 秒才開播。
+*   專輯接續播放靠「YSE Play v1」捷徑。捷徑不在、或專輯名稱有歧義時，只會播這一首，iPad 會提示。
+*   連續切歌時，每次都要等前一次生效（每首約 1.5 秒）；排隊超過 3 次會被拒絕。
+*   iPad 不能拖進度、不能調音量，只能在家用網路內使用。
+*   曲庫變動約一分鐘內反映到 iPad（Mac 每 60 秒重新檢查一次曲庫）。
+
+### 隱私與安全
+
+*   中繼在你打開之前都是關閉的，而且只接受以 QR 碼配對**並且**在 Mac 上按過允許的 iPad。
+*   每條連線都是雙向認證、釘選憑證的 TLS，只限區網；請求有防重放，只接受固定的幾種指令。
+*   在 Mac 上，中繼只**讀取** Music 曲庫並送出播放指令，不修改曲庫，也不寫 Music 的佇列檔案。輔助使用只用來按下 Music 的 Genius 選單項目。
+*   日誌只記 ID 與錯誤類型——不記曲名、歌詞、token 或配對秘密。
+
+### 從源碼建置 iPad App
+
+需求：**Xcode 16+**（Swift 6、iOS 18 SDK）、XcodeGen。實際以 Xcode 27 建置驗證。
+
+```bash
+cd Azathoths-Whisper/YogSothothsEcho
+xcodegen generate
+
+# 單元測試（任一 iPad 模擬器；名稱改成你有的）
+xcodebuild test -project YogSothothsEcho.xcodeproj -scheme YogSothothsEcho \
+  -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)' -only-testing:YogSothothsEchoTests
+
+# 未簽名的 Release .ipa（再用側載工具簽名）
+WORK="$(mktemp -d)"
+xcodebuild build -project YogSothothsEcho.xcodeproj -scheme YogSothothsEcho -sdk iphoneos \
+  -configuration Release CODE_SIGNING_ALLOWED=NO -derivedDataPath "$WORK/dd"
+mkdir -p "$WORK/ipa/Payload"
+cp -R "$WORK/dd/Build/Products/Release-iphoneos/Yog-Sothoth's Echo.app" "$WORK/ipa/Payload/"
+(cd "$WORK/ipa" && zip -qry ../YogSothothsEcho.ipa Payload)
+```
+
+兩邊共用的連線與協定程式碼在 `YogSothothsEcho/Packages/EchoKit`；Mac App 也依賴同一個套件，所以兩個 App 必須留在同一個 repo。
+
+> **唱機圖片：**唱片、唱臂與背景圖片**不在** repo 裡，從源碼建置時會改畫簡單的後備圖形。公開的 pre-release `.ipa` 內含這些圖片——見[授權](#授權)。
 
 ## 疑難排解
 
@@ -187,6 +281,10 @@ log show --predicate 'subsystem == "com.ibridgezhao.azathothswhisper"' --last 1h
 | 無法檢測到播放曲目 | 未授予 Music 自動化權限 | 系統設定 → 隱私權與安全性 → 自動化 → 為此應用啟用 Music，然後重新啟動 |
 | macOS 在更新後再次要求 Music 或 Keychain 存取權限 | Ad-hoc 簽名在每次編譯時改變，TCC 與 Keychain 都以程式碼簽名為鑰匙 | 預期行為——再次授予權限 |
 | 永遠找不到歌詞 | 沒有 Genius token，或 token 無效 | 設定 → Genius Token 設定 |
+| iPad 找不到 Mac | 中繼沒開、Mac 在別的網路，或 iPad 拒絕了區域網路存取 | 在 Remote Settings 開啟中繼；兩邊連同一個 Wi-Fi；iPad 設定 → 隱私權與安全性 → 區域網路 → Yog-Sothoth's Echo |
+| iPad 說 Mac 需要你確認 | App 更新後鑰匙圈要再授權一次 | 在 Mac 的 Remote Settings 按 **Authorize on this Mac**，輸入密碼，選 **永遠允許** |
+| 點的歌只播一首、沒接著播專輯 | 「YSE Play v1」捷徑不在 | Remote Settings → **Install Shortcut**（或 **Reinstall Shortcut**） |
+| Genius 鈕是灰的 | Mac 上的 Music 沒開，或 iPad 沒連上 | 打開 Mac 上的 Music。（若 Genius 未在輔助使用中允許，按鈕仍可按，但只會說明如何允許） |
 
 ## 解除安裝
 
@@ -196,7 +294,9 @@ rm -rf ~/Library/Caches/com.ibridgezhao.azathothswhisper      # 封面圖片快�
 defaults delete com.ibridgezhao.azathothswhisper              # 語言 / UI 偏好
 ```
 
-Genius token 存放在登入鑰匙圈中——打開 **鑰匙圈存取**，搜尋 `com.ibridgezhao.azathothswhisper`，然後刪除條目。1.x 設定檔案（`~/.azathoths_whisper_config`）應用不會自動刪除；若不再需要請手動移除。
+Genius token 存放在登入鑰匙圈中——打開 **鑰匙圈存取**，搜尋 `com.ibridgezhao.azathothswhisper`，然後刪除條目。中繼自己的身分（私鑰與自簽憑證）存在 `com.ibridgezhao.azathothswhisper.relay-identity` 底下。若用過 iPad 遙控，也請在「捷徑」App 刪除「YSE Play v1」，並到 系統設定 → 一般 → 登入項目 關掉登入時啟動。
+
+iPad App 和其他 App 一樣，直接從 iPad 刪除即可。1.x 設定檔案（`~/.azathoths_whisper_config`）應用不會自動刪除；若不再需要請手動移除。
 
 ## 技術棧
 
@@ -204,7 +304,11 @@ Genius token 存放在登入鑰匙圈中——打開 **鑰匙圈存取**，搜�
 *   **ScriptingBridge / Apple Events**：Music.app 自動化（讀當前曲目、讀寫歌詞、取封面）。
 *   **SwiftSoup**：歌詞來源的 HTML 解析。
 *   **XcodeGen**：`.xcodeproj` 由 `project.yml` 生成並已提交，所以純 clone 即可構建而無需安裝 XcodeGen。
-*   **Keychain**：Genius token 儲存（自 1.x 的 `.env` ／設定檔自動遷移）。
+*   **Keychain**：Genius token 儲存（自 1.x 的 `.env` ／設定檔自動遷移），以及中繼／iPad 的裝置身分。
+*   **Network.framework**：Mac 中繼與 iPad 之間的 Bonjour 發現，以及雙向釘選憑證的 TLS 1.3（`YogSothothsEcho/Packages/EchoKit`）。
+*   **iTunesLibrary**：唯讀讀取 Music 曲庫，供 iPad 的專輯清單使用。
+*   **捷徑（Shortcuts）**：以「YSE Play v1」捷徑在專輯脈絡中播放曲目。
+*   **VisionKit**：iPad 掃描 QR 碼。
 
 > **2.0 是完整的原生重寫。** 1.x 的 Python／Tkinter／PyInstaller 實作保留在倉庫根目錄供參考；
 > 實際出貨的應用程式完全由 `AzathothsWhisper/` 建置而成。
@@ -229,6 +333,13 @@ MIT —— 見 [LICENSE](LICENSE)。
 | Catacombs（ToughCrest Studio） | 個人與商業用途免費；再散布須署名 ToughCrest Studio |
 | Cenobyte（Chad Savage）、Mirage Gothic、Dark Metal | 商用條款未確認（Cenobyte 只寫「Freeware」；Mirage Gothic 內嵌「All rights reserved」；Dark Metal 無授權檔）。維護者自行承擔風險收錄 |
 | Material Symbols | Apache License 2.0 |
+
+iPad App（Yog-Sothoth's Echo）內含：
+
+| 元件 | 授權 |
+|---|---|
+| Space Grotesk | SIL Open Font License 1.1 |
+| 取自 **MD Vinyl** App 的唱機圖片（唱片、唱臂、底座、背景） | **不在本 repo 的授權範圍內**，權利屬於原作者。圖片不在 repo 裡，只包含在公開的 pre-release `.ipa` 中，由維護者自負風險 |
 
 ## 免責聲明
 
