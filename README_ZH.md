@@ -11,7 +11,7 @@
 | App | 平台 | 版本 | 用途 |
 |---|---|---|---|
 | **Azathoth's Whisper**（阿撒托斯的低語） | macOS | 3.0.0 | 上面的歌詞工具，外加可選的**中繼**，讓 iPad 控制這台 Mac 上的 Music |
-| **Yog-Sothoth's Echo**（尤格·索托斯的回響） | iPad | 1.0.0（pre-release） | 黑膠唱機造型的遙控器：在家裡任何地方瀏覽 Mac 的 Music 曲庫並控制播放 |
+| **Yog-Sothoth's Echo**（尤格·索托斯的回響） | iPad | 1.0.0 | 黑膠唱機造型的遙控器：在家裡任何地方瀏覽 Mac 的 Music 曲庫並控制播放 |
 
 iPad App 只會經由家中區網，連到你自己 Mac 上的 Azathoth's Whisper。詳見
 [iPad 遙控器：Yog-Sothoth's Echo](#ipad-遙控器yog-sothoths-echo)。
@@ -198,7 +198,7 @@ Yog-Sothoth's Echo 把 iPad 變成黑膠唱機造型的遙控器，用來控制 
 
 ### 安裝 iPad App
 
-iPad App 以 **pre-release** 的 `.ipa` 放在 [Releases 頁面](https://github.com/TK88101/Azathoths-Whisper/releases)。
+iPad App 以 `.ipa` 放在 [Releases 頁面](https://github.com/TK88101/Azathoths-Whisper/releases)。
 它**沒有簽名**、也不在 App Store 上，所以要用側載工具以你自己的 Apple ID 簽名後安裝，例如 **SideStore**、**AltStore** 或 **iLoader**。
 
 > 用免費 Apple ID 側載的 App **7 天**後會失效，屆時重新簽名／安裝即可（SideStore 可以自動續簽）。覆蓋安裝會保留配對。
@@ -259,7 +259,7 @@ cp -R "$WORK/dd/Build/Products/Release-iphoneos/Yog-Sothoth's Echo.app" "$WORK/i
 
 兩邊共用的連線與協定程式碼在 `YogSothothsEcho/Packages/EchoKit`；Mac App 也依賴同一個套件，所以兩個 App 必須留在同一個 repo。
 
-> **唱機圖片：**唱片、唱臂與背景圖片**不在** repo 裡，從源碼建置時會改畫簡單的後備圖形。公開的 pre-release `.ipa` 內含這些圖片——見[授權](#授權)。
+> **唱機圖片：**唱片、唱臂與背景圖片**不在** repo 裡，從源碼建置時會改畫簡單的後備圖形。公開的 `.ipa` 內含這些圖片——見[授權](#授權)。
 
 ## 疑難排解
 
@@ -339,7 +339,7 @@ iPad App（Yog-Sothoth's Echo）內含：
 | 元件 | 授權 |
 |---|---|
 | Space Grotesk | SIL Open Font License 1.1 |
-| 取自 **MD Vinyl** App 的唱機圖片（唱片、唱臂、底座、背景） | **不在本 repo 的授權範圍內**，權利屬於原作者。圖片不在 repo 裡，只包含在公開的 pre-release `.ipa` 中，由維護者自負風險 |
+| 取自 **MD Vinyl** App 的唱機圖片（唱片、唱臂、底座、背景） | **不在本 repo 的授權範圍內**，權利屬於原作者。圖片不在 repo 裡，只包含在公開的 `.ipa` 中，由維護者自負風險 |
 
 ## 免責聲明
 

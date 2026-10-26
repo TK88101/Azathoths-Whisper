@@ -11,7 +11,7 @@ It supports multiple lyrics sources and features a dark-themed, localized user i
 | App | Platform | Version | What it does |
 |---|---|---|---|
 | **Azathoth's Whisper** | macOS | 3.0.0 | The lyrics app above, plus an optional **relay** that lets the iPad control Music on this Mac |
-| **Yog-Sothoth's Echo** (尤格·索托斯的回響) | iPad | 1.0.0 (pre-release) | A vinyl-turntable remote: browse your Mac's Music library and control playback from anywhere in the house |
+| **Yog-Sothoth's Echo** (尤格·索托斯的回響) | iPad | 1.0.0 | A vinyl-turntable remote: browse your Mac's Music library and control playback from anywhere in the house |
 
 The iPad app talks only to Azathoth's Whisper on your own Mac, over your home network. See
 [iPad Remote: Yog-Sothoth's Echo](#ipad-remote-yog-sothoths-echo).
@@ -205,7 +205,7 @@ controller.
 
 ### Installing the iPad app
 
-The iPad app is published as a **pre-release** `.ipa` on the
+The iPad app is published as an `.ipa` on the
 [Releases page](https://github.com/TK88101/Azathoths-Whisper/releases). It is **not signed** and
 not on the App Store, so you install it with a sideloading tool that signs it with your own
 Apple ID, for example **SideStore**, **AltStore** or **iLoader**.
@@ -288,7 +288,7 @@ The shared networking and protocol code lives in `YogSothothsEcho/Packages/EchoK
 builds against the same package, so both apps must stay in this repository together.
 
 > **Turntable artwork:** the record, tonearm and background images are **not** in the repository.
-> Builds from source draw simple fallback shapes instead. The published pre-release `.ipa`
+> Builds from source draw simple fallback shapes instead. The published `.ipa`
 > includes those images — see [License](#license).
 
 ## Troubleshooting
@@ -378,7 +378,7 @@ The iPad app (Yog-Sothoth's Echo) bundles:
 | Component | License |
 |---|---|
 | Space Grotesk | SIL Open Font License 1.1 |
-| Turntable images (record, tonearm, base, background) taken from the **MD Vinyl** app | **Not covered by this repository's license.** All rights belong to their owner. They are not in the repository; they are included only in the published pre-release `.ipa`, at the maintainer's own risk |
+| Turntable images (record, tonearm, base, background) taken from the **MD Vinyl** app | **Not covered by this repository's license.** All rights belong to their owner. They are not in the repository; they are included only in the published `.ipa`, at the maintainer's own risk |
 
 ## Disclaimer
 
