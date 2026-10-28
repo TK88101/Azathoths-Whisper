@@ -7,10 +7,31 @@ import Testing
 // 讀得到的檢查 G2／G3（docs/plans/2026-10-20-lyrics-fx-readability-gate.md）：全部 profile × 6 個連播種子 × 三份歌詞
 @Suite("Readability gate")
 struct ReadabilityGateTests {
-    static let profileNames = ReadabilityAudit.profiles.map(\.name)
+    static let profileNames = ReadabilityAudit.singleProfiles.map(\.name)
+    /// ⑧ 計劃 §4.6：曲庫實際出現的多列組合（`ReadabilityPolicy.combinations`）；分開列，才能單獨重跑
+    static let combinationNames = ReadabilityAudit.combinationProfiles.map(\.name)
 
     @Test(arguments: profileNames)
     func nothingGoesBlankWhileALineIsSung(name: String) throws {
+        try Self.expectNoBlank(name)
+    }
+
+    @Test(arguments: profileNames)
+    func linesDoNotStayCovered(name: String) throws {
+        try Self.expectNotCovered(name)
+    }
+
+    @Test(arguments: combinationNames)
+    func combinationsDoNotGoBlank(name: String) throws {
+        try Self.expectNoBlank(name)
+    }
+
+    @Test(arguments: combinationNames)
+    func combinationsDoNotStayCovered(name: String) throws {
+        try Self.expectNotCovered(name)
+    }
+
+    private static func expectNoBlank(_ name: String) throws {
         let profile = try #require(ReadabilityAudit.profiles.first { $0.name == name }?.profile)
         let measurer = CoreTextMeasurer()
         for recipe in ReadabilityAudit.recipes(name, profile) {
@@ -22,8 +43,7 @@ struct ReadabilityGateTests {
         }
     }
 
-    @Test(arguments: profileNames)
-    func linesDoNotStayCovered(name: String) throws {
+    private static func expectNotCovered(_ name: String) throws {
         let profile = try #require(ReadabilityAudit.profiles.first { $0.name == name }?.profile)
         let measurer = CoreTextMeasurer()
         for recipe in ReadabilityAudit.recipes(name, profile) where !ReadabilityAudit.coverExemptEnters.contains(recipe.enter) {

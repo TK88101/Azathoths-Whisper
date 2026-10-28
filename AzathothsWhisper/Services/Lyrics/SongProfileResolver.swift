@@ -56,7 +56,8 @@ enum LyricsEvidence: Equatable, Sendable {
 enum ProfileSource: Equatable, Sendable {
     /// `verifiedArtistGenre`＝MB 驗證過的歌手曲風命中曲風列（⑥b 計劃 §4.3）；`genreRow`＝Apple 曲風命中；
     /// `generic`＝前面都組不出時命中通用列（⑦ 計劃 §4.1）
-    case signedBand, jpopPolicy, verifiedArtistGenre, genreRow, generic, noMatch
+    /// `userStyle`＝使用者在曲庫檢查指定的列（⑧ 計劃 §4.3）
+    case signedBand, jpopPolicy, userStyle, verifiedArtistGenre, genreRow, generic, noMatch
 
     /// 由歌詞內容決定的來源：寫入或改詞可能讓它出現或消失
     var dependsOnLyrics: Bool { self == .jpopPolicy }
@@ -68,6 +69,8 @@ enum ProfileResolution: Equatable, Sendable {
     case signedBand(SongProfile)
     /// 日文歌一律 J-Pop（使用者 2026-10-22）；變體由 VM 選（`JPopPolicy`）
     case jpop
+    /// 使用者指定的列（⑧）
+    case userStyle(SongProfile)
     /// MB 驗證過的歌手曲風命中曲風列（⑥b）
     case artistGenreRow(SongProfile)
     case genreRow(SongProfile)
@@ -81,6 +84,7 @@ enum ProfileResolution: Equatable, Sendable {
         case .pending: nil
         case .signedBand: .signedBand
         case .jpop: .jpopPolicy
+        case .userStyle: .userStyle
         case .artistGenreRow: .verifiedArtistGenre
         case .genreRow: .genreRow
         case .genericRow: .generic
@@ -90,7 +94,7 @@ enum ProfileResolution: Equatable, Sendable {
 
     var profile: SongProfile? {
         switch self {
-        case .signedBand(let profile), .artistGenreRow(let profile), .genreRow(let profile), .genericRow(let profile): profile
+        case .signedBand(let profile), .userStyle(let profile), .artistGenreRow(let profile), .genreRow(let profile), .genericRow(let profile): profile
         case .pending, .jpop, .noMatch: nil
         }
     }
@@ -264,16 +268,17 @@ enum SongProfileResolver {
     static let hardAxes: Set<FXAxis> = [.raw, .aggression, .speed, .decay, .cold, .theatrical]
 
     static func resolve(
-        artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown,
+        artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown, decision: ArtistDecision.Choice? = nil,
         rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows
     ) -> ProfileResolution {
-        explain(artist: artist, genre: genre, lyrics: lyrics, artistGenres: artistGenres, rows: rows, genericRows: genericRows).resolution
+        explain(artist: artist, genre: genre, lyrics: lyrics, artistGenres: artistGenres, decision: decision, rows: rows, genericRows: genericRows).resolution
     }
 
     /// 判定的唯一實作（⑧ 計劃 §4.2）：結果＋來源 key＋每一層的嘗試
     static func explain(
-        artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown,
-        rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows
+        artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown, decision: ArtistDecision.Choice? = nil,
+        rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows,
+        rejected: Set<ProfileExplanation.AuditKey> = ReadabilityPolicy.rejected
     ) -> ProfileExplanation {
         if let band = signedBand(artist) { return ProfileExplanation(resolution: .signedBand(band.profile), key: .signed(band.name), trace: []) }
         if lyrics == .unknown { return ProfileExplanation(resolution: .pending, key: .pending, trace: []) }
@@ -291,11 +296,31 @@ enum SongProfileResolver {
                 trace.append(.init(layer: layer, rowIDs: ids, outcome: .notComposable))
                 return nil
             }
+            guard !rejected.contains(.rows(ids)) else {
+                trace.append(.init(layer: layer, rowIDs: ids, outcome: .rejectedByReadability))
+                return nil
+            }
             trace.append(.init(layer: layer, rowIDs: ids, outcome: .adopted))
             return (profile, ids)
         }
         func adopted(_ resolution: ProfileResolution, _ layer: ProfileExplanation.Layer, _ ids: [String]) -> ProfileExplanation {
             ProfileExplanation(resolution: resolution, key: .rows(layer, ids), trace: trace)
+        }
+        // 使用者指定的列（⑧ §4.3）：排在 J-Pop 之後（日文歌一律 J-Pop、不開例外）、MB 之前；組不出或被拒絕就落下一層
+        if case .style(let rowID) = decision {
+            let chosen = (rows + genericRows).filter { $0.id == rowID }
+            if chosen.isEmpty {
+                trace.append(.init(layer: .userStyle, rowIDs: [rowID], outcome: .noHit))
+            } else if let profile = compose(rows: chosen), Composer.isComposable(profile) {
+                if rejected.contains(.rows([rowID])) {
+                    trace.append(.init(layer: .userStyle, rowIDs: [rowID], outcome: .rejectedByReadability))
+                } else {
+                    trace.append(.init(layer: .userStyle, rowIDs: [rowID], outcome: .adopted))
+                    return ProfileExplanation(resolution: .userStyle(profile), key: .userStyle(rowID), trace: trace)
+                }
+            } else {
+                trace.append(.init(layer: .userStyle, rowIDs: [rowID], outcome: .notComposable))
+            }
         }
         // MB 還沒查、認不出、或碰不到任何列：不等，落到 Apple 曲風（只升不降，⑥b §4.3）
         // 每個曲風字串只正規化一次，四層共用（⑦ simcodex 效率）

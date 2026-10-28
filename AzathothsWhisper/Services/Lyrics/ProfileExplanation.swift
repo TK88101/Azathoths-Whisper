@@ -5,7 +5,8 @@ import Foundation
 struct ProfileExplanation: Equatable, Sendable {
     /// 曲風列命中的層
     enum Layer: String, Sendable {
-        case mbGenre, appleGenre, genericMB, genericApple
+        /// `userStyle`＝使用者指定的列（計劃 §4.3）
+        case userStyle, mbGenre, appleGenre, genericMB, genericApple
     }
 
     enum Key: Hashable, Sendable {
@@ -13,6 +14,7 @@ struct ProfileExplanation: Equatable, Sendable {
         case jpop
         /// ids＝合成實際用到的列（排序；generic 抑制之後）
         case rows(Layer, [String])
+        case userStyle(String)
         case none
         case pending
     }
@@ -25,7 +27,8 @@ struct ProfileExplanation: Equatable, Sendable {
     }
 
     enum Outcome: Equatable, Sendable {
-        case adopted, notComposable, noHit
+        /// `rejectedByReadability`＝組得出但 G1–G3 不及格（`ReadabilityPolicy.rejected`），同組不出一樣落下一層
+        case adopted, notComposable, rejectedByReadability, noHit
     }
 
     struct Attempt: Equatable, Sendable {
@@ -43,6 +46,7 @@ struct ProfileExplanation: Equatable, Sendable {
         case .signed(let name): .signed(name)
         case .jpop: .jpop
         case .rows(_, let ids): .rows(ids)
+        case .userStyle(let id): .rows([id])
         case .none, .pending: nil
         }
     }

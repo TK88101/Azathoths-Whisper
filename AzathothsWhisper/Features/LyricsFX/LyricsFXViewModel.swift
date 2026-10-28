@@ -61,6 +61,8 @@ final class LyricsFXViewModel {
     @ObservationIgnored private let recipeHistory: any LyricsFXRecipeHistory
     /// ⑥b：歌手的 MB 曲風（`AppModel` 讀 snapshot 接上；同步、不碰 actor）。預設＝還沒查
     @ObservationIgnored var artistGenres: (String) -> ArtistGenres = { _ in .unknown }
+    /// ⑧：使用者在曲庫檢查下的決定（AppModel 讀不可變快照；feature 不持有服務）
+    @ObservationIgnored var artistDecision: (String) -> ArtistDecision.Choice? = { _ in nil }
 
     init(
         positionClock: PlaybackPositionClock, nonceSource: any FXNonceSource = SystemNonceSource(),
@@ -223,7 +225,8 @@ final class LyricsFXViewModel {
     private func reconcileRecipe() {
         guard let signature = sessionSignature else { return }
         let resolution = SongProfileResolver.resolve(
-            artist: sessionArtist, genre: metadata.genre, lyrics: LyricsEvidence.of(lyrics), artistGenres: artistGenres(sessionArtist)
+            artist: sessionArtist, genre: metadata.genre, lyrics: LyricsEvidence.of(lyrics), artistGenres: artistGenres(sessionArtist),
+            decision: artistDecision(sessionArtist)
         )
         guard let source = resolution.source, Self.shouldCompose(settled: settledSource, now: source) else { return }
         recipe = sessionRecipe(for: resolution, signature: signature)
@@ -240,7 +243,7 @@ final class LyricsFXViewModel {
         case .jpop:
             let target = JPopPolicy.target(signature: signature, nonce: sessionNonce, previousPalette: previous?.palette)
             return Composer.compose(profile: target.profile, seed: seed, catalog: target.catalog, avoiding: previous?.asPrevious)
-        case .signedBand(let profile), .artistGenreRow(let profile), .genreRow(let profile), .genericRow(let profile):
+        case .signedBand(let profile), .userStyle(let profile), .artistGenreRow(let profile), .genreRow(let profile), .genericRow(let profile):
             #if DEBUG
             if let forced = recipeOverride?(profile) { return .composed(forced) }
             #endif
