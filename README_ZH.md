@@ -11,7 +11,7 @@
 | App | 平台 | 版本 | 用途 |
 |---|---|---|---|
 | **Azathoth's Whisper**（阿撒托斯的低語） | macOS | 3.0.0 | 上面的歌詞工具，外加可選的**中繼**，讓 iPad 控制這台 Mac 上的 Music |
-| **Yog-Sothoth's Echo**（尤格·索托斯的回響） | iPad | 1.0.0 | 黑膠唱機造型的遙控器：在家裡任何地方瀏覽 Mac 的 Music 曲庫並控制播放 |
+| **Yog-Sothoth's Echo**（尤格·索托斯的回響） | iPad | 1.0.1 | 黑膠唱機造型的遙控器：在家裡任何地方瀏覽 Mac 的 Music 曲庫並控制播放 |
 
 iPad App 只會經由家中區網，連到你自己 Mac 上的 Azathoth's Whisper。詳見
 [iPad 遙控器：Yog-Sothoth's Echo](#ipad-遙控器yog-sothoths-echo)。
@@ -189,6 +189,7 @@ Yog-Sothoth's Echo 把 iPad 變成黑膠唱機造型的遙控器，用來控制 
 *   打開專輯、點一首歌——Mac 會從這首開始播，接著播這張專輯其後的歌。
 *   在唱機畫面點唱片暫停／繼續，左右甩動切換上一首／下一首。
 *   底部膠囊有上一首／播放暫停／下一首與 **Genius**（Music 自己的 Genius 隨機播放，和上面的 Genius *歌詞* token 無關）。
+*   可在設定頁或唱機畫面的按鈕切換唱機外觀（Default、Pioneer、Rega、Technics）。Pioneer、Rega、Technics 是維護者參考這幾款唱機自行建模算圖的外觀，與各品牌無關。
 *   可選唱片樣式（Random、Classic、Transparent、Splash、Marble）與亮色／暗色／跟隨系統的外觀。
 
 **需求**
@@ -259,7 +260,7 @@ cp -R "$WORK/dd/Build/Products/Release-iphoneos/Yog-Sothoth's Echo.app" "$WORK/i
 
 兩邊共用的連線與協定程式碼在 `YogSothothsEcho/Packages/EchoKit`；Mac App 也依賴同一個套件，所以兩個 App 必須留在同一個 repo。
 
-> **唱機圖片：**唱片、唱臂與背景圖片**不在** repo 裡，從源碼建置時會改畫簡單的後備圖形。公開的 `.ipa` 內含這些圖片——見[授權](#授權)。
+> **唱機圖片：**Default 外觀用的唱片、唱臂與背景圖片**不在** repo 裡，從源碼建置時會改畫簡單的後備圖形。公開的 `.ipa` 內含這些圖片——見[授權](#授權)。Pioneer、Rega、Technics 的唱臂與底座圖片是維護者自行算圖的，放在 repo 裡。
 
 ## 疑難排解
 

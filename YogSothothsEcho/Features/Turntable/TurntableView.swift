@@ -89,9 +89,15 @@ struct TurntableView: View {
                       sleeveAside: p.incomingSleeveAside, travel: p.incomingOffset * travel,
                       drag: 0, animation: phaseAnimation(incoming: true))
             }
+            armBaseMiddle(layout)
+                .zIndex(1.2)
             tonearm(layout)
                 .zIndex(1.5)
+            armBaseOverlay(layout)
+                .zIndex(1.6)
         }
+        // 序列圖皮膚依版面縮放解碼（同皮膚同縮放不重解；classic＝釋放）
+        .task(id: "\(model.skin.spec.id)|\(layout.scale)") { model.prepareSprites(layoutScale: layout.scale) }
         .animation(.easeInOut(duration: 0.4), value: model.sleeve)
     }
 
@@ -175,6 +181,7 @@ struct TurntableView: View {
         Group {
             switch layout.skin.spec.rendering {
             case .classicImages: classicArmBase(layout)
+            case .spriteSequence: spriteStill(model.sprites.base)
             }
         }
         .frame(width: layout.armBase.width, height: layout.armBase.height)
@@ -192,16 +199,55 @@ struct TurntableView: View {
         }
     }
 
+    /// 底座上層（序列圖皮膚；畫在唱臂之上）；classic 沒有
+    @ViewBuilder private func armBaseOverlay(_ layout: TurntableLayout) -> some View {
+        if let rect = layout.armBaseOverlay {
+            spriteStill(model.sprites.overlay)
+                .frame(width: rect.width, height: rect.height)
+                .offset(x: rect.minX, y: rect.minY)
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// 底座中層（增補 B；唱片 1 之上、唱臂 1.5 之下：刻度環蓋唱片、臂夾在唱臂下）；沒有中層的皮膚不畫
+    @ViewBuilder private func armBaseMiddle(_ layout: TurntableLayout) -> some View {
+        if let rect = layout.armBaseMiddle {
+            spriteStill(model.sprites.middle)
+                .frame(width: rect.width, height: rect.height)
+                .offset(x: rect.minX, y: rect.minY)
+                .accessibilityHidden(true)
+        }
+    }
+
+    @ViewBuilder private func spriteStill(_ image: CGImage?) -> some View {
+        if let image {
+            Image(decorative: image, scale: 1).resizable()
+        } else {
+            Color.clear
+        }
+    }
+
     private func tonearm(_ layout: TurntableLayout) -> some View {
         TimelineView(.animation(paused: model.nowPlaying.clock?.event.state != .playing)) { _ in
             let angle = model.armAngle()
-            armImage(layout)
-                .frame(width: layout.arm.width, height: layout.arm.height)
-                .rotationEffect(.degrees(layout.skin.armRotation(forAngle: angle)), anchor: Self.anchor(layout.skin.spec.arm))
-                .offset(x: layout.arm.minX, y: layout.arm.minY)
+            switch layout.skin.spec.rendering {
+            case .classicImages:
+                classicArmImage(layout)
+                    .frame(width: layout.arm.width, height: layout.arm.height)
+                    .rotationEffect(.degrees(layout.skin.armRotation(forAngle: angle)), anchor: Self.anchor(layout.skin.spec.arm))
+                    .offset(x: layout.arm.minX, y: layout.arm.minY)
+            case .spriteSequence:
+                SpriteTonearmView(angle: angle, layout: layout, sprites: model.sprites)
+            }
         }
         // 落臂／抬臂：linear 1 s（spec），甩動抬臂 350 ms（與煞停同步）。播放中的進度是每幀算出的連續值，不套動畫（每幀重啟會追不上）
         .animation(.linear(duration: model.swipe.armLifted ? SwipeTransition.liftDuration.secondsValue : 1), value: armIsResting)
+        #if DEBUG
+        // 附錄 F 卡頓診斷：落臂／抬臂期間記錄取幀與幀間隔
+        .onChange(of: armIsResting) {
+            SpriteTrace.current?.armMotionStarted(duration: model.swipe.armLifted ? SwipeTransition.liftDuration.secondsValue : 1)
+        }
+        #endif
         .accessibilityElement()
         .accessibilityLabel(Text("Tonearm"))
         .accessibilityValue(Text(verbatim: PlaybackPresentation.time(model.nowPlaying.position() ?? 0)))
@@ -217,12 +263,6 @@ struct TurntableView: View {
 
     private static func anchor(_ frame: ArtworkFrame) -> UnitPoint {
         UnitPoint(x: frame.pivotFraction.x, y: frame.pivotFraction.y)
-    }
-
-    @ViewBuilder private func armImage(_ layout: TurntableLayout) -> some View {
-        switch layout.skin.spec.rendering {
-        case .classicImages: classicArmImage(layout)
-        }
     }
 
     @ViewBuilder private func classicArmImage(_ layout: TurntableLayout) -> some View {
@@ -270,15 +310,19 @@ struct TurntableView: View {
     /// 依畫面上實際的上下關係判定（TurntableHitTest）；甩動轉場中一律忽略
     private func tap(at point: CGPoint, _ layout: TurntableLayout) {
         guard !model.swipe.isBusy else { return }
-        switch TurntableHitTest.classify(point, layout: layout, sleeve: model.sleeve, armAngle: model.armAngle()) {
-        case .record: Task { await model.tapRecord() }
-        case .cover: tapSleeve()
-        case .overlayToggle: withAnimation(.spring(duration: 0.4)) { model.overlay.toggle() }
-        }
+        let target = TurntableHitTest.classify(point, layout: layout, sleeve: model.sleeve, armAngle: model.armAngle())
+        guard model.handleTap(target, animate: { withAnimation(.spring(duration: 0.4), $0) }) else { return }
+        finishSleeveMidway()
     }
 
+    /// 無障礙動作「點封套」：與手指點擊同一個分派
     private func tapSleeve() {
-        guard model.tapSleeve() else { return }
+        guard model.handleTap(.cover) else { return }
+        finishSleeveMidway()
+    }
+
+    /// 封套接受點擊後 400 ms 交棒給 ViewModel
+    private func finishSleeveMidway() {
         Task {
             try? await Task.sleep(for: .milliseconds(CoverSleeveState.phaseMilliseconds))
             model.sleeveMidwayFinished()

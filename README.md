@@ -11,7 +11,7 @@ It supports multiple lyrics sources and features a dark-themed, localized user i
 | App | Platform | Version | What it does |
 |---|---|---|---|
 | **Azathoth's Whisper** | macOS | 3.0.0 | The lyrics app above, plus an optional **relay** that lets the iPad control Music on this Mac |
-| **Yog-Sothoth's Echo** (尤格·索托斯的回響) | iPad | 1.0.0 | A vinyl-turntable remote: browse your Mac's Music library and control playback from anywhere in the house |
+| **Yog-Sothoth's Echo** (尤格·索托斯的回響) | iPad | 1.0.1 | A vinyl-turntable remote: browse your Mac's Music library and control playback from anywhere in the house |
 
 The iPad app talks only to Azathoth's Whisper on your own Mac, over your home network. See
 [iPad Remote: Yog-Sothoth's Echo](#ipad-remote-yog-sothoths-echo).
@@ -195,6 +195,9 @@ controller.
 *   On the turntable screen, tap the record to pause or resume, and swipe left or right to skip.
 *   Use the bottom capsule for previous / play-pause / next and **Genius** (Music's own Genius
     shuffle — unrelated to the Genius *lyrics* token above).
+*   Switch the turntable look (Default, Pioneer, Rega, Technics) in Settings or from the button on the
+    turntable screen. The Pioneer, Rega and Technics looks are the maintainer's own renders modeled after
+    those turntables; they are not affiliated with the brands.
 *   Choose a record style (Random, Classic, Transparent, Splash, Marble) and a light, dark or
     system appearance.
 
@@ -287,9 +290,10 @@ cp -R "$WORK/dd/Build/Products/Release-iphoneos/Yog-Sothoth's Echo.app" "$WORK/i
 The shared networking and protocol code lives in `YogSothothsEcho/Packages/EchoKit`; the Mac app
 builds against the same package, so both apps must stay in this repository together.
 
-> **Turntable artwork:** the record, tonearm and background images are **not** in the repository.
-> Builds from source draw simple fallback shapes instead. The published `.ipa`
-> includes those images — see [License](#license).
+> **Turntable artwork:** the record, tonearm and background images used by the Default look are **not** in the
+> repository. Builds from source draw simple fallback shapes instead. The published `.ipa`
+> includes those images — see [License](#license). The tonearm and base images of the Pioneer, Rega and
+> Technics looks are the maintainer's own renders and are in the repository.
 
 ## Troubleshooting
 

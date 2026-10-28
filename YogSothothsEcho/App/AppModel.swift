@@ -61,7 +61,8 @@ final class AppModel {
                 let token = library.albums.first(where: { $0.id == id })?.artworkToken
                 return await detailScheduler.image(albumID: id, token: token, priority: .turntable)
             },
-            palette: { image in AlbumPalette.extract(from: image) })
+            palette: { image in AlbumPalette.extract(from: image) },
+            catalog: TurntableSkinCatalog.load(reader: MainBundleSkinReader()))   // CR-034：preflight 不過的皮膚不列入
         albumOpen = AlbumOpenController(
             now: { CACurrentMediaTime() }, sleep: { try? await Task.sleep(for: $0) },
             spineCover: { await library.image(for: $0) },
@@ -115,6 +116,7 @@ final class AppModel {
             store.removeValue(forKey: BackgroundViewModel.detailModeKey)
             store.removeValue(forKey: BrowseLayoutViewModel.storageKey)
             store.removeValue(forKey: LibraryViewModel.anchorKey)
+            store.removeValue(forKey: TurntableViewModel.skinKey)
         }
         if arguments.contains(AccessibilityID.resetPositionArgument) { store.removeValue(forKey: LibraryViewModel.anchorKey) }
         connector = UITestSupport.connector(arguments) ?? connector

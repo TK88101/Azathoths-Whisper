@@ -12,8 +12,8 @@ packages:
 
 settings:
   base:
-    MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "2"
+    MARKETING_VERSION: "1.0.1"
+    CURRENT_PROJECT_VERSION: "3"
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_IDENTITY: "-"
@@ -33,8 +33,12 @@ targets:
       - path: Resources
         excludes:
           - "VinylAssets.local/**"
+          - "Skins/**"
       # S5 D1：MD Vinyl 素材只放本機（Scripts/fetch_vinyl_assets.sh）；資料夾只追蹤 README.md，缺素材時畫後備圖形
       - path: Resources/VinylAssets.local
+        type: folder
+      # CR-034：唱機皮膚素材（Scripts/import_tonearm_skin.py 產生）；folder reference 保留子資料夾，各皮膚的同名幀不互撞
+      - path: Resources/Skins
         type: folder
     dependencies:
       - package: EchoKit

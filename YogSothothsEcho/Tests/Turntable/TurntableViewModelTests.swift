@@ -212,6 +212,31 @@ struct TurntableViewModelTests {
         #expect(controls == ["toggle"])
     }
 
+    /// 增補 B（Codex r2-5）：點擊分派在 ViewModel——浮層命中只切浮層、不送播放指令；唱片命中送一次 toggle；封套命中走封套
+    @Test func tapOnTheOverlayTargetNeverTogglesPlayback() async {
+        await start()
+        let visible = model.overlay.isVisible
+        #expect(model.handleTap(.overlayToggle) == false)
+        // 切換是同步的（測試的 sleep 替身會讓自動隱藏很快觸發，所以當下就斷言）
+        #expect(model.overlay.isVisible != visible)
+        for _ in 0..<50 { await Task.yield() }
+        #expect(controls.isEmpty, "浮層命中不得送播放指令")
+    }
+
+    @Test func tapOnTheRecordTargetTogglesPlaybackOnce() async {
+        await start()
+        model.handleTap(.record)
+        let deadline = ContinuousClock.now + .seconds(10)
+        while controls.isEmpty, ContinuousClock.now < deadline { await Task.yield() }
+        #expect(controls == ["toggle"])
+    }
+
+    @Test func tapOnTheCoverTargetGoesToTheSleeve() async {
+        await start()
+        #expect(model.handleTap(.cover) == true)
+        #expect(controls.isEmpty)
+    }
+
     /// 同專輯：放手即送一次；回覆先到時畫面仍是舊曲（快照），抬臂計時到才換標籤，200 ms 後回 idle 解除凍結
     @Test func sameAlbumSendsOnceAndRelabelsAfterLift() async {
         await start()

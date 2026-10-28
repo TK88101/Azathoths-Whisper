@@ -106,14 +106,77 @@ struct TurntableOverlayTests {
         let overlay = TurntableOverlayState(sleep: { await sleeper.sleep($0) })
         overlay.toggle()
         await settleMain()
-        overlay.setEditing(true)
+        overlay.beginHold(.tuningSlider)
         await settleMain()
         await sleeper.wakeOldest()           // 編輯前的計時醒來：已作廢
         await settleMain()
         #expect(overlay.isVisible)
-        overlay.setEditing(false)
+        overlay.endHold(.tuningSlider)
         await settleMain()
         #expect(await sleeper.waiting == 1)
+        await sleeper.wakeOldest()
+        await settleMain()
+        #expect(!overlay.isVisible)
+    }
+
+    /// 增補 A r1-4：停表原因可疊加——滑桿放手時選擇器仍開著＝不重新計時；全部結束才計時
+    @Test func holdReasonsCompose() async {
+        let sleeper = QueueSleeper()
+        let overlay = TurntableOverlayState(sleep: { await sleeper.sleep($0) })
+        overlay.toggle()
+        await settleMain()
+        overlay.beginHold(.tuningSlider)
+        overlay.beginHold(.skinPicker)
+        overlay.endHold(.tuningSlider)
+        await settleMain()
+        await sleeper.wakeOldest()           // 停表前的計時：已作廢
+        await settleMain()
+        #expect(overlay.isVisible)
+        #expect(await sleeper.waiting == 0, "選擇器仍開著：不計時")
+        overlay.endHold(.skinPicker)
+        await settleMain()
+        #expect(await sleeper.waiting == 1)
+        await sleeper.wakeOldest()
+        await settleMain()
+        #expect(!overlay.isVisible)
+    }
+
+    /// 選擇器開著時點格子（selectSkin → poke）：不得重新計時，否則 5 s 後浮層連同選擇器收掉
+    @Test func pokeWhileHeldDoesNotRestartTheTimer() async {
+        let sleeper = QueueSleeper()
+        let overlay = TurntableOverlayState(sleep: { await sleeper.sleep($0) })
+        overlay.toggle()
+        overlay.beginHold(.skinPicker)
+        await settleMain()
+        await sleeper.wakeOldest()
+        overlay.poke()
+        await settleMain()
+        #expect(await sleeper.waiting == 0)
+        #expect(overlay.isVisible)
+    }
+
+    /// 沒有 begin 過的原因：end 不動作（不重設計時）
+    @Test func endingAnUnheldReasonDoesNothing() async {
+        let sleeper = QueueSleeper()
+        let overlay = TurntableOverlayState(sleep: { await sleeper.sleep($0) })
+        overlay.toggle()
+        await settleMain()
+        overlay.endHold(.skinPicker)
+        await settleMain()
+        #expect(await sleeper.waiting == 1)
+    }
+
+    /// 唱機離開（關閉、斷線）：清空所有原因；仍可見就重新計時（r2-1）
+    @Test func endAllHoldsClearsEveryReason() async {
+        let sleeper = QueueSleeper()
+        let overlay = TurntableOverlayState(sleep: { await sleeper.sleep($0) })
+        overlay.toggle()
+        overlay.beginHold(.skinPicker)
+        overlay.beginHold(.tuningSlider)
+        overlay.endAllHolds()
+        #expect(overlay.holds.isEmpty)
+        await settleMain()
+        await sleeper.wakeOldest()
         await sleeper.wakeOldest()
         await settleMain()
         #expect(!overlay.isVisible)

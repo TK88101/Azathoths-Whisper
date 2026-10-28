@@ -9,9 +9,7 @@ enum TurntableMetrics {
     /// R ＝ min(0.775H, W／1.72)
     static let recordHeightFraction: CGFloat = 0.775
     static let recordWidthDivisor: CGFloat = 1.72
-    /// 唱片圓心距容器右緣、比垂直中線往下
-    static let recordCenterRightInset: CGFloat = 0.61
-    static let recordCenterDrop: CGFloat = 0.0125
+    // 唱片圓心的位置在皮膚（`TurntableSkin.placement`；classic＝0.61／0.0125，CR-034）
     /// 畫面上的唱片＝唱片框 × 0.96（原版靜止縮放；畫面與點擊命中共用）
     static let recordVisibleScale: CGFloat = 0.96
     /// 封套邊長＝可見唱片 × 1.0475（12 吋黑膠 30.0 cm／封套 31.4 cm；#5-1 使用者實機比較後選「縮小封套」）；

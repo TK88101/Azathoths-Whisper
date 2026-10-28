@@ -14,6 +14,11 @@ struct TurntableLayout: Equatable {
     let cover: CGRect
     let arm: CGRect
     let armBase: CGRect
+    /// 唱臂投影（與唱臂一起轉）、底座上層（畫在唱臂上）；皮膚沒有這層＝nil（CR-034）
+    let armShadow: CGRect?
+    let armBaseOverlay: CGRect?
+    /// 底座中層（唱片之上、唱臂之下；CR-034 增補 B）；皮膚沒有這層＝nil
+    let armBaseMiddle: CGRect?
     let armPivot: CGPoint
     let fullCover: Bool
     /// 唱臂與底座的來源（S7 F-V-07）；由組裝根注入，版面、點擊判定、繪製共用這一個值
@@ -24,7 +29,8 @@ struct TurntableLayout: Equatable {
     init(container: CGRect, fullCover: Bool, skin: ResolvedTurntableSkin) {
         let r = min(M.recordHeightFraction * container.height, container.width / M.recordWidthDivisor)
         let s = r / M.recordSize
-        let center = CGPoint(x: container.maxX - M.recordCenterRightInset * r, y: container.midY + M.recordCenterDrop * r)
+        let place = skin.spec.placement
+        let center = CGPoint(x: container.maxX - place.rightInset * r, y: container.midY + place.drop * r)
         let record = CGRect(x: center.x - r / 2, y: center.y - r / 2, width: r, height: r)
         let side = M.sleeveToRecord * r * M.recordVisibleScale
         let coverCenter = fullCover
@@ -38,10 +44,16 @@ struct TurntableLayout: Equatable {
         self.record = record
         cover = CGRect(x: coverCenter.x - side / 2, y: coverCenter.y - side / 2, width: side, height: side)
         let look = skin.spec
-        arm = CGRect(x: record.minX + look.armOrigin.x * s, y: record.minY + look.armOrigin.y * s,
-                     width: look.arm.size.width * s, height: look.arm.size.height * s)
-        armBase = CGRect(x: record.minX + look.baseOrigin.x * s, y: record.minY + look.baseOrigin.y * s,
-                         width: look.base.size.width * s, height: look.base.size.height * s)
+        /// 每一層的畫框：左上＝支點 − 框內支點（唱片框座標 u）× 縮放
+        func rect(_ frame: ArtworkFrame) -> CGRect {
+            let origin = look.origin(of: frame)
+            return CGRect(x: record.minX + origin.x * s, y: record.minY + origin.y * s, width: frame.size.width * s, height: frame.size.height * s)
+        }
+        arm = rect(look.arm)
+        armBase = rect(look.base)
+        armShadow = look.armShadow.map(rect)
+        armBaseOverlay = look.baseOverlay.map(rect)
+        armBaseMiddle = look.baseMiddle.map(rect)
         armPivot = CGPoint(x: arm.minX + look.arm.localPivot.x * s, y: arm.minY + look.arm.localPivot.y * s)
     }
 
@@ -84,7 +96,22 @@ struct TurntableLayout: Equatable {
 
     /// 唱臂轉到 `angle` 度（順時針）後的外接矩形
     func armBoundingBox(angle: Double) -> CGRect {
-        Self.boundingBox(of: arm, rotatedBy: skin.armRotation(forAngle: angle), about: armPivot)
+        visibleBox(of: arm, outline: skin.spec.armOutline, angle: angle)
+    }
+
+    /// 唱臂投影轉到 `angle` 度後的外接矩形（與唱臂同一支點、同一角度）；沒有投影層＝nil
+    func shadowBoundingBox(angle: Double) -> CGRect? {
+        armShadow.map { visibleBox(of: $0, outline: skin.spec.shadowOutline, angle: angle) }
+    }
+
+    /// 有可見輪廓＝以輪廓各列的角旋轉（透明角落不算）；沒有＝以畫框矩形（classic，與 1.0 相同）
+    private func visibleBox(of rect: CGRect, outline: RowOutline?, angle: Double) -> CGRect {
+        let degrees = skin.armRotation(forAngle: angle)
+        guard let outline else { return Self.boundingBox(of: rect, rotatedBy: degrees, about: armPivot) }
+        let points = outline.corners.map { corner in
+            TonearmGeometry.rotate(CGPoint(x: rect.minX + corner.x * scale, y: rect.minY + corner.y * scale), about: armPivot, degrees: degrees)
+        }
+        return Self.boundingBox(of: points)
     }
 
     /// 封套（常態傾斜，全封面時擺正）的外接矩形
@@ -96,8 +123,11 @@ struct TurntableLayout: Equatable {
     static func boundingBox(of rect: CGRect, rotatedBy degrees: Double, about pivot: CGPoint) -> CGRect {
         let corners = [CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.minY),
                        CGPoint(x: rect.minX, y: rect.maxY), CGPoint(x: rect.maxX, y: rect.maxY)]
-            .map { TonearmGeometry.rotate($0, about: pivot, degrees: degrees) }
-        let xs = corners.map(\.x), ys = corners.map(\.y)
+        return boundingBox(of: corners.map { TonearmGeometry.rotate($0, about: pivot, degrees: degrees) })
+    }
+
+    private static func boundingBox(of points: [CGPoint]) -> CGRect {
+        let xs = points.map(\.x), ys = points.map(\.y)
         return CGRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!)
     }
 }

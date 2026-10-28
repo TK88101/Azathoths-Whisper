@@ -127,7 +127,7 @@ struct ShellView: View {
         // 側封的 UIKit 無障礙容器不受 SwiftUI accessibilityHidden 管，經環境值自己藏
         .environment(\.libraryCovered, turntable.layer.isPresent)
         .sheet(isPresented: $showsSettings) {
-            SettingsSheet(appearance: appearance, background: background, connection: connection)
+            SettingsSheet(appearance: appearance, background: background, connection: connection, turntable: turntable)
         }
         .onAppear { albumOpen.reduceMotion = reduceMotion }
         .onChange(of: reduceMotion) { _, value in albumOpen.reduceMotion = value }

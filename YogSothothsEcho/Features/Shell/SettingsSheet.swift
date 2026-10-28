@@ -5,6 +5,7 @@ struct SettingsSheet: View {
     @Bindable var appearance: AppearanceViewModel
     @Bindable var background: BackgroundViewModel
     let connection: ConnectionViewModel
+    let turntable: TurntableViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @State private var confirmingForget = false
@@ -24,6 +25,8 @@ struct SettingsSheet: View {
                     .pickerStyle(.segmented)
                     .accessibilityIdentifier(AccessibilityID.appearancePicker)
                 }
+                // CR-034 增補 A：目前外觀＋小圖（只露支點與底座），點入選擇器；唱機沒開也能換。只有一款時不顯示
+                if turntable.canBrowseSkins { turntableSection }
                 Section("Background") {
                     Picker(selection: $background.preset) {
                         ForEach(BackgroundPreset.allCases, id: \.self) { preset in
@@ -46,11 +49,7 @@ struct SettingsSheet: View {
             }
             .navigationTitle(Text("Settings"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }.accessibilityIdentifier(AccessibilityID.settingsDone)
-                }
-            }
+            .toolbar { doneButton }
             .confirmationDialog(Text("Forget this Mac?"), isPresented: $confirmingForget, titleVisibility: .visible) {
                 Button("Forget this Mac", role: .destructive) {
                     dismiss()
@@ -58,6 +57,36 @@ struct SettingsSheet: View {
                 }
                 .accessibilityIdentifier(AccessibilityID.settingsForgetConfirm)
             }
+        }
+    }
+
+    private var doneButton: some ToolbarContent {
+        ToolbarItem(placement: .confirmationAction) {
+            Button("Done") { dismiss() }.accessibilityIdentifier(AccessibilityID.settingsDone)
+        }
+    }
+
+    private var turntableSection: some View {
+        Section("Turntable") {
+            NavigationLink {
+                ScrollView {
+                    TurntableSkinPicker(model: turntable).padding(20)
+                }
+                .background(Color(uiColor: .systemGroupedBackground))
+                .navigationTitle(Text("Turntable Skin"))
+                // 工具列只掛在首頁：推進來的這頁也要能直接關掉設定
+                .toolbar { doneButton }
+            } label: {
+                HStack(spacing: 12) {
+                    SkinPreviewImage(previews: turntable.previews, skin: turntable.skin, crop: .head, size: CGSize(width: 44, height: 44))
+                        .padding(4)
+                        .background(SkinTileBackground())
+                    Text("Turntable Skin")
+                    Spacer()
+                    SkinTitle(skin: turntable.skin).foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityIdentifier(AccessibilityID.settingsTurntableSkin)
         }
     }
 

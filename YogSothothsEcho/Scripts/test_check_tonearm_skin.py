@@ -70,6 +70,9 @@ class CheckTonearmSkinTests(unittest.TestCase):
         code, out = self.run_tool()
         self.assertEqual(code, 0, out)
 
+    def test_canvas_has_an_upper_bound(self):
+        self.assertRejected("canvas_px", m=manifest(base={"canvas_px": [4097, 40], "pivot_px": [10, 20]}))
+
     def test_px_per_unit_must_be_the_contract_value(self):
         self.assertRejected("px_per_unit", m=manifest(px_per_unit=3))
 

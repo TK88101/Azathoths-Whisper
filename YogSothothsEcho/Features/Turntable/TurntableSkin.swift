@@ -7,43 +7,158 @@ import RemoteProtocol
 /// 座標單位是唱片框的 u（474 u＝唱片直徑）；角度是畫面絕對角（0＝臂管朝畫面正下方、順時針為正）
 struct TurntableSkin: Sendable, Equatable {
     let id: String
-    let kinematics: TonearmKinematics
+    private(set) var kinematics: TonearmKinematics
     /// 轉動部件（配重＋臂管＋唱頭）的畫框
-    let arm: ArtworkFrame
-    /// 固定部件（底座）的畫框
-    let base: ArtworkFrame
-    let hitShape: HitShape
-    let rendering: Rendering
+    private(set) var arm: ArtworkFrame
+    /// 固定部件（底座；畫在唱片下）的畫框
+    private(set) var base: ArtworkFrame
+    private(set) var hitShape: HitShape
+    private(set) var rendering: Rendering
+    /// 唱片圓心在容器內的位置（CR-034：序列圖皮膚取自 `SpriteSkinDefinition.placement`；封套、全封面、G7 都相對唱片圓心，跟著走）
+    private(set) var placement: RecordPlacement
+    /// 唱臂投影（與唱臂一起繞支點轉；自己的裁切框，CR-034 r1-1）；nil＝沒有獨立投影層
+    private(set) var armShadow: ArtworkFrame?
+    /// 底座上層（畫在唱臂之上的固定零件）；nil＝沒有
+    private(set) var baseOverlay: ArtworkFrame?
+    /// 唱臂與投影的可見輪廓（各自畫框內 u；所有幀 alpha 聯集）：版面以它算旋轉後的可見外接框。nil＝以畫框矩形計（classic）
+    private(set) var armOutline: RowOutline?
+    private(set) var shadowOutline: RowOutline?
+    /// 底座中層（唱片之上、唱臂之下；CR-034 增補 B）；nil＝兩層底座
+    private(set) var baseMiddle: ArtworkFrame?
+    /// 中層的點擊遮罩（中層素材像素座標）；有中層就必備
+    private(set) var middleHitMask: PixelRuns?
+
+    init(id: String, kinematics: TonearmKinematics, arm: ArtworkFrame, base: ArtworkFrame, hitShape: HitShape, rendering: Rendering,
+         placement: RecordPlacement = .classic, armShadow: ArtworkFrame? = nil, baseOverlay: ArtworkFrame? = nil,
+         armOutline: RowOutline? = nil, shadowOutline: RowOutline? = nil, baseMiddle: ArtworkFrame? = nil, middleHitMask: PixelRuns? = nil) {
+        self.id = id
+        self.kinematics = kinematics
+        self.arm = arm
+        self.base = base
+        self.hitShape = hitShape
+        self.rendering = rendering
+        self.placement = placement
+        self.armShadow = armShadow
+        self.baseOverlay = baseOverlay
+        self.armOutline = armOutline
+        self.shadowOutline = shadowOutline
+        self.baseMiddle = baseMiddle
+        self.middleHitMask = middleHitMask
+    }
 
     enum HitShape: Sendable, Equatable {
         /// 臂管＝畫布支點 x 為中線、半寬 `halfWidth` 的細條；唱頭區＝畫框內 y 在 headTop…headBottom 的整列（皆為畫框內 u）
         case tubeStrip(halfWidth: CGFloat, headTop: CGFloat, headBottom: CGFloat)
+        /// 逐列可點範圍＝唱臂可見輪廓（`armOutline`，35 幀 alpha 聯集）每列左右各外擴 `margin` u、夾在臂框內（CR-034 r1-5）
+        case rowSpans(margin: CGFloat)
     }
 
     enum Rendering: Sendable, Equatable {
         /// 原版 MD Vinyl 的兩張本機 PNG，缺素材時畫後備圖形
         case classicImages
+        /// 每整數度一幀的序列圖（本地 rest 姿態，取最近幀後整張轉完整角度）＋投影＋上下兩層底座
+        case spriteSequence(SpriteSkinAssets)
     }
 
     /// 畫框左上（唱片框座標）＝支點 − 畫布支點；classic 與素材序列圖共用這一個公式
     var armOrigin: CGPoint { origin(of: arm) }
     var baseOrigin: CGPoint { origin(of: base) }
 
-    private func origin(of frame: ArtworkFrame) -> CGPoint {
+    func origin(of frame: ArtworkFrame) -> CGPoint {
         CGPoint(x: kinematics.pivot.x - frame.localPivot.x, y: kinematics.pivot.y - frame.localPivot.y)
     }
 
-    func replacing(kinematics: TonearmKinematics) -> TurntableSkin {
-        TurntableSkin(id: id, kinematics: kinematics, arm: arm, base: base, hitShape: hitShape, rendering: rendering)
+    /// 序列圖皮膚必備的圖層（resolver 已保證齊全；不是序列圖＝nil）。目錄與快取經這裡解包；版面與繪製讀各層畫框（classic 為 nil）。
+    /// 中層是可選的：不列入必備條件，沒有中層照樣解包（兩層皮膚路徑不變）
+    var spriteLayers: SpriteLayers? {
+        guard case .spriteSequence(let assets) = rendering, let armShadow, let baseOverlay else { return nil }
+        return SpriteLayers(assets: assets, shadow: armShadow, overlay: baseOverlay, middle: baseMiddle)
     }
 
-    func replacing(arm: ArtworkFrame) -> TurntableSkin {
-        TurntableSkin(id: id, kinematics: kinematics, arm: arm, base: base, hitShape: hitShape, rendering: rendering)
+    struct SpriteLayers: Sendable, Equatable {
+        let assets: SpriteSkinAssets
+        let shadow: ArtworkFrame
+        let overlay: ArtworkFrame
+        let middle: ArtworkFrame?
     }
 
-    func replacing(base: ArtworkFrame) -> TurntableSkin {
-        TurntableSkin(id: id, kinematics: kinematics, arm: arm, base: base, hitShape: hitShape, rendering: rendering)
+    func replacing(kinematics: TonearmKinematics) -> TurntableSkin { with { $0.kinematics = kinematics } }
+    func replacing(arm: ArtworkFrame) -> TurntableSkin { with { $0.arm = arm } }
+    func replacing(base: ArtworkFrame) -> TurntableSkin { with { $0.base = base } }
+    func replacing(hitShape: HitShape) -> TurntableSkin { with { $0.hitShape = hitShape } }
+    func replacing(rendering: Rendering) -> TurntableSkin { with { $0.rendering = rendering } }
+    func replacing(placement: RecordPlacement) -> TurntableSkin { with { $0.placement = placement } }
+    func replacing(armShadow: ArtworkFrame?) -> TurntableSkin { with { $0.armShadow = armShadow } }
+    func replacing(baseOverlay: ArtworkFrame?) -> TurntableSkin { with { $0.baseOverlay = baseOverlay } }
+    func replacing(armOutline: RowOutline?) -> TurntableSkin { with { $0.armOutline = armOutline } }
+    func replacing(baseMiddle: ArtworkFrame?) -> TurntableSkin { with { $0.baseMiddle = baseMiddle } }
+    func replacing(middleHitMask: PixelRuns?) -> TurntableSkin { with { $0.middleHitMask = middleHitMask } }
+
+    /// 複製後改一處（欄位對外唯讀）
+    private func with(_ change: (inout TurntableSkin) -> Void) -> TurntableSkin {
+        var copy = self
+        change(&copy)
+        return copy
     }
+}
+
+/// 逐像素列的點擊遮罩（CR-034 增補 B §4.5）：每列若干段半開區間 [x0, x1)，座標＝該層素材像素。由 `import_tonearm_skin.py` 產生
+struct PixelRuns: Sendable, Equatable {
+    let rows: [[Range<Int>]]
+
+    func contains(x: Int, y: Int) -> Bool {
+        guard rows.indices.contains(y) else { return false }
+        return rows[y].contains { $0.contains(x) }
+    }
+
+    /// 列數＝素材像素高；每段在寬度內、同列遞增不重疊
+    func fits(width: Int, height: Int) -> Bool {
+        rows.count == height && rows.allSatisfy { row in
+            zip([0..<0] + row, row).allSatisfy { previous, run in run.lowerBound >= previous.upperBound && !run.isEmpty }
+                && (row.last?.upperBound ?? 0) <= width && (row.first?.lowerBound ?? 0) >= 0
+        }
+    }
+}
+
+/// 逐列輪廓（畫框內 u）：每 `bandHeight` 一列，該列 alpha 的最左…最右；nil＝整列透明。由 `import_tonearm_skin.py` 從所有幀的聯集產生
+struct RowOutline: Sendable, Equatable {
+    let bandHeight: CGFloat
+    let spans: [ClosedRange<CGFloat>?]
+
+    /// 畫框內 y 所在列的範圍；超出列數或該列透明＝nil
+    func span(atY y: CGFloat) -> ClosedRange<CGFloat>? {
+        guard y >= 0, bandHeight > 0 else { return nil }
+        let row = Int(y / bandHeight)
+        return row < spans.count ? spans[row] : nil
+    }
+
+    /// 每列的四個角（畫框內 u）：旋轉後的可見外接框以這些點計
+    var corners: [CGPoint] {
+        spans.enumerated().flatMap { row, span -> [CGPoint] in
+            guard let span else { return [] }
+            let top = CGFloat(row) * bandHeight, bottom = top + bandHeight
+            return [CGPoint(x: span.lowerBound, y: top), CGPoint(x: span.upperBound, y: top),
+                    CGPoint(x: span.lowerBound, y: bottom), CGPoint(x: span.upperBound, y: bottom)]
+        }
+    }
+
+    func fits(in frame: ArtworkFrame) -> Bool {
+        guard bandHeight.isFinite, bandHeight > 0, spans.contains(where: { $0 != nil }),
+              CGFloat(spans.count) <= (frame.size.height / bandHeight).rounded(.up) else { return false }
+        return spans.allSatisfy { span in
+            guard let span else { return true }
+            return span.lowerBound.isFinite && span.upperBound.isFinite && span.lowerBound >= 0 && span.upperBound <= frame.size.width
+        }
+    }
+}
+
+/// 唱片圓心距容器右緣（× R）、比垂直中線往下（× R）；R＝唱片直徑（sprint-5-detail.md §4.2b）
+struct RecordPlacement: Sendable, Equatable {
+    let rightInset: CGFloat
+    let drop: CGFloat
+
+    /// 原版構圖（v1.6／v1.8）
+    static let classic = RecordPlacement(rightInset: 0.61, drop: 0.0125)
 }
 
 struct TonearmKinematics: Sendable, Equatable {
@@ -137,6 +252,18 @@ enum SkinError: Error, Equatable {
     case declaredTravelMismatch
     /// 點擊外形的數值非有限、為負、上下界顛倒或超出臂框
     case invalidHitShape
+    /// 唱片位置非有限，或右距不在 0…1 之間（不含端點）
+    case invalidPlacement
+    /// 序列圖沒有幀、或每 u 像素數不為正
+    case invalidRendering
+    /// skin.json 解不開或 schema 不符
+    case invalidManifest
+    /// 可見輪廓沒有任何列、列高非正，或某列超出所屬畫框
+    case invalidOutline
+    /// bundle 內缺 skin.json、缺幀，或某檔的 PNG 檔頭尺寸與 skin.json 不符
+    case missingAsset
+    /// preflight 通過、執行期某幀解碼失敗
+    case decodeFailed
 }
 
 enum TurntableSkinResolver {
@@ -165,23 +292,61 @@ enum TurntableSkinResolver {
         let k = skin.kinematics
         let travel = k.declaredTravel.map { [CGFloat($0.startDegrees), CGFloat($0.sweepDegrees)] } ?? []
         let numbers: [CGFloat] = [k.pivot.x, k.pivot.y, k.stylusAtRest.dx, k.stylusAtRest.dy, CGFloat(k.restDegrees),
-                                  k.leadInRadius, k.runOutRadius] + travel + [skin.arm, skin.base].flatMap {
+                                  k.leadInRadius, k.runOutRadius] + travel + frames(of: skin).flatMap {
             [$0.size.width, $0.size.height, $0.localPivot.x, $0.localPivot.y]
         }
         if numbers.contains(where: { !$0.isFinite }) { return .nonFinite }
         if hypot(k.stylusAtRest.dx, k.stylusAtRest.dy) <= 0 { return .zeroStylus }
         if k.leadInRadius <= 0 || k.runOutRadius <= 0 { return .nonPositiveRadius }
-        let frames = [skin.arm, skin.base]
+        let frames = frames(of: skin)
         if frames.contains(where: { $0.size.width <= 0 || $0.size.height <= 0 }) { return .invalidFrame }
         let inside = frames.allSatisfy { f in
             (0...f.size.width).contains(f.localPivot.x) && (0...f.size.height).contains(f.localPivot.y)
         }
         guard inside else { return .pivotOutsideFrame }
-        switch skin.hitShape {
+        let p = skin.placement
+        guard p.rightInset.isFinite, p.drop.isFinite, p.rightInset > 0, p.rightInset < 1 else { return .invalidPlacement }
+        if case .spriteSequence(let assets) = skin.rendering {
+            // 序列圖皮膚：投影、上層底座、兩份輪廓都必備（`spriteLayers` 據此解包）
+            guard assets.pixelsPerUnit > 0, skin.spriteLayers != nil, skin.armOutline != nil, skin.shadowOutline != nil else {
+                return .invalidRendering
+            }
+        }
+        guard fits(skin.armOutline, skin.arm), fits(skin.shadowOutline, skin.armShadow), middleMaskFits(skin) else { return .invalidOutline }
+        return isValid(skin.hitShape, of: skin) ? nil : .invalidHitShape
+    }
+
+    /// 會畫出來的每一層（驗證畫框與支點用）
+    private static func frames(of skin: TurntableSkin) -> [ArtworkFrame] {
+        [skin.arm, skin.base] + [skin.armShadow, skin.baseOverlay, skin.baseMiddle].compactMap { $0 }
+    }
+
+    /// 中層與遮罩同進同出；遮罩要對得上中層的像素尺寸（每 u 像素數取自序列圖）
+    private static func middleMaskFits(_ skin: TurntableSkin) -> Bool {
+        switch (skin.baseMiddle, skin.middleHitMask) {
+        case (nil, nil): return true
+        case (let middle?, let mask?):
+            guard case .spriteSequence(let assets) = skin.rendering else { return false }
+            let unit = assets.pixelsPerUnit
+            return mask.fits(width: Int((middle.size.width * unit).rounded()), height: Int((middle.size.height * unit).rounded()))
+        default: return false
+        }
+    }
+
+    /// 沒有輪廓＝不必驗；有輪廓就得有對應畫框且落在框內
+    private static func fits(_ outline: RowOutline?, _ frame: ArtworkFrame?) -> Bool {
+        guard let outline else { return true }
+        return frame.map(outline.fits) ?? false
+    }
+
+    private static func isValid(_ shape: TurntableSkin.HitShape, of skin: TurntableSkin) -> Bool {
+        let arm = skin.arm
+        switch shape {
         case .tubeStrip(let halfWidth, let headTop, let headBottom):
-            let valid = [halfWidth, headTop, headBottom].allSatisfy(\.isFinite) && halfWidth >= 0
-                && 0 <= headTop && headTop <= headBottom && headBottom <= skin.arm.size.height
-            return valid ? nil : .invalidHitShape
+            return [halfWidth, headTop, headBottom].allSatisfy(\.isFinite) && halfWidth >= 0
+                && 0 <= headTop && headTop <= headBottom && headBottom <= arm.size.height
+        case .rowSpans(let margin):
+            return margin.isFinite && margin >= 0 && skin.armOutline != nil
         }
     }
 }

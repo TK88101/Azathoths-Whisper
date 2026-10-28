@@ -1,7 +1,7 @@
 """iPad 文案三語檢查（N-10；sprint-1-detail.md §4.7）。
 
 ① Resources/*.xcstrings 的每個 key 都要有 en／zh-Hant／ja，state＝translated、值非空。
-② App／Features／UI 程式碼裡會被本地化的字面量（Text／Picker／Button／Label／String(localized:)／LocalizedStringKey(…)，
+② App／Features／UI 程式碼裡會被本地化的字面量（Text／Picker／Button／Label／String(localized:)／LocalizedStringKey(…)／LocalizedStringResource(…)，
    以及型別為 LocalizedStringKey 的計算屬性裡的字面量）都要在 Localizable.xcstrings 裡。Text(verbatim:) 不算。
 
 用法：python3 -I Scripts/check_xcstrings.py [--root <YogSothothsEcho 目錄>]；有缺 → stderr 列出、退出 1。
@@ -13,7 +13,7 @@ import sys
 
 LANGS = ("en", "zh-Hant", "ja")
 CODE_DIRS = ("App", "Features", "UI")
-CALL = re.compile(r'\b(?:Text|Picker|Button|Label|Toggle|LocalizedStringKey)\(\s*"((?:[^"\\]|\\.)+)"'
+CALL = re.compile(r'\b(?:Text|Picker|Button|Label|Toggle|LocalizedStringKey|LocalizedStringResource)\(\s*"((?:[^"\\]|\\.)+)"'
                   r'|String\(localized:\s*"((?:[^"\\]|\\.)+)"')
 KEY_PROPERTY = re.compile(r":\s*LocalizedStringKey\s*\{")
 LITERAL = re.compile(r'"((?:[^"\\]|\\.)+)"')

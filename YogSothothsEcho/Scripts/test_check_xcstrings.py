@@ -83,7 +83,8 @@ class CheckXcstringsTests(unittest.TestCase):
 
     def test_key_used_in_code_but_missing_from_catalog_is_caught(self):
         for snippet in ['Text("Light")', 'Picker("Light", selection: $x) {}', 'String(localized: "Light")',
-                        'Button("Light") {}', 'var title: LocalizedStringKey {\n  switch self { case .a: "Light" }\n}']:
+                        'Button("Light") {}', 'var title: LocalizedStringKey {\n  switch self { case .a: "Light" }\n}',
+                        'let title = LocalizedStringResource("Light")']:
             with self.subTest(snippet=snippet):
                 code, err = self.run_tool({"Dark": full("Dark")}, {"Features/A.swift": snippet + "\n"})
                 self.assertEqual(code, 1)

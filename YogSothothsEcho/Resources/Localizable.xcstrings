@@ -169,6 +169,13 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "暗色" } }
       }
     },
+    "Default" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Default" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Default" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "預設" } }
+      }
+    },
     "Disc %lld" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Disc %lld" } },
@@ -351,6 +358,13 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在這張專輯點歌時，只會播你點的那一首。" } }
       }
     },
+    "Pioneer" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pioneer" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pioneer" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "先鋒" } }
+      }
+    },
     "Play" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Play" } },
@@ -405,6 +419,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Random" } },
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "ランダム" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "隨機" } }
+      }
+    },
+    "Rega" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rega" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Rega" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "君子" } }
       }
     },
     "Resync" : {
@@ -470,6 +491,13 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "霧銀藍" } }
       }
     },
+    "Skins can be changed once the turntable settles." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Skins can be changed once the turntable settles." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ターンテーブルが落ち着いてから変更できます。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "唱機停穩後才能更換外觀。" } }
+      }
+    },
     "Something went wrong. Try again." : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Something went wrong. Try again." } },
@@ -496,6 +524,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "System" } },
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "システムに合わせる" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "跟隨系統" } }
+      }
+    },
+    "Technics" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Technics" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Technics" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "松下" } }
       }
     },
     "Terracotta Night" : {
@@ -580,6 +615,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Turntable Blur" } },
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "ターンテーブル風ぼかし" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "唱機式模糊" } }
+      }
+    },
+    "Turntable Skin" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Turntable Skin" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ターンテーブルの外観" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "唱機外觀" } }
       }
     },
     "Use this iPad as a remote for Music on your Mac." : {

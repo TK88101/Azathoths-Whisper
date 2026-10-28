@@ -32,6 +32,8 @@ struct YogSothothsEchoApp: App {
                 // 位置記憶先寫盤（慣性中關 App 也保住；CR-027）
                 model.library.flushBrowseAnchor()
                 model.connection.suspend()
+                // 唱機沒開著就放掉序列圖（CR-034 附錄 F）
+                model.turntable.releaseSpritesIfHidden()
             default: break
             }
         }

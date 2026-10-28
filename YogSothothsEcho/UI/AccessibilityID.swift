@@ -76,6 +76,11 @@ enum AccessibilityID {
     static let turntableTuningOtherHaze = "turntable.tuning.otherHaze"
     static let turntableNotice = "turntable.notice"
     static func turntableStyle(_ raw: String) -> String { "turntable.style.\(raw)" }
+    /// CR-034 唱機皮膚切換（皮膚 id）：選擇器的格子
+    static func turntableSkin(_ id: String) -> String { "turntable.skin.\(id)" }
+    /// CR-034 增補 A：唱機浮層開選擇器的圓鈕、設定頁「唱機外觀」那一列
+    static let turntableSkinButton = "turntable.skinButton"
+    static let settingsTurntableSkin = "settings.turntableSkin"
     /// 合成播放器一開始就在播；連上後自動開唱機（只在 DEBUG 有作用）
     static let nowPlayingArgument = "-YSEUITestNowPlaying"
     static let openTurntableArgument = "-YSEUITestOpenTurntable"

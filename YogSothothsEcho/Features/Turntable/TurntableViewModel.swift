@@ -13,6 +13,8 @@ import UIKit
 @Observable
 final class TurntableViewModel {
     static let recordStyleKey = "turntable.recordStyle"
+    /// 皮膚選擇（CR-034）：存皮膚 id；未知或不可用＝classic，存值不改寫
+    static let skinKey = "turntable.skin"
     static let placeholderText = "…"
 
     struct Label: Equatable {
@@ -21,8 +23,14 @@ final class TurntableViewModel {
     }
 
     let nowPlaying: NowPlayingViewModel
-    /// 唱臂皮膚（S7 F-V-07；組裝根注入）
-    let skin: ResolvedTurntableSkin
+    /// 目前的唱機皮膚（S7 F-V-07；CR-034 起可切換）
+    private(set) var skin: ResolvedTurntableSkin
+    /// 本 session 可用的皮膚（classic 在首）；序列圖解碼失敗的皮膚由 `disableSkin` 移出（R2-2：唯一 owner）
+    private(set) var availableSkins: [ResolvedTurntableSkin]
+    /// 序列圖皮膚的解碼快取（由本 VM 持有；View 只讀）
+    let sprites: TonearmSpriteCache
+    /// 選擇器預覽（設定頁與浮層共用這一個，r3-1）
+    let previews: SkinPreviewRenderer
     let overlay: TurntableOverlayState
     private(set) var swipe: SwipeTransition
     /// 唱機層（S6 §4.8）：存在與否由它決定；殼層只讀
@@ -49,6 +57,11 @@ final class TurntableViewModel {
     }
 
     @ObservationIgnored private let store: SettingsStore
+    /// 序列圖解碼尺寸用（畫面像素 / pt）；視圖出現時更新
+    @ObservationIgnored private var displayScale: CGFloat
+    /// A′：關唱機時保留已解好的幀（附錄 F；DEBUG 可關以對照）
+    @ObservationIgnored private let keepSpritesOnClose: () -> Bool
+    @ObservationIgnored private var memoryWarning: NSObjectProtocol?
     /// 先到的小圖（spine）與之後換上的原圖（detail，CR-018）
     @ObservationIgnored private let artwork: (String) async -> UIImage?
     @ObservationIgnored private let detailArtwork: (String) async -> UIImage?
@@ -68,9 +81,19 @@ final class TurntableViewModel {
          artwork: @escaping (String) async -> UIImage?, detailArtwork: @escaping (String) async -> UIImage? = { _ in nil },
          palette: @escaping @Sendable (UIImage) async -> AlbumColors,
          sleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) },
-         transitionSleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) }) {
+         transitionSleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) },
+         catalog: TurntableSkinCatalog? = nil, spriteDecode: @escaping TonearmSpriteCache.Decode = { SpriteDecoder.decode($0) },
+         keepSpritesOnClose: @escaping () -> Bool = { SpriteStrategy.keepOnClose },
+         previewSource: any SkinPreviewImageSource = BundleSkinPreviewSource()) {
         self.nowPlaying = nowPlaying
-        self.skin = skin
+        // 沒給目錄＝只有注入的那一款（1.0 的組裝）；還原存值，未知或不可用落回目錄第一款（classic）
+        let catalog = catalog ?? TurntableSkinCatalog(skins: [skin])
+        availableSkins = catalog.skins
+        self.skin = catalog.skin(id: store.string(forKey: Self.skinKey)) ?? catalog.skins[0]
+        sprites = TonearmSpriteCache(decode: spriteDecode, onFailure: { _, _ in })
+        previews = SkinPreviewRenderer(source: previewSource)
+        self.displayScale = displayScale
+        self.keepSpritesOnClose = keepSpritesOnClose
         self.store = store
         self.artwork = artwork
         self.detailArtwork = detailArtwork
@@ -79,6 +102,75 @@ final class TurntableViewModel {
         overlay = TurntableOverlayState(sleep: sleep)
         swipe = SwipeTransition(displayScale: displayScale)
         recordStyle = RecordStyle.restore(store.string(forKey: Self.recordStyleKey))
+        sprites.onFailure = { [weak self] id, generation in self?.disableSkin(id, generation: generation) }
+        sprites.focusTarget = { [weak self] in self?.spriteFocusFrame }
+        memoryWarning = NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil,
+                                                               queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.releaseSpritesIfHidden() }
+        }
+    }
+
+    isolated deinit {
+        if let memoryWarning { NotificationCenter.default.removeObserver(memoryWarning) }
+    }
+
+    // MARK: 皮膚（CR-034）
+
+    /// 為什麼現在不能套用皮膚（CR-034 增補 A §4.2）
+    enum SkinApplyBlock: Equatable {
+        /// 唱機進場／離場、甩動轉場或封套動作中：換錨點會讓唱片跳位
+        case turntableTransition
+    }
+
+    /// 選擇器入口（設定頁區段、浮層按鈕）是否存在：只看有沒有兩款以上，與唱機狀態無關
+    var canBrowseSkins: Bool { availableSkins.count >= 2 }
+
+    /// 唱機未開＝可套用（只存值與換皮膚，下次開唱機才解碼）；唱機在畫面上則要停穩
+    var skinApplyBlock: SkinApplyBlock? {
+        switch layer {
+        case .hidden: nil
+        case .shown: swipe.isBusy || sleeve.isMidway ? .turntableTransition : nil
+        case .entering, .leaving: .turntableTransition
+        }
+    }
+
+    /// 格子可點與 `selectSkin` 生效共用這一個判斷
+    var canSelectSkin: Bool { canBrowseSkins && skinApplyBlock == nil }
+
+    /// 立即換（不做交叉淡化，r1-4）；轉場中忽略（格子此時也停用）
+    func selectSkin(_ id: String) {
+        guard canSelectSkin, let next = availableSkins.first(where: { $0.spec.id == id }), next != skin else { return }
+        skin = next
+        store.set(id, forKey: Self.skinKey)
+        sprites.release()
+        overlay.poke()
+    }
+
+    /// 視圖拿到版面縮放後呼叫：序列圖皮膚依畫面像素解碼（同皮膚同縮放不重解），classic 釋放
+    func prepareSprites(layoutScale: CGFloat) {
+        sprites.load(skin, pixelScale: layoutScale * displayScale)
+    }
+
+    /// 記憶體警告、App 進背景（附錄 F）：唱機未顯示才釋放序列圖（顯示中釋放會讓唱臂空白又立刻重解）
+    func releaseSpritesIfHidden() {
+        guard layer == .hidden else { return }
+        sprites.release()
+    }
+
+    /// 解碼焦點：目前進度在這款皮膚上對應的幀（落臂落到那裡、抬臂從那裡起；附錄 F 的 E）。沒有播放資訊＝nil
+    var spriteFocusFrame: Int? {
+        guard let event = nowPlaying.clock?.event, let duration = event.duration, duration > 0 else { return nil }
+        let progress = (nowPlaying.position() ?? event.position) / duration
+        return TonearmSpriteCache.frameIndex(angle: skin.angle(progress: progress), rest: skin.restDegrees, count: SpriteSkinAssets.frameCount)
+    }
+
+    /// 執行期解碼失敗（R2-2 ①–⑥）：晚到的回報忽略；否則取消並釋放快取、從本 session 移出、目前是它就回 classic、記一次
+    func disableSkin(_ id: String, generation: Int) {
+        guard generation == sprites.generation, id != TurntableSkin.classic.id else { return }
+        sprites.release()
+        availableSkins.removeAll { $0.spec.id == id }
+        if skin.spec.id == id { skin = availableSkins.first ?? .classic }
+        TurntableSkinCatalog.logUnavailable(id, .decodeFailed)
     }
 
     // MARK: 顯示
@@ -210,6 +302,8 @@ final class TurntableViewModel {
         }
         let snapshot = scenePresentation
         cancelTransition()
+        overlay.endAllHolds()
+        if !keepSpritesOnClose() { sprites.release() }
         layerReduceMotion = reduceMotion
         layer = .leaving(record: snapshot)
         let generation = nextLayerGeneration()
@@ -222,6 +316,8 @@ final class TurntableViewModel {
     func hideImmediately() {
         _ = nextLayerGeneration()
         cancelTransition()
+        overlay.endAllHolds()
+        sprites.release()
         layer = .hidden
     }
 
@@ -255,6 +351,22 @@ final class TurntableViewModel {
 
     // MARK: 手勢
 
+    /// 點擊分派（增補 B，Codex r2-5）：命中判定的結果 → 動作。放在這裡讓「浮層命中不切播放」可以測；
+    /// 視圖只負責動畫（`animate` 包住浮層切換）。回傳封套是否接受（接受後由視圖排 400 ms 半程）
+    @discardableResult
+    func handleTap(_ target: TurntableHitTest.Target, animate: (() -> Void) -> Void = { $0() }) -> Bool {
+        switch target {
+        case .record:
+            Task { await tapRecord() }
+            return false
+        case .cover:
+            return tapSleeve()
+        case .overlayToggle:
+            animate { overlay.toggle() }
+            return false
+        }
+    }
+
     func tapRecord() async {
         guard !layer.blocksInput, !swipe.isBusy else { return }
         await nowPlaying.toggle()
@@ -277,11 +389,13 @@ final class TurntableViewModel {
 
     /// 視圖出現時以畫面的 displayScale 重設甩動閾值（D4）；甩動進行中不換
     func setDisplayScale(_ scale: CGFloat) {
+        displayScale = scale
         guard swipe.phase == .idle else { return }
         swipe = SwipeTransition(displayScale: scale)
     }
 
     /// 斷線：結束轉場，畫面回到最後一次採用的資料
+    /// 序列圖是 bundle 內的本機素材、與連線無關，斷線不釋放（釋放了也沒有重新載入的觸發）
     func connectionLost() { cancelTransition() }
 
     /// 關閉唱機或斷線：取消計時、解除凍結

@@ -5,6 +5,7 @@ import SwiftUI
 struct TurntableOverlay: View {
     let model: TurntableViewModel
     let onClose: () -> Void
+    @State private var showsSkinPicker = false
 
     var body: some View {
         ZStack {
@@ -12,19 +13,18 @@ struct TurntableOverlay: View {
                 VStack {
                     HStack {
                         Button(action: onClose) {
-                            Label("Close", systemImage: "xmark").labelStyle(.iconOnly).font(.title2.weight(.semibold))
-                                .frame(width: 40, height: 40)
-                                .background(Circle().fill(Color.black.opacity(0.3)))
-                                .overlay(Circle().strokeBorder(Color.white.opacity(0.1)))
-                                .foregroundStyle(.white)
+                            Label("Close", systemImage: "xmark").overlayCircleButton()
                         }
                         .accessibilityIdentifier(AccessibilityID.turntableClose)
                         Spacer()
+                        // CR-034 增補 A：有兩款以上才有入口；轉場中照樣可開，格子停用並說明
+                        if model.canBrowseSkins { skinButton }
                     }
                     Spacer()
                     #if DEBUG
                     tuningPanel
                     measurement
+                    if model.skin.spec.spriteLayers != nil { spriteDiagnostics }
                     #endif
                     stylePicker
                 }
@@ -36,6 +36,8 @@ struct TurntableOverlay: View {
                 notice.padding(.bottom, 40)
             }
         }
+        // 防線：視圖被移出（斷線、關唱機）時 popover 的回呼不一定跑；VM 另在 close／hideImmediately 清空（r2-1）
+        .onDisappear { model.overlay.endHold(.skinPicker) }
     }
 
     #if DEBUG
@@ -49,6 +51,22 @@ struct TurntableOverlay: View {
             if let result = monitor.lastResult { Text(verbatim: result) }
         }
         .disabled(!ready || monitor.running != nil)
+        .font(.caption.monospacedDigit())
+        .padding(8)
+        .background(.ultraThinMaterial, in: Capsule())
+    }
+
+    /// CR-034 附錄 F 在場對照：A′（關唱機保留）、E（解碼優先序）開關、清快取（模擬冷開）、存 trace
+    private var spriteDiagnostics: some View {
+        @Bindable var diagnostics = SpriteDiagnostics.shared
+        return HStack(spacing: 12) {
+            Toggle(isOn: $diagnostics.keepOnClose) { Text(verbatim: "A′ keep") }.fixedSize()
+            Toggle(isOn: $diagnostics.prioritized) { Text(verbatim: "E order") }.fixedSize()
+            Button { model.sprites.release() } label: { Text(verbatim: "clear cache") }
+            Button { diagnostics.save() } label: { Text(verbatim: "save trace") }
+            if let saved = diagnostics.lastSaved { Text(verbatim: saved) }
+            Text(verbatim: "sprites \(model.sprites.residentBytes / 1_048_576) MiB")
+        }
         .font(.caption.monospacedDigit())
         .padding(8)
         .background(.ultraThinMaterial, in: Capsule())
@@ -81,13 +99,38 @@ struct TurntableOverlay: View {
     private func tuningRow(_ title: String, value: Double, id: String, set: @escaping (Double) -> Void) -> some View {
         HStack(spacing: 8) {
             Text(verbatim: title).frame(width: 64, alignment: .leading)
-            Slider(value: Binding(get: { value }, set: set), in: 0...1, step: 0.05) { editing in model.overlay.setEditing(editing) }
+            Slider(value: Binding(get: { value }, set: set), in: 0...1, step: 0.05) { editing in editing ? model.overlay.beginHold(.tuningSlider) : model.overlay.endHold(.tuningSlider) }
                 .frame(width: 240)
                 .accessibilityIdentifier(id)
             Text(verbatim: String(format: "%.2f", value)).frame(width: 40, alignment: .trailing)
         }
     }
     #endif
+
+    /// 唱機外觀：一顆圓鈕（與 Close 同樣式）開選擇器 popover，唱機在背後即時換（CR-034 增補 A §4.4）。
+    /// 按下的同一個動作裡先停浮層計時，否則浮層 5 s 隱藏時錨點消失、popover 連帶收起（r1-4）
+    private var skinButton: some View {
+        Button {
+            model.overlay.beginHold(.skinPicker)
+            showsSkinPicker = true
+        } label: {
+            Label("Turntable Skin", systemImage: "record.circle").overlayCircleButton()
+        }
+        .accessibilityIdentifier(AccessibilityID.turntableSkinButton)
+        .popover(isPresented: $showsSkinPicker, arrowEdge: .top) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Turntable Skin").font(.headline)
+                TurntableSkinPicker(model: model)
+            }
+            .padding(16)
+            .frame(width: TurntableSkinPicker.threeColumnWidth + 32)
+            .preferredColorScheme(.dark)
+            .presentationCompactAdaptation(.popover)
+        }
+        .onChange(of: showsSkinPicker) { _, shown in
+            if !shown { model.overlay.endHold(.skinPicker) }
+        }
+    }
 
     private var stylePicker: some View {
         HStack(spacing: 20) {
@@ -130,6 +173,18 @@ struct TurntableOverlay: View {
                 .background(Capsule().fill(.ultraThinMaterial))
                 .accessibilityIdentifier(AccessibilityID.turntableNotice)
         }
+    }
+}
+
+
+private extension Label where Title == Text, Icon == Image {
+    /// 浮層角落的圓鈕（關閉、唱機外觀）：只顯示圖示、40 pt 半透明黑圓
+    func overlayCircleButton() -> some View {
+        labelStyle(.iconOnly).font(.title2.weight(.semibold))
+            .frame(width: 40, height: 40)
+            .background(Circle().fill(Color.black.opacity(0.3)))
+            .overlay(Circle().strokeBorder(Color.white.opacity(0.1)))
+            .foregroundStyle(.white)
     }
 }
 
