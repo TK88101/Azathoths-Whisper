@@ -267,20 +267,48 @@ enum SongProfileResolver {
         artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown,
         rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows
     ) -> ProfileResolution {
-        if let profile = signedProfile(artist) { return .signedBand(profile) }
-        if lyrics == .unknown { return .pending }
-        if lyrics == .text(isJapanese: true) { return .jpop }
+        explain(artist: artist, genre: genre, lyrics: lyrics, artistGenres: artistGenres, rows: rows, genericRows: genericRows).resolution
+    }
+
+    /// 判定的唯一實作（⑧ 計劃 §4.2）：結果＋來源 key＋每一層的嘗試
+    static func explain(
+        artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown,
+        rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows
+    ) -> ProfileExplanation {
+        if let band = signedBand(artist) { return ProfileExplanation(resolution: .signedBand(band.profile), key: .signed(band.name), trace: []) }
+        if lyrics == .unknown { return ProfileExplanation(resolution: .pending, key: .pending, trace: []) }
+        if lyrics == .text(isJapanese: true) { return ProfileExplanation(resolution: .jpop, key: .jpop, trace: []) }
+        var trace: [ProfileExplanation.Attempt] = []
+        /// 試一層：命中列合成、組不出就當沒命中（⑥b R3-4），都記進 trace
+        func attempt(_ layer: ProfileExplanation.Layer, _ genres: [GenreStyleResolver.NormalizedGenre], _ candidates: [KeywordRow]) -> (SongProfile, [String])? {
+            let hit = hits(normalized: genres, rows: candidates)
+            let ids = hit.map(\.id).sorted()
+            guard let profile = compose(rows: hit) else {
+                trace.append(.init(layer: layer, rowIDs: [], outcome: .noHit))
+                return nil
+            }
+            guard Composer.isComposable(profile) else {
+                trace.append(.init(layer: layer, rowIDs: ids, outcome: .notComposable))
+                return nil
+            }
+            trace.append(.init(layer: layer, rowIDs: ids, outcome: .adopted))
+            return (profile, ids)
+        }
+        func adopted(_ resolution: ProfileResolution, _ layer: ProfileExplanation.Layer, _ ids: [String]) -> ProfileExplanation {
+            ProfileExplanation(resolution: resolution, key: .rows(layer, ids), trace: trace)
+        }
         // MB 還沒查、認不出、或碰不到任何列：不等，落到 Apple 曲風（只升不降，⑥b §4.3）
         // 每個曲風字串只正規化一次，四層共用（⑦ simcodex 效率）
         let mb: [GenreStyleResolver.NormalizedGenre]? = if case .verified(let genres) = artistGenres { genres.map(GenreStyleResolver.normalized) } else { nil }
-        if let mb, let profile = playable(compose(normalized: mb, rows: rows)) { return .artistGenreRow(profile) }
+        if let mb, let (profile, ids) = attempt(.mbGenre, mb, rows) { return adopted(.artistGenreRow(profile), .mbGenre, ids) }
         // genre nil＝讀取失敗、還不知道：要等它，Apple 的既有列優先於通用列（⑦ 計劃 §4.1）
-        guard let genre else { return .pending }
+        guard let genre else { return ProfileExplanation(resolution: .pending, key: .pending, trace: trace) }
         let apple = [GenreStyleResolver.normalized(genre)]
-        if let profile = playable(compose(normalized: apple, rows: rows)) { return .genreRow(profile) }
+        if let (profile, ids) = attempt(.appleGenre, apple, rows) { return adopted(.genreRow(profile), .appleGenre, ids) }
         // 通用層：先 MB（比 Apple 細），再 Apple
-        if let mb, let profile = playable(compose(normalized: mb, rows: genericRows)) { return .genericRow(profile) }
-        return playable(compose(normalized: apple, rows: genericRows)).map(ProfileResolution.genericRow) ?? .noMatch
+        if let mb, let (profile, ids) = attempt(.genericMB, mb, genericRows) { return adopted(.genericRow(profile), .genericMB, ids) }
+        if let (profile, ids) = attempt(.genericApple, apple, genericRows) { return adopted(.genericRow(profile), .genericApple, ids) }
+        return ProfileExplanation(resolution: .noMatch, key: .none, trace: trace)
     }
 
     /// 要不要為這位歌手查 MB：樂團表的團一律以表為準（與 `resolve` 的第一層同一個判斷）
@@ -292,10 +320,13 @@ enum SongProfileResolver {
         overrides[normalizedArtist(artist)]
     }
 
-    /// 組不出六槽的目標值不算命中（⑥b R3-4）：讓下一層有機會，而不是靜默變成素面
-    private static func playable(_ profile: SongProfile?) -> SongProfile? {
-        profile.flatMap { Composer.isComposable($0) ? $0 : nil }
+    /// 署名團（正式名＋profile）；鍵與 `overrides` 相同，撞鍵時同樣先列的團勝出
+    private static func signedBand(_ artist: String) -> BandEntry? {
+        signedBands[normalizedArtist(artist)]
     }
+
+    private static let signedBands: [String: BandEntry] =
+        Dictionary(bandTable.flatMap { band in band.keys.map { ($0, band) } }, uniquingKeysWith: { first, _ in first })
 
     /// genre 命中的所有關鍵字列合成一個目標值；無命中＝nil
     static func compose(genre: String, rows: [KeywordRow]) -> SongProfile? {
@@ -308,9 +339,14 @@ enum SongProfileResolver {
     }
 
     private static func compose(normalized: [GenreStyleResolver.NormalizedGenre], rows: [KeywordRow]) -> SongProfile? {
+        compose(rows: hits(normalized: normalized, rows: rows))
+    }
+
+    /// 命中的列，已套 generic 抑制
+    private static func hits(normalized: [GenreStyleResolver.NormalizedGenre], rows: [KeywordRow]) -> [KeywordRow] {
         let hits = rows.filter { row in row.keywords.contains { keyword in normalized.contains { GenreStyleResolver.genre($0, matches: keyword) } } }
         let specific = hits.filter { !$0.isGeneric }
-        return compose(rows: specific.isEmpty ? hits : specific)
+        return specific.isEmpty ? hits : specific
     }
 
     /// 指定的列直接合成（不比對、不抑制 generic）；空＝nil

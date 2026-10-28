@@ -264,18 +264,51 @@ struct MusicAppleEventsClient: MusicControlling {
         }
     }
 
-    /// ⑥b：在 `libraryBudget` 內對（篩選後的）整庫讀兩欄字串；兩欄長度不一＝整批作廢
+    func libraryTrackSnapshot() async throws -> [LibraryTrackRow] {
+        try await run { app in
+            let columns = try Self.requireColumns(Self.readColumns(app, [
+                #selector(getter: MusicTrackProto.persistentID), #selector(getter: MusicTrackProto.name),
+                #selector(getter: MusicTrackProto.artist), #selector(getter: MusicTrackProto.album), #selector(getter: MusicTrackProto.genre),
+            ]) { $0 })
+            return columns[0].indices.map { LibraryTrackRow(persistentID: columns[0][$0], name: columns[1][$0], artist: columns[2][$0], album: columns[3][$0], genre: columns[4][$0]) }
+        }
+    }
+
+    func artistLyrics(artist: String) async throws -> [ArtistLyricsRow] {
+        try await run { app in
+            let columns = try Self.requireColumns(Self.readColumns(app, [#selector(getter: MusicTrackProto.persistentID), #selector(getter: MusicTrackProto.lyrics)]) { all in
+                (all.filtered(using: NSPredicate(format: "artist == %@", artist)) as NSArray) as? SBElementArray
+            })
+            return zip(columns[0], columns[1]).map { ArtistLyricsRow(persistentID: $0, lyrics: $1) }
+        }
+    }
+
+    /// ⑥b：兩欄讀取失敗時沿用「回空陣列」的既有語義
     private static func readPairs(
         _ app: MusicAppProto, _ first: Selector, _ second: Selector, elements: (SBElementArray) -> SBElementArray?
     ) -> [(String, String)] {
+        guard let columns = readColumns(app, [first, second], elements: elements) else { return [] }
+        return Array(zip(columns[0], columns[1]))
+    }
+
+    /// ⑧ 計劃 §4.5-4：讀不完整不能當成「空曲庫」，要讓呼叫端分得出來
+    private static func requireColumns(_ columns: [[String]]?) throws -> [[String]] {
+        guard let columns else { throw MusicError.scriptingFailure("library read incomplete") }
+        return columns
+    }
+
+    /// 在 `libraryBudget` 內對（篩選後的）整庫讀多欄字串；預算用完或各欄長度不一＝nil（整批作廢）
+    private static func readColumns(
+        _ app: MusicAppProto, _ selectors: [Selector], elements: (SBElementArray) -> SBElementArray?
+    ) -> [[String]]? {
         let budget = AEBudget(total: libraryBudget, start: .now)
         let sbApp = app as? SBApplication
         let setTimeout: (Int) -> Void = { sbApp?.timeout = $0 }
         guard budget.spend(setTimeout: setTimeout), let all = app.tracks?(), let chosen = elements(all),
-              let columns = budget.readColumns([first, second], setTimeout: setTimeout, read: { chosen.array(byApplying: $0) }),
-              columns.count == 2, columns[0].count == columns[1].count
-        else { return [] }
-        return zip(columns[0], columns[1]).map { ($0 as? String ?? "", $1 as? String ?? "") }
+              let columns = budget.readColumns(selectors, setTimeout: setTimeout, read: { chosen.array(byApplying: $0) }),
+              columns.count == selectors.count, Set(columns.map(\.count)).count <= 1
+        else { return nil }
+        return columns.map { column in column.map { $0 as? String ?? "" } }
     }
 
     private func run<T: Sendable>(

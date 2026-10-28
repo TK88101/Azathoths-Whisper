@@ -189,6 +189,25 @@ protocol MusicControlling: Sendable {
     func libraryArtistAlbums() async throws -> [LibraryArtistAlbum]
     /// ⑥b：某位歌手所有曲的專輯與歌詞（`whose artist == X`，曲數最多的歌手實測 ≤ 0.11 s）
     func artistTracks(artist: String) async throws -> [ArtistTrack]
+    /// ⑧ 曲庫閘門（計劃 §4.5-1）：整庫每首的 ID、曲名、歌手、專輯、曲風（五欄一次讀完）。讀不完整＝throw，不回空陣列
+    func libraryTrackSnapshot() async throws -> [LibraryTrackRow]
+    /// ⑧（計劃 §4.5-2）：某個原始歌手寫法所有曲的 ID 與歌詞（`whose artist == X`）。讀不完整＝throw
+    func artistLyrics(artist: String) async throws -> [ArtistLyricsRow]
+}
+
+/// 曲庫閘門的整庫一列（⑧）
+struct LibraryTrackRow: Equatable, Sendable {
+    let persistentID: String
+    let name: String
+    let artist: String
+    let album: String
+    let genre: String
+}
+
+/// 曲庫閘門的逐歌手一列（⑧）：歌詞只在 scanner 內判有無詞與日文，不外流
+struct ArtistLyricsRow: Equatable, Sendable {
+    let persistentID: String
+    let lyrics: String
 }
 
 /// 整庫掃描的一列（⑥b）
