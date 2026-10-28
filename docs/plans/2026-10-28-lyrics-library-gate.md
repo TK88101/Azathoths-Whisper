@@ -135,6 +135,7 @@
 - **production 只放小型版本化清單**（R1-11、R2 V02-6）：`ReadabilityPolicy`＝版本號＋`audited: Set<key>`＋`rejected: Set<key>`（兩者互斥）。鍵是 §4.2 的 `auditKey`（`signed(name)`／`rows(ids)`／`jpop`）。resolver 讀 `rejected` 做可讀性拒絕落層，檢查畫面讀 `audited` 判 G-READ。`jpop` 一個鍵代表三變體**全部**已稽核（任何一首日文歌每次播放可能抽到任一變體，`JPopVisualTests` 三變體全跑；R1-8 部分採納：不必記本曲抽到哪個變體）。
 - **測試端負責生成與斷言**：fixture（`GenreRowTests.libraryCombinations`＋`GenericLayerTests.libraryCombinations` 合併成一份測試資料）＋單列＋樂團表＋J-Pop 生成「應稽核集合」，斷言 `audited ∪ rejected` 與它完全相等、兩者交集為空、`rejected` 每一筆都有 G1–G3 不及格記錄；`ReadabilityAudit.profiles`、`LyricsFXContrastTests`（G1，含組合的跨列配對）、`ReadabilityGateTests`（G2／G3）都走這份。`GenreRowTests.swift:98` 不實註解改正。
 - fixture 要涵蓋 §2.2 的 43 種曲庫組合（T2 以量測程式輸出列 id 組合核對，缺的補進）。
+- **（實作中修訂，2026-10-28，/thecure 1 輪＋附錄 D）G1 只有少數「背景×配色」不及格時改用配對級硬禁止**：`ReadabilityPolicy.unreadablePairs`（版本化），`Composer.compatiblePalettes` 一律排除、沒有退路；組合保留。條件：被禁後每個受影響背景仍保有 ≥ 2 種配色、所有可稽核 profile 連播實抽都不含被禁配對（測試守）；若某背景排除後沒有配色＝組不出，要另行處置（不得悄悄放回）。整組拒絕（下一句）只在禁止配對無法滿足上述條件、或 G2／G3 不及格時採用。
 - 組合跑 G1–G3。不及格組合的處置（預先定好）：寫進 `ReadabilityPolicy.rejected`，resolver 把該組合視同「組不出」落下一層，trace 記「可讀性拒絕」；落下一層後若變素面，由使用者 §4.3 指定樣式解決。每一筆記 ACCEPTANCE ⚠️（改了既有曲的樣式），並列進 §4.7 的例外集合。不手調元件。
 - 執行期遇到清單以外的新組合（新歌手）：G-READ 不合格、顯示在檢查畫面；開發端補進 fixture、跑稽核、更新清單版本。不在執行期跑 G2／G3（一輪近 30 分鐘）。
 
@@ -271,4 +272,28 @@
 | 3 | 開放限定版手動查 MB（ambiguous＋noAlbumMatch 98 位／969 首，其中素面 268 首／27 位受益） | 推翻 ⑥b 既定，須使用者另行簽字 | Codex | ⑥b `2026-10-24-lyrics-fx-musicbrainz.md:52` §3 非目標「手動重查的介面」＋§9-2 預設不做 |
 - 整體確認（第 2 輪）：異議 3 條全採納——G-COMP 基線改 572 首（含署名待補 178 首子集）、寫明依賴順序（工具完成≠閘門通過）、手動 MB 相關段落全部標不做；另加 T0 全庫掃描總耗時停損線。
 - Codex 最擔心：為了讓畫面顯示「達標」而把尚未解決的缺口列成不擋的例外；以及以閘門壓力默默擴張 MB 網路行為。最容易失敗的一步：T0／T7 逐歌手歌詞回填掃描（單次合格但累積太慢、掃描一直未完成）。
+
+## 附錄 D 實作記錄（2026-10-28，分支 `wip/lyrics-library-gate`）
+- **T0**（a72c23e 之後 b4a2bff）：`libraryTrackSnapshot()`、`artistLyrics(artist:)`；讀不完整一律 throw（`readColumns` 回 nil→`requireColumns`），`readPairs` 沿用回空陣列的既有語義；5 個替身補齊。真機耗時待使用者在場量（掃描完成時 OSLog 記 tracks／reads／elapsed，不記名字）。
+- **T1**：紅燈＝`ProfileExplanation` 未定義 → 綠；相關 7 suite 67 條綠（`RecipeGoldenTests` `2f80…` 不變）。曲庫不變式（main 原始碼 vs 本分支，逐首判定＋十軸＋標籤＋seed 42 配方 id 雜湊）12,271 首 **0 差異**。
+- **T2 結構**：曲庫重掃出 43 種組合，其中 3 種（hardrock＋thrash、metalcore＋nu、metalcore＋poppunk＋punk）連「組得出」測試都沒涵蓋 → 補進 `GenreRowTests.libraryCombinations`；production `ReadabilityPolicy.combinations` 47 種（＝兩份 fixture 的多列組合聯集，測試斷言相等）。`ReadabilityGateTests` 拆成單列／組合兩組參數（共用檢查函式）。
+- **T2 長測**（4,608 s）：**G2、G3 47 種組合全綠**；**G1 不及格**：只出在 12 組「背景×配色」（crimsonFog × 8 配色、crimsonVelvet × 4 背景），單列抽不到、只有組合湊得出；影響 9 種組合、曲庫 6 種、264 首（有詞 168）。照 §4.6 原處置整組拒絕的模擬：181 首退到 generic metal、**37 首變素面**、其餘換列 → /thecure（附錄 E）改配對級硬禁止，`ReadabilityPolicy` 升 v2。
+- **硬禁止後**：`UnreadablePairTests`（硬不可達：可稽核 profile × 64 次連播；退路不放回；受影響背景 ≥ 2 配色）、`RecipeGoldenTests`、`ExistingBandCandidatesTests`、`PlayableSpaceTests`、`ComposerTests` 等 8 suite 54 條綠。曲庫不變式（main vs 本分支，seed 42）：**13 首改變，全是 classicrock＋death**，改前 spot＋crimsonVelvet（被禁，4.46）→ 改後 spot＋ashGrey；0 首變素面。其他 251 首受影響組合的歌在 seed 42 不變，但其他 seed 的可抽配色少了被禁的那幾格（樣式分佈改變，需使用者簽字）。
+- **T3**：紅燈步驟漏做（實作先寫），事後移開實作檔補確認紅燈（型別未定義）再放回。**T4**：紅燈＝`decision` 參數、`.userStyle` 未定義 → 綠。T3＋T4＋相關 10 suite 65 條綠。
+- **T5**：不做（§10-3）。
+- **T6**：紅燈 → 綠 12 條。**T7 掃描器**：紅燈 → 綠 8 條（含一次只排一個 AE、取消後不再排、讀不完整不發布、兩種寫法同 ID 去重）。**VM**：測試先寫但紅燈事後補做（移開實作檔確認）→ 綠 11 條。**AppModel 接線**：紅燈 → 綠 4 條（＋既有 2 條）。**畫面顯示判斷**：紅燈 → 綠 10 條（含三語字串齊）；一條測試本身寫錯（兩首專輯同名卻斷言只中一首）已改正，非放寬。
+- **T8**：`Settings ▸ Library Check...` 開獨立 `Window`；字串 63 條三語（只新增）；DEBUG 假曲庫 `LibraryCheckUITestFixture`＋`LibraryCheckUITests` 一條（編譯通過，待使用者在場跑）。
+- **T9**：ACCEPTANCE I-68（待簽）。
+- **交叉核對**（app 的 `LibraryGateReport` 跑真曲庫）：身分未定 137 位／1,173 首、素面 572 首（署名待補 4 團 178 首）、待處理歌手 148 位、可批次 91 位、缺來源 0——與 §2.2 獨立量測一致。
+- Scripts 443 條綠、`no_playback_gate.sh` exit 0。
+
+## 附錄 E /thecure：G1 不及格配對的處置（2026-10-28，Codex 1 輪）
+| 論點 | 結果 |
+|---|---|
+| 整組拒絕（§4.6 原處置）vs 配對級禁止 | **我方勝**（Codex 判方向正確）：每組合只有 1–3 組配對不及格，整組拒絕讓 264 首換樣式、37 首掉素面，代價不成比例；母計劃已有「禁止組合」機制 |
+| 沿用 `compatiblePalettes` 的「沒有合格者才不排除」 | **Codex 勝**：軟排除在候選稀少時會讓已知讀不到的配對回到抽樣池 → 改硬禁止，排除後無配色＝組不出，另行處置 |
+| 不變式只允許「原本抽到被禁配對」的配方改變 | **Codex 勝**：累積權重抽樣，拿掉一個候選可改到其他配方 → 例外以改前改後實測差異產生（實測 13 首，恰為原本抽到被禁配對者） |
+| 只測「還有一個配色」 | **Codex 勝**：受影響背景要 ≥ 2 配色，否則「每次換一套」失真 → 測試已加 |
+| 程序 | **採納**：修訂 §4.6、policy 升版、I-68 列 12 組配對與 6 組合 264 首、使用者對「樣式分佈改變」簽字 |
+- Codex 最擔心：把對比失敗做成軟排除，候選稀少時靜默失效。
 

@@ -50,9 +50,10 @@ enum Composer {
         return LinePersonalities.pick(pool.map { ($0, fit($0, profile)) }, &random)
     }
 
-    /// 背景宣告了要暗底或亮底時，配色候選先濾成相容者；濾完沒有合格者才不濾（取樣次數不變，B2 計劃 §7.3）
+    /// 背景宣告了要暗底或亮底時，配色候選先濾成相容者；濾完沒有合格者才不濾（取樣次數不變，B2 計劃 §7.3）。
+    /// 讀不到的配對（`ReadabilityPolicy.unreadablePairs`，⑧）是硬禁止：亮暗相容與退路都先排除它們
     static func compatiblePalettes(_ catalog: [FXComponent], backdrop: String, profile: SongProfile) -> [FXComponent] {
-        let palettes = catalog.filter { $0.slot == .palette }
+        let palettes = catalog.filter { $0.slot == .palette && !ReadabilityPolicy.isUnreadable(backdrop: backdrop, palette: $0.id) }
         guard case .backdrop(let kind)? = catalog.first(where: { $0.id == backdrop })?.payload, let tone = kind.tone else { return palettes }
         let matching = palettes.filter { component in
             if case .palette(let palette) = component.payload { tone.accepts(palette) } else { false }
