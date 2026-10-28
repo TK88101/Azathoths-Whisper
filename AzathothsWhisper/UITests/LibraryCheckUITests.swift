@@ -20,6 +20,7 @@ final class LibraryCheckUITests: AppUITestCase {
 
         let composed = element(ID.libraryCheckComposedCount)
         XCTAssertTrue(composed.waitForExistence(timeout: Self.timeout))
+        // 假曲庫另有一位日文歌手的無詞曲：推定日文（增補計劃 §4.1）而不計入素面與身分未定
         XCTAssertTrue((composed.label as String).hasPrefix("1 "), "處理前：素面 1 首（\(composed.label)）")
         XCTAssertTrue((element(ID.libraryCheckIdentityCount).label as String).hasPrefix("2 "), "處理前：身分未定 2 首")
 

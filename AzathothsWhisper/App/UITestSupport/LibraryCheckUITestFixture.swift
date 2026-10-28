@@ -9,10 +9,14 @@ enum LibraryCheckUITestFixture {
     static let plainArtist = "Paper Harbour"
     /// 有樣式（Apple 曲風命中黑金屬列）、身分未查：可批次照目前樣式
     static let styledArtist = "Velvet Lanterns"
+    /// 有詞曲是日文歌：無詞曲推定日文、走 J-Pop，不增加素面與身分未定（增補計劃 §4.1）
+    static let japaneseArtist = "Moon Ferry"
 
     static let tracks: [ScannedTrack] = [
         ScannedTrack(persistentID: "LC01", name: "Lantern Song", artist: plainArtist, album: "Night Ferry", genre: "Rock", hasLyrics: true, isJapanese: false),
         ScannedTrack(persistentID: "LC02", name: "Ash Tide", artist: styledArtist, album: "Grey Harbour", genre: "Black Metal", hasLyrics: true, isJapanese: false),
+        ScannedTrack(persistentID: "LC03", name: "Harbour Light", artist: japaneseArtist, album: "Tide Lines", genre: "Rock", hasLyrics: true, isJapanese: true),
+        ScannedTrack(persistentID: "LC04", name: "Quiet Pier", artist: japaneseArtist, album: "Tide Lines", genre: "Rock", hasLyrics: false, isJapanese: false),
     ]
 
     @MainActor

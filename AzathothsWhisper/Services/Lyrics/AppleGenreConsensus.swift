@@ -55,8 +55,13 @@ struct AppleGenreConsensus: Codable, Equatable, Sendable {
         }
     }
 
+    /// 泛用曲風列（metal…）：家族裡有任何具體命中時不算票，同 ⑥b 的 generic 抑制（U3 實測：否則黑金屬會被多數的 metal 蓋掉）
+    static let genericRowIDs = Set(SongProfileResolver.keywordRows.filter(\.isGeneric).map(\.id))
+
     /// 嚴格過半已排除平手，所以勝者唯一
-    private static func winner(_ items: [Evidence]) -> Vote? {
+    private static func winner(_ all: [Evidence]) -> Vote? {
+        let specific = all.filter { !$0.rowIDs.allSatisfy(genericRowIDs.contains) }
+        let items = specific.isEmpty ? all : specific
         guard items.count >= minimumEvidence else { return nil }
         let counts = Dictionary(items.map { ($0.rowIDs, 1) }, uniquingKeysWith: +)
         guard let top = counts.first(where: { $0.value * 2 > items.count }) else { return nil }

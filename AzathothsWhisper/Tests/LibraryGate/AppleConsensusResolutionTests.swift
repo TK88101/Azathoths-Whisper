@@ -42,9 +42,13 @@ struct AppleConsensusResolutionTests {
         #expect(explain(genre: nil, consensus: Self.hardRock).key == .pending, "genre 還沒讀到照舊等")
     }
 
-    @Test func aGenreTierMajorityComesBeforeGenericMB() {
-        let e = explain(genre: "Rock", mb: .verified(["industrial"]), consensus: Self.hardRock)
-        #expect(e.key == .rows(.appleConsensus, ["hardrock"]))
+    /// U3 真曲庫實測（2026-10-28）：MB 給得出歌手層級樣式（含通用列）時不得被 Apple 多數蓋掉——
+    /// 某位 MB 判為 electronic＋experimental＋pop 的歌手，96 首曾被 27 首 Apple「Indie Rock」的多數改成 altindie
+    @Test func anArtistStyledByMBGenericRowsKeepsMBAndPerSongApple() {
+        let indie = AppleGenreConsensus(genreRows: .init(rowIDs: ["altindie"], votes: 27, evidence: 27), genericRows: nil)
+        #expect(explain(genre: "Alternative", mb: .verified(["electronic"]), consensus: indie).key == .rows(.genericMB, ["electronic"]))
+        #expect(explain(genre: "Indie Rock", mb: .verified(["electronic"]), consensus: indie).key == .rows(.appleGenre, ["altindie"]), "逐曲判定照舊")
+        #expect(explain(genre: "Pop", mb: .verified(["electronic"]), consensus: Self.electronic).key == .rows(.genericMB, ["electronic"]))
     }
 
     @Test func theGenericTierComesAfterGenericMB() {

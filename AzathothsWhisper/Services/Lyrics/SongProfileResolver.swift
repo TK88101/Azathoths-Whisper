@@ -340,6 +340,8 @@ enum SongProfileResolver {
             }
             return attempt(layer, chosen)
         }
+        // MB 給得出歌手層級的樣式（命中通用列）時，以 MB 為準、不用 Apple 多數（U3 真曲庫實測；使用者：MB 可能分得更準）
+        let consensus = mb.map { hits(normalized: $0, rows: genericRows).isEmpty } == false ? nil : consensus
         let apple = [GenreStyleResolver.normalized(genre)]
         if let (profile, ids) = attemptConsensus(.appleConsensus, consensus?.genreRows, from: rows) { return adopted(.genreRow(profile), .appleConsensus, ids) }
         if let (profile, ids) = attempt(.appleGenre, hits(normalized: apple, rows: rows)) { return adopted(.genreRow(profile), .appleGenre, ids) }

@@ -33,6 +33,18 @@ struct AppleGenreConsensusTests {
         #expect(try #require(table["paper harbour"]?.genreRows).rowIDs == ["death", "melodeath"])
     }
 
+    /// U3 真曲庫實測（2026-10-28）：6 首只命中泛用 metal、5 首組出 black＋death——泛用列只在沒有具體命中時才算（同 ⑥b generic 抑制），
+    /// 否則多數票會讓黑金屬退成泛用 metal
+    @Test func specificRowsOutvoteTheGenericMetalRow() throws {
+        let table = AppleGenreConsensus.table(evidence("paper harbour", .genreRows, ["metal"], times: 6) + evidence("paper harbour", .genreRows, ["black", "death"], times: 5))
+        #expect(try #require(table["paper harbour"]?.genreRows) == .init(rowIDs: ["black", "death"], votes: 5, evidence: 5))
+    }
+
+    @Test func onlyGenericEvidenceStillCounts() throws {
+        let table = AppleGenreConsensus.table(evidence("paper harbour", .genreRows, ["metal"], times: 3))
+        #expect(try #require(table["paper harbour"]?.genreRows).rowIDs == ["metal"])
+    }
+
     @Test func eachTierAndEachFamilyIsCountedSeparately() throws {
         let table = AppleGenreConsensus.table(
             evidence("paper harbour", .genreRows, ["hardrock"], times: 2) + evidence("paper harbour", .genericRows, ["pop"], times: 3)

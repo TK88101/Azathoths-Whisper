@@ -229,6 +229,27 @@ struct LibraryGateReportTests {
         #expect(r.rows.allSatisfy { $0.consensusVote == nil })
     }
 
+    @Test func anArtistWithAnMBGenericStyleGetsNoAppleMajority() {
+        let electronic = ArtistStyleBook.Lookup.verified(id: "mb-2", matchedReleaseGroups: ["rg-2"], genres: [.init(name: "electronic", count: 3)])
+        let tracks = [
+            track("1", artist: "Paper Harbour", genre: "Indie Rock"), track("2", artist: "Paper Harbour", genre: "Indie Rock"),
+            track("3", artist: "Paper Harbour", genre: "Indie Rock"), track("4", artist: "Paper Harbour", genre: "Alternative"),
+        ]
+        let r = report(tracks, mb: mb([("Paper Harbour", electronic)]))
+        #expect(r.rows.map(\.explanation.key) == [
+            .rows(.appleGenre, ["altindie"]), .rows(.appleGenre, ["altindie"]), .rows(.appleGenre, ["altindie"]), .rows(.genericMB, ["electronic"]),
+        ])
+        #expect(r.rows.allSatisfy { $0.consensusVote == nil })
+    }
+
+    /// `LibraryCheckUITests` 的前提：假曲庫處理前素面 1、身分未定 2（日文歌手的無詞曲推定日文，不計入）
+    @Test func theUITestFixtureStartsWithOnePlainSongAndTwoOpenIdentities() {
+        let r = report(LibraryCheckUITestFixture.tracks)
+        #expect(r.composed.songs == 1)
+        #expect(r.identity.songs == 2)
+        #expect(r.rows.first { $0.track.persistentID == "LC04" }?.japaneseEstimate == .init(lyricsSongs: 1, japaneseSongs: 1))
+    }
+
     @Test func aChosenStyleWinsOverTheConsensus() throws {
         let tracks = [track("1", artist: "Paper Harbour", genre: "Hard Rock"), track("2", artist: "Paper Harbour", genre: "Hard Rock"), track("3", artist: "Paper Harbour", genre: "Rock")]
         let decided = try ArtistDecisionBook().deciding(.style(rowID: "gothic"), forArtists: ["Paper Harbour"], at: Self.base)

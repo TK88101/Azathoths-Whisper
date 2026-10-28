@@ -1,4 +1,4 @@
-# 歌詞特效 ⑧ 增補：減少曲庫檢查裡「掃不出結果」的歌（計劃 v0.5，使用者 2026-10-28 拍板 A、B）
+# 歌詞特效 ⑧ 增補：減少曲庫檢查裡「掃不出結果」的歌（計劃 v0.6，使用者 2026-10-28 拍板 A、B）
 
 狀態：**v0.4**（Codex 2 輪收斂見附錄 B；使用者 2026-10-28 拍板見附錄 C：A 做、B 做且改為「整位歌手統一」；R3 見附錄 C）。母計劃 docs/plans/2026-10-28-lyrics-library-gate.md（⑧ v1.0，附錄 H 為本增補的起點）。分支 `wip/lyrics-library-gate`（c846ee1）。
 
@@ -93,10 +93,13 @@
 - **證據（R3-2、R3-4）**：`preConsensusAppleEvidence`——只由每首**原始** Apple genre 對 `keywordRows`／`genericRows` 的命中計算，永不讀共識結果；以 persistentID 去重。**資格**＝關掉 B 時實際會走到該 tier 並被採用的曲（即舊 resolver 的 key 為 `.rows(.appleGenre, …)` 或 `.rows(.genericApple, …)`）；署名、J-Pop、使用者樣式、MB 命中的曲不當證據；A 的報表推定不參與（A 只在報表、推定曲走 J-Pop）。
 - **採用條件（R3-3）**：每個 tier 各自計票，`證據數 ≥ 2 且 勝出列組合票數 × 2 > 證據數`（嚴格過半已排除平手）。共識值＝`(tier, canonical 列 id 集合, 勝出票數, 證據數)`；resolver 直接合成這組列，不再以 genre 字串二次比對（R1-10）。
 - **退路（R3-3）**：共識不存在／未過門檻／列 id 已失效／合成組不出／被可讀性拒絕／快照不可用 → 一律退回**同 tier 的逐曲判定**（現況行為），trace 記原因；不得因共識失敗跳過逐曲直接 noMatch。
-- **快照（R3-5、R1-6；v0.5 實作中修訂）**：共識表只由**完整且為當前 generation 的曲庫檢查掃描**算出（同一份報表、同一套證據資格；要判日文歌需要歌詞，啟動時讀整庫拿不到歌詞，無法滿足 R3-4），存成 `Application Support/…/ArtistConsensus/consensus.json`（`schemaVersion`、`builtAt`、`catalogFingerprint`＝曲風列與通用列的 id＋關鍵字＋`ReadabilityPolicy.version` 的 SHA-256、表）；防線沿用 `ArtistDecisionStore`。播放啟動時載入；指紋不符、壞檔、沒有檔案＝不可用 → 逐曲退路。**不新增任何整庫 AE 讀取**（B0 量測因此取消）。取消、讀取失敗、舊 generation 不寫檔。新加入曲庫的歌手要下次掃描後才有共識。定格：載入或更新後下次播放生效。曲庫檢查畫面的報表永遠用自己掃描算出的表，不會「未就緒」；播放端不可用時只記日誌（計數，不記名字）。**過期語義（R5）**：播放端的共識是「最近一次成功完整掃描當時」的結果，不驗證目前曲庫；之後 Apple 曲風或歌詞改變、新增曲，要下次掃描才反映（使用者重掃即可）。指紋＝依序列出每個曲風列與通用列的 id、關鍵字、是否通用，加 `ReadabilityPolicy.version`，以固定格式串接後 SHA-256；列的軸值與標籤改變由播放時的組得出／可讀性檢查退路兜底。寫入一律 atomic（暫檔＋改名）；播放只在啟動時讀、寫入在主執行緒，無並行讀寫。這是可重建的衍生資料：版本不符或壞檔＝視為沒有，下次完整掃描直接覆寫成新版；路徑是符號連結時不讀不寫。
+- **快照（R3-5、R1-6；v0.5 實作中修訂）**：共識表只由**完整且為當前 generation 的曲庫檢查掃描**算出（同一份報表、同一套證據資格；要判日文歌需要歌詞，啟動時讀整庫拿不到歌詞，無法滿足 R3-4），存成 `Application Support/…/ArtistConsensus/consensus.json`（`schemaVersion`、`builtAt`、`catalogFingerprint`＝曲風列與通用列的 id＋關鍵字＋`ReadabilityPolicy.version` 的 SHA-256、表）；防線沿用 `ArtistDecisionStore`。播放啟動時載入；指紋不符、壞檔、沒有檔案＝不可用 → 逐曲退路。**不新增任何整庫 AE 讀取**（B0 量測因此取消）。取消、讀取失敗、舊 generation 不寫檔。新加入曲庫的歌手要下次掃描後才有共識。定格：載入或更新後下次播放生效。曲庫檢查畫面的報表永遠用自己掃描算出的表，不會「未就緒」；播放端不可用時只記日誌（計數，不記名字）。**過期語義（R5）**：播放端的共識是「最近一次成功完整掃描當時」的結果，不驗證目前曲庫；之後 Apple 曲風或歌詞改變、新增曲，要下次掃描才反映（使用者重掃即可）。**MB 存檔在掃描後變動**（只會是掃描時還沒查過的歌手查完；每位只查一次、不重查）時，播放端以目前的 MB 判斷是否停用共識（MB 命中通用列優先），報表的共識證據要重掃後才一致——曲庫檢查畫面此時已顯示「需重新掃描」（⑧ R1-12 既有機制），不另做失效條件（R7）。指紋＝依序列出每個曲風列與通用列的 id、關鍵字、是否通用，加 `ReadabilityPolicy.version`，以固定格式串接後 SHA-256；列的軸值與標籤改變由播放時的組得出／可讀性檢查退路兜底。寫入一律 atomic（暫檔＋改名）；播放只在啟動時讀、寫入在主執行緒，無並行讀寫。這是可重建的衍生資料：版本不符或壞檔＝視為沒有，下次完整掃描直接覆寫成新版；路徑是符號連結時不讀不寫。
 - **來源欄（G-SRC，R3-6 部分採納）**：顯示 tier、勝出列、`勝出票數／證據數`、快照時間、是否走逐曲退路（與原因）。證據曲清單不另列 persistentID；改為在「逐首來源」分頁**新增「Apple 曲風」欄**（原始字串）與**依寫法家族篩選**（從來源欄或待處理歌手點進去即篩出該家族全部曲），可逐首重建票數（R4 Codex 勝：現有頁面沒有這兩項，原駁回理由不成立）。
 - **量測（v0.3 合併計票的近似，B 完成後依兩 tier 重量）**：素面→有樣式約 199 首／7 位；已有樣式而改變 25 首（有詞 7）／3 位：Negative 15（altindie→gothic）、HIM 5（gothic→hardrock）、Duir 5（black+death→metal）。
 - **注意**：HIM 的多數是 Apple `Hard Rock`（86 首），所以自動判定給 HIM 的是 hardrock 列，不是使用者心中的哥德金屬（MB 對 HIM 是 ambiguous，沒有 MB 曲風）。使用者若要哥德金屬，在曲庫檢查對 HIM 指定 gothic 列（使用者樣式層在前）。
+- **實作中修正（v0.6，U3 真曲庫逐首比對發現；附錄 C R6）**：
+  1. **MB 命中通用列時不用 Apple 多數**：Björk（MB verified，前 3 曲風碰到通用列 electronic＋experimental＋pop）有 96 首靠 MB 通用列，27 首 Apple 標 `Indie Rock` 走 altindie；原設計（R3-1 共識 tier 排在通用 MB 之前）讓 27 首的多數把 96 首也改成 altindie。改為：MB 曲風命中任何通用列＝MB 已給出歌手層級樣式，兩個共識 tier 都停用，該歌手照舊逐曲判定（Björk 123 首 0 差異）。依據：使用者「MusicBrainz 可能比我分得更準」，與 MB > Apple 的既定優先順。
+  2. **泛用列不參與計票**：Duir 6 首 Apple 只命中泛用 metal、5 首組出 black＋death，多數票讓黑金屬退成泛用 metal。改為：同一 tier 內有任何具體命中時，只含泛用曲風列（`isGeneric`）的證據不算票（與 ⑥b generic 抑制同一原則）；只有泛用證據時照常計票。Duir 11 首整位 black＋death。
 - **不變式（R3-7）**：B 作用域外逐首 0 差異（含所有 J-Pop、使用者樣式、署名、MB 命中曲）；B 作用域內的差異逐首都要有可重算的 pre-consensus 多數證據；未過門檻或共識失敗的曲與舊 resolver 逐首 0 差異。
 
 ### 4.3 MB 重新判身分（**本增補不做**；列出供 §10-2 拍板）
@@ -214,3 +217,20 @@ B（若做）：另加 `SongProfileResolver.explain`、`ProfileExplanation.Layer
 - 修訂（共識表改存最近一次完整掃描的結果、播放載入存檔、不新增整庫讀取）：**成立**。
 - 採納 4 條：過期語義明定為「以最近一次完整掃描為準」；指紋含列的順序、關鍵字、通用旗標與 policy 版本；atomic 寫入、無並行讀寫；版本不符視為沒有、新掃描可覆寫（衍生資料，不同於使用者決定檔）。
 - 「指紋不含曲庫證據」：駁回為缺陷——播放端無法在不讀整庫的前提下驗證曲庫（Codex 同條也接受 as-of 語義），改以明文過期語義處理。
+
+### R6（2026-10-28，實作中修正；U3 實測觸發）
+- 見 §4.2「實作中修正」兩條；測試先紅後綠（`anArtistStyledByMBGenericRowsKeepsMBAndPerSongApple`、`anArtistWithAnMBGenericStyleGetsNoAppleMajority`、`specificRowsOutvoteTheGenericMetalRow`）。原 `aGenreTierMajorityComesBeforeGenericMB` 測試把第 1 條的錯誤行為寫成預期，已改寫。
+
+## 附錄 D U3 真曲庫逐首比對（2026-10-28T14:05Z，c846ee1 vs 工作樹，唯讀）
+| 集合 | 首 | 說明 |
+|---|---|---|
+| 不受影響 | 10,779 | 判定、樣式、四項逐首 0 差異 |
+| A（推定日文） | 61 | 全部改判 J-Pop（只在報表）；其中原本不合格 29（Yorushika 19、Kenshi Yonezu 10）；6 位：Yorushika 19、MONGOL800 13、星野源 12、Kenshi Yonezu 10、YOASOBI 4、back number 3 |
+| B 樣式相同 | 1,219 | 來源改記為同歌手多數，但列組合與原本相同（樣式不變） |
+| B 素面→有樣式 | 186（有詞 89） | HIM 132、Muse 32、Rhapsody 10、Tracedawn 9、Sóley… 2、Outlying 1 |
+| B 改樣式 | 26（有詞 7） | Negative 15（altindie→gothic）、Duir 6（metal→black＋death）、HIM 5（gothic→hardrock） |
+- 計數：G-ID 1,144／135、G-COMP 373／50（署名待補 178）、G-READ 0、G-SRC 0；有詞子集 G-ID 316、G-COMP 53；待處理歌手 145、可批次 95；共識表 99 位。
+
+### R7（2026-10-28，v0.6 快速複審）
+- 修正 1、2：**成立**，實作與文字一致（含 MB 通用列組不出時仍退回逐曲 Apple，不直接素面）。
+- 高：掃描後 MB 存檔變動時，播放端（讀目前 MB）與報表保存的共識證據可能不同步 → **採納其第二個選項**：明文定義為「需重掃後才一致」，寫進 §4.2 過期語義。理由：MB 只會對掃描當時還沒查過的歌手變動（每位只查一次），且畫面已顯示「需重新掃描」；把 MB 狀態納入快照失效條件要再存一份 MB 摘要，收益只在首次背景查詢期間。
