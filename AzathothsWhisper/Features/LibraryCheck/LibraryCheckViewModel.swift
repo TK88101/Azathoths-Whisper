@@ -17,19 +17,20 @@ final class LibraryCheckViewModel {
     }
 
     private(set) var report: LibraryGateReport?
-    private(set) var scannedAt: Date?
     private(set) var decisions: ArtistDecisionBook
     private(set) var decisionsAppliedAt: Date?
     private(set) var saveFailed = false
+    private var scan: LibraryScan?
+    /// 算出目前報表時用的 MB 存檔：現值與它不同（或還沒載入）＝結果要重新掃描確認（R1-12）
+    private var artistStylesUsed: ArtistStyleBook?
     private var scanning: (done: Int, total: Int)?
     private var lastIncomplete: LibraryScanOutcome.Reason?
-    private var isStale = false
-    private var tracks: [ScannedTrack] = []
+
+    var scannedAt: Date? { scan?.finishedAt }
 
     @ObservationIgnored var scanLibrary: @Sendable (_ progress: @escaping @Sendable (Int, Int) async -> Void) async throws -> LibraryScanOutcome = { _ in .incomplete(.emptyLibrary) }
-    @ObservationIgnored var artistStyles: () -> ArtistStyleBook = { ArtistStyleBook() }
-    /// MB 存檔已載入（背景同步發布過至少一次）
-    @ObservationIgnored var isArtistDataReady: () -> Bool = { false }
+    /// MB 存檔的目前值；nil＝背景同步還沒發布過（還不能判定達標）
+    @ObservationIgnored var artistStyles: () -> ArtistStyleBook? = { nil }
     /// 存使用者決定；失敗＝這次決定不生效
     @ObservationIgnored var onDecisionsChanged: (ArtistDecisionBook) throws -> Void = { _ in }
     @ObservationIgnored private let now: () -> Date
@@ -45,7 +46,7 @@ final class LibraryCheckViewModel {
         if let scanning { return .scanning(done: scanning.done, total: scanning.total) }
         if let lastIncomplete { return .incomplete(lastIncomplete) }
         guard let report else { return .notScanned }
-        if isStale || !isArtistDataReady() { return .needsRescan }
+        guard let current = artistStyles(), current == artistStylesUsed else { return .needsRescan }
         return report.passed ? .passed : .failing
     }
 
@@ -78,11 +79,6 @@ final class LibraryCheckViewModel {
         await scanTask?.value
     }
 
-    /// MB 存檔換了新的一份：已顯示的結果要重新掃描確認（R1-12）
-    func artistDataChanged() {
-        if report != nil { isStale = true }
-    }
-
     private func progress(_ done: Int, _ total: Int, generation current: Int) {
         guard current == generation, scanning != nil else { return }
         scanning = (done, total)
@@ -93,10 +89,8 @@ final class LibraryCheckViewModel {
         scanning = nil
         switch outcome {
         case .complete(let scan):
-            tracks = scan.tracks
-            scannedAt = scan.finishedAt
+            self.scan = scan
             lastIncomplete = nil
-            isStale = false
             recompute()
         case .incomplete(let reason):
             lastIncomplete = reason
@@ -138,7 +132,9 @@ final class LibraryCheckViewModel {
     }
 
     private func recompute() {
-        guard scannedAt != nil else { return }
-        report = LibraryGateReport(tracks: tracks, artistStyles: artistStyles(), decisions: decisions)
+        guard let scan else { return }
+        let styles = artistStyles()
+        artistStylesUsed = styles
+        report = LibraryGateReport(tracks: scan.tracks, artistStyles: styles ?? ArtistStyleBook(), decisions: decisions)
     }
 }

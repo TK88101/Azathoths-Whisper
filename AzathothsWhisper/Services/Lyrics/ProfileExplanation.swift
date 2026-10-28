@@ -13,8 +13,8 @@ struct ProfileExplanation: Equatable, Sendable {
         case signed(String)
         case jpop
         /// ids＝合成實際用到的列（排序；generic 抑制之後）
+        /// 使用者指定的列也走這裡（layer＝`.userStyle`）
         case rows(Layer, [String])
-        case userStyle(String)
         case none
         case pending
     }
@@ -46,7 +46,6 @@ struct ProfileExplanation: Equatable, Sendable {
         case .signed(let name): .signed(name)
         case .jpop: .jpop
         case .rows(_, let ids): .rows(ids)
-        case .userStyle(let id): .rows([id])
         case .none, .pending: nil
         }
     }

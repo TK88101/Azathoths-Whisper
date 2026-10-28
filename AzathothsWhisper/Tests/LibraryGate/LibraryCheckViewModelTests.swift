@@ -19,18 +19,19 @@ struct LibraryCheckViewModelTests {
     ]
 
     final class Saved { var books: [ArtistDecisionBook] = []; var fails = false }
+    /// MB 存檔的目前值（換一份＝背景同步發布了新結果）
+    final class Styles { var book = ArtistStyleBook() }
     struct SaveFailed: Error {}
 
     private func model(outcomes: [LibraryScanOutcome] = [.complete(LibraryScan(tracks: library, startedAt: start, finishedAt: start))],
-                       saved: Saved = Saved(), ready: Bool = true) -> LibraryCheckViewModel {
+                       saved: Saved = Saved(), styles: Styles = Styles(), ready: Bool = true) -> LibraryCheckViewModel {
         let queue = OutcomeQueue(outcomes)
         let vm = LibraryCheckViewModel(decisions: ArtistDecisionBook(), now: { Self.start })
         vm.scanLibrary = { progress in
             await progress(1, 1)
             return await queue.next()
         }
-        vm.artistStyles = { ArtistStyleBook() }
-        vm.isArtistDataReady = { ready }
+        vm.artistStyles = { ready ? styles.book : nil }
         vm.onDecisionsChanged = { book in
             if saved.fails { throw SaveFailed() }
             saved.books.append(book)
@@ -106,14 +107,24 @@ struct LibraryCheckViewModelTests {
     }
 
     @Test func newArtistDataMakesTheResultNeedARescan() async {
-        let vm = model(outcomes: [.complete(LibraryScan(tracks: [Self.track("2", "Velvet Lanterns", genre: "Black Metal")], startedAt: Self.start, finishedAt: Self.start))])
+        let styles = Styles()
+        let vm = model(outcomes: [.complete(LibraryScan(tracks: [Self.track("2", "Velvet Lanterns", genre: "Black Metal")], startedAt: Self.start, finishedAt: Self.start))], styles: styles)
         await scanned(vm)
         vm.decide(.keepFallback, forArtists: ["Velvet Lanterns"])
         #expect(vm.status == .passed)
-        vm.artistDataChanged()
+        styles.book = ArtistStyleBook().recording(.unresolved(.notFound), forSpelling: "Paper Harbour", at: Self.start)
         #expect(vm.status == .needsRescan)
         await scanned(vm)
         #expect(vm.status == .passed)
+    }
+
+    @Test func republishingTheSameArtistDataDoesNotAskForARescan() async {
+        let styles = Styles()
+        let vm = model(outcomes: [.complete(LibraryScan(tracks: [Self.track("2", "Velvet Lanterns", genre: "Black Metal")], startedAt: Self.start, finishedAt: Self.start))], styles: styles)
+        await scanned(vm)
+        vm.decide(.keepFallback, forArtists: ["Velvet Lanterns"])
+        styles.book = ArtistStyleBook()
+        #expect(vm.status == .passed, "內容相同的重發不算換新")
     }
 
     @Test func passingIsNotClaimedBeforeTheArtistDataIsReady() async {
@@ -137,7 +148,6 @@ struct LibraryCheckViewModelTests {
         let gate = LyricsGate()
         let vm = LibraryCheckViewModel(decisions: ArtistDecisionBook(), now: { Self.start })
         vm.artistStyles = { ArtistStyleBook() }
-        vm.isArtistDataReady = { true }
         vm.onDecisionsChanged = { _ in }
         let calls = Counter()
         vm.scanLibrary = { _ in
@@ -159,7 +169,6 @@ struct LibraryCheckViewModelTests {
         let gate = LyricsGate()
         let vm = LibraryCheckViewModel(decisions: ArtistDecisionBook(), now: { Self.start })
         vm.artistStyles = { ArtistStyleBook() }
-        vm.isArtistDataReady = { true }
         vm.onDecisionsChanged = { _ in }
         vm.scanLibrary = { progress in
             await progress(3, 10)

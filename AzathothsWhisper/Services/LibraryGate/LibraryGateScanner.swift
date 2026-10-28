@@ -36,28 +36,38 @@ struct LibraryGateScanner: Sendable {
         guard !snapshot.isEmpty else { return .incomplete(.emptyLibrary) }
         let spellings = Self.spellingsByGroup(snapshot)
         await progress(0, spellings.count)
-        var lyricsByID: [String: String] = [:]
+        /// 讀回來就只留兩個旗標，歌詞全文不駐留（simcodex R1 安全／效率）
+        var flagsByID: [String: LyricsFlags] = [:]
         for (index, spelling) in spellings.enumerated() {
             guard let rows = try? await music.artistLyrics(artist: spelling) else {
                 gateLog.error("library gate artist read failed at \(index, privacy: .public)")
                 return .incomplete(.artistReadFailed)
             }
             try Task.checkCancellation()
-            for row in rows where lyricsByID[row.persistentID] == nil { lyricsByID[row.persistentID] = row.lyrics }
+            for row in rows where flagsByID[row.persistentID] == nil { flagsByID[row.persistentID] = LyricsFlags(row.lyrics) }
             await progress(index + 1, spellings.count)
         }
-        guard snapshot.allSatisfy({ lyricsByID[$0.persistentID] != nil }) else { return .incomplete(.tracksMissing) }
+        guard snapshot.allSatisfy({ flagsByID[$0.persistentID] != nil }) else { return .incomplete(.tracksMissing) }
         let tracks = snapshot.map { row in
-            let lyrics = lyricsByID[row.persistentID] ?? ""
-            let hasLyrics = !lyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let flags = flagsByID[row.persistentID] ?? LyricsFlags("")
             return ScannedTrack(
                 persistentID: row.persistentID, name: row.name, artist: row.artist, album: row.album, genre: row.genre,
-                hasLyrics: hasLyrics, isJapanese: hasLyrics && LyricsScript.isJapaneseSong(lyrics)
+                hasLyrics: flags.hasLyrics, isJapanese: flags.isJapanese
             )
         }
         let elapsed = clock.now - began
         gateLog.info("library gate scan tracks=\(tracks.count, privacy: .public) reads=\(spellings.count, privacy: .public) elapsed=\(elapsed, privacy: .public)")
         return .complete(LibraryScan(tracks: tracks, startedAt: startedAt, finishedAt: now()))
+    }
+
+    private struct LyricsFlags {
+        let hasLyrics: Bool
+        let isJapanese: Bool
+
+        init(_ lyrics: String) {
+            hasLyrics = !LyricsText.isBlank(lyrics)
+            isJapanese = hasLyrics && LyricsScript.isJapaneseSong(lyrics)
+        }
     }
 
     /// 依 `normalizedArtist` 分組後攤平的原始寫法（同組相鄰、寫法去重、順序固定）

@@ -61,9 +61,8 @@ final class AppModel {
     private var artistStyles: ArtistStyleSync?
     private var artistStylesTask: Task<Void, Never>?
     /// ⑥b：最新的查詢結果 snapshot（R1-6）；歌詞特效同步讀它
-    @ObservationIgnored private(set) var artistBook = ArtistStyleBook()
-    /// ⑧：MB 存檔是否已由背景同步發布過（還沒＝曲庫檢查不能判定達標）
-    @ObservationIgnored private var hasArtistBook = false
+    /// ⑧：nil＝背景同步還沒發布過（曲庫檢查不能判定達標）。可觀察：檢查視窗的「需重新掃描」要隨它重繪
+    private(set) var artistBook: ArtistStyleBook?
     /// ⑧：使用者決定的存檔（nil＝只在記憶體——單元測試與 UI 測試組裝的預設，絕不碰使用者的檔案）
     private let artistDecisions: ArtistDecisionStore?
     /// ⑧：使用者決定的 snapshot；歌詞特效同步讀它
@@ -190,12 +189,11 @@ final class AppModel {
         // D8：Editor 只拿唯讀判斷式與回報出口，不持有標記 store 與狀態機
         editor.isMarkedNoLyrics = { [weak self] in self?.lyricsFlow.isMarkedNoLyrics($0) ?? false }
         lyricsFX.isMarkedNoLyrics = { [weak self] in self?.lyricsFlow.isMarkedNoLyrics($0) ?? false }
-        lyricsFX.artistGenres = { [weak self] artist in self?.artistBook.genres(forArtist: artist) ?? .unknown }
+        lyricsFX.artistGenres = { [weak self] artist in self?.artistBook?.genres(forArtist: artist) ?? .unknown }
         lyricsFX.artistDecision = { [weak self] artist in self?.decisionBook.decision(forArtist: artist)?.choice }
         let scanner = LibraryGateScanner(music: music)
         libraryCheck.scanLibrary = { progress in try await scanner.scan(progress: progress) }
-        libraryCheck.artistStyles = { [weak self] in self?.artistBook ?? ArtistStyleBook() }
-        libraryCheck.isArtistDataReady = { [weak self] in self?.hasArtistBook ?? false }
+        libraryCheck.artistStyles = { [weak self] in self?.artistBook }
         libraryCheck.onDecisionsChanged = { [weak self] book in try self?.saveDecisions(book) }
         editor.onSaved = { [weak self] persistentID, text in
             self?.lyricsFlow.saved(persistentID: persistentID, text: text)
@@ -440,8 +438,6 @@ final class AppModel {
 
     private func receiveArtistBook(_ book: ArtistStyleBook) {
         artistBook = book
-        hasArtistBook = true
-        libraryCheck.artistDataChanged()
     }
 
     /// ⑧：先落盤再換 snapshot；落盤失敗就丟出、這次決定不生效

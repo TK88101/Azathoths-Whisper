@@ -23,7 +23,7 @@ enum LibraryCheckUITestFixture {
             await progress(1, 1)
             return .complete(scan)
         }
-        model.libraryCheck.isArtistDataReady = { true }
+        model.libraryCheck.artistStyles = { ArtistStyleBook() }
     }
 }
 #endif

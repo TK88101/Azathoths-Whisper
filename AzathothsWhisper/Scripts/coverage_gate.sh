@@ -44,7 +44,7 @@ EXEMPTIONS = [
 ]
 # 2026-10-04 使用者批准 400→410：歌詞特效 A1 新增 genre／duration／playerPosition 的唯讀讀取（實測 408 行；
 # docs/plans/2026-10-04-lyrics-fx-a1-contract-and-time.md §8.3／§9-Q5，實機 LiveLyricsFXMeasurementTests 已驗）
-EXEMPT_LINE_BUDGET = 470   # 豁免檔可執行行數合計上限；調高須經評審並記入計劃（410→470：⑥b 整庫讀取兩方法，使用者 2026-10-24 批准，docs/plans/2026-10-24-lyrics-fx-musicbrainz.md 附錄 E）
+EXEMPT_LINE_BUDGET = 490   # 豁免檔可執行行數合計上限；調高須經評審並記入計劃（410→470：⑥b 整庫讀取兩方法，使用者 2026-10-24 批准，docs/plans/2026-10-24-lyrics-fx-musicbrainz.md 附錄 E；470→490：⑧ 曲庫閘門整庫五欄與逐寫法歌詞讀取，/thecure 2026-10-28，待使用者批准，docs/plans/2026-10-28-lyrics-library-gate.md 附錄 G）
 
 root = os.path.realpath(os.getcwd())
 report = json.load(open(os.environ["AZW_COVERAGE_REPORT"]))

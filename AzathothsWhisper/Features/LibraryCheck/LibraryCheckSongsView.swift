@@ -37,7 +37,7 @@ struct LibraryCheckSongsView: View {
     }
 
     private func issuesText(_ row: LibraryGateReport.Row) -> some View {
-        let issues = row.issues.sorted { "\($0)" < "\($1)" }
+        let issues = LibraryGateReport.Issue.ordered(row.issues)
         return Group {
             if issues.isEmpty {
                 Text("library_check_no_issues").foregroundStyle(Theme.success)

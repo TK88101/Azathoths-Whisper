@@ -55,8 +55,14 @@ struct ArtistDecisionStore: Sendable {
         }
     }
 
-    func save(_ book: ArtistDecisionBook) throws {
-        if case .unrecognized = inspect() { throw StoreError.unrecognizedFileOnDisk }
+    /// 壞檔不直接蓋掉：使用者手動做的決定丟了補不回來（不像 MB 快取可重查），先改名留一份（simcodex R1 安全）
+    func save(_ book: ArtistDecisionBook, now: Date = Date()) throws {
+        switch inspect() {
+        case .unrecognized: throw StoreError.unrecognizedFileOnDisk
+        // 同一秒可能已有備份：加唯一後綴，不讓撞名擋住這次寫入（codex review R2）
+        case .corrupt: try FileManager.default.moveItem(at: fileURL, to: directory.appendingPathComponent("\(Self.fileName).bak-\(Int(now.timeIntervalSince1970))-\(UUID().uuidString.prefix(8))"))
+        case .absent, .current: break
+        }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Self.encoder.encode(StoredFile(schemaVersion: Self.schemaVersion, decisions: book.decisions)).write(to: fileURL, options: .atomic)
     }

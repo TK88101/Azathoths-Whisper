@@ -186,8 +186,6 @@ struct LyricsFXContrastTests {
         }
     }
 
-    /// crimsonVelvet 原本是 B1 簽字的低對比例外（字 #8A1C2B，約 2.1）。2026-10-20 使用者同意「只調亮字色、例外拿掉」，看新舊並排後選 #FF6E6E（實測 4.92–5.47）：
-    /// 交響類曲風每兩次抽到一次，讀不清楚不行。每個背景都要達標、沒有例外
     /// ⑧ 計劃 §4.6：被禁的配對要真的不及格（日後元件改色讓它讀得到了，這條會紅、提醒解禁）。英文或日文行任一不及格即算
     @Test func everyBannedPairReallyFailsTheMinimum() {
         for pair in ReadabilityPolicy.unreadablePairs {
@@ -197,6 +195,8 @@ struct LyricsFXContrastTests {
         }
     }
 
+    /// crimsonVelvet 原本是 B1 簽字的低對比例外（字 #8A1C2B，約 2.1）。2026-10-20 使用者同意「只調亮字色、例外拿掉」，看新舊並排後選 #FF6E6E（實測 4.92–5.47）：
+    /// 交響類曲風每兩次抽到一次，讀不清楚不行。每個背景都要達標、沒有例外
     @Test func crimsonVelvetMeetsTheMinimumOnEveryBackdropWithoutAnException() {
         let backdrops = Self.reachablePairs.filter { $0.palette == "crimsonVelvet" }.map(\.backdrop)
         #expect(!backdrops.isEmpty)

@@ -25,6 +25,14 @@ struct LibraryGateReport: Equatable, Sendable {
         case unknown
         case unresolved(ArtistIdentity.UnresolvedReason)
         case verified(hasGenres: Bool)
+
+        /// 身分還沒定（還沒查或認不出）
+        var isIdentityOpen: Bool {
+            switch self {
+            case .unknown, .unresolved: true
+            case .notApplicable, .verified: false
+            }
+        }
     }
 
     /// 組不出樣式的原因（G-SRC：素面也要說得出為什麼）
@@ -35,32 +43,30 @@ struct LibraryGateReport: Equatable, Sendable {
         case noRowMatched
     }
 
-    enum Issue: Hashable, Sendable {
+    /// 四項；宣告順序＝畫面上的排列順序
+    enum Issue: CaseIterable, Hashable, Sendable {
         case identity, composed, readability, source
+
+        static func ordered(_ issues: Set<Issue>) -> [Issue] {
+            allCases.filter(issues.contains)
+        }
     }
 
     struct Row: Equatable, Sendable {
         let track: ScannedTrack
+        /// 寫法家族鍵（`ArtistDecisionBook.key`）：計數與待處理歌手都以它分組
+        let familyKey: String
         let explanation: ProfileExplanation
         let mbStatus: MBStatus
         let decision: ArtistDecision?
-        let isComposed: Bool
         let noStyleReason: NoStyleReason?
-        let passesIdentity: Bool
-        let passesReadability: Bool
-        let passesSource: Bool
+        let issues: Set<Issue>
 
-        var issues: Set<Issue> {
-            var issues: Set<Issue> = []
-            if !passesIdentity { issues.insert(.identity) }
-            if !isComposed { issues.insert(.composed) }
-            if !passesReadability { issues.insert(.readability) }
-            if !passesSource { issues.insert(.source) }
-            return issues
-        }
+        var isComposed: Bool { !issues.contains(.composed) }
+        var passesSource: Bool { !issues.contains(.source) }
     }
 
-    /// 待處理歌手（以寫法家族列，計劃 §4.3）
+    /// 待處理歌手（以寫法家族列，計劃 §4.3）；已有決定的歌手即使沒有問題也列出，才改得了、清得掉（R1-6）
     struct ArtistIssue: Equatable, Sendable {
         let key: String
         let spellings: [String]
@@ -94,40 +100,71 @@ struct LibraryGateReport: Equatable, Sendable {
     }
 
     init(tracks: [ScannedTrack], artistStyles: ArtistStyleBook, decisions: ArtistDecisionBook, audited: Set<ProfileExplanation.AuditKey> = ReadabilityPolicy.audited) {
-        let rows = tracks.map { Self.row($0, artistStyles: artistStyles, decisions: decisions, audited: audited) }
+        // 判定只看（歌手寫法, 曲風, 是否日文）：整庫一萬多首只有一兩千種組合，每種算一次（simcodex R1 效率）
+        var verdicts: [VerdictKey: Verdict] = [:]
+        let rows = tracks.map { track in
+            let key = VerdictKey(artist: track.artist, genre: track.genre, isJapanese: track.isJapanese)
+            let verdict = verdicts[key] ?? {
+                let fresh = Self.verdict(key, artistStyles: artistStyles, decisions: decisions, audited: audited)
+                verdicts[key] = fresh
+                return fresh
+            }()
+            return Row(
+                track: track, familyKey: verdict.familyKey, explanation: verdict.explanation, mbStatus: verdict.mbStatus,
+                decision: verdict.decision, noStyleReason: verdict.noStyleReason, issues: verdict.issues
+            )
+        }
         self.rows = rows
         artists = Self.artistIssues(rows)
         let withLyrics = rows.filter(\.track.hasLyrics)
-        identity = Self.count(rows) { !$0.passesIdentity }
-        identityWithLyrics = Self.count(withLyrics) { !$0.passesIdentity }
-        composed = Self.count(rows) { !$0.isComposed }
-        composedWithLyrics = Self.count(withLyrics) { !$0.isComposed }
-        signedPending = Self.count(rows) { $0.noStyleReason == .signedBandMissingParts }
-        readability = Self.count(rows) { !$0.passesReadability }
-        readabilityWithLyrics = Self.count(withLyrics) { !$0.passesReadability }
-        source = Self.count(rows) { !$0.passesSource }
+        identity = Self.count(rows, .identity)
+        identityWithLyrics = Self.count(withLyrics, .identity)
+        composed = Self.count(rows, .composed)
+        composedWithLyrics = Self.count(withLyrics, .composed)
+        signedPending = Self.count(rows.filter { $0.noStyleReason == .signedBandMissingParts }, .composed)
+        readability = Self.count(rows, .readability)
+        readabilityWithLyrics = Self.count(withLyrics, .readability)
+        source = Self.count(rows, .source)
     }
 
-    private static func row(_ track: ScannedTrack, artistStyles: ArtistStyleBook, decisions: ArtistDecisionBook, audited: Set<ProfileExplanation.AuditKey>) -> Row {
-        let genres = artistStyles.genres(forArtist: track.artist)
-        let decision = decisions.decision(forArtist: track.artist)
+    private struct VerdictKey: Hashable {
+        let artist: String
+        let genre: String
+        let isJapanese: Bool
+    }
+
+    private struct Verdict {
+        let familyKey: String
+        let explanation: ProfileExplanation
+        let mbStatus: MBStatus
+        let decision: ArtistDecision?
+        let noStyleReason: NoStyleReason?
+        let issues: Set<Issue>
+    }
+
+    private static func verdict(_ key: VerdictKey, artistStyles: ArtistStyleBook, decisions: ArtistDecisionBook, audited: Set<ProfileExplanation.AuditKey>) -> Verdict {
+        let genres = artistStyles.genres(forArtist: key.artist)
+        let decision = decisions.decision(forArtist: key.artist)
         let explanation = SongProfileResolver.explain(
-            artist: track.artist, genre: track.genre, lyrics: .text(isJapanese: track.isJapanese), artistGenres: genres, decision: decision?.choice
+            artist: key.artist, genre: key.genre, lyrics: .text(isJapanese: key.isJapanese), artistGenres: genres, decision: decision?.choice
         )
-        let isComposed = switch explanation.resolution {
-        case .jpop: true
-        case .pending, .noMatch: false
-        default: explanation.resolution.profile.map { Composer.isComposable($0) } ?? false
+        // 曲風列各層在 explain 裡已確認組得出；只剩署名團要另外判
+        let (isComposed, noStyleReason): (Bool, NoStyleReason?) = switch explanation.resolution {
+        case .pending: (false, nil)
+        case .noMatch: (false, .noRowMatched)
+        case .signedBand(let profile): Composer.isComposable(profile) ? (true, nil) : (false, .signedBandMissingParts)
+        default: (true, nil)
         }
-        let usesMB = SongProfileResolver.needsArtistGenres(track.artist) && explanation.key != .jpop
-        let mbStatus: MBStatus = usesMB ? status(genres, record: artistStyles.record(forArtist: track.artist)) : .notApplicable
-        let identityOpen = mbStatus == .unknown || { if case .unresolved = mbStatus { true } else { false } }()
-        let noStyleReason: NoStyleReason? = isComposed ? nil : (explanation.key == .none ? .noRowMatched : explanation.resolution.source == .signedBand ? .signedBandMissingParts : nil)
-        return Row(
-            track: track, explanation: explanation, mbStatus: mbStatus, decision: decision, isComposed: isComposed, noStyleReason: noStyleReason,
-            passesIdentity: !identityOpen || decision != nil,
-            passesReadability: !isComposed || explanation.auditKey.map(audited.contains) == true,
-            passesSource: explanation.key != .pending && (isComposed || noStyleReason != nil)
+        let usesMB = SongProfileResolver.needsArtistGenres(key.artist) && explanation.key != .jpop
+        let mbStatus: MBStatus = usesMB ? status(genres, record: artistStyles.record(forArtist: key.artist)) : .notApplicable
+        var issues: Set<Issue> = []
+        if mbStatus.isIdentityOpen && decision == nil { issues.insert(.identity) }
+        if !isComposed { issues.insert(.composed) }
+        if isComposed && explanation.auditKey.map(audited.contains) != true { issues.insert(.readability) }
+        if explanation.key == .pending { issues.insert(.source) }
+        return Verdict(
+            familyKey: ArtistDecisionBook.key(key.artist), explanation: explanation, mbStatus: mbStatus, decision: decision,
+            noStyleReason: noStyleReason, issues: issues
         )
     }
 
@@ -139,23 +176,24 @@ struct LibraryGateReport: Equatable, Sendable {
         }
     }
 
-    private static func count(_ rows: [Row], where failing: (Row) -> Bool) -> Count {
-        let failed = rows.filter(failing)
-        return Count(songs: failed.count, artists: Set(failed.map { ArtistDecisionBook.key($0.track.artist) }).count)
+    private static func count(_ rows: [Row], _ issue: Issue) -> Count {
+        let failed = rows.filter { $0.issues.contains(issue) }
+        return Count(songs: failed.count, artists: Set(failed.map(\.familyKey)).count)
     }
 
     private static func artistIssues(_ rows: [Row]) -> [ArtistIssue] {
-        let families = Dictionary(grouping: rows) { ArtistDecisionBook.key($0.track.artist) }
-        let byNormalized = Dictionary(grouping: families.keys) { key in SongProfileResolver.normalizedArtist(families[key]?.first?.track.artist ?? key) }
+        let families = Dictionary(grouping: rows, by: \.familyKey)
+        let normalizedOf = families.mapValues { SongProfileResolver.normalizedArtist($0[0].track.artist) }
+        let byNormalized = Dictionary(grouping: families.keys) { normalizedOf[$0] ?? $0 }
         return families.compactMap { key, songs -> ArtistIssue? in
             let issues = songs.reduce(into: Set<Issue>()) { $0.formUnion($1.issues) }
-            guard !issues.isEmpty, let first = songs.first else { return nil }
-            let normalized = SongProfileResolver.normalizedArtist(first.track.artist)
+            let first = songs[0]
+            guard !issues.isEmpty || first.decision != nil else { return nil }
             return ArtistIssue(
                 key: key, spellings: Array(Set(songs.map(\.track.artist))).sorted(), songs: songs.count, albums: Set(songs.map(\.track.album)).count,
                 issues: issues, mbStatus: songs.map(\.mbStatus).first { $0 != .notApplicable } ?? .notApplicable, decision: first.decision,
                 isSigned: !SongProfileResolver.needsArtistGenres(first.track.artist),
-                sameNormalizedName: (byNormalized[normalized] ?? []).filter { $0 != key }.sorted(),
+                sameNormalizedName: (byNormalized[normalizedOf[key] ?? key] ?? []).filter { $0 != key }.sorted(),
                 canKeepFallbackInBulk: songs.allSatisfy(\.isComposed)
             )
         }

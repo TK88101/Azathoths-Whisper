@@ -86,8 +86,25 @@ struct ArtistDecisionStoreTests {
         try Data(contents.utf8).write(to: directory.appendingPathComponent(ArtistDecisionStore.fileName))
         let store = ArtistDecisionStore(directory: directory)
         #expect(store.load() == .init(book: ArtistDecisionBook(), isWritable: true))
-        try store.save(ArtistDecisionBook().deciding(.keepFallback, forArtists: ["Velvet Lanterns"], at: Self.base))
+        try store.save(ArtistDecisionBook().deciding(.keepFallback, forArtists: ["Velvet Lanterns"], at: Self.base), now: Self.base)
         #expect(store.load().book.decision(forArtist: "Velvet Lanterns") != nil)
+        let prefix = "\(ArtistDecisionStore.fileName).bak-\(Int(Self.base.timeIntervalSince1970))-"
+        let backups = try FileManager.default.contentsOfDirectory(atPath: directory.path).filter { $0.hasPrefix(prefix) }
+        #expect(backups.count == 1)
+        #expect(try backups.first.map { try Data(contentsOf: directory.appendingPathComponent($0)) } == Data(contents.utf8), "壞檔先留一份再覆寫")
+    }
+
+    @Test func aSecondCorruptionInTheSameSecondStillSaves() throws {
+        let directory = tempDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent(ArtistDecisionStore.fileName)
+        let store = ArtistDecisionStore(directory: directory)
+        for round in 0..<2 {
+            try Data("not json \(round)".utf8).write(to: url)
+            try store.save(ArtistDecisionBook().deciding(.keepFallback, forArtists: ["Velvet Lanterns"], at: Self.base), now: Self.base)
+        }
+        #expect(store.load().book.decision(forArtist: "Velvet Lanterns") != nil)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).filter { $0.contains(".bak-") }.count == 2)
     }
 
     @Test func aNewerSchemaIsNeitherReadNorOverwritten() throws {

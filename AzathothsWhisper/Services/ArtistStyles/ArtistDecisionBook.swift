@@ -22,8 +22,9 @@ struct ArtistDecisionBook: Equatable, Sendable {
         case unknownRow
     }
 
-    /// 可指定的列：曲風列＋通用列（使用者拿掉的列本來就不在表內）
-    static let selectableRowIDs: [String] = (SongProfileResolver.keywordRows + SongProfileResolver.genericRows).map(\.id)
+    /// 可指定的列：曲風列、通用列兩段（使用者拿掉的列本來就不在表內）；畫面選單也讀這一份
+    static let selectableRows = (genre: SongProfileResolver.keywordRows.map(\.id), generic: SongProfileResolver.genericRows.map(\.id))
+    static let selectableRowIDs: [String] = selectableRows.genre + selectableRows.generic
 
     private(set) var decisions: [String: ArtistDecision]
 

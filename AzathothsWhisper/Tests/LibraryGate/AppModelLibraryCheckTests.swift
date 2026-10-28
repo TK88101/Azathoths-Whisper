@@ -68,6 +68,29 @@ struct AppModelLibraryCheckTests {
         #expect(model.lyricsFX.artistDecision("Paper Harbour") == .keepFallback)
     }
 
+    /// codex review R2 P1：MB 資料換新時，畫面讀的 `status` 要收到觀察通知（不靠別的欄位碰巧重繪）
+    @Test func freshArtistDataNotifiesObserversOfTheStatus() async {
+        let suiteName = "AppModelLibraryCheckTests-\(UUID().uuidString)"
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let music = MockMusicClient(script: [.notPlaying], repeatLast: true)
+        await music.setSnapshot([LibraryTrackRow(persistentID: "1", name: "Song 1", artist: "Mayhem", album: "Night Ferry", genre: "Black Metal")])
+        await music.setArtistLyrics([ArtistLyricsRow(persistentID: "1", lyrics: "Lanterns over the river")], for: "Mayhem")
+        let store = ArtistStyleStore(directory: tempDirectory())
+        let model = model(music: music, decisions: nil, suiteName: suiteName, artistStyles: { publish in
+            ArtistStyleSync(music: music, store: store, identify: { _, _ throws(ProviderFailure) in .unresolved(.notFound) }, publish: publish)
+        })
+        defer { model.stop() }
+        // 已有報表時 status 才會讀 MB 存檔（還沒掃描＝直接回「還沒掃描」）
+        model.libraryCheck.rescan()
+        await model.libraryCheck.waitForScan()
+        final class Flag: @unchecked Sendable { var changed = false }
+        let flag = Flag()
+        withObservationTracking { _ = model.libraryCheck.status } onChange: { flag.changed = true }
+        model.startArtistStyles()
+        await model.waitForArtistStyles()
+        #expect(flag.changed)
+    }
+
     @Test func freshArtistDataMarksTheCheckForARescan() async {
         let suiteName = "AppModelLibraryCheckTests-\(UUID().uuidString)"
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }

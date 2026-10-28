@@ -20,14 +20,14 @@ struct UserStyleResolutionTests {
     @Test func aChosenStyleWinsOverMBAndApple() throws {
         let explanation = explain(decision: .style(rowID: "gothic"))
         #expect(explanation.resolution == .userStyle(SongProfileResolver.compose(rows: [try row("gothic")])!))
-        #expect(explanation.key == .userStyle("gothic"))
+        #expect(explanation.key == .rows(.userStyle, ["gothic"]))
         #expect(explanation.auditKey == .rows(["gothic"]), "與單列命中同一個稽核鍵（R3-3）")
         #expect(explanation.resolution.source == .userStyle)
         #expect(explanation.resolution.source?.dependsOnLyrics == false)
     }
 
     @Test func aGenericRowCanBeChosenForANonSignedArtist() throws {
-        #expect(explain(genre: "Rock", mb: .unresolved, decision: .style(rowID: "industrial")).key == .userStyle("industrial"))
+        #expect(explain(genre: "Rock", mb: .unresolved, decision: .style(rowID: "industrial")).key == .rows(.userStyle, ["industrial"]))
     }
 
     @Test func theSignedBandStillComesFirst() {
@@ -54,6 +54,7 @@ struct UserStyleResolutionTests {
     @Test func anUnknownRowFallsThroughAndIsTraced() {
         let explanation = explain(decision: .style(rowID: "heavypower"))
         #expect(explanation.trace.first == .init(layer: .userStyle, rowIDs: ["heavypower"], outcome: .noHit))
+        #expect(explanation.trace.filter { $0.layer == .userStyle }.count == 1)
         #expect(explanation.key == .rows(.mbGenre, ["symphonic"]))
     }
 

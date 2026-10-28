@@ -111,6 +111,15 @@ struct LibraryGateReportTests {
         #expect(try #require(r.artists.first { $0.key == ArtistDecisionBook.key("Velvet Lanterns") }).canKeepFallbackInBulk == false)
     }
 
+    /// 計劃 R1-6：決定後沒有問題的歌手也要留在清單，才改得了、清得掉（codex review R1）
+    @Test func aDecidedArtistStaysListedSoTheDecisionCanBeChanged() throws {
+        let decided = try ArtistDecisionBook().deciding(.style(rowID: "punk"), forArtists: ["Paper Harbour"], at: Self.base)
+        let r = report([track("1", artist: "Paper Harbour", genre: "Rock")], decisions: decided)
+        let artist = try #require(r.artists.first)
+        #expect(artist.issues.isEmpty)
+        #expect(artist.decision?.choice == .style(rowID: "punk"))
+    }
+
     @Test func anArtistWithoutIssuesIsNotListed() {
         #expect(report([track("1", artist: "Mayhem")]).artists.isEmpty)
     }

@@ -40,7 +40,7 @@ struct LibraryCheckArtistRow: View {
                 Text(verbatim: artist.spellings.joined(separator: " / ")).font(.headline)
                 Text("library_check_songs_albums \(artist.songs) \(artist.albums)").font(.caption).foregroundStyle(Theme.Gray.g400)
                 HStack(spacing: 8) {
-                    ForEach(artist.issues.sorted { "\($0)" < "\($1)" }, id: \.self) { issue in
+                    ForEach(LibraryGateReport.Issue.ordered(artist.issues), id: \.self) { issue in
                         Text(LocalizedStringKey(LibraryCheckPresentation.issue(issue)))
                             .font(.caption)
                             .padding(.horizontal, 6)
