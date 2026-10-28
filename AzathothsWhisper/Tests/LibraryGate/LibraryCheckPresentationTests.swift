@@ -27,7 +27,7 @@ struct LibraryCheckPresentationTests {
         "library_check_reason_signed_missing_parts", "library_check_reason_no_row",
         "library_check_source_jpop_estimated", "library_check_source_apple_consensus", "library_check_source_generic_apple_consensus",
         "library_check_consensus_fallback", "library_check_column_apple_genre", "library_check_show_artist_songs",
-        "library_check_artist_filter %@", "library_check_clear_filter",
+        "library_check_artist_filter %@", "library_check_clear_filter", "library_check_consensus_mb_first",
     ]
 
     private func row(_ id: String, _ artist: String, name: String = "Song", genre: String = "Rock") -> LibraryGateReport.Row {
@@ -93,14 +93,15 @@ struct LibraryCheckPresentationTests {
 
     @Test func anEstimatedSongShowsJapaneseOverWithLyrics() throws {
         let r = report([track("1", "Paper Harbour", japanese: true), track("2", "Paper Harbour", japanese: true), track("3", "Paper Harbour"), track("4", "Paper Harbour", lyrics: false)])
-        let text = LibraryCheckPresentation.source(for: try #require(r.rows.last))
-        #expect(text == .init(key: "library_check_source_jpop_estimated", detail: "2/3", note: nil))
+        let row = try #require(r.rows.last)
+        #expect(LibraryCheckPresentation.source(for: row, consensus: nil) == .init(key: "library_check_source_jpop_estimated", detail: "2/3", note: nil))
     }
 
     @Test func aConsensusSongShowsTheRowsAndTheVotes() throws {
         let r = report([track("1", "Paper Harbour", genre: "Hard Rock"), track("2", "Paper Harbour", genre: "Hard Rock"), track("3", "Paper Harbour", genre: "Gothic"), track("4", "Paper Harbour")])
-        let text = LibraryCheckPresentation.source(for: try #require(r.rows.last))
-        #expect(text == .init(key: "library_check_source_apple_consensus", detail: "hardrock · 2/3", note: nil))
+        let row = try #require(r.rows.last)
+        #expect(LibraryCheckPresentation.source(for: row, consensus: r.consensus[row.familyKey])
+            == .init(key: "library_check_source_apple_consensus", detail: "hardrock · 2/3", note: nil))
     }
 
     @Test func aFallbackFromTheConsensusIsShown() throws {
@@ -111,10 +112,17 @@ struct LibraryCheckPresentationTests {
         let base = row("1", "Paper Harbour")
         let fallback = LibraryGateReport.Row(
             track: base.track, familyKey: base.familyKey, explanation: explanation, mbStatus: base.mbStatus, decision: nil, noStyleReason: nil,
-            issues: [], japaneseEstimate: nil, consensusVote: nil
+            issues: [], japaneseEstimate: nil
         )
-        #expect(LibraryCheckPresentation.source(for: fallback) == .init(key: "library_check_source_apple", detail: "gothic", note: "library_check_consensus_fallback"))
-        #expect(LibraryCheckPresentation.source(for: base).note == nil)
+        #expect(LibraryCheckPresentation.source(for: fallback, consensus: nil)
+            == .init(key: "library_check_source_apple", detail: "gothic", note: "library_check_consensus_fallback"))
+        #expect(LibraryCheckPresentation.source(for: base, consensus: nil).note == nil)
+        let mbFirst = LibraryGateReport.Row(
+            track: base.track, familyKey: base.familyKey,
+            explanation: ProfileExplanation(resolution: explanation.resolution, key: explanation.key, trace: [.init(layer: .appleConsensus, rowIDs: ["altindie"], outcome: .overriddenByMB)]),
+            mbStatus: base.mbStatus, decision: nil, noStyleReason: nil, issues: [], japaneseEstimate: nil
+        )
+        #expect(LibraryCheckPresentation.source(for: mbFirst, consensus: nil).note == "library_check_consensus_mb_first")
     }
 
     @Test func theSongListCanShowOneArtistFamily() {

@@ -67,7 +67,17 @@ struct ArtistConsensusStore: Sendable {
             consensusLog.info("artist consensus file not usable; per-song genres until the next full scan")
             return nil
         }
-        return Snapshot(builtAt: stored.builtAt, table: stored.table)
+        return Snapshot(builtAt: stored.builtAt, table: stored.table.compactMapValues(Self.sanitized))
+    }
+
+    private static let catalogSize = SongProfileResolver.keywordRows.count + SongProfileResolver.genericRows.count
+
+    /// 被竄改的檔可塞空、重複或比目錄還長的列清單，播放時每次都要逐一比對（安全評審 L2）：載入時就丟掉這種票
+    private static func sanitized(_ consensus: AppleGenreConsensus) -> AppleGenreConsensus? {
+        AppleGenreConsensus.nonEmpty(
+            genreRows: consensus.genreRows.flatMap { $0.isWellFormed(maxRows: catalogSize) ? $0 : nil },
+            genericRows: consensus.genericRows.flatMap { $0.isWellFormed(maxRows: catalogSize) ? $0 : nil }
+        )
     }
 
     func save(_ snapshot: Snapshot) throws {

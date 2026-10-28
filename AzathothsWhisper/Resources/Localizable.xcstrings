@@ -4486,6 +4486,29 @@
         }
       }
     },
+    "library_check_consensus_mb_first": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MusicBrainz already gives this artist a style; artist majority not used"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MusicBrainz がこのアーティストのスタイルを決めているため、多数派は使わない"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MusicBrainz 已給出這位歌手的樣式，不用同歌手多數"
+          }
+        }
+      }
+    },
     "library_check_column_apple_genre": {
       "extractionState": "manual",
       "localizations": {

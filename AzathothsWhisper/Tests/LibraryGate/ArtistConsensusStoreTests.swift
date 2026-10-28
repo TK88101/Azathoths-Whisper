@@ -54,6 +54,21 @@ struct ArtistConsensusStoreTests {
         #expect(throws: ArtistConsensusStore.StoreError.symbolicLink) { try store.save(.init(builtAt: Self.builtAt, table: [:])) }
     }
 
+    /// 安全評審 L2：被竄改的檔可塞超大、重複或空的列清單，播放時每次都要逐一比對——載入時就丟掉
+    @Test func malformedVotesAreDroppedOnLoad() throws {
+        let store = ArtistConsensusStore(directory: directory())
+        let huge = (0..<1_000).map { "row\($0)" }
+        let table = [
+            "empty": AppleGenreConsensus(genreRows: .init(rowIDs: [], votes: 2, evidence: 2), genericRows: nil),
+            "duplicate": AppleGenreConsensus(genreRows: .init(rowIDs: ["gothic", "gothic"], votes: 2, evidence: 2), genericRows: nil),
+            "huge": AppleGenreConsensus(genreRows: .init(rowIDs: huge, votes: 2, evidence: 2), genericRows: nil),
+            "mixed": AppleGenreConsensus(genreRows: .init(rowIDs: [], votes: 2, evidence: 2), genericRows: .init(rowIDs: ["pop"], votes: 2, evidence: 3)),
+        ]
+        try store.save(.init(builtAt: Self.builtAt, table: table))
+        let loaded = try #require(store.load()).table
+        #expect(loaded == ["mixed": AppleGenreConsensus(genreRows: nil, genericRows: .init(rowIDs: ["pop"], votes: 2, evidence: 3))])
+    }
+
     @Test func anOversizedFileIsIgnored() throws {
         let dir = directory()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

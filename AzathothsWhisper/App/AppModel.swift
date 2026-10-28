@@ -69,6 +69,8 @@ final class AppModel {
     private let artistConsensus: ArtistConsensusStore?
     /// 播放端的同歌手共識（家族鍵 → 共識）：啟動時載入存檔、完整掃描後換新
     @ObservationIgnored private var consensusTable: [String: AppleGenreConsensus]
+    /// 最後一次成功寫進檔的表：寫檔失敗後，同一張表下次還要再試（codex review R1）
+    @ObservationIgnored private var savedConsensusTable: [String: AppleGenreConsensus]?
     /// ⑧：使用者決定的 snapshot；歌詞特效同步讀它
     @ObservationIgnored private(set) var decisionBook: ArtistDecisionBook
     /// ⑧ 曲庫檢查（獨立視窗）
@@ -131,7 +133,9 @@ final class AppModel {
         let decisionBook = artistDecisions?.load().book ?? ArtistDecisionBook()
         self.decisionBook = decisionBook
         self.artistConsensus = artistConsensus
-        self.consensusTable = artistConsensus?.load()?.table ?? [:]
+        let savedConsensus = artistConsensus?.load()?.table
+        self.consensusTable = savedConsensus ?? [:]
+        self.savedConsensusTable = savedConsensus
         self.libraryCheck = LibraryCheckViewModel(decisions: decisionBook)
         self.editor = EditorViewModel(
             lyricsService: Self.makeLyricsService(client: httpClient, token: initialToken),
@@ -456,8 +460,11 @@ final class AppModel {
     /// 增補計劃 §4.2：先換播放端的表（下次播放生效），再落盤；落盤失敗只影響下次啟動，記日誌
     private func receiveConsensus(_ snapshot: ArtistConsensusStore.Snapshot) {
         consensusTable = snapshot.table
+        // 使用者決定也會重算報表，但多半不改共識：和已寫進檔的一樣就不重寫（simcodex R1 效率）
+        guard let store = artistConsensus, snapshot.table != savedConsensusTable else { return }
         do {
-            try artistConsensus?.save(snapshot)
+            try store.save(snapshot)
+            savedConsensusTable = snapshot.table
         } catch {
             Self.consensusLog.error("artist consensus file not written")
         }

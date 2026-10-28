@@ -206,7 +206,7 @@ struct LibraryGateReportTests {
         #expect(r.rows.allSatisfy { $0.explanation.key == .rows(.appleConsensus, ["hardrock"]) })
         let vote = AppleGenreConsensus.Vote(rowIDs: ["hardrock"], votes: 3, evidence: 4)
         #expect(r.consensus[ArtistDecisionBook.key("Paper Harbour")]?.genreRows == vote, "證據只算沒有共識時被 Apple 層採用的 4 首（R3-2）")
-        #expect(r.rows.allSatisfy { $0.consensusVote == vote })
+        #expect(r.rows.allSatisfy { LibraryCheckPresentation.source(for: $0, consensus: r.consensus[$0.familyKey]).detail == "hardrock · 3/4" })
         #expect(r.composed == .zero)
         #expect(r.identity == .init(songs: 6, artists: 1), "共識不解決身分未定")
     }
@@ -226,7 +226,6 @@ struct LibraryGateReportTests {
         let tracks = [track("1", artist: "Paper Harbour", genre: "Hard Rock"), track("2", artist: "Paper Harbour", genre: "Hard Rock"), track("3", artist: "Paper Harbour", genre: "Rock")]
         let r = report(tracks, mb: mb([("Paper Harbour", Self.blackMetal)]))
         #expect(r.rows.allSatisfy { $0.explanation.key == .rows(.mbGenre, ["black"]) })
-        #expect(r.rows.allSatisfy { $0.consensusVote == nil })
     }
 
     @Test func anArtistWithAnMBGenericStyleGetsNoAppleMajority() {
@@ -239,7 +238,8 @@ struct LibraryGateReportTests {
         #expect(r.rows.map(\.explanation.key) == [
             .rows(.appleGenre, ["altindie"]), .rows(.appleGenre, ["altindie"]), .rows(.appleGenre, ["altindie"]), .rows(.genericMB, ["electronic"]),
         ])
-        #expect(r.rows.allSatisfy { $0.consensusVote == nil })
+        #expect(r.rows.allSatisfy { $0.explanation.trace.contains(.init(layer: .appleConsensus, rowIDs: ["altindie"], outcome: .overriddenByMB)) },
+                "停用共識也要留 trace，來源欄才說得出原因（simcodex R1 層級）")
     }
 
     /// `LibraryCheckUITests` 的前提：假曲庫處理前素面 1、身分未定 2（日文歌手的無詞曲推定日文，不計入）
@@ -248,6 +248,12 @@ struct LibraryGateReportTests {
         #expect(r.composed.songs == 1)
         #expect(r.identity.songs == 2)
         #expect(r.rows.first { $0.track.persistentID == "LC04" }?.japaneseEstimate == .init(lyricsSongs: 1, japaneseSongs: 1))
+    }
+
+    /// codex review R1：同一首（persistentID 相同）出現兩次只算一票
+    @Test func aRepeatedTrackIsOneVote() {
+        let tracks = [track("1", artist: "Paper Harbour", genre: "Hard Rock"), track("1", artist: "Paper Harbour", genre: "Hard Rock"), track("2", artist: "Paper Harbour")]
+        #expect(report(tracks).consensus.isEmpty)
     }
 
     @Test func aChosenStyleWinsOverTheConsensus() throws {

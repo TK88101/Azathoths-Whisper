@@ -28,8 +28,9 @@ struct ProfileExplanation: Equatable, Sendable {
     }
 
     enum Outcome: Equatable, Sendable {
-        /// `rejectedByReadability`＝組得出但 G1–G3 不及格（`ReadabilityPolicy.rejected`），同組不出一樣落下一層
-        case adopted, notComposable, rejectedByReadability, noHit
+        /// `rejectedByReadability`＝組得出但 G1–G3 不及格（`ReadabilityPolicy.rejected`），同組不出一樣落下一層；
+        /// `overriddenByMB`＝同歌手共識因 MB 已給出歌手層級樣式而停用（增補計劃 §4.2 v0.6）
+        case adopted, notComposable, rejectedByReadability, noHit, overriddenByMB
     }
 
     struct Attempt: Equatable, Sendable {

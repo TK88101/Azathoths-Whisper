@@ -63,8 +63,6 @@ struct LibraryGateReport: Equatable, Sendable {
         let issues: Set<Issue>
         /// 無詞曲依同歌手有詞曲推定為日文歌的依據（增補計劃 §4.1）；nil＝不是推定
         let japaneseEstimate: JapaneseEstimate?
-        /// 採用了同歌手共識時的票數（增補計劃 §4.2，來源欄顯示）；nil＝沒用共識
-        let consensusVote: AppleGenreConsensus.Vote?
 
         var isComposed: Bool { !issues.contains(.composed) }
         var passesSource: Bool { !issues.contains(.source) }
@@ -114,34 +112,39 @@ struct LibraryGateReport: Equatable, Sendable {
     }
 
     init(tracks: [ScannedTrack], artistStyles: ArtistStyleBook, decisions: ArtistDecisionBook, audited: Set<ProfileExplanation.AuditKey> = ReadabilityPolicy.audited) {
-        let estimates = Self.japaneseEstimates(tracks)
+        // 寫法家族鍵每個原始寫法算一次（整庫一萬多首、寫法幾百個；simcodex R1 效率）
+        let familyOf = Dictionary(uniqueKeysWithValues: Set(tracks.map(\.artist)).map { ($0, ArtistDecisionBook.key($0)) })
+        let family = { (artist: String) in familyOf[artist] ?? ArtistDecisionBook.key(artist) }
+        let estimates = Self.japaneseEstimates(tracks, family: family)
         // 推定曲照日文歌判；鍵帶的是「實際走哪條路」，同歌手同曲風的有詞英文歌不會共用（R1-8）
         let keyed = tracks.map { track in
-            let estimate = track.hasLyrics ? nil : estimates[ArtistDecisionBook.key(track.artist)]
-            return (track, estimate, VerdictKey(artist: track.artist, genre: track.genre, isJapanese: track.isJapanese || estimate != nil))
+            let estimate = track.hasLyrics ? nil : estimates[family(track.artist)]
+            return KeyedTrack(track: track, estimate: estimate, key: VerdictKey(artist: track.artist, genre: track.genre, isJapanese: track.isJapanese || estimate != nil))
         }
-        // 兩段：先不用共識判一次，取證據（R3-2：共識結果本身不當證據）；再帶共識判定
-        let judge = { (consensus: [String: AppleGenreConsensus]) -> [Row] in
-            var verdicts: [VerdictKey: Verdict] = [:]
-            return keyed.map { track, estimate, key in
-                let verdict = verdicts[key] ?? {
-                    let fresh = Self.verdict(key, artistStyles: artistStyles, decisions: decisions, consensus: consensus, audited: audited)
-                    verdicts[key] = fresh
-                    return fresh
-                }()
-                return Row(
-                    track: track, familyKey: verdict.familyKey, explanation: verdict.explanation, mbStatus: verdict.mbStatus,
-                    decision: verdict.decision, noStyleReason: verdict.noStyleReason, issues: verdict.issues, japaneseEstimate: estimate,
-                    consensusVote: verdict.consensusVote
-                )
-            }
+        // 判定只看（歌手寫法, 曲風, 是否日文）：整庫只有一兩千種組合，每種算一次（simcodex R1 效率）；
+        // 票數以 persistentID 去重——同一首出現兩次只算一票（codex review R1）
+        let songsPerKey = Dictionary(grouping: keyed, by: \.key).mapValues { Set($0.map(\.track.persistentID)).count }
+        func judge(_ key: VerdictKey, _ consensus: AppleGenreConsensus?) -> Verdict {
+            Self.verdict(key, familyKey: family(key.artist), artistStyles: artistStyles, decisions: decisions, consensus: consensus, audited: audited)
         }
-        let consensus = AppleGenreConsensus.table(judge([:]).compactMap { row in
-            guard case .rows(_, let ids) = row.explanation.key, let tier = AppleGenreConsensus.evidenceTier(of: row.explanation.key) else { return nil }
-            return AppleGenreConsensus.Evidence(familyKey: row.familyKey, tier: tier, rowIDs: ids)
+        // 兩段：先不用共識判一次取證據（R3-2：共識結果本身不當證據），再只重判有共識的歌手
+        let plain = Dictionary(uniqueKeysWithValues: songsPerKey.keys.map { ($0, judge($0, nil)) })
+        let consensus = AppleGenreConsensus.table(songsPerKey.flatMap { key, songs -> [AppleGenreConsensus.Evidence] in
+            let verdict = plain[key]!
+            guard case .rows(_, let ids) = verdict.explanation.key, let tier = AppleGenreConsensus.evidenceTier(of: verdict.explanation.key) else { return [] }
+            return Array(repeating: .init(familyKey: verdict.familyKey, tier: tier, rowIDs: ids), count: songs)
         })
         self.consensus = consensus
-        let rows = judge(consensus)
+        let verdicts = plain.reduce(into: plain) { verdicts, entry in
+            if let family = consensus[entry.value.familyKey] { verdicts[entry.key] = judge(entry.key, family) }
+        }
+        let rows = keyed.map { item in
+            let verdict = verdicts[item.key]!
+            return Row(
+                track: item.track, familyKey: verdict.familyKey, explanation: verdict.explanation, mbStatus: verdict.mbStatus,
+                decision: verdict.decision, noStyleReason: verdict.noStyleReason, issues: verdict.issues, japaneseEstimate: item.estimate
+            )
+        }
         self.rows = rows
         artists = Self.artistIssues(rows)
         let withLyrics = rows.filter(\.track.hasLyrics)
@@ -156,11 +159,20 @@ struct LibraryGateReport: Equatable, Sendable {
     }
 
     /// 只留日文過半的家族（增補計劃 §4.1）
-    private static func japaneseEstimates(_ tracks: [ScannedTrack]) -> [String: JapaneseEstimate] {
-        let withLyrics = Dictionary(grouping: tracks.filter(\.hasLyrics)) { ArtistDecisionBook.key($0.artist) }
-        return withLyrics
-            .mapValues { JapaneseEstimate(lyricsSongs: $0.count, japaneseSongs: $0.filter(\.isJapanese).count) }
+    private static func japaneseEstimates(_ tracks: [ScannedTrack], family: (String) -> String) -> [String: JapaneseEstimate] {
+        tracks.filter(\.hasLyrics)
+            .reduce(into: [String: JapaneseEstimate]()) { estimates, track in
+                let key = family(track.artist)
+                let current = estimates[key] ?? JapaneseEstimate(lyricsSongs: 0, japaneseSongs: 0)
+                estimates[key] = JapaneseEstimate(lyricsSongs: current.lyricsSongs + 1, japaneseSongs: current.japaneseSongs + (track.isJapanese ? 1 : 0))
+            }
             .filter { $0.value.isMostlyJapanese }
+    }
+
+    private struct KeyedTrack {
+        let track: ScannedTrack
+        let estimate: JapaneseEstimate?
+        let key: VerdictKey
     }
 
     private struct VerdictKey: Hashable {
@@ -176,26 +188,18 @@ struct LibraryGateReport: Equatable, Sendable {
         let decision: ArtistDecision?
         let noStyleReason: NoStyleReason?
         let issues: Set<Issue>
-        let consensusVote: AppleGenreConsensus.Vote?
     }
 
     private static func verdict(
-        _ key: VerdictKey, artistStyles: ArtistStyleBook, decisions: ArtistDecisionBook, consensus table: [String: AppleGenreConsensus],
+        _ key: VerdictKey, familyKey: String, artistStyles: ArtistStyleBook, decisions: ArtistDecisionBook, consensus: AppleGenreConsensus?,
         audited: Set<ProfileExplanation.AuditKey>
     ) -> Verdict {
         let genres = artistStyles.genres(forArtist: key.artist)
         let decision = decisions.decision(forArtist: key.artist)
-        let familyKey = ArtistDecisionBook.key(key.artist)
-        let consensus = table[familyKey]
         let explanation = SongProfileResolver.explain(
             artist: key.artist, genre: key.genre, lyrics: .text(isJapanese: key.isJapanese), artistGenres: genres, decision: decision?.choice,
             consensus: consensus
         )
-        let consensusVote: AppleGenreConsensus.Vote? = switch explanation.key {
-        case .rows(.appleConsensus, _): consensus?.genreRows
-        case .rows(.genericAppleConsensus, _): consensus?.genericRows
-        default: nil
-        }
         // 曲風列各層在 explain 裡已確認組得出；只剩署名團要另外判
         let (isComposed, noStyleReason): (Bool, NoStyleReason?) = switch explanation.resolution {
         case .pending: (false, nil)
@@ -212,7 +216,7 @@ struct LibraryGateReport: Equatable, Sendable {
         if explanation.key == .pending { issues.insert(.source) }
         return Verdict(
             familyKey: familyKey, explanation: explanation, mbStatus: mbStatus, decision: decision,
-            noStyleReason: noStyleReason, issues: issues, consensusVote: consensusVote
+            noStyleReason: noStyleReason, issues: issues
         )
     }
 

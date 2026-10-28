@@ -46,7 +46,9 @@ struct AppleConsensusResolutionTests {
     /// 某位 MB 判為 electronic＋experimental＋pop 的歌手，96 首曾被 27 首 Apple「Indie Rock」的多數改成 altindie
     @Test func anArtistStyledByMBGenericRowsKeepsMBAndPerSongApple() {
         let indie = AppleGenreConsensus(genreRows: .init(rowIDs: ["altindie"], votes: 27, evidence: 27), genericRows: nil)
-        #expect(explain(genre: "Alternative", mb: .verified(["electronic"]), consensus: indie).key == .rows(.genericMB, ["electronic"]))
+        let overridden = explain(genre: "Alternative", mb: .verified(["electronic"]), consensus: indie)
+        #expect(overridden.key == .rows(.genericMB, ["electronic"]))
+        #expect(overridden.trace.contains(.init(layer: .appleConsensus, rowIDs: ["altindie"], outcome: .overriddenByMB)), "MB 曲風列的無命中排在前面")
         #expect(explain(genre: "Indie Rock", mb: .verified(["electronic"]), consensus: indie).key == .rows(.appleGenre, ["altindie"]), "逐曲判定照舊")
         #expect(explain(genre: "Pop", mb: .verified(["electronic"]), consensus: Self.electronic).key == .rows(.genericMB, ["electronic"]))
     }

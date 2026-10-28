@@ -7,6 +7,8 @@ extension LibraryGateReport.Row: Identifiable {
 /// 逐首來源（⑧ 計劃 §4.2）：全曲庫表格、可搜尋、可只看不合格。曲名等只在畫面顯示，不寫日誌
 struct LibraryCheckSongsView: View {
     let rows: [LibraryGateReport.Row]
+    /// 報表算出的同歌手共識（來源欄的票數）
+    let consensus: [String: AppleGenreConsensus]
     @State private var failingOnly = true
     @State private var search = ""
     /// 只看一位歌手（寫法家族鍵）；nil＝全部
@@ -40,7 +42,7 @@ struct LibraryCheckSongsView: View {
     }
 
     private func sourceText(_ row: LibraryGateReport.Row) -> some View {
-        let text = LibraryCheckPresentation.source(for: row)
+        let text = LibraryCheckPresentation.source(for: row, consensus: consensus[row.familyKey])
         return HStack(spacing: 4) {
             Text(LocalizedStringKey(text.key))
             if !text.detail.isEmpty { Text(verbatim: text.detail).foregroundStyle(Theme.Gray.g400) }

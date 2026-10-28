@@ -74,6 +74,32 @@ struct AppModelLibraryCheckTests {
         #expect(relaunched.lyricsFX.artistConsensus("Paper Harbour") == expected)
     }
 
+    /// codex review R1：寫檔失敗後，下次掃描出同一張表也要再試著寫（不能因為「表沒變」就跳過）
+    @Test func aFailedConsensusWriteIsRetriedOnTheNextScan() async throws {
+        let suiteName = "AppModelLibraryCheckTests-\(UUID().uuidString)"
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let music = MockMusicClient(script: [.notPlaying], repeatLast: true)
+        await music.setSnapshot([
+            LibraryTrackRow(persistentID: "1", name: "Song 1", artist: "Paper Harbour", album: "Night Ferry", genre: "Hard Rock"),
+            LibraryTrackRow(persistentID: "2", name: "Song 2", artist: "Paper Harbour", album: "Night Ferry", genre: "Hard Rock"),
+        ])
+        await music.setArtistLyrics(["1", "2"].map { ArtistLyricsRow(persistentID: $0, lyrics: "Lanterns over the river") }, for: "Paper Harbour")
+        let directory = tempDirectory()
+        // 目錄位置先放一個普通檔：建目錄失敗＝寫檔失敗
+        try Data().write(to: directory)
+        let model = model(music: music, decisions: nil, suiteName: suiteName, consensus: ArtistConsensusStore(directory: directory))
+        defer { model.stop() }
+        model.libraryCheck.rescan()
+        await model.libraryCheck.waitForScan()
+        #expect(model.lyricsFX.artistConsensus("Paper Harbour") != nil, "寫檔失敗不影響這次播放")
+        #expect(ArtistConsensusStore(directory: directory).load() == nil)
+
+        try FileManager.default.removeItem(at: directory)
+        model.libraryCheck.rescan()
+        await model.libraryCheck.waitForScan()
+        #expect(ArtistConsensusStore(directory: directory).load()?.table.isEmpty == false)
+    }
+
     @Test func anIncompleteScanLeavesTheSavedConsensusAlone() async throws {
         let suiteName = "AppModelLibraryCheckTests-\(UUID().uuidString)"
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }

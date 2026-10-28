@@ -340,14 +340,21 @@ enum SongProfileResolver {
             }
             return attempt(layer, chosen)
         }
-        // MB 給得出歌手層級的樣式（命中通用列）時，以 MB 為準、不用 Apple 多數（U3 真曲庫實測；使用者：MB 可能分得更準）
-        let consensus = mb.map { hits(normalized: $0, rows: genericRows).isEmpty } == false ? nil : consensus
+        // MB 給得出歌手層級的樣式（命中通用列）時，以 MB 為準、不用 Apple 多數（U3 真曲庫實測；使用者：MB 可能分得更準）；停用也記 trace
+        let mbGenericHits = mb.map { hits(normalized: $0, rows: genericRows) }
+        let mbOverrides = mbGenericHits?.isEmpty == false
+        let usableConsensus = mbOverrides ? nil : consensus
+        if mbOverrides, let consensus {
+            for tier in AppleGenreConsensus.Tier.allCases {
+                if let vote = consensus.vote(for: tier) { trace.append(.init(layer: tier.consensusLayer, rowIDs: vote.rowIDs, outcome: .overriddenByMB)) }
+            }
+        }
         let apple = [GenreStyleResolver.normalized(genre)]
-        if let (profile, ids) = attemptConsensus(.appleConsensus, consensus?.genreRows, from: rows) { return adopted(.genreRow(profile), .appleConsensus, ids) }
+        if let (profile, ids) = attemptConsensus(.appleConsensus, usableConsensus?.genreRows, from: rows) { return adopted(.genreRow(profile), .appleConsensus, ids) }
         if let (profile, ids) = attempt(.appleGenre, hits(normalized: apple, rows: rows)) { return adopted(.genreRow(profile), .appleGenre, ids) }
         // 通用層：先 MB（比 Apple 細），再 Apple（同歌手共識優先於逐曲）
-        if let mb, let (profile, ids) = attempt(.genericMB, hits(normalized: mb, rows: genericRows)) { return adopted(.genericRow(profile), .genericMB, ids) }
-        if let (profile, ids) = attemptConsensus(.genericAppleConsensus, consensus?.genericRows, from: genericRows) {
+        if let mbGenericHits, let (profile, ids) = attempt(.genericMB, mbGenericHits) { return adopted(.genericRow(profile), .genericMB, ids) }
+        if let (profile, ids) = attemptConsensus(.genericAppleConsensus, usableConsensus?.genericRows, from: genericRows) {
             return adopted(.genericRow(profile), .genericAppleConsensus, ids)
         }
         if let (profile, ids) = attempt(.genericApple, hits(normalized: apple, rows: genericRows)) { return adopted(.genericRow(profile), .genericApple, ids) }
@@ -379,9 +386,14 @@ enum SongProfileResolver {
 
     /// 命中的列，已套 generic 抑制
     private static func hits(normalized: [GenreStyleResolver.NormalizedGenre], rows: [KeywordRow]) -> [KeywordRow] {
-        let hits = rows.filter { row in row.keywords.contains { keyword in normalized.contains { GenreStyleResolver.genre($0, matches: keyword) } } }
-        let specific = hits.filter { !$0.isGeneric }
-        return specific.isEmpty ? hits : specific
+        let matched = rows.filter { row in row.keywords.contains { keyword in normalized.contains { GenreStyleResolver.genre($0, matches: keyword) } } }
+        return preferSpecific(matched) { $0.isGeneric }
+    }
+
+    /// generic 抑制的唯一定義：有任何非 generic 的就只留它們，否則全留（逐曲命中與同歌手共識計票共用）
+    static func preferSpecific<Item>(_ items: [Item], isGeneric: (Item) -> Bool) -> [Item] {
+        let specific = items.filter { !isGeneric($0) }
+        return specific.isEmpty ? items : specific
     }
 
     /// 指定的列直接合成（不比對、不抑制 generic）；空＝nil

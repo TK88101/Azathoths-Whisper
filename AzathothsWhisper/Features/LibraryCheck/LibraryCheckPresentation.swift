@@ -16,15 +16,18 @@ enum LibraryCheckPresentation {
         }
     }
 
-    /// 逐首來源：推定日文帶「日文／有詞」，同歌手共識帶「列 · 票數／證據數」，共識退回單曲時加附註（增補計劃 §4.1、§4.2）
-    static func source(for row: LibraryGateReport.Row) -> SourceText {
+    /// 逐首來源：推定日文帶「日文／有詞」，同歌手共識帶「列 · 票數／證據數」（`consensus`＝這位歌手在報表裡的共識），
+    /// 共識沒用上時加附註——MB 優先或退回單曲（增補計劃 §4.1、§4.2）
+    static func source(for row: LibraryGateReport.Row, consensus: AppleGenreConsensus?) -> SourceText {
         if let estimate = row.japaneseEstimate {
             return SourceText(key: "library_check_source_jpop_estimated", detail: "\(estimate.japaneseSongs)/\(estimate.lyricsSongs)")
         }
         let base = source(row.explanation.key)
-        let detail = row.consensusVote.map { "\(base.detail) · \($0.votes)/\($0.evidence)" } ?? base.detail
-        let fellBack = row.explanation.trace.contains { [.appleConsensus, .genericAppleConsensus].contains($0.layer) && $0.outcome != .adopted }
-        return SourceText(key: base.key, detail: detail, note: fellBack ? "library_check_consensus_fallback" : nil)
+        let vote: AppleGenreConsensus.Vote? = if case .rows(let layer, _) = row.explanation.key, let tier = layer.consensusTier { consensus?.vote(for: tier) } else { nil }
+        let detail = vote.map { "\(base.detail) · \($0.votes)/\($0.evidence)" } ?? base.detail
+        let missed = row.explanation.trace.first { $0.layer.consensusTier != nil && $0.outcome != .adopted }
+        let note = missed.map { $0.outcome == .overriddenByMB ? "library_check_consensus_mb_first" : "library_check_consensus_fallback" }
+        return SourceText(key: base.key, detail: detail, note: note)
     }
 
     static func source(_ key: ProfileExplanation.Key) -> SourceText {

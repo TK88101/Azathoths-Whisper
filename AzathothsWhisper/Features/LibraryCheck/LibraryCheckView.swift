@@ -26,7 +26,7 @@ struct LibraryCheckView: View {
             .labelsHidden()
             switch tab {
             case .artists: LibraryCheckArtistsView(model: model)
-            case .songs: LibraryCheckSongsView(rows: model.report?.rows ?? [])
+            case .songs: LibraryCheckSongsView(rows: model.report?.rows ?? [], consensus: model.report?.consensus ?? [:])
             }
         }
         .padding(20)

@@ -33,7 +33,7 @@ final class LibraryCheckViewModel {
     @ObservationIgnored var artistStyles: () -> ArtistStyleBook? = { nil }
     /// 存使用者決定；失敗＝這次決定不生效
     @ObservationIgnored var onDecisionsChanged: (ArtistDecisionBook) throws -> Void = { _ in }
-    /// 由完整掃描算出報表時交出同歌手共識（增補計劃 §4.2 快照）：只有當前 generation 的完整掃描會走到這裡
+    /// 每次由完整掃描重算報表（掃描完成、使用者決定）時交出同歌手共識（增補計劃 §4.2 快照）；只有當前 generation 的完整掃描有報表
     @ObservationIgnored var onConsensusComputed: (ArtistConsensusStore.Snapshot) -> Void = { _ in }
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private var generation = 0
