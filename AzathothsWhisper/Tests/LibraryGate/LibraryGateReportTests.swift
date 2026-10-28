@@ -128,4 +128,117 @@ struct LibraryGateReportTests {
         let r = report([])
         #expect(r.passed == false, "空掃描不能當成達標（R3-4）")
     }
+
+    // MARK: 增補計劃 §4.1（A）：無詞曲依同歌手有詞曲推定日文
+
+    @Test func aSongWithoutLyricsByAMostlyJapaneseArtistIsEstimatedJapanese() throws {
+        let tracks = [
+            track("1", artist: "Paper Harbour", japanese: true), track("2", artist: "Paper Harbour", japanese: true),
+            track("3", artist: "Paper Harbour"), track("4", artist: "Paper Harbour", genre: "Rock", lyrics: false),
+        ]
+        let r = report(tracks, mb: mb([("Paper Harbour", .unresolved(.notFound))]))
+        let estimated = try #require(r.rows.first { $0.track.persistentID == "4" })
+        #expect(estimated.explanation.key == .jpop)
+        #expect(estimated.japaneseEstimate == .init(lyricsSongs: 3, japaneseSongs: 2))
+        #expect(estimated.mbStatus == .notApplicable)
+        #expect(estimated.issues.isEmpty)
+    }
+
+    @Test func exactlyHalfJapaneseIsNotEnough() throws {
+        let tracks = [track("1", artist: "Paper Harbour", japanese: true), track("2", artist: "Paper Harbour"), track("3", artist: "Paper Harbour", genre: "Rock", lyrics: false)]
+        let row = try #require(report(tracks).rows.last)
+        #expect(row.japaneseEstimate == nil)
+        #expect(row.explanation.key == .none)
+    }
+
+    @Test func anArtistWithoutAnyLyricsIsNotEstimated() {
+        let r = report([track("1", artist: "Paper Harbour", genre: "Rock", lyrics: false)])
+        #expect(r.rows[0].japaneseEstimate == nil)
+        #expect(r.rows[0].explanation.key == .none)
+    }
+
+    @Test func songsWithLyricsKeepTheirOwnJudgement() throws {
+        let tracks = [
+            track("1", artist: "Paper Harbour", japanese: true), track("2", artist: "Paper Harbour", japanese: true),
+            track("3", artist: "Paper Harbour", genre: "Rock"),
+        ]
+        let english = try #require(report(tracks).rows.last)
+        #expect(english.japaneseEstimate == nil)
+        #expect(english.explanation.key == .none, "有詞的英文歌照自己的歌詞判，不推定")
+    }
+
+    /// R1-8：同歌手同曲風，一首有詞英文歌、一首無詞推定日文——判定不得共用快取
+    @Test func aLyricSongAndAnEstimatedSongWithTheSameGenreAreJudgedSeparately() throws {
+        let tracks = [
+            track("1", artist: "Paper Harbour", japanese: true), track("2", artist: "Paper Harbour", japanese: true),
+            track("3", artist: "Paper Harbour", genre: "Rock"), track("4", artist: "Paper Harbour", genre: "Rock", lyrics: false),
+        ]
+        let r = report(tracks)
+        #expect(r.rows.map(\.explanation.key) == [.jpop, .jpop, .none, .jpop])
+    }
+
+    @Test func theEstimateFollowsTheSpellingFamily() {
+        let tracks = [
+            track("1", artist: "Paper Harbour", japanese: true), track("2", artist: "PAPER HARBOUR", genre: "Rock", lyrics: false),
+            track("3", artist: "AC/DX", japanese: true), track("4", artist: "ACDX", genre: "Rock", lyrics: false),
+        ]
+        let r = report(tracks)
+        #expect(r.rows[1].japaneseEstimate == .init(lyricsSongs: 1, japaneseSongs: 1), "大小寫寫法同一家族")
+        #expect(r.rows[3].japaneseEstimate == nil, "AC/DX 與 ACDX 是不同家族")
+    }
+
+    @Test func theWithLyricsCountsIgnoreEstimates() {
+        let tracks = [track("1", artist: "Paper Harbour", japanese: true), track("2", artist: "Paper Harbour", genre: "Rock", lyrics: false)]
+        let r = report(tracks, mb: mb([("Paper Harbour", .unresolved(.notFound))]))
+        #expect(r.identity == .zero && r.composed == .zero)
+        #expect(r.identityWithLyrics == .zero && r.composedWithLyrics == .zero)
+    }
+
+    // MARK: 增補計劃 §4.2（B）：同歌手 Apple 曲風共識
+
+    @Test func anArtistGetsItsMajorityAppleRowOnEverySong() throws {
+        let tracks = [
+            track("1", artist: "Paper Harbour", genre: "Hard Rock"), track("2", artist: "Paper Harbour", genre: "Hard Rock"),
+            track("3", artist: "Paper Harbour", genre: "Hard Rock"), track("4", artist: "Paper Harbour", genre: "Gothic"),
+            track("5", artist: "Paper Harbour", genre: "Rock"), track("6", artist: "Paper Harbour", genre: "Alternative", lyrics: false),
+        ]
+        let r = report(tracks, mb: mb([("Paper Harbour", .unresolved(.ambiguous))]))
+        #expect(r.rows.allSatisfy { $0.explanation.key == .rows(.appleConsensus, ["hardrock"]) })
+        let vote = AppleGenreConsensus.Vote(rowIDs: ["hardrock"], votes: 3, evidence: 4)
+        #expect(r.consensus[ArtistDecisionBook.key("Paper Harbour")]?.genreRows == vote, "證據只算沒有共識時被 Apple 層採用的 4 首（R3-2）")
+        #expect(r.rows.allSatisfy { $0.consensusVote == vote })
+        #expect(r.composed == .zero)
+        #expect(r.identity == .init(songs: 6, artists: 1), "共識不解決身分未定")
+    }
+
+    @Test func japaneseAndEstimatedSongsAreNotEvidence() throws {
+        let tracks = [
+            track("1", artist: "Paper Harbour", genre: "Hard Rock", japanese: true), track("2", artist: "Paper Harbour", genre: "Hard Rock", japanese: true),
+            track("3", artist: "Paper Harbour", genre: "Hard Rock", japanese: true), track("4", artist: "Paper Harbour", genre: "Hard Rock"),
+            track("5", artist: "Paper Harbour", genre: "Rock"), track("6", artist: "Paper Harbour", genre: "Hard Rock", lyrics: false),
+        ]
+        let r = report(tracks)
+        #expect(r.consensus.isEmpty, "只剩 1 首英文歌是證據，不到 2 首")
+        #expect(try #require(r.rows.first { $0.track.persistentID == "5" }).explanation.key == .none)
+    }
+
+    @Test func anArtistVerifiedByMBIsNotAffected() {
+        let tracks = [track("1", artist: "Paper Harbour", genre: "Hard Rock"), track("2", artist: "Paper Harbour", genre: "Hard Rock"), track("3", artist: "Paper Harbour", genre: "Rock")]
+        let r = report(tracks, mb: mb([("Paper Harbour", Self.blackMetal)]))
+        #expect(r.rows.allSatisfy { $0.explanation.key == .rows(.mbGenre, ["black"]) })
+        #expect(r.rows.allSatisfy { $0.consensusVote == nil })
+    }
+
+    @Test func aChosenStyleWinsOverTheConsensus() throws {
+        let tracks = [track("1", artist: "Paper Harbour", genre: "Hard Rock"), track("2", artist: "Paper Harbour", genre: "Hard Rock"), track("3", artist: "Paper Harbour", genre: "Rock")]
+        let decided = try ArtistDecisionBook().deciding(.style(rowID: "gothic"), forArtists: ["Paper Harbour"], at: Self.base)
+        #expect(report(tracks, decisions: decided).rows.allSatisfy { $0.explanation.key == .rows(.userStyle, ["gothic"]) })
+    }
+
+    @Test func withoutAMajorityEachSongKeepsItsOwnGenre() {
+        let tracks = [track("1", artist: "Paper Harbour", genre: "Hard Rock"), track("2", artist: "Paper Harbour", genre: "Gothic"), track("3", artist: "Paper Harbour", genre: "Rock")]
+        let r = report(tracks)
+        #expect(r.rows.map(\.explanation.key) == [.rows(.appleGenre, ["hardrock"]), .rows(.appleGenre, ["gothic"]), .none])
+        #expect(r.consensus.isEmpty)
+    }
 }

@@ -5,8 +5,9 @@ import Foundation
 struct ProfileExplanation: Equatable, Sendable {
     /// 曲風列命中的層
     enum Layer: String, Sendable {
-        /// `userStyle`＝使用者指定的列（計劃 §4.3）
-        case userStyle, mbGenre, appleGenre, genericMB, genericApple
+        /// `userStyle`＝使用者指定的列（計劃 §4.3）；`appleConsensus`／`genericAppleConsensus`＝同歌手 Apple 曲風共識
+        ///（增補計劃 §4.2），分別取代逐曲的 Apple 曲風列與通用 Apple 列
+        case userStyle, mbGenre, appleConsensus, appleGenre, genericMB, genericAppleConsensus, genericApple
     }
 
     enum Key: Hashable, Sendable {

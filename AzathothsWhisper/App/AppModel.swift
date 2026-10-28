@@ -55,6 +55,7 @@ final class AppModel {
     /// 中繼只發起一次：App 啟動（AppDelegate）與畫面 start() 都會呼叫（s6-61-login-launch.md §5）
     @ObservationIgnored private var didStartRelay = false
     private static let relayLog = Logger(subsystem: "com.ibridgezhao.azathothswhisper", category: "relay")
+    private static let consensusLog = Logger(subsystem: "com.ibridgezhao.azathothswhisper", category: "artist-consensus")
     /// ⑥b：背景查 MB 的組裝（nil＝不查——單元測試與 UI 測試組裝的預設，絕不連網）
     typealias ArtistStylesFactory = (@escaping @Sendable (ArtistStyleBook) async -> Void) -> ArtistStyleSync
     private let makeArtistStyles: ArtistStylesFactory?
@@ -65,6 +66,9 @@ final class AppModel {
     private(set) var artistBook: ArtistStyleBook?
     /// ⑧：使用者決定的存檔（nil＝只在記憶體——單元測試與 UI 測試組裝的預設，絕不碰使用者的檔案）
     private let artistDecisions: ArtistDecisionStore?
+    private let artistConsensus: ArtistConsensusStore?
+    /// 播放端的同歌手共識（家族鍵 → 共識）：啟動時載入存檔、完整掃描後換新
+    @ObservationIgnored private var consensusTable: [String: AppleGenreConsensus]
     /// ⑧：使用者決定的 snapshot；歌詞特效同步讀它
     @ObservationIgnored private(set) var decisionBook: ArtistDecisionBook
     /// ⑧ 曲庫檢查（獨立視窗）
@@ -104,7 +108,9 @@ final class AppModel {
         /// ⑥b 歌手曲風。nil＝不查
         artistStyles: ArtistStylesFactory? = nil,
         /// ⑧ 使用者決定的存檔。nil＝只在記憶體
-        artistDecisions: ArtistDecisionStore? = nil
+        artistDecisions: ArtistDecisionStore? = nil,
+        /// 增補計劃 §4.2：同歌手共識的存檔。nil＝只在記憶體
+        artistConsensus: ArtistConsensusStore? = nil
     ) {
         self.relayHost = relayHost
         self.relayLifecycle = relayLifecycle
@@ -124,6 +130,8 @@ final class AppModel {
         self.artistDecisions = artistDecisions
         let decisionBook = artistDecisions?.load().book ?? ArtistDecisionBook()
         self.decisionBook = decisionBook
+        self.artistConsensus = artistConsensus
+        self.consensusTable = artistConsensus?.load()?.table ?? [:]
         self.libraryCheck = LibraryCheckViewModel(decisions: decisionBook)
         self.editor = EditorViewModel(
             lyricsService: Self.makeLyricsService(client: httpClient, token: initialToken),
@@ -191,10 +199,12 @@ final class AppModel {
         lyricsFX.isMarkedNoLyrics = { [weak self] in self?.lyricsFlow.isMarkedNoLyrics($0) ?? false }
         lyricsFX.artistGenres = { [weak self] artist in self?.artistBook?.genres(forArtist: artist) ?? .unknown }
         lyricsFX.artistDecision = { [weak self] artist in self?.decisionBook.decision(forArtist: artist)?.choice }
+        lyricsFX.artistConsensus = { [weak self] artist in self?.consensusTable[ArtistDecisionBook.key(artist)] }
         let scanner = LibraryGateScanner(music: music)
         libraryCheck.scanLibrary = { progress in try await scanner.scan(progress: progress) }
         libraryCheck.artistStyles = { [weak self] in self?.artistBook }
         libraryCheck.onDecisionsChanged = { [weak self] book in try self?.saveDecisions(book) }
+        libraryCheck.onConsensusComputed = { [weak self] snapshot in self?.receiveConsensus(snapshot) }
         editor.onSaved = { [weak self] persistentID, text in
             self?.lyricsFlow.saved(persistentID: persistentID, text: text)
             self?.lyricsFX.lyricsUpdated(persistentID: persistentID, text: text)
@@ -346,9 +356,11 @@ final class AppModel {
         // 自動化測試（單元與 UI）一律不連外網查歌手曲風、不掃使用者的曲庫
         let artistStyles: ArtistStylesFactory? = isAutomatedTest ? nil : liveArtistStyles(music: music)
         let artistDecisions: ArtistDecisionStore? = isAutomatedTest ? nil : ArtistDecisionStore(directory: ArtistDecisionStore.defaultDirectory)
+        let artistConsensus: ArtistConsensusStore? = isAutomatedTest ? nil : ArtistConsensusStore(directory: ArtistConsensusStore.defaultDirectory)
         #else
         let artistStyles: ArtistStylesFactory? = liveArtistStyles(music: music)
         let artistDecisions: ArtistDecisionStore? = ArtistDecisionStore(directory: ArtistDecisionStore.defaultDirectory)
+        let artistConsensus: ArtistConsensusStore? = ArtistConsensusStore(directory: ArtistConsensusStore.defaultDirectory)
         #endif
         return AppModel(
             configStore: store,
@@ -366,7 +378,8 @@ final class AppModel {
             relayLifecycle: relayLifecycle,
             timing: timing,
             artistStyles: artistStyles,
-            artistDecisions: artistDecisions
+            artistDecisions: artistDecisions,
+            artistConsensus: artistConsensus
         )
     }
 
@@ -438,6 +451,16 @@ final class AppModel {
 
     private func receiveArtistBook(_ book: ArtistStyleBook) {
         artistBook = book
+    }
+
+    /// 增補計劃 §4.2：先換播放端的表（下次播放生效），再落盤；落盤失敗只影響下次啟動，記日誌
+    private func receiveConsensus(_ snapshot: ArtistConsensusStore.Snapshot) {
+        consensusTable = snapshot.table
+        do {
+            try artistConsensus?.save(snapshot)
+        } catch {
+            Self.consensusLog.error("artist consensus file not written")
+        }
     }
 
     /// ⑧：先落盤再換 snapshot；落盤失敗就丟出、這次決定不生效

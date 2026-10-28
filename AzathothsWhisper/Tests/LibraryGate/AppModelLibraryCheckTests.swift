@@ -12,14 +12,14 @@ struct AppModelLibraryCheckTests {
     }
 
     private func model(music: MockMusicClient, decisions: ArtistDecisionStore?, suiteName: String,
-                       artistStyles: AppModel.ArtistStylesFactory? = nil) -> AppModel {
+                       artistStyles: AppModel.ArtistStylesFactory? = nil, consensus: ArtistConsensusStore? = nil) -> AppModel {
         AppModel(
             configStore: ConfigStore(secrets: EphemeralSecretStore(), defaults: UserDefaults(suiteName: suiteName)!),
             httpClient: MockHTTPClient(), music: music, monitor: NowPlayingMonitor(music: music, clock: GatedPollClock()),
             validator: AlwaysValidValidator(), notifier: SpyLyricsNotifier(), playerSignal: SpyPlayerChangeSignal(),
             initialToken: "", initialLanguage: .system, artistStylesStartDelay: .milliseconds(1), lyricsFlowClock: GatedPollClock(),
             positionPollClock: GatedPollClock(), isMusicRunning: { true },
-            artistStyles: artistStyles, artistDecisions: decisions
+            artistStyles: artistStyles, artistDecisions: decisions, artistConsensus: consensus
         )
     }
 
@@ -44,6 +44,49 @@ struct AppModelLibraryCheckTests {
         model.libraryCheck.decide(.style(rowID: "punk"), forArtists: ["Paper Harbour"])
         #expect(model.lyricsFX.artistDecision("Paper Harbour") == .style(rowID: "punk"))
         #expect(ArtistDecisionStore(directory: directory).load().book.decision(forArtist: "Paper Harbour")?.choice == .style(rowID: "punk"))
+    }
+
+    // 增補計劃 §4.2 快照：完整掃描算出的共識表存檔、給歌詞特效；下次啟動載入
+    @Test func aCompleteScanSavesTheConsensusAndHandsItToLyricsFX() async throws {
+        let suiteName = "AppModelLibraryCheckTests-\(UUID().uuidString)"
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let music = MockMusicClient(script: [.notPlaying], repeatLast: true)
+        await music.setSnapshot([
+            LibraryTrackRow(persistentID: "1", name: "Song 1", artist: "Paper Harbour", album: "Night Ferry", genre: "Hard Rock"),
+            LibraryTrackRow(persistentID: "2", name: "Song 2", artist: "Paper Harbour", album: "Night Ferry", genre: "Hard Rock"),
+            LibraryTrackRow(persistentID: "3", name: "Song 3", artist: "Paper Harbour", album: "Night Ferry", genre: "Rock"),
+        ])
+        await music.setArtistLyrics(["1", "2", "3"].map { ArtistLyricsRow(persistentID: $0, lyrics: "Lanterns over the river") }, for: "Paper Harbour")
+        let directory = tempDirectory()
+        let model = model(music: music, decisions: nil, suiteName: suiteName, consensus: ArtistConsensusStore(directory: directory))
+        defer { model.stop() }
+        #expect(model.lyricsFX.artistConsensus("Paper Harbour") == nil)
+
+        model.libraryCheck.rescan()
+        await model.libraryCheck.waitForScan()
+        let expected = AppleGenreConsensus(genreRows: .init(rowIDs: ["hardrock"], votes: 2, evidence: 2), genericRows: nil)
+        #expect(model.libraryCheck.report?.composed == .zero)
+        #expect(model.lyricsFX.artistConsensus("PAPER HARBOUR") == expected, "以寫法家族查")
+        #expect(ArtistConsensusStore(directory: directory).load()?.table[ArtistDecisionBook.key("Paper Harbour")] == expected)
+
+        let relaunched = self.model(music: music, decisions: nil, suiteName: suiteName, consensus: ArtistConsensusStore(directory: directory))
+        defer { relaunched.stop() }
+        #expect(relaunched.lyricsFX.artistConsensus("Paper Harbour") == expected)
+    }
+
+    @Test func anIncompleteScanLeavesTheSavedConsensusAlone() async throws {
+        let suiteName = "AppModelLibraryCheckTests-\(UUID().uuidString)"
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let directory = tempDirectory()
+        let saved = ["paper harbour": AppleGenreConsensus(genreRows: .init(rowIDs: ["gothic"], votes: 2, evidence: 2), genericRows: nil)]
+        try ArtistConsensusStore(directory: directory).save(.init(builtAt: Date(timeIntervalSince1970: 1_790_000_000), table: saved))
+        let music = MockMusicClient(script: [.notPlaying], repeatLast: true)   // 替身曲庫是空的＝掃描未完成
+        let model = model(music: music, decisions: nil, suiteName: suiteName, consensus: ArtistConsensusStore(directory: directory))
+        defer { model.stop() }
+        model.libraryCheck.rescan()
+        await model.libraryCheck.waitForScan()
+        #expect(ArtistConsensusStore(directory: directory).load()?.table == saved)
+        #expect(model.lyricsFX.artistConsensus("Paper Harbour") == saved["paper harbour"])
     }
 
     @Test func savedDecisionsAreLoadedAtLaunch() throws {

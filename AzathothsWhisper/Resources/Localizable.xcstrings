@@ -4393,6 +4393,190 @@
           }
         }
       }
+    },
+    "library_check_source_jpop_estimated": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "J-Pop (estimated: no lyrics yet; most of this artist's songs with lyrics are Japanese — Japanese/with lyrics; re-judged once lyrics are added)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "J-Pop（推定：この曲はまだ歌詞なし。同じアーティストの歌詞ありの曲の過半数が日本語——日本語／歌詞あり。歌詞を書き込むと再判定）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "J-Pop（推定：此曲還沒有歌詞；同歌手有詞的歌過半是日文——日文／有詞；寫入歌詞後重判）"
+          }
+        }
+      }
+    },
+    "library_check_source_apple_consensus": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Artist majority (Apple genre)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同じアーティストの多数派（Apple のジャンル）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同歌手多數（Apple 曲風）"
+          }
+        }
+      }
+    },
+    "library_check_source_generic_apple_consensus": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Artist majority (generic row, Apple genre)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同じアーティストの多数派（汎用、Apple のジャンル）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同歌手多數（通用列，Apple 曲風）"
+          }
+        }
+      }
+    },
+    "library_check_consensus_fallback": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "artist majority unavailable; per-song genre used"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アーティストの多数派が使えないため曲ごとのジャンル"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同歌手多數不可用，改依單曲曲風"
+          }
+        }
+      }
+    },
+    "library_check_column_apple_genre": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Genre"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple のジャンル"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple 曲風"
+          }
+        }
+      }
+    },
+    "library_check_show_artist_songs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show This Artist's Songs"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアーティストの曲だけ表示"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只看這位歌手的歌"
+          }
+        }
+      }
+    },
+    "library_check_artist_filter %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Artist: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アーティスト：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌手：%@"
+          }
+        }
+      }
+    },
+    "library_check_clear_filter": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show All"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべて表示"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示全部"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

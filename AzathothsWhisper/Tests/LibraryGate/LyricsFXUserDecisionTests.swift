@@ -39,6 +39,25 @@ struct LyricsFXUserDecisionTests {
         #expect(tags(vm.recipe) == [.genIndustrial], "下一次播放套使用者指定的列")
     }
 
+    /// 增補計劃 §4.2：同歌手共識也照定格規則——播放途中才載入，下一次播放才生效
+    @Test func theArtistConsensusAppliesFromTheNextPlay() {
+        final class ConsensusBox { var value: AppleGenreConsensus? }
+        let box = ConsensusBox()
+        let vm = model()
+        vm.artistConsensus = { _ in box.value }
+        let track = TrackInfo.fixture(id: "A", artist: "Velvet Lanterns")
+        vm.handle(.trackChanged(track, existingLyrics: Self.lyrics, metadata: Self.unknown))
+        #expect(tags(vm.recipe) == nil, "沒有共識：素面")
+
+        box.value = AppleGenreConsensus(genreRows: nil, genericRows: .init(rowIDs: ["industrial"], votes: 2, evidence: 2))
+        vm.handle(.metadataChanged(persistentID: "A", metadata: TrackMetadata(genre: "Glimmerwave Foo", duration: 201)))
+        #expect(tags(vm.recipe) == nil, "同一次播放不重組")
+
+        vm.handle(.notPlaying)
+        vm.handle(.trackChanged(track, existingLyrics: Self.lyrics, metadata: Self.unknown))
+        #expect(tags(vm.recipe) == [.genIndustrial], "下一次播放套同歌手共識")
+    }
+
     @Test func theCallbackGetsTheTrackArtist() {
         var asked: [String] = []
         let vm = model()

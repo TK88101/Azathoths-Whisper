@@ -25,6 +25,9 @@ struct LibraryCheckPresentationTests {
         "library_check_status_not_scanned", "library_check_status_scanning", "library_check_status_incomplete", "library_check_status_needs_rescan",
         "library_check_status_failing", "library_check_status_passed",
         "library_check_reason_signed_missing_parts", "library_check_reason_no_row",
+        "library_check_source_jpop_estimated", "library_check_source_apple_consensus", "library_check_source_generic_apple_consensus",
+        "library_check_consensus_fallback", "library_check_column_apple_genre", "library_check_show_artist_songs",
+        "library_check_artist_filter %@", "library_check_clear_filter",
     ]
 
     private func row(_ id: String, _ artist: String, name: String = "Song", genre: String = "Rock") -> LibraryGateReport.Row {
@@ -40,6 +43,8 @@ struct LibraryCheckPresentationTests {
         (.rows(.appleGenre, ["black"]), "library_check_source_apple", "black"),
         (.rows(.genericMB, ["industrial"]), "library_check_source_generic_mb", "industrial"),
         (.rows(.genericApple, ["pop"]), "library_check_source_generic_apple", "pop"),
+        (.rows(.appleConsensus, ["hardrock"]), "library_check_source_apple_consensus", "hardrock"),
+        (.rows(.genericAppleConsensus, ["pop"]), "library_check_source_generic_apple_consensus", "pop"),
         (.none, "library_check_source_none", ""),
         (.pending, "library_check_source_pending", ""),
     ] as [(ProfileExplanation.Key, String, String)])
@@ -74,6 +79,49 @@ struct LibraryCheckPresentationTests {
     ] as [(LibraryCheckViewModel.Status, String)])
     func everyStatusHasAKey(status: LibraryCheckViewModel.Status, expected: String) {
         #expect(LibraryCheckPresentation.status(status) == expected)
+    }
+
+    // 增補計劃 §4.1、§4.2：推定與共識的來源要帶可核對的數字
+
+    private func report(_ tracks: [ScannedTrack]) -> LibraryGateReport {
+        LibraryGateReport(tracks: tracks, artistStyles: ArtistStyleBook(), decisions: ArtistDecisionBook())
+    }
+
+    private func track(_ id: String, _ artist: String, genre: String = "Rock", lyrics: Bool = true, japanese: Bool = false) -> ScannedTrack {
+        ScannedTrack(persistentID: id, name: "Song \(id)", artist: artist, album: "Paper Boats", genre: genre, hasLyrics: lyrics, isJapanese: japanese)
+    }
+
+    @Test func anEstimatedSongShowsJapaneseOverWithLyrics() throws {
+        let r = report([track("1", "Paper Harbour", japanese: true), track("2", "Paper Harbour", japanese: true), track("3", "Paper Harbour"), track("4", "Paper Harbour", lyrics: false)])
+        let text = LibraryCheckPresentation.source(for: try #require(r.rows.last))
+        #expect(text == .init(key: "library_check_source_jpop_estimated", detail: "2/3", note: nil))
+    }
+
+    @Test func aConsensusSongShowsTheRowsAndTheVotes() throws {
+        let r = report([track("1", "Paper Harbour", genre: "Hard Rock"), track("2", "Paper Harbour", genre: "Hard Rock"), track("3", "Paper Harbour", genre: "Gothic"), track("4", "Paper Harbour")])
+        let text = LibraryCheckPresentation.source(for: try #require(r.rows.last))
+        #expect(text == .init(key: "library_check_source_apple_consensus", detail: "hardrock · 2/3", note: nil))
+    }
+
+    @Test func aFallbackFromTheConsensusIsShown() throws {
+        let explanation = ProfileExplanation(
+            resolution: .genreRow(SongProfileResolver.compose(genres: ["Gothic"])!), key: .rows(.appleGenre, ["gothic"]),
+            trace: [.init(layer: .appleConsensus, rowIDs: ["retired"], outcome: .noHit), .init(layer: .appleGenre, rowIDs: ["gothic"], outcome: .adopted)]
+        )
+        let base = row("1", "Paper Harbour")
+        let fallback = LibraryGateReport.Row(
+            track: base.track, familyKey: base.familyKey, explanation: explanation, mbStatus: base.mbStatus, decision: nil, noStyleReason: nil,
+            issues: [], japaneseEstimate: nil, consensusVote: nil
+        )
+        #expect(LibraryCheckPresentation.source(for: fallback) == .init(key: "library_check_source_apple", detail: "gothic", note: "library_check_consensus_fallback"))
+        #expect(LibraryCheckPresentation.source(for: base).note == nil)
+    }
+
+    @Test func theSongListCanShowOneArtistFamily() {
+        let rows = report([track("1", "Paper Harbour"), track("2", "PAPER HARBOUR"), track("3", "Velvet Lanterns")]).rows
+        let family = ArtistDecisionBook.key("Paper Harbour")
+        #expect(LibraryCheckPresentation.filter(rows, failingOnly: false, search: "", family: family).map(\.track.persistentID) == ["1", "2"])
+        #expect(LibraryCheckPresentation.filter(rows, failingOnly: false, search: "", family: nil).count == 3)
     }
 
     @Test func theSongListFiltersByIssueAndSearch() {

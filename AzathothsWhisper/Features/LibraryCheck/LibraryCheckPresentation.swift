@@ -4,8 +4,27 @@ import Foundation
 enum LibraryCheckPresentation {
     struct SourceText: Equatable {
         let key: String
-        /// 嵌進文案的細節（團名、列 id）；沒有＝空字串
+        /// 嵌進文案的細節（團名、列 id、票數）；沒有＝空字串
         let detail: String
+        /// 附註的字串鍵（例：同歌手共識不可用、改依單曲）；沒有＝nil
+        let note: String?
+
+        init(key: String, detail: String, note: String? = nil) {
+            self.key = key
+            self.detail = detail
+            self.note = note
+        }
+    }
+
+    /// 逐首來源：推定日文帶「日文／有詞」，同歌手共識帶「列 · 票數／證據數」，共識退回單曲時加附註（增補計劃 §4.1、§4.2）
+    static func source(for row: LibraryGateReport.Row) -> SourceText {
+        if let estimate = row.japaneseEstimate {
+            return SourceText(key: "library_check_source_jpop_estimated", detail: "\(estimate.japaneseSongs)/\(estimate.lyricsSongs)")
+        }
+        let base = source(row.explanation.key)
+        let detail = row.consensusVote.map { "\(base.detail) · \($0.votes)/\($0.evidence)" } ?? base.detail
+        let fellBack = row.explanation.trace.contains { [.appleConsensus, .genericAppleConsensus].contains($0.layer) && $0.outcome != .adopted }
+        return SourceText(key: base.key, detail: detail, note: fellBack ? "library_check_consensus_fallback" : nil)
     }
 
     static func source(_ key: ProfileExplanation.Key) -> SourceText {
@@ -22,8 +41,10 @@ enum LibraryCheckPresentation {
         switch layer {
         case .userStyle: "library_check_source_user"
         case .mbGenre: "library_check_source_mb"
+        case .appleConsensus: "library_check_source_apple_consensus"
         case .appleGenre: "library_check_source_apple"
         case .genericMB: "library_check_source_generic_mb"
+        case .genericAppleConsensus: "library_check_source_generic_apple_consensus"
         case .genericApple: "library_check_source_generic_apple"
         }
     }
@@ -69,11 +90,12 @@ enum LibraryCheckPresentation {
         }
     }
 
-    /// 逐首表：只看不合格／依曲名、歌手、專輯搜尋（不分大小寫）
-    static func filter(_ rows: [LibraryGateReport.Row], failingOnly: Bool, search: String) -> [LibraryGateReport.Row] {
+    /// 逐首表：只看不合格／只看一位歌手（寫法家族，增補計劃 R4）／依曲名、歌手、專輯搜尋（不分大小寫）
+    static func filter(_ rows: [LibraryGateReport.Row], failingOnly: Bool, search: String, family: String? = nil) -> [LibraryGateReport.Row] {
         let needle = search.trimmingCharacters(in: .whitespaces)
         return rows.filter { row in
             (!failingOnly || !row.issues.isEmpty)
+                && (family.map { $0 == row.familyKey } ?? true)
                 && (needle.isEmpty || [row.track.name, row.track.artist, row.track.album].contains { $0.localizedCaseInsensitiveContains(needle) })
         }
     }

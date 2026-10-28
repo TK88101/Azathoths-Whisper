@@ -63,6 +63,8 @@ final class LyricsFXViewModel {
     @ObservationIgnored var artistGenres: (String) -> ArtistGenres = { _ in .unknown }
     /// ⑧：使用者在曲庫檢查下的決定（AppModel 讀不可變快照；feature 不持有服務）
     @ObservationIgnored var artistDecision: (String) -> ArtistDecision.Choice? = { _ in nil }
+    /// 同歌手 Apple 曲風共識（增補計劃 §4.2）：最近一次完整掃描存下的表；沒有＝逐曲判定
+    @ObservationIgnored var artistConsensus: (String) -> AppleGenreConsensus? = { _ in nil }
 
     init(
         positionClock: PlaybackPositionClock, nonceSource: any FXNonceSource = SystemNonceSource(),
@@ -226,7 +228,7 @@ final class LyricsFXViewModel {
         guard let signature = sessionSignature else { return }
         let resolution = SongProfileResolver.resolve(
             artist: sessionArtist, genre: metadata.genre, lyrics: LyricsEvidence.of(lyrics), artistGenres: artistGenres(sessionArtist),
-            decision: artistDecision(sessionArtist)
+            decision: artistDecision(sessionArtist), consensus: artistConsensus(sessionArtist)
         )
         guard let source = resolution.source, Self.shouldCompose(settled: settledSource, now: source) else { return }
         recipe = sessionRecipe(for: resolution, signature: signature)

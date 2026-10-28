@@ -276,15 +276,17 @@ enum SongProfileResolver {
 
     static func resolve(
         artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown, decision: ArtistDecision.Choice? = nil,
-        rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows
+        consensus: AppleGenreConsensus? = nil, rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows
     ) -> ProfileResolution {
-        explain(artist: artist, genre: genre, lyrics: lyrics, artistGenres: artistGenres, decision: decision, rows: rows, genericRows: genericRows).resolution
+        explain(
+            artist: artist, genre: genre, lyrics: lyrics, artistGenres: artistGenres, decision: decision, consensus: consensus, rows: rows, genericRows: genericRows
+        ).resolution
     }
 
     /// 判定的唯一實作（⑧ 計劃 §4.2）：結果＋來源 key＋每一層的嘗試
     static func explain(
         artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown, decision: ArtistDecision.Choice? = nil,
-        rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows,
+        consensus: AppleGenreConsensus? = nil, rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows,
         rejected: Set<ProfileExplanation.AuditKey> = ReadabilityPolicy.rejected
     ) -> ProfileExplanation {
         if let band = signedBand(artist) { return ProfileExplanation(resolution: .signedBand(band.profile), key: .signed(band.name), trace: []) }
@@ -328,10 +330,24 @@ enum SongProfileResolver {
         if let mb, let (profile, ids) = attempt(.mbGenre, hits(normalized: mb, rows: rows)) { return adopted(.artistGenreRow(profile), .mbGenre, ids) }
         // genre nil＝讀取失敗、還不知道：要等它，Apple 的既有列優先於通用列（⑦ 計劃 §4.1）
         guard let genre else { return ProfileExplanation(resolution: .pending, key: .pending, trace: trace) }
+        /// 同歌手共識（增補計劃 §4.2）：整位用同一組列；列不在目錄、組不出或被拒絕就退回同層的逐曲判定，都記進 trace
+        func attemptConsensus(_ layer: ProfileExplanation.Layer, _ vote: AppleGenreConsensus.Vote?, from pool: [KeywordRow]) -> (SongProfile, [String])? {
+            guard let vote else { return nil }
+            let chosen = pool.filter { vote.rowIDs.contains($0.id) }
+            guard chosen.count == vote.rowIDs.count else {
+                trace.append(.init(layer: layer, rowIDs: vote.rowIDs, outcome: .noHit))
+                return nil
+            }
+            return attempt(layer, chosen)
+        }
         let apple = [GenreStyleResolver.normalized(genre)]
+        if let (profile, ids) = attemptConsensus(.appleConsensus, consensus?.genreRows, from: rows) { return adopted(.genreRow(profile), .appleConsensus, ids) }
         if let (profile, ids) = attempt(.appleGenre, hits(normalized: apple, rows: rows)) { return adopted(.genreRow(profile), .appleGenre, ids) }
-        // 通用層：先 MB（比 Apple 細），再 Apple
+        // 通用層：先 MB（比 Apple 細），再 Apple（同歌手共識優先於逐曲）
         if let mb, let (profile, ids) = attempt(.genericMB, hits(normalized: mb, rows: genericRows)) { return adopted(.genericRow(profile), .genericMB, ids) }
+        if let (profile, ids) = attemptConsensus(.genericAppleConsensus, consensus?.genericRows, from: genericRows) {
+            return adopted(.genericRow(profile), .genericAppleConsensus, ids)
+        }
         if let (profile, ids) = attempt(.genericApple, hits(normalized: apple, rows: genericRows)) { return adopted(.genericRow(profile), .genericApple, ids) }
         return ProfileExplanation(resolution: .noMatch, key: .none, trace: trace)
     }
