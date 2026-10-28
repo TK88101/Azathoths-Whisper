@@ -234,3 +234,31 @@ B（若做）：另加 `SongProfileResolver.explain`、`ProfileExplanation.Layer
 ### R7（2026-10-28，v0.6 快速複審）
 - 修正 1、2：**成立**，實作與文字一致（含 MB 通用列組不出時仍退回逐曲 Apple，不直接素面）。
 - 高：掃描後 MB 存檔變動時，播放端（讀目前 MB）與報表保存的共識證據可能不同步 → **採納其第二個選項**：明文定義為「需重掃後才一致」，寫進 §4.2 過期語義。理由：MB 只會對掃描當時還沒查過的歌手變動（每位只查一次），且畫面已顯示「需重新掃描」；把 MB 狀態納入快照失效條件要再存一份 MB 摘要，收益只在首次背景查詢期間。
+
+## 附錄 E 實作記錄與 simcodex（2026-10-28，`wip/lyrics-library-gate`：79810f5 → 31c92e6 → 2271b8e）
+- **TDD**：A（報表推定 7 條）紅→綠；B1／B2（共識 6＋判定 10 條）實作先寫、紅燈事後補做（移開實作確認型別未定義）；報表共識、存檔、接線、畫面、U3 兩處修正、simcodex 各修正皆先紅後綠。U6 假曲庫計數由單元測試 `theUITestFixtureStartsWithOnePlainSongAndTwoOpenIdentities` 先守（UI 測試待使用者在場）。
+- **simcodex 3 輪**（審 c846ee1..HEAD＋工作樹）：
+| 輪 | 來源 | 意見 | 處置 |
+|---|---|---|---|
+| 1 | simplify 簡化／效率 P1 | 報表第一段白建一萬多筆 Row、兩段都逐首重判；`consensusVote` 存兩份可推導值；`vote(for:)` 死碼；寫法家族鍵每首算一次 | **採納**：每種判定鍵只判一次、第二段只重判有共識的歌手；刪 `consensusVote`，來源欄以層→tier 查報表共識；家族鍵每寫法算一次 |
+| 1 | simplify 效率／層級 P1 | 每次使用者決定都重寫共識檔；回呼註解與實際觸發不符 | **採納**：表沒變不寫；註解改正（決定也會改變證據，保留觸發） |
+| 1 | simplify 層級 P1 | MB 優先停用共識時沒留 trace，畫面說不出原因 | **採納**：新 outcome `overriddenByMB`、來源欄附註（三語 1 條） |
+| 1 | simplify 重用 P2 | generic 抑制兩處定義 | **採納**：`SongProfileResolver.preferSpecific` 一處 |
+| 1 | security-reviewer | 無 CRITICAL／HIGH／MEDIUM；LOW：目錄符號連結（同既有三個存檔）、竄改檔塞超長列清單會讓播放每次逐一比對、竄改可指定任意真列組合 | **採納 L2**：載入時丟掉空／重複／比目錄長的票；L1、L3 延後（同既有存檔／屬完整性） |
+| 1 | codex review [P2] | 寫檔失敗後同一張表不再重試 | **採納**：另記「已寫入的表」；`aFailedConsensusWriteIsRetriedOnTheNextScan` |
+| 1 | codex review [P2] | 同一 persistentID 重複出現會多算票 | **採納**：計票以 persistentID 去重；`aRepeatedTrackIsOneVote` |
+| 2 | simplify 簡化 P1 | 家族鍵查法寫 5 次、計票去重靠副作用、「兩 tier 皆空＝沒有共識」兩處、`isMostlyJapanese` 被內聯 | **採納** |
+| 2 | simplify 效率／層級 | 無 P1；層↔tier 對應三處（P2，兩份都點到） | **採納**：只定義在 `Tier.appleLayer／consensusLayer` |
+| 2 | codex review [P1] | `Tier` 拿掉 String 後失去 Equatable、無法編譯 | **駁回（誤報）**：無關聯值的 enum 自動 Equatable／Hashable；已編譯且 143 條測試綠 |
+| 3 | codex review | 無問題 | — |
+| 3 | simplify 四角度 | 無 P1 | 收斂 |
+- 每輪驗證：相關 14 suite 143→145 條綠；真曲庫逐首比對（附錄 D）每輪重跑結果不變。
+- **遺留 P2**：①四個存檔（Decision／Style／Timing／Consensus）檔案防線與 JSON coder 抽共用（含目錄符號連結）；②SHA-256 轉十六進位四處；③`Snapshot.builtAt` 目前只有測試讀；④`SourceText` 手寫 init；⑤`Verdict.familyKey` 可推導；⑥證據以「權重」代替逐首展開；⑦報表移出主執行緒；⑧`Key.layer` 存取子；⑨`family` 閉包的退路分支、`plain[key]!`；⑩`AppleGenreConsensus` 兩個 tier 以字典存（只在要第三個 tier 時）。
+
+## 附錄 F 全量測試（2026-10-28 23:0x–10-29 00:49，2271b8e）
+- 全量單元（`-enableCodeCoverage`，已知 flaky `BatchOverlappingLoadTests/overlappingLoadSuspendsPollingUntilLastCompletes()` 以完整名稱 skip）：**1,978 條，通過 1,946、失敗 7、略過 25**。
+- 失敗 7 條，兩類，**都與本次修改無關**：
+  1. `CoverFlowStripRenderGeometryTests` 3 條（上螢幕，`items.count >= 5`）：單獨重跑全綠（0.8–5 s）。與記憶中「Cover Flow 上螢幕測試 AX 讀到 0 個屬環境暫態」同型；本次未改任何 Cover Flow 程式。**未以重跑結案**，列為環境遺留。
+  2. `LyricsFXContrastTests` 4 條（G1 主字對比）：**超過每條 120 s 上限**，不是判定失敗。改上限 600 s 量：修改前 c846ee1 單條 234.4 s、修改後 233.6 s（同機前後緊接），兩版皆通過；這 4 條用到的程式（可讀性稽核集合、元件目錄、Composer）本次 0 改動。⑧ 10-28 全量同設定通過——推測本機目前較慢（fileproviderd 約 55 % CPU），待機器閒時重跑全量確認；不放寬上限。
+- coverage_gate（傳入本次 xcresult）：**exit 0**，Services+Infra 96.5 %（5309/5503），豁免 483／490；新增或修改檔：AppleGenreConsensus 100 %、ArtistConsensusStore 100 %、ProfileExplanation 100 %、SongProfileResolver 99.2 %、LibraryGateReport 95.6 %。
+- `no_playback_gate.sh` exit 0；Scripts 443 條綠。
