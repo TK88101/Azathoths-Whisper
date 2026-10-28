@@ -323,3 +323,13 @@
 - 處置：新檔 `Services/Music/LibraryColumns.swift`（欄位→列、欄數與長度檢查、讀不完整 throw），`LibraryColumnsTests` 先紅後綠；AE 檔只留 ScriptingBridge 呼叫，並把 `whose artist == X` 篩選收成一個 `tracks(_:byArtist:)`（`artistTracks` 與 `artistLyrics` 共用）。`EXEMPT_LINE_BUDGET` 470→**490**、`Scripts/test_coverage_gate.py` 471／470→491／490（Scripts 443 條綠）——**預算調整待使用者批准**。
 - **全量單元第 2 次**（同上 skip）：**1,929 條／234 suite 全綠**（7,207 s）。抽出後豁免檔 **483 行**（比 Codex 推估 493 少），依「留約 6–7 行餘裕」把預算定為 490（不是原提的 500）；coverage_gate **exit 0**：Services+Infra 96.4%（5096/5289）、豁免 483／490。`no_playback_gate.sh` exit 0。
 
+## 附錄 H 使用者在場 #1：真機開啟曲庫檢查（2026-10-28 21:49）
+- Debug 版（e9f62ca 建置）`Settings ▸ Library Check...` → Rescan。畫面四項計數與 §2.2 量測**完全一致**：身分未定 1,173 首／137 位（有詞 316／36）、素面 572 首／57 位（有詞 142／18），其中署名待補 178 首／4 位；可讀性未檢查 0、缺來源 0；狀態「Gate not met」。
+- **T0 真機掃描耗時**（OSLog `library-gate`）：tracks=12271、reads=491、**elapsed 69.8 s**——在 3 分鐘停損線內。掃描中 `nowPlaying` 延遲未量（需使用者邊播邊掃，留待下次）。
+- 待處理歌手前幾位（截圖）：HIM 223 首／18 張（身分未定＋素面，MB 多個候選）、Rammstein 78（署名待補）、Yorushika 69（身分未定＋素面，MB 查無同名）、Negative 68（身分未定，多個候選）、The London Suede 58（身分未定，查無）、Daft Punk 54（署名待補）、Muse 43（身分未定＋素面，多個候選）。
+- **更正**：署名待補的 4 團包含 **Daft Punk**（54 首）。附錄 C／§10-1 的 /thecure 提示裡把 4 團寫成 Rammstein、The Chemical Brothers、Fatboy Slim、Aphex Twin，是未核對的記憶；結論（另立補元件計劃、不做署名替換）不受影響，補元件計劃以實際名單為準。
+- **新發現（下個 session 處理，使用者 2026-10-28 指示）**：
+  1. 日文歌手（例：Yorushika）的**無詞曲**判不出是不是日文 → 走一般流程 → 素面＋身分未定；有詞的同歌手曲是 J-Pop。寫入日文詞後會自動變 J-Pop，但目前擋閘門。
+  2. 知名樂團因 MB 同名多筆（ambiguous）而身分未定、Apple 又只標粗分類 → 整位素面（HIM 223 首、Muse 43 首）。
+  - 使用者目標：「讓它盡量把掃不出來結果的狀況能少就少一些」——下個 session 先量各類原因的曲數，提出減少自動判不出（身分未定／素面）的方案，經 /thecure 後給使用者拍板，再實作。
+
