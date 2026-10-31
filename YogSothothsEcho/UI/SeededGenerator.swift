@@ -13,3 +13,10 @@ struct SeededGenerator: RandomNumberGenerator {
     /// 0…1
     mutating func nextUnit() -> Double { Double(next() >> 11) / Double(1 << 53) }
 }
+
+/// FNV-1a 64（UTF-8 位元組）：書脊磨損與唱片花紋（CR-037）的種子共用
+enum FNV1a64 {
+    static func hash(_ text: String) -> UInt64 {
+        text.utf8.reduce(0xCBF2_9CE4_8422_2325) { ($0 ^ UInt64($1)) &* 0x0000_0100_0000_01B3 }
+    }
+}

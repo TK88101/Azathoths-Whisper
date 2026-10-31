@@ -56,10 +56,7 @@ enum SpineWear {
     static let ageRange: ClosedRange<Double> = 0.6...1.3
     static let spineEndRange: ClosedRange<Double> = 0.3...1.6
 
-    /// FNV-1a 64
-    static func seed(albumID: String) -> UInt64 {
-        albumID.utf8.reduce(0xCBF2_9CE4_8422_2325) { ($0 ^ UInt64($1)) &* 0x0000_0100_0000_01B3 }
-    }
+    static func seed(albumID: String) -> UInt64 { FNV1a64.hash(albumID) }
 
     static func shape(albumID: String) -> SpineWearShape {
         var rng = SeededGenerator(seed: seed(albumID: albumID))
