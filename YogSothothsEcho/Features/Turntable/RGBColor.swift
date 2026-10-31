@@ -73,6 +73,24 @@ extension RGBColor {
 }
 
 extension RGBColor {
+    /// 正規化 HSL：色相度、飽和與亮度 0…1（SWIRL 配色用；既有 `hsl` 是百分比，不改）
+    var hslUnit: (hue: Double, saturation: Double, lightness: Double) {
+        let v = hsl
+        return (v.hue, v.saturation / 100, v.lightness / 100)
+    }
+
+    /// 正規化 HSL 建色；飽和與亮度先夾到 0…1
+    init(hueDegrees: Double, saturationUnit: Double, lightnessUnit: Double) {
+        self.init(hue: hueDegrees, saturation: min(max(saturationUnit, 0), 1) * 100, lightness: min(max(lightnessUnit, 0), 1) * 100)
+    }
+
+    /// 量化到 8 bit（與配色小樣的整數運算一致）
+    var quantized8: RGBColor {
+        RGBColor(r: (r * 255).rounded() / 255, g: (g * 255).rounded() / 255, b: (b * 255).rounded() / 255)
+    }
+}
+
+extension RGBColor {
     /// source-over：把 `top` 以 `alpha` 疊在自己上面
     func over(_ top: RGBColor, alpha: Double) -> RGBColor {
         RGBColor(r: top.r * alpha + r * (1 - alpha), g: top.g * alpha + g * (1 - alpha), b: top.b * alpha + b * (1 - alpha))

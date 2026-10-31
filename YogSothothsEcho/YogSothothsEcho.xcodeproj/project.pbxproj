@@ -49,6 +49,7 @@
 		28A03B5A453FE70D2241F276 /* SpineWrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FBBD476853380D370DDF30 /* SpineWrap.swift */; };
 		2A2D36F18A8E49BB66BD6F6E /* PaperFiberTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5740EA6F1CE9770CBAE489BA /* PaperFiberTests.swift */; };
 		2C306567E34F9DDB078DD966 /* TonearmGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06CC6039D296A167BE9E90FF /* TonearmGeometryTests.swift */; };
+		2C52F66707A217F3E5767F98 /* SwirlPaletteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBA8D51CE064AF693614B80C /* SwirlPaletteTests.swift */; };
 		2D1433C2510EE89E0B2D9A08 /* LibraryShortRetryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCC18DB0FB08F8C22425C718 /* LibraryShortRetryTests.swift */; };
 		2E086A82B093616972F146C5 /* SpineWrapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FBF23C7113B4D8ADAAA9413 /* SpineWrapTests.swift */; };
 		2E28D41A1A2C2E8A17A55F00 /* PlaybackUITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504A58A5424F398F31C4BBCD /* PlaybackUITestSupport.swift */; };
@@ -205,6 +206,7 @@
 		C4EA8314CCA23B5FB8C8AA01 /* MiddleLayerSkinTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D8F31A5FB5A1DEA65AC816 /* MiddleLayerSkinTests.swift */; };
 		C50DB0997FA5F3F06820B90D /* VinylAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC36A2EF666BA58B669F55D4 /* VinylAssets.swift */; };
 		C7C6C2E2935F8A977292F89B /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A089AD90571C3554A1D7B927 /* Localizable.xcstrings */; };
+		C7D553BEC1A7DEACF9B0BAF9 /* SwirlPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F5522696E6E081301B3876 /* SwirlPalette.swift */; };
 		C7F4446B40DBF9E9DE8F936A /* PlaybackPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E3E7BA71A9F9A667BBC1AFC /* PlaybackPresentationTests.swift */; };
 		C8E0EC52E5242F26B6DA4041 /* TurntableSkinCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3A55C9D57FADDDB9B97D26 /* TurntableSkinCatalogTests.swift */; };
 		C8E934769417C2D1E5DFD4A6 /* TurntableMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4968698D16DF7C21B7DB09ED /* TurntableMetrics.swift */; };
@@ -467,6 +469,7 @@
 		B8ACD3F35BD75B2131A63278 /* SwirlRecipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwirlRecipe.swift; sourceTree = "<group>"; };
 		BAECEC763FF86D2E380FE64F /* TurntableSkin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurntableSkin.swift; sourceTree = "<group>"; };
 		BB38368CD14AAD72F189A498 /* AlbumDetailPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumDetailPresentation.swift; sourceTree = "<group>"; };
+		BBA8D51CE064AF693614B80C /* SwirlPaletteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwirlPaletteTests.swift; sourceTree = "<group>"; };
 		BC9970214BAACAE9B0E0A19E /* RecordSpin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordSpin.swift; sourceTree = "<group>"; };
 		BD1F39AFBCEE314AADB6E41A /* YogSothothsEchoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = YogSothothsEchoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BD5B1EC5E392B60DC043AB98 /* Turbulence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Turbulence.swift; sourceTree = "<group>"; };
@@ -476,6 +479,7 @@
 		C5AF3D1B0AA1ED4B2D6103D8 /* RetryTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryTestSupport.swift; sourceTree = "<group>"; };
 		C7D3ECAFC33AFBF40992BDF0 /* CoverSleeveState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverSleeveState.swift; sourceTree = "<group>"; };
 		C8F04DE4C8CAA7507C1E05F5 /* RecordStyleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordStyleTests.swift; sourceTree = "<group>"; };
+		C8F5522696E6E081301B3876 /* SwirlPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwirlPalette.swift; sourceTree = "<group>"; };
 		C9801610CDF08669AE0CB1F6 /* ConnectionPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionPresentation.swift; sourceTree = "<group>"; };
 		C9F1D3732393EE81B9662505 /* PairingLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingLayout.swift; sourceTree = "<group>"; };
 		CA6086425FBF36E94587B411 /* BrowseLayoutUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseLayoutUITests.swift; sourceTree = "<group>"; };
@@ -772,6 +776,7 @@
 				63B902E3F8D51A1E8622B263 /* SpriteSkinLayoutTests.swift */,
 				D009171DA0253DB3CB37EDE6 /* SpriteSkinTests.swift */,
 				17C4C0951EE90B3AA432F553 /* SwipeTransitionTests.swift */,
+				BBA8D51CE064AF693614B80C /* SwirlPaletteTests.swift */,
 				ED4632432A714F4633040A06 /* SwirlRecipeTests.swift */,
 				CBCFE08B2884E677F35A7F53 /* TechnicsSkinTests.swift */,
 				06CC6039D296A167BE9E90FF /* TonearmGeometryTests.swift */,
@@ -910,6 +915,7 @@
 				B6A9B2C1FF6F276C8AE9A894 /* SpriteSkin.swift */,
 				9E2C3AA73299F4BFC69C951A /* SpriteTonearmView.swift */,
 				2817C1A021DCE21F993544BC /* SwipeTransition.swift */,
+				C8F5522696E6E081301B3876 /* SwirlPalette.swift */,
 				B8ACD3F35BD75B2131A63278 /* SwirlRecipe.swift */,
 				47538DAC421F357E88469929 /* TonearmGeometry.swift */,
 				19C4DE72299DDB815AC44020 /* TonearmSpriteCache.swift */,
@@ -1261,6 +1267,7 @@
 				3F50C8DD513618493640B996 /* SpriteSkinLayoutTests.swift in Sources */,
 				24A9C8D5E63319BCA62B2DD5 /* SpriteSkinTests.swift in Sources */,
 				1F0EA41C5A1693E8CA899F28 /* SwipeTransitionTests.swift in Sources */,
+				2C52F66707A217F3E5767F98 /* SwirlPaletteTests.swift in Sources */,
 				E824AD693BE7C1748DD6DE0E /* SwirlRecipeTests.swift in Sources */,
 				3AA2AED1A8E8FB1E9A7026FC /* SyntheticGeniusTests.swift in Sources */,
 				BC7F41B1F2AC1FC06F05CE5F /* TechnicsSkinTests.swift in Sources */,
@@ -1373,6 +1380,7 @@
 				2E4450CD833B25895EB5CAA8 /* SpriteSkin.swift in Sources */,
 				E63069D4EEE32C12DEAD9DF1 /* SpriteTonearmView.swift in Sources */,
 				B659C666100C14A3DECBADB6 /* SwipeTransition.swift in Sources */,
+				C7D553BEC1A7DEACF9B0BAF9 /* SwirlPalette.swift in Sources */,
 				77467E1FA7D3A2289BE8813A /* SwirlRecipe.swift in Sources */,
 				F53B6C5724BE5FE5D41DA213 /* TonearmGeometry.swift in Sources */,
 				B90BF06AE5F91333AB2BF5A1 /* TonearmSpriteCache.swift in Sources */,
