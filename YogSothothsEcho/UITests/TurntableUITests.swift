@@ -69,6 +69,45 @@ final class TurntableUITests: XCTestCase {
         XCTAssertEqual(closeAndReadTitle(), "Synthetic Song 01")
     }
 
+    /// 叫出浮層（同 closeAndReadTitle：點最右側中間的空白）
+    private func showOverlay(waitingFor element: XCUIElement) {
+        for _ in 0..<5 where !element.exists {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.985, dy: 0.5)).tap()
+            _ = element.waitForExistence(timeout: 1.5)
+        }
+        XCTAssertTrue(element.exists)
+    }
+
+    /// CR-037：浮層 9 顆樣式；點煙渦展開第二排、選變化（不收合）、再點煙渦收合；選擇重開保留
+    func testSmokeVariantRowOpensClosesAndPersists() {
+        let smoke = app.buttons[AccessibilityID.turntableStyle("smoke")]
+        showOverlay(waitingFor: smoke)
+        for raw in ["random", "classic", "transparent", "splash", "marble", "smoke", "streak", "flake", "chunk"] {
+            XCTAssertTrue(app.buttons[AccessibilityID.turntableStyle(raw)].exists, raw)
+        }
+        let darkInk = app.buttons[AccessibilityID.turntableSmokeVariant("darkInk")]
+        smoke.tap()
+        XCTAssertTrue(darkInk.waitForExistence(timeout: 3))
+        darkInk.tap()
+        XCTAssertTrue(waitFor("selected == true", [], on: darkInk))        XCTAssertTrue(darkInk.exists, "選變化不收合")
+        smoke.tap()
+        XCTAssertTrue(waitFor("exists == false", [], on: darkInk))
+
+        app.terminate()
+        app = XCUIApplication.launchConnected([AccessibilityID.nowPlayingArgument])
+        let open = app.buttons[AccessibilityID.nowPlayingOpenTurntable]
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        open.tap()
+        XCTAssertTrue(record.waitForExistence(timeout: 10))
+        let smokeAgain = app.buttons[AccessibilityID.turntableStyle("smoke")]
+        showOverlay(waitingFor: smokeAgain)
+        XCTAssertTrue(smokeAgain.isSelected)
+        smokeAgain.tap()
+        let darkInkAgain = app.buttons[AccessibilityID.turntableSmokeVariant("darkInk")]
+        XCTAssertTrue(darkInkAgain.waitForExistence(timeout: 3))
+        XCTAssertTrue(darkInkAgain.isSelected)
+    }
+
     func testSwipeLeftSkipsToNextAndRightGoesBack() {
         swipe(towardRight: false)
         XCTAssertEqual(closeAndReadTitle(), "Synthetic Song 02")
