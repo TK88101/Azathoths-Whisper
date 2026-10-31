@@ -47,6 +47,7 @@
 		25D72E3C181F793560F89186 /* TurntableSkinCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 122E5BBE67288CE6518DF000 /* TurntableSkinCatalog.swift */; };
 		265B7E7F87DAB7314AE9898B /* UITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CD44062E1013CD68BAB25EA /* UITestSupport.swift */; };
 		28309C07C4D4592185BB86A0 /* SpineBakeCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A0E0178DBE21D502F7CDA8D /* SpineBakeCacheTests.swift */; };
+		2842E4260B87C3D84E458963 /* SwirlArtworkStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24E15FF6DEABA4D0F9A1200F /* SwirlArtworkStoreTests.swift */; };
 		28A03B5A453FE70D2241F276 /* SpineWrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FBBD476853380D370DDF30 /* SpineWrap.swift */; };
 		2A2D36F18A8E49BB66BD6F6E /* PaperFiberTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5740EA6F1CE9770CBAE489BA /* PaperFiberTests.swift */; };
 		2C306567E34F9DDB078DD966 /* TonearmGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06CC6039D296A167BE9E90FF /* TonearmGeometryTests.swift */; };
@@ -146,6 +147,7 @@
 		8C133B5EE2A7BFE6B542C983 /* CarouselHitTestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5495F99343DAAF065C16F31D /* CarouselHitTestTests.swift */; };
 		8D58B8896FA0710CF6D5AFF6 /* BrowseArtworkBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA4511CF7748E1D7D3DB185B /* BrowseArtworkBudgetTests.swift */; };
 		8D673A582B72DD316EB020BD /* RemoteConnectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96444D017858F589D14635B8 /* RemoteConnectorTests.swift */; };
+		8FD828E4DF76C742AD0D7F7E /* SwirlArtworkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84CCCAB31660F317B96EE4CD /* SwirlArtworkStore.swift */; };
 		905DC93D3720A30A625338C5 /* RegaSkinTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDD941CAF55FAACBAC5E8BBF /* RegaSkinTests.swift */; };
 		90EC2087DCE99264D3AE85AA /* FaceTexture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE4B093DB6850D38DB61F16 /* FaceTexture.swift */; };
 		917BA1AA486197F29817FF4E /* ArtworkCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 313FE5FBCC82AB4D4E014D39 /* ArtworkCache.swift */; };
@@ -324,6 +326,7 @@
 		20C4EE4F2BE3E79FD1AD5183 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
 		21437C7AC8144095EB6C4EEC /* DetailArtworkScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailArtworkScheduler.swift; sourceTree = "<group>"; };
 		239056D54144FF6A9CA97A12 /* CameraAuthorization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraAuthorization.swift; sourceTree = "<group>"; };
+		24E15FF6DEABA4D0F9A1200F /* SwirlArtworkStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwirlArtworkStoreTests.swift; sourceTree = "<group>"; };
 		271460C93EA53EA0F2E29207 /* LibraryCatalogChangeEnduranceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCatalogChangeEnduranceTests.swift; sourceTree = "<group>"; };
 		27BA605CEFFBDE304ED16E59 /* scanning-light.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "scanning-light.png"; sourceTree = "<group>"; };
 		2817C1A021DCE21F993544BC /* SwipeTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeTransition.swift; sourceTree = "<group>"; };
@@ -424,6 +427,7 @@
 		81FB08F42BD45F44BEB0A5B4 /* OrientationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrientationTests.swift; sourceTree = "<group>"; };
 		8384A1FA3C6FC13D694B3AE4 /* TurntableHitTestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurntableHitTestTests.swift; sourceTree = "<group>"; };
 		840AFA1B34DCF6BDA9589174 /* AlbumStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumStageView.swift; sourceTree = "<group>"; };
+		84CCCAB31660F317B96EE4CD /* SwirlArtworkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwirlArtworkStore.swift; sourceTree = "<group>"; };
 		85CB52F258A6B66EE2EA7501 /* PlaybackTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackTestSupport.swift; sourceTree = "<group>"; };
 		87F26CD5E5736E780F5EE9FE /* TurntableEntrance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurntableEntrance.swift; sourceTree = "<group>"; };
 		895E0E594520288DEEEC832C /* KeyboardLayoutUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardLayoutUITests.swift; sourceTree = "<group>"; };
@@ -782,6 +786,7 @@
 				63B902E3F8D51A1E8622B263 /* SpriteSkinLayoutTests.swift */,
 				D009171DA0253DB3CB37EDE6 /* SpriteSkinTests.swift */,
 				17C4C0951EE90B3AA432F553 /* SwipeTransitionTests.swift */,
+				24E15FF6DEABA4D0F9A1200F /* SwirlArtworkStoreTests.swift */,
 				CAE5E2AC39C86C4E09D7B096 /* SwirlBakerTests.swift */,
 				BBA8D51CE064AF693614B80C /* SwirlPaletteTests.swift */,
 				ED4632432A714F4633040A06 /* SwirlRecipeTests.swift */,
@@ -922,6 +927,7 @@
 				B6A9B2C1FF6F276C8AE9A894 /* SpriteSkin.swift */,
 				9E2C3AA73299F4BFC69C951A /* SpriteTonearmView.swift */,
 				2817C1A021DCE21F993544BC /* SwipeTransition.swift */,
+				84CCCAB31660F317B96EE4CD /* SwirlArtworkStore.swift */,
 				9148B670AC3B6D3E60C9E640 /* SwirlBaker.swift */,
 				910148B949470A6537672AA9 /* SwirlFace.metal */,
 				C8F5522696E6E081301B3876 /* SwirlPalette.swift */,
@@ -1276,6 +1282,7 @@
 				3F50C8DD513618493640B996 /* SpriteSkinLayoutTests.swift in Sources */,
 				24A9C8D5E63319BCA62B2DD5 /* SpriteSkinTests.swift in Sources */,
 				1F0EA41C5A1693E8CA899F28 /* SwipeTransitionTests.swift in Sources */,
+				2842E4260B87C3D84E458963 /* SwirlArtworkStoreTests.swift in Sources */,
 				D6C35BDF8D438D6F5541DF5E /* SwirlBakerTests.swift in Sources */,
 				2C52F66707A217F3E5767F98 /* SwirlPaletteTests.swift in Sources */,
 				E824AD693BE7C1748DD6DE0E /* SwirlRecipeTests.swift in Sources */,
@@ -1390,6 +1397,7 @@
 				2E4450CD833B25895EB5CAA8 /* SpriteSkin.swift in Sources */,
 				E63069D4EEE32C12DEAD9DF1 /* SpriteTonearmView.swift in Sources */,
 				B659C666100C14A3DECBADB6 /* SwipeTransition.swift in Sources */,
+				8FD828E4DF76C742AD0D7F7E /* SwirlArtworkStore.swift in Sources */,
 				0A859716381A524DCF3D04CD /* SwirlBaker.swift in Sources */,
 				EC267B62BB917DD5BC4CDEAB /* SwirlFace.metal in Sources */,
 				C7D553BEC1A7DEACF9B0BAF9 /* SwirlPalette.swift in Sources */,

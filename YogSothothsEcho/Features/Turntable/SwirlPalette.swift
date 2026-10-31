@@ -1,8 +1,8 @@
 import Foundation
 
 /// SWIRL 系列的盤面配色（CR-037；yse-swirl-style.md §4.3 決策表）
-struct SwirlColors: Equatable {
-    enum Base: Equatable {
+struct SwirlColors: Hashable {
+    enum Base: Hashable {
         case solid(RGBColor)
         /// 斜向（左上→右下）漸變，隨盤轉
         case gradient(RGBColor, RGBColor)
