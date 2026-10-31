@@ -3,10 +3,13 @@ import Foundation
 import Metal
 import MetalPerformanceShaders
 
-/// 烘好的盤面（M1：底色＋花紋已上色、premultiplied RGBA8）。CGImage 建好後不可變，跨隔離傳遞安全
-struct SwirlFace: @unchecked Sendable {
+/// 烘好的盤面（M1：底色＋花紋已上色、premultiplied RGBA8）。CGImage 建好後不可變，跨隔離傳遞安全；
+/// 相等＝同一張圖（快取狀態比較用）
+struct SwirlFace: @unchecked Sendable, Equatable {
     let image: CGImage
-    var byteCount: Int { image.bytesPerRow * image.height }
+    var byteCount: Int { image.byteCost }
+
+    static func == (a: SwirlFace, b: SwirlFace) -> Bool { a.image === b.image }
 }
 
 /// SWIRL 系列的盤面烘焙器（CR-037 §4.4；S0 選定 Metal compute）：每首歌烘一次，播放時只旋轉圖片。
@@ -74,9 +77,13 @@ actor SwirlBaker {
 
     private static func image(from texture: MTLTexture, side: Int) -> CGImage? {
         let bytesPerRow = side * 4
-        var bytes = [UInt8](repeating: 0, count: bytesPerRow * side)
-        texture.getBytes(&bytes, bytesPerRow: bytesPerRow, from: MTLRegionMake2D(0, 0, side, side), mipmapLevel: 0)
-        guard let provider = CGDataProvider(data: Data(bytes) as CFData), let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        // 讀回直接寫進 Data（一次配置、一次複製）
+        var data = Data(count: bytesPerRow * side)
+        data.withUnsafeMutableBytes { buffer in
+            guard let base = buffer.baseAddress else { return }
+            texture.getBytes(base, bytesPerRow: bytesPerRow, from: MTLRegionMake2D(0, 0, side, side), mipmapLevel: 0)
+        }
+        guard let provider = CGDataProvider(data: data as CFData), let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
         return CGImage(width: side, height: side, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: bytesPerRow, space: space,
                        bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue), provider: provider,
                        decode: nil, shouldInterpolate: true, intent: .defaultIntent)

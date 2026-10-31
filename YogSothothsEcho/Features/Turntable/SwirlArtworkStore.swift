@@ -9,8 +9,16 @@ protocol SwirlBaking: Sendable {
 
 extension SwirlBaker: SwirlBaking {}
 
-extension SwirlFace: Equatable {
-    static func == (a: SwirlFace, b: SwirlFace) -> Bool { a.image === b.image }
+/// 第一次真的要烘時才建 Metal 裝置與管線（在這個 actor 上、不佔主執行緒）；沒選 SWIRL 系列的人不付這個成本。
+/// 建不起來＝之後每次都回 unavailable（呼叫端只畫底色）
+actor LazySwirlBaker: SwirlBaking {
+    /// lazy 只求值一次（含失敗的 nil）
+    private lazy var baker: SwirlBaker? = try? SwirlBaker()
+
+    func bake(_ recipe: SwirlRecipe, colors: SwirlColors, side: Int) async throws -> SwirlFace {
+        guard let baker else { throw SwirlBaker.Failure.unavailable }
+        return try await baker.bake(recipe, colors: colors, side: side)
+    }
 }
 
 /// SWIRL 盤面的快取（CR-037 §4.4 資料流）：同鍵在途只烘一次；位元組預算 LRU；畫面上正在用的不淘汰；
@@ -46,7 +54,7 @@ final class SwirlArtworkStore {
 
     /// 常態預算：M1 1,024 px 一張 4 MiB，G7 轉場舊新兩張同時在畫面＋1 張餘裕
     static let defaultBudgetBytes = 12 << 20
-    static let shared = SwirlArtworkStore(baker: try? SwirlBaker(), budgetBytes: defaultBudgetBytes)
+    static let shared = SwirlArtworkStore(baker: LazySwirlBaker(), budgetBytes: defaultBudgetBytes)
 
     private static let log = Logger(subsystem: "com.ibridgezhao.yogsothothsecho", category: "turntable")
 
@@ -99,7 +107,8 @@ final class SwirlArtworkStore {
         inUse[key, default: 0] += 1
         request(key)
         while !Task.isCancelled { try? await Task.sleep(for: .seconds(3600)) }
-        inUse[key] = inUse[key, default: 1] > 1 ? inUse[key, default: 1] - 1 : nil
+        let remaining = inUse[key, default: 1] - 1
+        inUse[key] = remaining > 0 ? remaining : nil
         evictOverBudget()
     }
 

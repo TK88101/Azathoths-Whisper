@@ -111,7 +111,10 @@ enum TransparentFinish: Equatable {
     var usesMaterial: Bool { self == .frosted }
 
     /// 透明盤的投影要淡，否則透過盤面看到一團黑
-    var shadowOpacity: Double { usesMaterial ? 0.08 : 0.2 }
+    var shadowOpacity: Double { Self.shadowOpacity(translucent: usesMaterial) }
+
+    /// 唱片投影濃淡的唯一規則：透光的盤（磨砂、SWIRL 半透明款）淡、不透光的深（CR-037 共用）
+    static func shadowOpacity(translucent: Bool) -> Double { translucent ? 0.08 : 0.2 }
 }
 
 /// 磨砂盤的可調量（v2.1 T8／T10）：主色濃淡、材質（霧）濃淡，分紅色與其他兩組（使用者以調整面板實機定案）；

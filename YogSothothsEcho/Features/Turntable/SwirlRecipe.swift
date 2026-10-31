@@ -53,7 +53,7 @@ struct SwirlRecipe: Hashable {
 
         init(trackID: String?) {
             var rng = SeededGenerator(seed: SwirlRecipe.hash(trackID: trackID))
-            autoVariant = SmokeVariant.allCases[Int(rng.nextUnit() * 4)]
+            autoVariant = SmokeVariant.allCases[Int(rng.nextUnit() * Double(SmokeVariant.allCases.count))]
             noiseSeed = (rng.nextUnit() * 5000).rounded(.down) / 100
             smokeBody = 0.28 + rng.nextUnit() * 0.08
             smokeOpacity = Self.opacityTiers[min(2, Int(rng.nextUnit() * 3))]
@@ -66,19 +66,20 @@ struct SwirlRecipe: Hashable {
         switch style {
         case .smoke:
             switch SmokeVariant(choice) ?? draws.autoVariant {
-            case .water: return SwirlRecipe(subtype: .smokeWater, ink: nil, noiseSeed: draws.noiseSeed, body: 0.25, opacity: 0.95)
-            case .darkInk: return smoke(.dark, draws)
-            case .lightInk: return smoke(.light, draws)
-            case .accent: return smoke(.accent, draws)
+            case .water: return recipe(.smokeWater, body: 0.25, opacity: 0.95, draws)
+            case .darkInk: return recipe(.smoke, ink: .dark, body: draws.smokeBody, opacity: draws.smokeOpacity, draws)
+            case .lightInk: return recipe(.smoke, ink: .light, body: draws.smokeBody, opacity: draws.smokeOpacity, draws)
+            case .accent: return recipe(.smoke, ink: .accent, body: draws.smokeBody, opacity: draws.smokeOpacity, draws)
             }
-        case .streak: return SwirlRecipe(subtype: .pull, ink: nil, noiseSeed: draws.noiseSeed, body: 0.4, opacity: 1)
-        case .flake: return SwirlRecipe(subtype: .flake, ink: nil, noiseSeed: draws.noiseSeed, body: 0.5, opacity: 1)
-        case .chunk: return SwirlRecipe(subtype: .chunk, ink: nil, noiseSeed: draws.noiseSeed, body: 0.5, opacity: 0.95)
+        case .streak: return recipe(.pull, body: 0.4, opacity: 1, draws)
+        case .flake: return recipe(.flake, body: 0.5, opacity: 1, draws)
+        case .chunk: return recipe(.chunk, body: 0.5, opacity: 0.95, draws)
         case .random, .classic, .transparent, .splash, .marble: return nil
         }
     }
 
-    private static func smoke(_ ink: SmokeInk, _ draws: Draws) -> SwirlRecipe {
-        SwirlRecipe(subtype: .smoke, ink: ink, noiseSeed: draws.noiseSeed, body: draws.smokeBody, opacity: draws.smokeOpacity)
+    /// 噪聲種子一律取自同一首歌的抽樣（換樣式保留花紋位置）
+    private static func recipe(_ subtype: SwirlSubtype, ink: SmokeInk? = nil, body: Double, opacity: Double, _ draws: Draws) -> SwirlRecipe {
+        SwirlRecipe(subtype: subtype, ink: ink, noiseSeed: draws.noiseSeed, body: body, opacity: opacity)
     }
 }

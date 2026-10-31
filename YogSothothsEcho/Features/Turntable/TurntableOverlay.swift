@@ -31,6 +31,19 @@ struct TurntableOverlay: View {
                     #endif
                     stylePicker
                 }
+                // 煙渦第二排錨定在 SMOKE 按鈕上（主排捲動時也跟著），左右夾在浮層內；收合時這層沒有內容、不攔點擊
+                .overlayPreferenceValue(SmokeAnchorKey.self) { anchor in
+                    GeometryReader { proxy in
+                        if model.isSmokeRowOpen, let anchor {
+                            let point = proxy[anchor]
+                            smokeRow
+                                .fixedSize()
+                                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { smokeRowWidth = $0 }
+                                .position(x: SmokeRowLayout.centerX(anchorX: point.x, rowWidth: smokeRowWidth, containerWidth: proxy.size.width),
+                                          y: point.y - SmokeRowLayout.verticalOffset)
+                        }
+                    }
+                }
                 .padding(64)
                 .transition(.opacity)
             }
@@ -152,32 +165,16 @@ struct TurntableOverlay: View {
         }
     }
 
-    /// 樣式主排（CR-037：9 顆）＋煙渦第二排。容器太窄（Split View 等）時主排改水平捲動、維持 40 pt 觸控尺寸
+    /// 樣式主排（CR-037：9 顆）。容器太窄（Split View 等）時改水平捲動、維持 40 pt 觸控尺寸；煙渦第二排見 body 的 overlayPreferenceValue
     private var stylePicker: some View {
-        GeometryReader { proxy in
-            VStack(spacing: 12) {
-                Spacer(minLength: 0)
-                if model.isSmokeRowOpen {
-                    smokeRow
-                        .fixedSize()
-                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { smokeRowWidth = $0 }
-                        .position(x: SmokeRowLayout.centerX(anchorX: proxy.size.width / 2 + SmokeRowLayout.smokeOffsetFromRowCenter,
-                                                            rowWidth: smokeRowWidth, containerWidth: proxy.size.width),
-                                  y: 30)
-                        .frame(height: 60)
-                }
-                ViewThatFits(in: .horizontal) {
-                    styleRow
-                    ScrollView(.horizontal, showsIndicators: false) { styleRow }
-                }
-            }
-            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .bottom)
+        ViewThatFits(in: .horizontal) {
+            styleRow
+            ScrollView(.horizontal, showsIndicators: false) { styleRow }
         }
-        .frame(height: 140)
     }
 
     private var styleRow: some View {
-        HStack(spacing: SmokeRowLayout.iconSpacing) {
+        HStack(spacing: 20) {
             ForEach(RecordStyle.allCases, id: \.self) { style in
                 Button {
                     model.tapStyle(style)
@@ -190,6 +187,7 @@ struct TurntableOverlay: View {
                 .accessibilityAddTraits(model.recordStyle == style ? .isSelected : [])
                 .accessibilityIdentifier(AccessibilityID.turntableStyle(style.rawValue))
                 .modifier(SmokeButtonAccessibility(isSmoke: style == .smoke, isOpen: model.isSmokeRowOpen))
+                .anchorPreference(key: SmokeAnchorKey.self, value: .center) { style == .smoke ? $0 : nil }
             }
         }
         .padding(SmokeRowLayout.rowPadding)
@@ -279,21 +277,15 @@ private extension Label where Title == Text, Icon == Image {
 
 /// 煙渦第二排的位置（CR-037 §4.5b）：水平中心對齊主排上的 SMOKE 圖示，超出畫面時整排往內平移、左右各留邊界
 enum SmokeRowLayout {
-    static let iconSize: CGFloat = 40
-    static let iconSpacing: CGFloat = 20
-    static let rowPadding: CGFloat = 12
     static let margin: CGFloat = 16
-
-    /// 主排寬度與 SMOKE 圖示中心相對主排中心的位移（由 allCases 的順序推出，不寫死索引）
-    static var rowWidth: CGFloat {
-        let n = CGFloat(RecordStyle.allCases.count)
-        return n * iconSize + (n - 1) * iconSpacing + 2 * rowPadding
-    }
-
-    static var smokeOffsetFromRowCenter: CGFloat {
-        let index = CGFloat(RecordStyle.allCases.firstIndex(of: .smoke) ?? 0)
-        return rowPadding + index * (iconSize + iconSpacing) + iconSize / 2 - rowWidth / 2
-    }
+    /// 主排圖示與內距（styleRow 用同一組值）
+    static let iconSize: CGFloat = 40
+    static let rowPadding: CGFloat = 12
+    /// 主排上緣到第二排下緣的間隔；第二排高＝膠囊 44＋上下內距 8
+    static let gap: CGFloat = 12
+    static let smokeRowHeight: CGFloat = 44 + 2 * 8
+    /// 第二排中心在 SMOKE 圖示中心上方的距離
+    static let verticalOffset = iconSize / 2 + rowPadding + gap + smokeRowHeight / 2
 
     static func centerX(anchorX: CGFloat, rowWidth: CGFloat, containerWidth: CGFloat) -> CGFloat {
         let half = rowWidth / 2
@@ -301,6 +293,12 @@ enum SmokeRowLayout {
         guard low <= high else { return containerWidth / 2 }
         return min(max(anchorX, low), high)
     }
+}
+
+/// 主排上 SMOKE 按鈕的中心（第二排的錨點）
+struct SmokeAnchorKey: PreferenceKey {
+    static var defaultValue: Anchor<CGPoint>? { nil }
+    static func reduce(value: inout Anchor<CGPoint>?, nextValue: () -> Anchor<CGPoint>?) { value = value ?? nextValue() }
 }
 
 /// SMOKE 主按鈕的展開狀態與提示（VoiceOver）

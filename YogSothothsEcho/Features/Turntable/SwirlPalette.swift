@@ -19,13 +19,14 @@ struct SwirlColors: Hashable {
 /// 決策表的唯一實作。所有中間色都量化到 8 bit，與使用者看過的小樣 v14（JS 整數運算）一致——golden 見
 /// Tests/Fixtures/swirl-palette-fixtures-v1.json
 enum SwirlPalette {
-    static let nearBlackBase = RGBColor(r: 222 / 255, g: 225 / 255, b: 232 / 255)
-    static let nearBlackInk = RGBColor(r: 18 / 255, g: 18 / 255, b: 20 / 255)
-    static let flakeInk = RGBColor(r: 252 / 255, g: 253 / 255, b: 1)
-    static let achromaticFlakeBase = RGBColor(r: 216 / 255, g: 216 / 255, b: 220 / 255)
-    static let achromaticDark = RGBColor(r: 58 / 255, g: 58 / 255, b: 62 / 255)
-    static let achromaticChunkGradient = (RGBColor(r: 122 / 255, g: 122 / 255, b: 126 / 255), RGBColor(r: 160 / 255, g: 160 / 255, b: 164 / 255))
-    static let chunkVein = RGBColor(r: 240 / 255, g: 243 / 255, b: 252 / 255)
+    static let nearBlackBase = RGBColor(hex: 0xDEE1E8)
+    static let nearBlackInk = RGBColor(hex: 0x121214)
+    static let flakeInk = RGBColor(hex: 0xFCFDFF)
+    static let achromaticFlakeBase = RGBColor(hex: 0xD8D8DC)
+    static let achromaticDark = RGBColor(hex: 0x3A3A3E)
+    static let achromaticChunkFrom = RGBColor(hex: 0x7A7A7E)
+    static let achromaticChunkTo = RGBColor(hex: 0xA0A0A4)
+    static let chunkVein = RGBColor(hex: 0xF0F3FC)
 
     static let inkContrast = 2.0
     static let fiberContrast = 1.3
@@ -38,8 +39,7 @@ enum SwirlPalette {
         let opacity = reduceTransparency ? 1 : recipe.opacity
         switch recipe.subtype {
         case .smokeWater:
-            if TransparentFinish.isNearBlack(p) { return solid(nearBlackBase, ink: nearBlackInk, opacity: opacity) }
-            return solid(p, ink: dark(p), opacity: opacity)
+            return nearBlackSmoke(p, opacity: opacity) ?? solid(p, ink: dark(p), opacity: opacity)
         case .smoke:
             return smoke(p, ink: recipe.ink ?? .dark, colors: colors, opacity: opacity)
         case .pull:
@@ -55,7 +55,7 @@ enum SwirlPalette {
             let source = (colors.vivid ?? colors.primary).quantized8
             let hsl = source.hslUnit
             guard source.chroma >= achromaticChroma else {
-                return SwirlColors(base: .gradient(achromaticChunkGradient.0, achromaticChunkGradient.1), ink: achromaticDark,
+                return SwirlColors(base: .gradient(achromaticChunkFrom, achromaticChunkTo), ink: achromaticDark,
                                    accent: chunkVein, accentFallback: nil, opacity: opacity)
             }
             return SwirlColors(base: .gradient(hslColor(hsl.hue, 0.18, 0.52), hslColor(hsl.hue, 0.18, 0.66)),
@@ -65,7 +65,7 @@ enum SwirlPalette {
 
     /// 煙渦：主色近黑＝301 灰底黑渦；否則依取向取墨色，對比不足退回深／淺端中對比較高者
     private static func smoke(_ p: RGBColor, ink: SmokeInk, colors: AlbumColors, opacity: Double) -> SwirlColors {
-        if TransparentFinish.isNearBlack(p) { return solid(nearBlackBase, ink: nearBlackInk, opacity: opacity) }
+        if let face = nearBlackSmoke(p, opacity: opacity) { return face }
         let darkInk = dark(p), lightInk = light(p)
         let chosen: RGBColor? = switch ink {
         case .dark: darkInk
@@ -90,6 +90,11 @@ enum SwirlPalette {
         return hslColor(hsl.hue, hsl.saturation, p.luminance >= 0.18 ? 0.25 : 0.85)
     }
 
+    /// 主色近黑的煙渦＝301 外觀（灰底黑渦），不看取向
+    private static func nearBlackSmoke(_ p: RGBColor, opacity: Double) -> SwirlColors? {
+        TransparentFinish.isNearBlack(p) ? solid(nearBlackBase, ink: nearBlackInk, opacity: opacity) : nil
+    }
+
     private static func dark(_ c: RGBColor) -> RGBColor { let h = c.hslUnit; return hslColor(h.hue, h.saturation, 0.08) }
     private static func light(_ c: RGBColor) -> RGBColor { let h = c.hslUnit; return hslColor(h.hue, h.saturation * 0.3, 0.94) }
 
@@ -98,7 +103,7 @@ enum SwirlPalette {
     }
 
     private static func mix(_ a: RGBColor, _ b: RGBColor, _ t: Double) -> RGBColor {
-        RGBColor(r: a.r + (b.r - a.r) * t, g: a.g + (b.g - a.g) * t, b: a.b + (b.b - a.b) * t).quantized8
+        a.over(b, alpha: t).quantized8
     }
 
     private static func hueDistance(_ a: RGBColor, _ b: RGBColor) -> Double {

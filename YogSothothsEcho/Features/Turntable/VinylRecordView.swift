@@ -13,22 +13,17 @@ struct VinylRecordView: View {
     var tuning: TransparentTuning = .standard
     /// SWIRL 系列的花紋配方（CR-037）；其他樣式＝nil
     var swirl: SwirlRecipe? = nil
-    var swirlStore: SwirlArtworkStore = .shared
 
     /// 烘焙邊長上限（M1 一張 4 MiB；顯示時放大，花紋本身柔和）
     static let swirlBakeLimit = 1024
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var swirlKey: SwirlArtworkStore.Key? {
+    /// 每次 body 算一次再傳下去（本視圖在 TimelineView 內每幀重建，所以仍是每幀一次；改到 deck 層算是 P2）
+    private func makeSwirlKey() -> SwirlArtworkStore.Key? {
         guard let swirl else { return nil }
         let palette = SwirlPalette.resolve(swirl, colors: colors, reduceTransparency: reduceTransparency)
         return SwirlArtworkStore.Key(recipe: swirl, colors: palette, side: min(Self.swirlBakeLimit, max(1, Int((side * displayScale).rounded()))))
-    }
-
-    private var shadowOpacity: Double {
-        if let key = swirlKey { return key.colors.opacity < 1 ? 0.08 : 0.2 }
-        return transparentFinish?.shadowOpacity ?? 0.2
     }
 
     private var s: CGFloat { side / TurntableMetrics.recordSize }
@@ -52,6 +47,8 @@ struct VinylRecordView: View {
     var body: some View {
         let finish = transparentFinish
         let usesMaterial = finish?.usesMaterial == true
+        let swirlKey = makeSwirlKey()
+        let translucent = swirlKey.map { $0.colors.opacity < 1 } ?? usesMaterial
         ZStack {
             // 磨砂層必須在 drawingGroup 之外：合成圖層內的 Material 拿不到後面的封套與背景
             // 透明盤是乳白透光：材質固定淺色版本（深色模式的 Material 會讓盤面發黑）
@@ -60,7 +57,7 @@ struct VinylRecordView: View {
                     .opacity(tuning.look(for: TransparentFinish.tint(for: colors)).material)
             }
             ZStack {
-                styleLayers(finish)
+                styleLayers(finish, swirlKey: swirlKey)
                 rotationCue(RotationCue.cue(style: style, finish: finish), finish: finish)
                 Circle().strokeBorder(AngularGradient(stops: Self.rimStops, center: .center), lineWidth: 3 * s)
                 if usesMaterial { Circle().strokeBorder(Color.white.opacity(0.22), lineWidth: 1.2 * s) }
@@ -71,22 +68,22 @@ struct VinylRecordView: View {
         }
         .frame(width: side, height: side)
         // 投影放在合成圖層之外：drawingGroup 的範圍只有唱片大小，往下偏移的模糊陰影放在裡面會被切出一條直邊（#5-1 實機發現）
-        .background(Circle().fill(Color.black.opacity(shadowOpacity)).blur(radius: 12 * s).offset(y: 12 * s))
+        .background(Circle().fill(Color.black.opacity(TransparentFinish.shadowOpacity(translucent: translucent))).blur(radius: 12 * s).offset(y: 12 * s))
         // SWIRL：顯示期間登記使用中（不被淘汰）；鍵改變（換歌、換尺寸、換色、Reduce Transparency）即換一張
         .task(id: swirlKey) {
-            if let key = swirlKey { await swirlStore.use(key) }
+            if let swirlKey { await SwirlArtworkStore.shared.use(swirlKey) }
         }
     }
 
     /// SWIRL 系列（CR-037 §4.4）：烘好的盤面（底色＋花紋，已含不透明度）只旋轉；未就緒先畫底色，就緒後淡入（Reduce Motion＝直接出現）
-    @ViewBuilder private func swirlLayers() -> some View {
-        if let key = swirlKey {
-            let state = swirlStore.state(for: key)
+    @ViewBuilder private func swirlLayers(_ key: SwirlArtworkStore.Key?) -> some View {
+        if let key {
+            let state = SwirlArtworkStore.shared.state(for: key)
             ZStack {
                 if case .ready(let face) = state {
                     Image(decorative: face.image, scale: 1).resizable()
                         .rotationEffect(.degrees(angle))
-                        .transition(reduceMotion ? .identity : .opacity)
+                        .transition(.opacity)
                 } else {
                     swirlBaseFill(key.colors)
                 }
@@ -107,7 +104,7 @@ struct VinylRecordView: View {
         }
     }
 
-    @ViewBuilder private func styleLayers(_ finish: TransparentFinish?) -> some View {
+    @ViewBuilder private func styleLayers(_ finish: TransparentFinish?, swirlKey: SwirlArtworkStore.Key?) -> some View {
         switch style {
         case .classic, .random:
             base(.normal)
@@ -137,7 +134,7 @@ struct VinylRecordView: View {
                 .blendMode(layer.blend == .colorBurn ? .colorBurn : .hardLight)
             base(.screen)
         case .smoke, .streak, .flake, .chunk:
-            swirlLayers()
+            swirlLayers(swirlKey)
         }
     }
 
