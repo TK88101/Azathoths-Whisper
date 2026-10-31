@@ -13,6 +13,7 @@ import UIKit
 @Observable
 final class TurntableViewModel {
     static let recordStyleKey = "turntable.recordStyle"
+    static let smokeVariantKey = "turntable.smokeVariant"
     /// 皮膚選擇（CR-034）：存皮膚 id；未知或不可用＝classic，存值不改寫
     static let skinKey = "turntable.skin"
     static let placeholderText = "…"
@@ -55,6 +56,17 @@ final class TurntableViewModel {
             overlay.poke()
         }
     }
+    /// 煙渦的變化（CR-037 §4.1b）：手選或 RANDOM 抽到煙渦都讀這一個設定（Q6）
+    var smokeVariant: SmokeVariantChoice {
+        didSet {
+            store.set(smokeVariant.rawValue, forKey: Self.smokeVariantKey)
+            overlay.poke()
+        }
+    }
+    #if DEBUG
+    /// DEBUG「換種子」（§4.7）：只存記憶體，接在 trackID 後面改變花紋種子
+    var swirlDebugSalt = 0
+    #endif
 
     @ObservationIgnored private let store: SettingsStore
     /// 序列圖解碼尺寸用（畫面像素 / pt）；視圖出現時更新
@@ -102,6 +114,7 @@ final class TurntableViewModel {
         overlay = TurntableOverlayState(sleep: sleep)
         swipe = SwipeTransition(displayScale: displayScale)
         recordStyle = RecordStyle.restore(store.string(forKey: Self.recordStyleKey))
+        smokeVariant = SmokeVariantChoice.restore(store.string(forKey: Self.smokeVariantKey))
         sprites.onFailure = { [weak self] id, generation in self?.disableSkin(id, generation: generation) }
         sprites.focusTarget = { [weak self] in self?.spriteFocusFrame }
         memoryWarning = NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil,
@@ -189,7 +202,43 @@ final class TurntableViewModel {
         let albumID = nowPlaying.clock?.event.albumID
         let ownArtwork = albumID != nil && coverAlbum == albumID
         return TurntableDeck(trackID: nowPlaying.currentTrackID, albumID: albumID, label: label, style: resolvedStyle, splash: splashStyle,
-                             cover: ownArtwork ? cover : nil, colors: ownArtwork ? colors : .fallback)
+                             cover: ownArtwork ? cover : nil, colors: ownArtwork ? colors : .fallback,
+                             swirl: SwirlRecipe.make(style: resolvedStyle, trackID: swirlSeedID, smoke: smokeVariant))
+    }
+
+    private var swirlSeedID: String? {
+        #if DEBUG
+        guard swirlDebugSalt != 0 else { return nowPlaying.currentTrackID }
+        return (nowPlaying.currentTrackID ?? "") + "#\(swirlDebugSalt)"
+        #else
+        nowPlaying.currentTrackID
+        #endif
+    }
+
+    // MARK: 煙渦第二排（CR-037 §4.5b）
+
+    /// 第二排展開＝浮層持有 `.smokeVariants`（唯一狀態：浮層收起、關唱機時 endAllHolds 一併收合）
+    var isSmokeRowOpen: Bool { overlay.holds.contains(.smokeVariants) }
+
+    /// 樣式鈕：點煙渦＝選中並展開，已展開再點＝收合；點其他樣式＝選中並收合
+    func tapStyle(_ style: RecordStyle) {
+        if style == .smoke, recordStyle == .smoke, isSmokeRowOpen {
+            overlay.endHold(.smokeVariants)
+            return
+        }
+        recordStyle = style
+        if style == .smoke {
+            overlay.beginHold(.smokeVariants)
+        } else {
+            overlay.endHold(.smokeVariants)
+        }
+    }
+
+    /// 手選強調色但這首的封面沒有合適強調色時實際用的墨色；讀畫面上的主唱片（轉場決定後＝新曲）
+    var smokeAccentFallback: SmokeInk? {
+        let deck = incomingDeck ?? groupDeck
+        guard let recipe = deck.swirl, recipe.ink == .accent else { return nil }
+        return SwirlPalette.resolve(recipe, colors: deck.colors, reduceTransparency: false).accentFallback
     }
 
     /// 主組（封面套＋唱片）畫的資料：換標籤與淡化時是新曲，其他轉場階段是凍結的舊組，平時跟已採用狀態

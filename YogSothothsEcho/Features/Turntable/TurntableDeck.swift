@@ -10,9 +10,11 @@ struct TurntableDeck: Equatable {
     let splash: SplashStyle
     let cover: UIImage?
     let colors: AlbumColors
+    /// SWIRL 系列的花紋配方（CR-037）：組 deck 時已套用煙渦設定，轉場快照一併凍結；其他樣式＝nil
+    var swirl: SwirlRecipe? = nil
 
-    /// 同一張專輯的封面到了（spine→原圖）：只換圖與取色
+    /// 同一張專輯的封面到了（spine→原圖）：只換圖與取色（花紋配方不變）
     func withArtwork(_ image: UIImage?, colors: AlbumColors) -> TurntableDeck {
-        TurntableDeck(trackID: trackID, albumID: albumID, label: label, style: style, splash: splash, cover: image, colors: colors)
+        TurntableDeck(trackID: trackID, albumID: albumID, label: label, style: style, splash: splash, cover: image, colors: colors, swirl: swirl)
     }
 }
