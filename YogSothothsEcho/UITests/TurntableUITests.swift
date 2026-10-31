@@ -89,7 +89,8 @@ final class TurntableUITests: XCTestCase {
         smoke.tap()
         XCTAssertTrue(darkInk.waitForExistence(timeout: 3))
         darkInk.tap()
-        XCTAssertTrue(waitFor("selected == true", [], on: darkInk))        XCTAssertTrue(darkInk.exists, "選變化不收合")
+        XCTAssertTrue(waitFor("selected == true", [], on: darkInk))
+        XCTAssertTrue(darkInk.exists, "選變化不收合")
         smoke.tap()
         XCTAssertTrue(waitFor("exists == false", [], on: darkInk))
 

@@ -26,6 +26,7 @@ struct TurntableOverlay: View {
                     #if DEBUG
                     tuningPanel
                     measurement
+                    if model.resolvedStyle.isSwirl { swirlSeedControl }
                     if model.skin.spec.spriteLayers != nil { spriteDiagnostics }
                     #endif
                     stylePicker
@@ -56,6 +57,20 @@ struct TurntableOverlay: View {
             if let result = monitor.lastResult { Text(verbatim: result) }
         }
         .disabled(!ready || monitor.running != nil)
+        .font(.caption.monospacedDigit())
+        .padding(8)
+        .background(.ultraThinMaterial, in: Capsule())
+    }
+
+    /// CR-037 §4.7：換一組花紋種子（只存記憶體、App 重開即消失）；生效中顯示 override
+    private var swirlSeedControl: some View {
+        HStack(spacing: 12) {
+            Button { model.swirlDebugSalt += 1 } label: { Text(verbatim: "swirl seed +1") }
+            if model.swirlDebugSalt != 0 {
+                Text(verbatim: "override \(model.swirlDebugSalt)")
+                Button { model.swirlDebugSalt = 0 } label: { Text(verbatim: "reset") }
+            }
+        }
         .font(.caption.monospacedDigit())
         .padding(8)
         .background(.ultraThinMaterial, in: Capsule())
