@@ -5,8 +5,9 @@ import Testing
 
 private final class SwirlPaletteBundleToken {}
 
-// CR-037 T3（yse-swirl-style.md §4.3）：配色決策表。golden＝使用者 2026-10-31 看過的小樣 v14 以同一規則（JS）
-// 算出的 12 組代表色 × 7 欄（Tests/Fixtures/swirl-palette-fixtures-v1.json）；Swift 與 JS 逐分量差 ≤ 1/255
+// CR-037 T3（yse-swirl-style.md §4.3）：配色決策表。golden＝小樣 swirl-color-preview.html 以同一規則（JS）算出的
+// 13 組代表色 × 7 欄（Tests/Fixtures/swirl-palette-fixtures-v2.json；v0.8 深／淺墨改調底色，含 FOB《Folie à Deux》實測色）；
+// Swift 與 JS 逐分量差 ≤ 1/255
 struct SwirlPaletteTests {
     private struct Fixture: Decodable {
         struct Case: Decodable {
@@ -33,7 +34,7 @@ struct SwirlPaletteTests {
     }
 
     private static func load() throws -> Fixture {
-        let url = try #require(Bundle(for: SwirlPaletteBundleToken.self).url(forResource: "swirl-palette-fixtures-v1", withExtension: "json"))
+        let url = try #require(Bundle(for: SwirlPaletteBundleToken.self).url(forResource: "swirl-palette-fixtures-v2", withExtension: "json"))
         return try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: url))
     }
 
@@ -63,7 +64,7 @@ struct SwirlPaletteTests {
 
     @Test func matchesPreviewFixtures() throws {
         let fixture = try Self.load()
-        #expect(fixture.schema == "swirl-palette-fixtures-v1" && fixture.cases.count == 12)
+        #expect(fixture.schema == "swirl-palette-fixtures-v2" && fixture.cases.count == 13)
         for c in fixture.cases {
             let primary = Self.rgb(c.P)
             let colors = AlbumColors(primary: primary, text: AlbumPalette.textColor(on: primary),
@@ -93,6 +94,19 @@ struct SwirlPaletteTests {
                 }
                 #expect(out.accentFallback == fallback, "\(label) fallback")
             }
+        }
+    }
+
+    /// v0.8（使用者實機：FOB《Folie à Deux》深墨＝淺墨）：暗底上深墨對比不足時提亮底色、墨色不換——深墨與淺墨一定不同
+    @Test func darkAndLightInkStayDistinctOnDarkCovers() {
+        for hex: UInt32 in [0x5B1B19, 0x191818, 0x14285A] {
+            let p = RGBColor(hex: hex)
+            let colors = AlbumColors(primary: p, text: .white, secondary: p, hasMuted: false)
+            let dark = SwirlPalette.resolve(SwirlRecipe(subtype: .smoke, ink: .dark, noiseSeed: 1, body: 0.3, opacity: 1), colors: colors, reduceTransparency: false)
+            let light = SwirlPalette.resolve(SwirlRecipe(subtype: .smoke, ink: .light, noiseSeed: 1, body: 0.3, opacity: 1), colors: colors, reduceTransparency: false)
+            #expect(dark.ink.luminance < light.ink.luminance, "\(hex)")
+            guard case .solid(let darkBase) = dark.base, case .solid(let lightBase) = light.base else { Issue.record("solid"); continue }
+            #expect(AlbumPalette.contrast(dark.ink, darkBase) >= 2 && AlbumPalette.contrast(light.ink, lightBase) >= 2, "\(hex)")
         }
     }
 

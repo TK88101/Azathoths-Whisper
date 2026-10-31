@@ -20,9 +20,10 @@ actor SwirlBaker {
         case encodingFailed
     }
 
-    /// 與 SwirlFace.metal 的 FaceParams 欄位順序一致（8 個 float＋4 個 float4）
+    /// 與 SwirlFace.metal 的 FaceParams 欄位順序一致（12 個 float＋4 個 float4）
     private struct Params {
         var seed: Float, type: Float, body: Float, water: Float, opacity: Float, hasGradient: Float, hasAccent: Float, side: Float
+        var depthFloor: Float, waterGain: Float, pad0: Float = 0, pad1: Float = 0
         var base: SIMD4<Float>, base2: SIMD4<Float>, ink: SIMD4<Float>, accent: SIMD4<Float>
     }
 
@@ -31,11 +32,17 @@ actor SwirlBaker {
     static func blurPixels(_ subtype: SwirlSubtype) -> Float {
         switch subtype {
         case .smokeWater: 0.5
-        case .smoke: 1.2
+        case .smoke: 0.6
         case .chunk: 0.6
         case .pull, .flake: 0
         }
     }
+
+    /// 煙渦濃淡起伏的最淡倍率：深／淺／強調墨拉高到 0.6 不虛（v0.8 使用者實機回饋）；水感維持小樣定案 0.3
+    static func depthFloor(_ subtype: SwirlSubtype) -> Float { subtype == .smoke ? 0.6 : 0.3 }
+
+    /// 水感邊線強度（v0.8 使用者選 A：加強水線）；其他型沒有水線
+    static func waterGain(_ subtype: SwirlSubtype) -> Float { subtype == .smokeWater ? 0.7 : 0 }
 
     private let device: MTLDevice
     private let queue: MTLCommandQueue
@@ -103,6 +110,7 @@ actor SwirlBaker {
         }
         return Params(seed: Float(recipe.noiseSeed), type: type, body: Float(recipe.body), water: recipe.subtype == .smokeWater ? 1 : 0,
                       opacity: Float(colors.opacity), hasGradient: hasGradient, hasAccent: colors.accent == nil ? 0 : 1, side: Float(side),
+                      depthFloor: Self.depthFloor(recipe.subtype), waterGain: Self.waterGain(recipe.subtype),
                       base: vector(base), base2: vector(base2), ink: vector(colors.ink), accent: vector(colors.accent ?? .black))
     }
 }

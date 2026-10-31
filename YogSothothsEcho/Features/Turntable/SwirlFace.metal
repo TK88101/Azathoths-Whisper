@@ -12,7 +12,7 @@ static float n3(float3 x) {
 static float fbm(float3 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * n3(p); p = p * 2.03 + float3(1.7, 9.2, 3.1); a *= 0.5; } return s; }
 
 // q：盤面座標（半徑 1，y 向下）；type 0 smoke／1 pull／2 flake／3 chunk；回傳 (ink, accent) 覆蓋度
-static float2 swirlMasks(float2 q, float seed, float type, float body, float water) {
+static float2 swirlMasks(float2 q, float seed, float type, float body, float depthFloor, float waterGain) {
     float r = length(q); if (r > 1.0) return float2(0);
     float th = atan2(q.y, q.x); float3 off = float3(seed * 13.1, seed * 7.7, seed * 3.3); float ink = 0, acc = 0;
     if (type < 0.5) {
@@ -20,8 +20,8 @@ static float2 swirlMasks(float2 q, float seed, float type, float body, float wat
         float3 w = float3(fbm(P), fbm(P + float3(5.2, 1.3, 2.8)), fbm(P + float3(2.1, 7.4, 4.6))); float f = fbm(P + 2.2 * w);
         float fil = pow(1.0 - abs(2.0 * f - 1.0), 3.5); float cloud = smoothstep(0.62 - body * 0.25, 0.82, f);
         ink = clamp(fil * 0.55 + cloud * (0.35 + body), 0.0, 1.0);
-        float depth = smoothstep(0.35, 0.65, fbm(P * 0.55 + w * 1.3 + float3(31.0))); ink = clamp(ink * mix(0.3, 1.9, depth), 0.0, 1.0);
-        if (water > 0.5) { float e = (1.0 - smoothstep(0.0, 0.01, abs(f - 0.62))) * smoothstep(0.55, 0.8, depth); ink = clamp(ink + e * 0.3, 0.0, 1.0); }
+        float depth = smoothstep(0.35, 0.65, fbm(P * 0.55 + w * 1.3 + float3(31.0))); ink = clamp(ink * mix(depthFloor, 1.9, depth), 0.0, 1.0);
+        if (waterGain > 0.0) { float e = (1.0 - smoothstep(0.0, 0.01, abs(f - 0.62))) * smoothstep(0.55, 0.8, depth); ink = clamp(ink + e * waterGain, 0.0, 1.0); }
     } else if (type < 1.5) {
         float tw = 0.35 * fbm(float3(q * 2.0, 3.0) + off); float t = th + tw; float3 P = float3(cos(t) * 7.0, sin(t) * 7.0, r * 1.1) + off;
         float f = fbm(P + 1.2 * float3(fbm(P * 0.5), fbm(P * 0.5 + 4.0), 0.0)); float fine = fbm(float3(cos(t) * 28.0, sin(t) * 28.0, r * 2.0) + off);
@@ -46,15 +46,15 @@ static float2 swirlMasks(float2 q, float seed, float type, float body, float wat
     return float2(ink, acc) * rim;
 }
 
-// 欄位順序與 SwirlBaker.Params 一致（8 個 float＋4 個 float4）
-struct FaceParams { float seed, type, body, water, opacity, hasGrad, hasAcc, side; float4 base, base2, ink, acc; };
+// 欄位順序與 SwirlBaker.Params 一致（12 個 float＋4 個 float4）
+struct FaceParams { float seed, type, body, water, opacity, hasGrad, hasAcc, side, depthFloor, waterGain, pad0, pad1; float4 base, base2, ink, acc; };
 
 // M1 成品：底色（或斜向漸變）＋花紋上色，整張乘不透明度，premultiplied
 static float4 face(float2 px, constant FaceParams &u) {
     float2 q = (px / u.side) * 2.0 - 1.0; float r = length(q);
     if (r > 1.0) return float4(0);
     float3 col = u.hasGrad > 0.5 ? mix(u.base.rgb, u.base2.rgb, clamp((q.x + q.y + 2.0) / 4.0, 0.0, 1.0)) : u.base.rgb;
-    float2 m = swirlMasks(q, u.seed, u.type, u.body, u.water);
+    float2 m = swirlMasks(q, u.seed, u.type, u.body, u.depthFloor, u.waterGain);
     if (u.type > 2.5) { if (u.hasAcc > 0.5) col = mix(col, u.acc.rgb, m.y); col = mix(col, u.ink.rgb, m.x); }
     else { col = mix(col, u.ink.rgb, m.x); if (u.hasAcc > 0.5) col = mix(col, u.acc.rgb, m.y); }
     float a = u.opacity * clamp((1.0 - r) * u.side * 0.5 + 0.5, 0.0, 1.0);

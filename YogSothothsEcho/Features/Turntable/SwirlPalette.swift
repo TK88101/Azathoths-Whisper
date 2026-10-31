@@ -63,20 +63,35 @@ enum SwirlPalette {
         }
     }
 
-    /// 煙渦：主色近黑＝301 灰底黑渦；否則依取向取墨色，對比不足退回深／淺端中對比較高者
+    /// 煙渦（v0.8）：深墨／淺墨的墨色固定，對比不足時把底色往反方向調明度（同色相）——兩者一定不同；
+    /// 強調色不足時退回深／淺端中對比較高者並註記。近黑不特例（301 外觀只留給水感）
     private static func smoke(_ p: RGBColor, ink: SmokeInk, colors: AlbumColors, opacity: Double) -> SwirlColors {
-        if let face = nearBlackSmoke(p, opacity: opacity) { return face }
         let darkInk = dark(p), lightInk = light(p)
-        let chosen: RGBColor? = switch ink {
-        case .dark: darkInk
-        case .light: lightInk
-        case .accent: accent(for: p, colors: colors)
+        switch ink {
+        case .dark: return solid(base(p, legibleUnder: darkInk, lighten: true), ink: darkInk, opacity: opacity)
+        case .light: return solid(base(p, legibleUnder: lightInk, lighten: false), ink: lightInk, opacity: opacity)
+        case .accent:
+            if let accent = accent(for: p, colors: colors), AlbumPalette.contrast(accent, p) >= inkContrast {
+                return solid(p, ink: accent, opacity: opacity)
+            }
+            // 平手時取深端（小樣以穩定排序保留 dark 在前）
+            let useLight = AlbumPalette.contrast(lightInk, p) > AlbumPalette.contrast(darkInk, p)
+            let fallback = useLight ? lightInk : darkInk
+            return SwirlColors(base: .solid(base(p, legibleUnder: fallback, lighten: !useLight)), ink: fallback, accent: nil,
+                               accentFallback: useLight ? .light : .dark, opacity: opacity)
         }
-        if let chosen, AlbumPalette.contrast(chosen, p) >= inkContrast { return solid(p, ink: chosen, opacity: opacity) }
-        // 平手時取深端（小樣以穩定排序保留 dark 在前）
-        let useLight = AlbumPalette.contrast(lightInk, p) > AlbumPalette.contrast(darkInk, p)
-        return SwirlColors(base: .solid(p), ink: useLight ? lightInk : darkInk, accent: nil,
-                           accentFallback: ink == .accent ? (useLight ? .light : .dark) : nil, opacity: opacity)
+    }
+
+    /// 墨色在主色上對比夠＝主色；否則同色相每次調 0.02 明度直到對比 ≥ 2（最多 60 步、夾在 0.04…0.92）
+    private static func base(_ p: RGBColor, legibleUnder ink: RGBColor, lighten: Bool) -> RGBColor {
+        guard AlbumPalette.contrast(ink, p) < inkContrast else { return p }
+        let hsl = p.hslUnit
+        var lightness = hsl.lightness
+        for _ in 0..<60 where AlbumPalette.contrast(ink, hslColor(hsl.hue, hsl.saturation, lightness)) < inkContrast {
+            lightness += lighten ? 0.02 : -0.02
+            if lightness > 0.92 || lightness < 0.04 { break }
+        }
+        return hslColor(hsl.hue, hsl.saturation, min(0.92, max(0.04, lightness)))
     }
 
     /// 強調色候選：V → S（只在真的取自封面時），彩度與色相距都要夠；對比不足先把明度推開再交給呼叫端判斷
@@ -90,7 +105,7 @@ enum SwirlPalette {
         return hslColor(hsl.hue, hsl.saturation, p.luminance >= 0.18 ? 0.25 : 0.85)
     }
 
-    /// 主色近黑的煙渦＝301 外觀（灰底黑渦），不看取向
+    /// 主色近黑的水感＝301 外觀（灰底黑渦）
     private static func nearBlackSmoke(_ p: RGBColor, opacity: Double) -> SwirlColors? {
         TransparentFinish.isNearBlack(p) ? solid(nearBlackBase, ink: nearBlackInk, opacity: opacity) : nil
     }

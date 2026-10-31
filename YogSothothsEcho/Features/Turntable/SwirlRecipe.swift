@@ -66,7 +66,7 @@ struct SwirlRecipe: Hashable {
         switch style {
         case .smoke:
             switch SmokeVariant(choice) ?? draws.autoVariant {
-            case .water: return recipe(.smokeWater, body: 0.25, opacity: 0.95, draws)
+            case .water: return recipe(.smokeWater, body: 0.2, opacity: 0.95, draws)
             case .darkInk: return recipe(.smoke, ink: .dark, body: draws.smokeBody, opacity: draws.smokeOpacity, draws)
             case .lightInk: return recipe(.smoke, ink: .light, body: draws.smokeBody, opacity: draws.smokeOpacity, draws)
             case .accent: return recipe(.smoke, ink: .accent, body: draws.smokeBody, opacity: draws.smokeOpacity, draws)

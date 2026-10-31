@@ -79,6 +79,13 @@ struct SwirlBakerTests {
         #expect(abs(small.0 - large.0) <= 0.02 && abs(small.1 - large.1) <= 0.02 && abs(small.2 - large.2) <= 0.02)
     }
 
+    /// v0.8：深／淺／強調墨不虛（模糊 0.6 px、最淡處 0.6）、水感加強水線（0.7）——著色器參數唯一來源
+    @Test func smokeTuningFollowsV08() {
+        #expect(SwirlBaker.blurPixels(.smoke) == 0.6 && SwirlBaker.blurPixels(.smokeWater) == 0.5)
+        #expect(SwirlBaker.depthFloor(.smoke) == 0.6 && SwirlBaker.depthFloor(.smokeWater) == 0.3)
+        #expect(SwirlBaker.waterGain(.smokeWater) == 0.7 && SwirlBaker.waterGain(.smoke) == 0)
+    }
+
     /// 沒有 Metal 裝置＝建構失敗（呼叫端只畫底色）
     @Test func unavailableDeviceThrows() {
         #expect(throws: SwirlBaker.Failure.unavailable) { try SwirlBaker(device: nil) }

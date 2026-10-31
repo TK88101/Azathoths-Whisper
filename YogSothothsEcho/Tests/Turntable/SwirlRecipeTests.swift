@@ -47,7 +47,7 @@ struct SwirlRecipeTests {
         let auto = try #require(SwirlRecipe.make(style: .smoke, trackID: id, smoke: .auto))
         #expect(auto.subtype == .smoke && auto.ink == .dark && auto.noiseSeed == 3.52 && auto.opacity == 0.95)
         let water = try #require(SwirlRecipe.make(style: .smoke, trackID: id, smoke: .water))
-        #expect(water.subtype == .smokeWater && water.ink == nil && water.body == 0.25 && water.opacity == 0.95)
+        #expect(water.subtype == .smokeWater && water.ink == nil && water.body == 0.2 && water.opacity == 0.95)
         #expect(SwirlRecipe.make(style: .smoke, trackID: id, smoke: .lightInk)?.ink == .light)
         #expect(SwirlRecipe.make(style: .smoke, trackID: id, smoke: .accent)?.ink == .accent)
         let streak = try #require(SwirlRecipe.make(style: .streak, trackID: id, smoke: .accent))

@@ -35,6 +35,7 @@
 		17A9A20C8BE4570E8AA7B5D2 /* PairingStyleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 019C62E8AFA97AC397E4146D /* PairingStyleTests.swift */; };
 		1A24841FBFE4D7134667382E /* failed-dark.png in Resources */ = {isa = PBXBuildFile; fileRef = E1712DC638CFF34EA2E5F2A9 /* failed-dark.png */; };
 		1A2FE391EB93FF228B039C9B /* TurntableLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C5564794C20CCA865113AE /* TurntableLayoutTests.swift */; };
+		1B9D2DFE87BA8530140AE9C3 /* swirl-palette-fixtures-v2.json in Resources */ = {isa = PBXBuildFile; fileRef = FD3A45168F1B9D40E892FB7B /* swirl-palette-fixtures-v2.json */; };
 		1C735E2067AF511C1690351E /* PairingLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF58E4A7EE2633694AD66AB /* PairingLayoutTests.swift */; };
 		1D857369F576AF849FC1F50C /* SpineBakeLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72F3541F37CFD23D0CA23FBB /* SpineBakeLabel.swift */; };
 		1F0EA41C5A1693E8CA899F28 /* SwipeTransitionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17C4C0951EE90B3AA432F553 /* SwipeTransitionTests.swift */; };
@@ -225,7 +226,6 @@
 		D4EED68B2C9C013574D50035 /* TurntableSkin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAECEC763FF86D2E380FE64F /* TurntableSkin.swift */; };
 		D6C35BDF8D438D6F5541DF5E /* SwirlBakerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE5E2AC39C86C4E09D7B096 /* SwirlBakerTests.swift */; };
 		D7C51DD1FE19BDFE697E3488 /* TurntableFrameJudgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922924F78E83EAF3233AAC60 /* TurntableFrameJudgeTests.swift */; };
-		D8531F5C3728CFF66F64DA7A /* swirl-palette-fixtures-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 4A922D54F79253BE41645701 /* swirl-palette-fixtures-v1.json */; };
 		DA2AE36A897E06EF6D299AFE /* TurntableViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FD10FF15AD07BF3012B1A9F /* TurntableViewModel.swift */; };
 		DB9F013C23F482951113BE93 /* PairingStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5460BA259B14B1B2710D14BA /* PairingStyle.swift */; };
 		DCBC2B16B2FBE2D3C593739B /* turntable-golden-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = D6E9F917F1D8A52B46246BF6 /* turntable-golden-v1.json */; };
@@ -360,7 +360,6 @@
 		494B88BAD591A261D5023D4D /* TurntableSkinPickerRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurntableSkinPickerRenderTests.swift; sourceTree = "<group>"; };
 		4968698D16DF7C21B7DB09ED /* TurntableMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurntableMetrics.swift; sourceTree = "<group>"; };
 		4A1F63C462CB21E6E89D6BB3 /* DetailRevealTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailRevealTests.swift; sourceTree = "<group>"; };
-		4A922D54F79253BE41645701 /* swirl-palette-fixtures-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "swirl-palette-fixtures-v1.json"; sourceTree = "<group>"; };
 		4B3C62A50B01C7A07424A74C /* AlbumDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumDetailView.swift; sourceTree = "<group>"; };
 		4B3D77A132BDD77E4F122D57 /* TurntableDeck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurntableDeck.swift; sourceTree = "<group>"; };
 		4C7F01E7DD6DFDAB6A47631D /* RGBColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RGBColor.swift; sourceTree = "<group>"; };
@@ -549,6 +548,7 @@
 		F7872F66F165A458FD1A3248 /* LibraryAnchorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryAnchorTests.swift; sourceTree = "<group>"; };
 		F8BC5D2B6AEDE17162198001 /* BottomDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomDock.swift; sourceTree = "<group>"; };
 		F9FD8A1DFA82F664F13AE9AA /* ShortTransientRetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortTransientRetry.swift; sourceTree = "<group>"; };
+		FD3A45168F1B9D40E892FB7B /* swirl-palette-fixtures-v2.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "swirl-palette-fixtures-v2.json"; sourceTree = "<group>"; };
 		FEB68CAACF83E79B0CADE263 /* BrowseArtworkHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseArtworkHarness.swift; sourceTree = "<group>"; };
 		FEE9F8B32230EA641355F68D /* AppearanceSetting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSetting.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -569,7 +569,7 @@
 		01EC623CDC744605F4AF313B /* Fixtures */ = {
 			isa = PBXGroup;
 			children = (
-				4A922D54F79253BE41645701 /* swirl-palette-fixtures-v1.json */,
+				FD3A45168F1B9D40E892FB7B /* swirl-palette-fixtures-v2.json */,
 				D6E9F917F1D8A52B46246BF6 /* turntable-golden-v1.json */,
 			);
 			path = Fixtures;
@@ -1167,7 +1167,7 @@
 				9655EC5036841E02938D57A3 /* scanning-dark-zhHant.png in Resources */,
 				D26C3D6E0B70AB9C9711331D /* scanning-dark.png in Resources */,
 				3B0A4886ADC762D0ACC3072C /* scanning-light.png in Resources */,
-				D8531F5C3728CFF66F64DA7A /* swirl-palette-fixtures-v1.json in Resources */,
+				1B9D2DFE87BA8530140AE9C3 /* swirl-palette-fixtures-v2.json in Resources */,
 				DCBC2B16B2FBE2D3C593739B /* turntable-golden-v1.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

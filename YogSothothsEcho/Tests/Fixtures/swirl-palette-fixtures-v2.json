@@ -1,6 +1,6 @@
 {
- "schema": "swirl-palette-fixtures-v1",
- "source": "docs/plans/2026-10-14-yse/swirl-color-preview.html（小樣 v14，使用者 2026-10-31 認可）",
+ "schema": "swirl-palette-fixtures-v2",
+ "source": "docs/plans/2026-10-14-yse/swirl-color-preview.html（v0.8 規則：深／淺墨改調底色；使用者 2026-10-31 實機回饋）",
  "cases": [
   {
    "name": "深紅",
@@ -507,14 +507,14 @@
      "subtype": "smoke",
      "inkMode": "dark",
      "base": [
-      222,
-      225,
-      232
+      78,
+      74,
+      74
      ],
      "gradient": null,
      "ink": [
-      18,
-      18,
+      21,
+      20,
       20
      ],
      "accent": null,
@@ -524,15 +524,15 @@
      "subtype": "smoke",
      "inkMode": "light",
      "base": [
-      222,
-      225,
-      232
+      20,
+      19,
+      19
      ],
      "gradient": null,
      "ink": [
-      18,
-      18,
-      20
+      240,
+      240,
+      240
      ],
      "accent": null,
      "accentFallback": null
@@ -541,18 +541,18 @@
      "subtype": "smoke",
      "inkMode": "accent",
      "base": [
-      222,
-      225,
-      232
+      20,
+      19,
+      19
      ],
      "gradient": null,
      "ink": [
-      18,
-      18,
-      20
+      240,
+      240,
+      240
      ],
      "accent": null,
-     "accentFallback": null
+     "accentFallback": "light"
     },
     {
      "subtype": "pull",
@@ -654,14 +654,14 @@
      "subtype": "smoke",
      "inkMode": "dark",
      "base": [
-      222,
-      225,
-      232
+      77,
+      74,
+      74
      ],
      "gradient": null,
      "ink": [
-      18,
-      18,
+      21,
+      20,
       20
      ],
      "accent": null,
@@ -671,15 +671,15 @@
      "subtype": "smoke",
      "inkMode": "light",
      "base": [
-      222,
-      225,
-      232
+      25,
+      24,
+      24
      ],
      "gradient": null,
      "ink": [
-      18,
-      18,
-      20
+      240,
+      240,
+      240
      ],
      "accent": null,
      "accentFallback": null
@@ -688,18 +688,18 @@
      "subtype": "smoke",
      "inkMode": "accent",
      "base": [
-      222,
-      225,
-      232
+      25,
+      24,
+      24
      ],
      "gradient": null,
      "ink": [
-      18,
-      18,
-      20
+      240,
+      240,
+      240
      ],
      "accent": null,
-     "accentFallback": null
+     "accentFallback": "light"
     },
     {
      "subtype": "pull",
@@ -826,15 +826,15 @@
      "subtype": "smoke",
      "inkMode": "light",
      "base": [
-      240,
-      238,
-      232
+      180,
+      170,
+      139
      ],
      "gradient": null,
      "ink": [
-      25,
-      23,
-      16
+      241,
+      240,
+      239
      ],
      "accent": null,
      "accentFallback": null
@@ -981,15 +981,15 @@
      "subtype": "smoke",
      "inkMode": "light",
      "base": [
-      150,
-      198,
-      240
+      105,
+      174,
+      234
      ],
      "gradient": null,
      "ink": [
-      5,
-      21,
-      36
+      236,
+      240,
+      243
      ],
      "accent": null,
      "accentFallback": null
@@ -1119,15 +1119,15 @@
      "subtype": "smoke",
      "inkMode": "dark",
      "base": [
-      20,
-      40,
-      90
+      33,
+      66,
+      148
      ],
      "gradient": null,
      "ink": [
-      237,
-      238,
-      243
+      7,
+      15,
+      33
      ],
      "accent": null,
      "accentFallback": null
@@ -1840,6 +1840,161 @@
       199,
       35,
       82
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  },
+  {
+   "name": "暗紅（FOB Folie à Deux 實測）",
+   "P": [
+    91,
+    27,
+    25
+   ],
+   "V": [
+    150,
+    38,
+    32
+   ],
+   "S": [
+    165,
+    144,
+    91
+   ],
+   "hasMuted": true,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      91,
+      27,
+      25
+     ],
+     "gradient": null,
+     "ink": [
+      32,
+      9,
+      9
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      131,
+      39,
+      36
+     ],
+     "gradient": null,
+     "ink": [
+      32,
+      9,
+      9
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      91,
+      27,
+      25
+     ],
+     "gradient": null,
+     "ink": [
+      242,
+      237,
+      237
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      91,
+      27,
+      25
+     ],
+     "gradient": null,
+     "ink": [
+      165,
+      144,
+      91
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      91,
+      27,
+      25
+     ],
+     "gradient": null,
+     "ink": [
+      189,
+      164,
+      163
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      224,
+      145,
+      143
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      184,
+      50,
+      46
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       155,
+       113,
+       111
+      ],
+      [
+       184,
+       154,
+       153
+      ]
+     ],
+     "ink": [
+      199,
+      44,
+      35
      ],
      "accent": [
       240,
