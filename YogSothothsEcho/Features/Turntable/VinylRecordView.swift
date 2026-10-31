@@ -84,6 +84,10 @@ struct VinylRecordView: View {
             spinning(.marble, tint: nil, opacity: layer.alpha)
                 .blendMode(layer.blend == .colorBurn ? .colorBurn : .hardLight)
             base(.screen)
+        case .smoke, .streak, .flake, .chunk:
+            // CR-037 T6 前的過渡：只畫主色底（花紋烘焙在 T4–T6 接上）
+            Circle().fill(colors.primary.color)
+            base(.screen)
         }
     }
 

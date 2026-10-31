@@ -1,0 +1,1854 @@
+{
+ "schema": "swirl-palette-fixtures-v1",
+ "source": "docs/plans/2026-10-14-yse/swirl-color-preview.html（小樣 v14，使用者 2026-10-31 認可）",
+ "cases": [
+  {
+   "name": "深紅",
+   "P": [
+    150,
+    14,
+    28
+   ],
+   "V": [
+    200,
+    30,
+    40
+   ],
+   "S": [
+    120,
+    90,
+    85
+   ],
+   "hasMuted": true,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      150,
+      14,
+      28
+     ],
+     "gradient": null,
+     "ink": [
+      37,
+      3,
+      7
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      150,
+      14,
+      28
+     ],
+     "gradient": null,
+     "ink": [
+      37,
+      3,
+      7
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      150,
+      14,
+      28
+     ],
+     "gradient": null,
+     "ink": [
+      244,
+      236,
+      237
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      150,
+      14,
+      28
+     ],
+     "gradient": null,
+     "ink": [
+      244,
+      236,
+      237
+     ],
+     "accent": null,
+     "accentFallback": "light"
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      150,
+      14,
+      28
+     ],
+     "gradient": null,
+     "ink": [
+      213,
+      159,
+      164
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      243,
+      124,
+      137
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      210,
+      20,
+      39
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       155,
+       111,
+       113
+      ],
+      [
+       184,
+       153,
+       155
+      ]
+     ],
+     "ink": [
+      204,
+      31,
+      41
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  },
+  {
+   "name": "金黃",
+   "P": [
+    200,
+    145,
+    28
+   ],
+   "V": [
+    220,
+    160,
+    30
+   ],
+   "S": [
+    140,
+    120,
+    90
+   ],
+   "hasMuted": true,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      200,
+      145,
+      28
+     ],
+     "gradient": null,
+     "ink": [
+      36,
+      26,
+      5
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      200,
+      145,
+      28
+     ],
+     "gradient": null,
+     "ink": [
+      36,
+      26,
+      5
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      200,
+      145,
+      28
+     ],
+     "gradient": null,
+     "ink": [
+      243,
+      241,
+      236
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      200,
+      145,
+      28
+     ],
+     "gradient": null,
+     "ink": [
+      36,
+      26,
+      5
+     ],
+     "accent": null,
+     "accentFallback": "dark"
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      200,
+      145,
+      28
+     ],
+     "gradient": null,
+     "ink": [
+      233,
+      211,
+      164
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      237,
+      203,
+      130
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      201,
+      146,
+      28
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       155,
+       141,
+       111
+      ],
+      [
+       184,
+       174,
+       153
+      ]
+     ],
+     "ink": [
+      206,
+      150,
+      28
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  },
+  {
+   "name": "粉紫",
+   "P": [
+    180,
+    90,
+    200
+   ],
+   "V": [
+    60,
+    70,
+    190
+   ],
+   "S": [
+    130,
+    110,
+    140
+   ],
+   "hasMuted": true,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      180,
+      90,
+      200
+     ],
+     "gradient": null,
+     "ink": [
+      27,
+      10,
+      31
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      180,
+      90,
+      200
+     ],
+     "gradient": null,
+     "ink": [
+      27,
+      10,
+      31
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      180,
+      90,
+      200
+     ],
+     "gradient": null,
+     "ink": [
+      241,
+      237,
+      242
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      180,
+      90,
+      200
+     ],
+     "gradient": null,
+     "ink": [
+      31,
+      36,
+      97
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      180,
+      90,
+      200
+     ],
+     "gradient": null,
+     "ink": [
+      225,
+      189,
+      233
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      206,
+      148,
+      219
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      159,
+      46,
+      184
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       111,
+       114,
+       155
+      ],
+      [
+       153,
+       155,
+       184
+      ]
+     ],
+     "ink": [
+      35,
+      48,
+      199
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  },
+  {
+   "name": "近黑＋紅",
+   "P": [
+    20,
+    19,
+    19
+   ],
+   "V": [
+    190,
+    40,
+    40
+   ],
+   "S": [
+    90,
+    80,
+    75
+   ],
+   "hasMuted": true,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      222,
+      225,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      18,
+      18,
+      20
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      222,
+      225,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      18,
+      18,
+      20
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      222,
+      225,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      18,
+      18,
+      20
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      222,
+      225,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      18,
+      18,
+      20
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      20,
+      19,
+      19
+     ],
+     "gradient": null,
+     "ink": [
+      161,
+      161,
+      161
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      216,
+      216,
+      220
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      58,
+      58,
+      62
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       155,
+       111,
+       111
+      ],
+      [
+       184,
+       153,
+       153
+      ]
+     ],
+     "ink": [
+      199,
+      35,
+      35
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  },
+  {
+   "name": "近黑（無鮮色）",
+   "P": [
+    25,
+    24,
+    24
+   ],
+   "V": null,
+   "S": null,
+   "hasMuted": false,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      222,
+      225,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      18,
+      18,
+      20
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      222,
+      225,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      18,
+      18,
+      20
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      222,
+      225,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      18,
+      18,
+      20
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      222,
+      225,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      18,
+      18,
+      20
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      25,
+      24,
+      24
+     ],
+     "gradient": null,
+     "ink": [
+      163,
+      163,
+      163
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      216,
+      216,
+      220
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      58,
+      58,
+      62
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       122,
+       122,
+       126
+      ],
+      [
+       160,
+       160,
+       164
+      ]
+     ],
+     "ink": [
+      58,
+      58,
+      62
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  },
+  {
+   "name": "白",
+   "P": [
+    240,
+    238,
+    232
+   ],
+   "V": [
+    40,
+    90,
+    170
+   ],
+   "S": [
+    150,
+    145,
+    140
+   ],
+   "hasMuted": true,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      240,
+      238,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      25,
+      23,
+      16
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      240,
+      238,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      25,
+      23,
+      16
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      240,
+      238,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      25,
+      23,
+      16
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      240,
+      238,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      40,
+      90,
+      170
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      240,
+      238,
+      232
+     ],
+     "gradient": null,
+     "ink": [
+      156,
+      155,
+      151
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      216,
+      216,
+      220
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      58,
+      58,
+      62
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       111,
+       128,
+       155
+      ],
+      [
+       153,
+       165,
+       184
+      ]
+     ],
+     "ink": [
+      35,
+      98,
+      199
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  },
+  {
+   "name": "淺藍",
+   "P": [
+    150,
+    198,
+    240
+   ],
+   "V": [
+    40,
+    110,
+    205
+   ],
+   "S": [
+    110,
+    130,
+    150
+   ],
+   "hasMuted": true,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      150,
+      198,
+      240
+     ],
+     "gradient": null,
+     "ink": [
+      5,
+      21,
+      36
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      150,
+      198,
+      240
+     ],
+     "gradient": null,
+     "ink": [
+      5,
+      21,
+      36
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      150,
+      198,
+      240
+     ],
+     "gradient": null,
+     "ink": [
+      5,
+      21,
+      36
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      150,
+      198,
+      240
+     ],
+     "gradient": null,
+     "ink": [
+      5,
+      21,
+      36
+     ],
+     "accent": null,
+     "accentFallback": "dark"
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      150,
+      198,
+      240
+     ],
+     "gradient": null,
+     "ink": [
+      213,
+      232,
+      249
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      150,
+      198,
+      240
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      29,
+      120,
+      201
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       111,
+       129,
+       155
+      ],
+      [
+       153,
+       166,
+       184
+      ]
+     ],
+     "ink": [
+      35,
+      105,
+      199
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  },
+  {
+   "name": "深藍",
+   "P": [
+    20,
+    40,
+    90
+   ],
+   "V": [
+    60,
+    110,
+    200
+   ],
+   "S": [
+    80,
+    90,
+    110
+   ],
+   "hasMuted": true,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      20,
+      40,
+      90
+     ],
+     "gradient": null,
+     "ink": [
+      7,
+      15,
+      33
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      20,
+      40,
+      90
+     ],
+     "gradient": null,
+     "ink": [
+      237,
+      238,
+      243
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      20,
+      40,
+      90
+     ],
+     "gradient": null,
+     "ink": [
+      237,
+      238,
+      243
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      20,
+      40,
+      90
+     ],
+     "gradient": null,
+     "ink": [
+      237,
+      238,
+      243
+     ],
+     "accent": null,
+     "accentFallback": "light"
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      20,
+      40,
+      90
+     ],
+     "gradient": null,
+     "ink": [
+      161,
+      169,
+      189
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      138,
+      164,
+      229
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      42,
+      83,
+      188
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       111,
+       126,
+       155
+      ],
+      [
+       153,
+       164,
+       184
+      ]
+     ],
+     "ink": [
+      35,
+      94,
+      199
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  },
+  {
+   "name": "橄欖綠",
+   "P": [
+    110,
+    120,
+    60
+   ],
+   "V": [
+    150,
+    170,
+    40
+   ],
+   "S": [
+    120,
+    125,
+    100
+   ],
+   "hasMuted": true,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      110,
+      120,
+      60
+     ],
+     "gradient": null,
+     "ink": [
+      25,
+      27,
+      14
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      110,
+      120,
+      60
+     ],
+     "gradient": null,
+     "ink": [
+      25,
+      27,
+      14
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      110,
+      120,
+      60
+     ],
+     "gradient": null,
+     "ink": [
+      241,
+      241,
+      238
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      110,
+      120,
+      60
+     ],
+     "gradient": null,
+     "ink": [
+      241,
+      241,
+      238
+     ],
+     "accent": null,
+     "accentFallback": "light"
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      110,
+      120,
+      60
+     ],
+     "gradient": null,
+     "ink": [
+      197,
+      201,
+      177
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      199,
+      207,
+      160
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      161,
+      184,
+      46
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       148,
+       155,
+       111
+      ],
+      [
+       179,
+       184,
+       153
+      ]
+     ],
+     "ink": [
+      174,
+      199,
+      35
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  },
+  {
+   "name": "中灰（無彩）",
+   "P": [
+    128,
+    128,
+    128
+   ],
+   "V": null,
+   "S": [
+    110,
+    110,
+    110
+   ],
+   "hasMuted": true,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      128,
+      128,
+      128
+     ],
+     "gradient": null,
+     "ink": [
+      20,
+      20,
+      20
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      128,
+      128,
+      128
+     ],
+     "gradient": null,
+     "ink": [
+      20,
+      20,
+      20
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      128,
+      128,
+      128
+     ],
+     "gradient": null,
+     "ink": [
+      240,
+      240,
+      240
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      128,
+      128,
+      128
+     ],
+     "gradient": null,
+     "ink": [
+      20,
+      20,
+      20
+     ],
+     "accent": null,
+     "accentFallback": "dark"
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      128,
+      128,
+      128
+     ],
+     "gradient": null,
+     "ink": [
+      204,
+      204,
+      204
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      216,
+      216,
+      220
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      58,
+      58,
+      62
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       122,
+       122,
+       126
+      ],
+      [
+       160,
+       160,
+       164
+      ]
+     ],
+     "ink": [
+      58,
+      58,
+      62
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  },
+  {
+   "name": "橘",
+   "P": [
+    230,
+    110,
+    30
+   ],
+   "V": [
+    235,
+    120,
+    30
+   ],
+   "S": [
+    150,
+    110,
+    90
+   ],
+   "hasMuted": true,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      230,
+      110,
+      30
+     ],
+     "gradient": null,
+     "ink": [
+      37,
+      17,
+      4
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      230,
+      110,
+      30
+     ],
+     "gradient": null,
+     "ink": [
+      37,
+      17,
+      4
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      230,
+      110,
+      30
+     ],
+     "gradient": null,
+     "ink": [
+      243,
+      239,
+      236
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      230,
+      110,
+      30
+     ],
+     "gradient": null,
+     "ink": [
+      37,
+      17,
+      4
+     ],
+     "accent": null,
+     "accentFallback": "dark"
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      230,
+      110,
+      30
+     ],
+     "gradient": null,
+     "ink": [
+      245,
+      197,
+      165
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      241,
+      172,
+      126
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      207,
+      96,
+      23
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       155,
+       130,
+       111
+      ],
+      [
+       184,
+       166,
+       153
+      ]
+     ],
+     "ink": [
+      215,
+      105,
+      19
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  },
+  {
+   "name": "青綠＋桃紅",
+   "P": [
+    30,
+    140,
+    140
+   ],
+   "V": [
+    220,
+    80,
+    120
+   ],
+   "S": [
+    100,
+    130,
+    130
+   ],
+   "hasMuted": true,
+   "results": [
+    {
+     "subtype": "smokeWater",
+     "inkMode": null,
+     "base": [
+      30,
+      140,
+      140
+     ],
+     "gradient": null,
+     "ink": [
+      7,
+      34,
+      34
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "dark",
+     "base": [
+      30,
+      140,
+      140
+     ],
+     "gradient": null,
+     "ink": [
+      7,
+      34,
+      34
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "light",
+     "base": [
+      30,
+      140,
+      140
+     ],
+     "gradient": null,
+     "ink": [
+      237,
+      243,
+      243
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "smoke",
+     "inkMode": "accent",
+     "base": [
+      30,
+      140,
+      140
+     ],
+     "gradient": null,
+     "ink": [
+      106,
+      21,
+      46
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "pull",
+     "inkMode": null,
+     "base": [
+      30,
+      140,
+      140
+     ],
+     "gradient": null,
+     "ink": [
+      165,
+      209,
+      209
+     ],
+     "accent": null,
+     "accentFallback": null
+    },
+    {
+     "subtype": "flake",
+     "inkMode": null,
+     "base": [
+      137,
+      230,
+      230
+     ],
+     "gradient": null,
+     "ink": [
+      252,
+      253,
+      255
+     ],
+     "accent": [
+      41,
+      189,
+      189
+     ],
+     "accentFallback": null
+    },
+    {
+     "subtype": "chunk",
+     "inkMode": null,
+     "base": null,
+     "gradient": [
+      [
+       155,
+       111,
+       123
+      ],
+      [
+       184,
+       153,
+       162
+      ]
+     ],
+     "ink": [
+      199,
+      35,
+      82
+     ],
+     "accent": [
+      240,
+      243,
+      252
+     ],
+     "accentFallback": null
+    }
+   ]
+  }
+ ]
+}

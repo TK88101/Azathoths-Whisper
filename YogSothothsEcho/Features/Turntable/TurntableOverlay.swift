@@ -151,13 +151,21 @@ struct TurntableOverlay: View {
         .background(Capsule().fill(Color.black.opacity(0.3)))
     }
 
-    /// 原版的小唱片預覽（#5-1 G6）；RANDOM 或缺素材＝圓底加符號
+    /// 原版的小唱片預覽（#5-1 G6）、SWIRL 系列的自製灰階圖（CR-037）；RANDOM 或缺素材＝圓底加符號
     @ViewBuilder private func styleIcon(_ style: RecordStyle) -> some View {
-        if let image = style.preview.flatMap(VinylAssets.image) {
+        if let image = Self.iconImage(style.icon) {
             Image(uiImage: image).resizable().clipShape(Circle())
         } else {
             Circle().fill(Color(white: style == .random ? 0.5 : 0.15))
                 .overlay(Image(systemName: style == .random ? "shuffle" : "circle.circle").foregroundStyle(.white.opacity(0.8)))
+        }
+    }
+
+    static func iconImage(_ source: RecordStyle.IconSource) -> UIImage? {
+        switch source {
+        case .vinylAsset(let name): VinylAssets.image(name)
+        case .bundled(let name): UIImage(named: name)
+        case .symbol: nil
         }
     }
 
@@ -196,6 +204,10 @@ extension RecordStyle {
         case .transparent: "Transparent"
         case .splash: "Splash"
         case .marble: "Marble"
+        case .smoke: "Smoke"
+        case .streak: "Streak"
+        case .flake: "Flake"
+        case .chunk: "Chunk"
         }
     }
 }

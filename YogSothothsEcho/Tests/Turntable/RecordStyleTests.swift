@@ -13,11 +13,38 @@ struct RecordStyleTests {
         #expect(JavaHash.string(text) == expected)
     }
 
-    /// h％100 的四個區間與邊界
+    /// h％100 的區間與邊界（CR-037：新 4 種只從 SPLASH 尾段切出 15 桶，7／3／2／3）
     @Test func builtInBuckets() {
         let expected: [(UInt32, RecordStyle)] = [(0, .classic), (14, .classic), (15, .transparent), (39, .transparent),
-                                                 (40, .marble), (64, .marble), (65, .splash), (99, .splash)]
+                                                 (40, .marble), (64, .marble), (65, .splash), (84, .splash),
+                                                 (85, .smoke), (91, .smoke), (92, .streak), (94, .streak),
+                                                 (95, .flake), (96, .flake), (97, .chunk), (99, .chunk)]
         for (bucket, style) in expected { #expect(RecordStyle.builtIn(bucket: bucket) == style, "\(bucket)") }
+    }
+
+    /// CR-037：0…84 與改前的分桶逐值相同（原本 CLASSIC／TRANSPARENT／MARBLE 的歌一首都不變），只有 85…99 改成新 4 種
+    @Test func bucketsBelow85AreUnchangedFromBeforeCR037() {
+        func before(_ bucket: UInt32) -> RecordStyle {
+            switch bucket {
+            case ..<15: .classic
+            case ..<40: .transparent
+            case ..<65: .marble
+            default: .splash
+            }
+        }
+        for bucket in UInt32(0)..<85 { #expect(RecordStyle.builtIn(bucket: bucket) == before(bucket), "\(bucket)") }
+        for bucket in UInt32(85)..<100 { #expect(RecordStyle.builtIn(bucket: bucket).isSwirl, "\(bucket)") }
+        let counts = Dictionary(grouping: UInt32(0)..<100, by: RecordStyle.builtIn(bucket:)).mapValues(\.count)
+        #expect(counts == [.classic: 15, .transparent: 25, .marble: 25, .splash: 20, .smoke: 7, .streak: 3, .flake: 2, .chunk: 3])
+    }
+
+    /// 各新分桶邊界的真實 trackID（雜湊值以 Python 依 Java 語意獨立算出）
+    @Test func randomResolvesIntoNewBuckets() {
+        #expect(RecordStyle.random.resolved(trackID: "000000000000001a") == .splash) // 84
+        #expect(RecordStyle.random.resolved(trackID: "000000000000004a") == .smoke)  // 91
+        #expect(RecordStyle.random.resolved(trackID: "0000000000000028") == .streak) // 94
+        #expect(RecordStyle.random.resolved(trackID: "0000000000000026") == .flake)  // 96
+        #expect(RecordStyle.random.resolved(trackID: "0000000000000023") == .chunk)  // 99
     }
 
     /// RANDOM：同一首永遠同一種；Int32.min 取絕對值不溢位（2147483648 % 100 = 48 → MARBLE）
@@ -60,20 +87,40 @@ struct RecordStyleTests {
         #expect(abs(RGBColor(r: 0.5, g: 0.5, b: 0.5).luminance - 0.21404) < 1e-4)
     }
 
-    /// 偏好：預設 RANDOM，壞值回 RANDOM，五選一依序
+    /// 偏好：預設 RANDOM，壞值回 RANDOM，九選一依序（CR-037 新 4 種接在 MARBLE 之後）
     @Test func preference() {
-        #expect(RecordStyle.allCases == [.random, .classic, .transparent, .splash, .marble])
+        #expect(RecordStyle.allCases == [.random, .classic, .transparent, .splash, .marble, .smoke, .streak, .flake, .chunk])
         #expect(RecordStyle.restore(nil) == .random && RecordStyle.restore("bogus") == .random)
         #expect(RecordStyle.restore(RecordStyle.marble.rawValue) == .marble)
+        // rawValue 是設定的資料格式，寫死；舊版讀到這些值會回 RANDOM（既有 restore 行為）
+        #expect([RecordStyle.smoke, .streak, .flake, .chunk].map(\.rawValue) == ["smoke", "streak", "flake", "chunk"])
+        for raw in ["smoke", "streak", "flake", "chunk"] { #expect(RecordStyle.restore(raw).rawValue == raw) }
     }
 
-    /// 浮層樣式圖示（#5-1 G6）：用原版的小唱片預覽素材；RANDOM 沒有預覽圖、維持洗牌箭頭
-    @Test func previewAssets() {
-        #expect(RecordStyle.random.preview == nil)
-        #expect(RecordStyle.classic.preview == .previewClassic)
-        #expect(RecordStyle.transparent.preview == .previewColoredBase)
-        #expect(RecordStyle.splash.preview == .previewSplash)
-        #expect(RecordStyle.marble.preview == .previewMarble)
+    /// SWIRL 系列＝新 4 種；其他樣式不是
+    @Test func swirlFamily() {
+        #expect(RecordStyle.allCases.filter(\.isSwirl) == [.smoke, .streak, .flake, .chunk])
+    }
+
+    /// 浮層樣式圖示：原版 4 種用 MD Vinyl 預覽素材；新 4 種用 asset catalog 的自製灰階圖；RANDOM 畫洗牌箭頭
+    @Test func iconSources() {
+        #expect(RecordStyle.random.icon == .symbol)
+        #expect(RecordStyle.classic.icon == .vinylAsset(.previewClassic))
+        #expect(RecordStyle.transparent.icon == .vinylAsset(.previewColoredBase))
+        #expect(RecordStyle.splash.icon == .vinylAsset(.previewSplash))
+        #expect(RecordStyle.marble.icon == .vinylAsset(.previewMarble))
+        #expect(RecordStyle.smoke.icon == .bundled("RecordStyleSmoke"))
+        #expect(RecordStyle.streak.icon == .bundled("RecordStyleStreak"))
+        #expect(RecordStyle.flake.icon == .bundled("RecordStyleFlake"))
+        #expect(RecordStyle.chunk.icon == .bundled("RecordStyleChunk"))
+    }
+
+    /// 煙渦變化設定：預設與壞值＝自動；rawValue 寫死（資料格式）
+    @Test func smokeVariantChoicePreference() {
+        #expect(SmokeVariantChoice.allCases == [.auto, .water, .darkInk, .lightInk, .accent])
+        #expect(SmokeVariantChoice.allCases.map(\.rawValue) == ["auto", "water", "darkInk", "lightInk", "accent"])
+        #expect(SmokeVariantChoice.restore(nil) == .auto && SmokeVariantChoice.restore("bogus") == .auto)
+        #expect(SmokeVariantChoice.restore("lightInk") == .lightInk)
     }
 }
 

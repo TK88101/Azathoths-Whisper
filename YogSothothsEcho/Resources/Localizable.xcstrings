@@ -99,6 +99,13 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "按「**配對新 iPad**」。" } }
       }
     },
+    "Chunk" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Chunk" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "チャンク" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "碎塊" } }
+      }
+    },
     "Classic" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Classic" } },
@@ -188,6 +195,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Done" } },
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "完了" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "完成" } }
+      }
+    },
+    "Flake" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Flake" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "フレーク" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "碎片" } }
       }
     },
     "Forest Haze" : {
@@ -498,6 +512,13 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "唱機停穩後才能更換外觀。" } }
       }
     },
+    "Smoke" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Smoke" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "スモーク" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "煙渦" } }
+      }
+    },
     "Something went wrong. Try again." : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Something went wrong. Try again." } },
@@ -517,6 +538,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Splash" } },
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "スプラッシュ" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "潑彩" } }
+      }
+    },
+    "Streak" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Streak" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ストリーク" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "拉絲" } }
       }
     },
     "System" : {
