@@ -6,6 +6,8 @@ struct TurntableOverlay: View {
     let model: TurntableViewModel
     let onClose: () -> Void
     @State private var showsSkinPicker = false
+    @State private var smokeRowWidth: CGFloat = 0
+    @AccessibilityFocusState private var focusedVariant: SmokeVariantChoice?
 
     var body: some View {
         ZStack {
@@ -37,7 +39,10 @@ struct TurntableOverlay: View {
             }
         }
         // 防線：視圖被移出（斷線、關唱機）時 popover 的回呼不一定跑；VM 另在 close／hideImmediately 清空（r2-1）
-        .onDisappear { model.overlay.endHold(.skinPicker) }
+        .onDisappear {
+            model.overlay.endHold(.skinPicker)
+            model.overlay.endHold(.smokeVariants)
+        }
     }
 
     #if DEBUG
@@ -132,23 +137,84 @@ struct TurntableOverlay: View {
         }
     }
 
+    /// 樣式主排（CR-037：9 顆）＋煙渦第二排。容器太窄（Split View 等）時主排改水平捲動、維持 40 pt 觸控尺寸
     private var stylePicker: some View {
-        HStack(spacing: 20) {
+        GeometryReader { proxy in
+            VStack(spacing: 12) {
+                Spacer(minLength: 0)
+                if model.isSmokeRowOpen {
+                    smokeRow
+                        .fixedSize()
+                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { smokeRowWidth = $0 }
+                        .position(x: SmokeRowLayout.centerX(anchorX: proxy.size.width / 2 + SmokeRowLayout.smokeOffsetFromRowCenter,
+                                                            rowWidth: smokeRowWidth, containerWidth: proxy.size.width),
+                                  y: 30)
+                        .frame(height: 60)
+                }
+                ViewThatFits(in: .horizontal) {
+                    styleRow
+                    ScrollView(.horizontal, showsIndicators: false) { styleRow }
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .bottom)
+        }
+        .frame(height: 140)
+    }
+
+    private var styleRow: some View {
+        HStack(spacing: SmokeRowLayout.iconSpacing) {
             ForEach(RecordStyle.allCases, id: \.self) { style in
                 Button {
-                    model.recordStyle = style
+                    model.tapStyle(style)
                 } label: {
                     styleIcon(style)
-                        .frame(width: 40, height: 40)
+                        .frame(width: SmokeRowLayout.iconSize, height: SmokeRowLayout.iconSize)
                         .overlay(Circle().strokeBorder(Color.white, lineWidth: model.recordStyle == style ? 2 : 0))
                 }
                 .accessibilityLabel(Text(style.title))
                 .accessibilityAddTraits(model.recordStyle == style ? .isSelected : [])
                 .accessibilityIdentifier(AccessibilityID.turntableStyle(style.rawValue))
+                .modifier(SmokeButtonAccessibility(isSmoke: style == .smoke, isOpen: model.isSmokeRowOpen))
             }
         }
-        .padding(12)
+        .padding(SmokeRowLayout.rowPadding)
         .background(Capsule().fill(Color.black.opacity(0.3)))
+    }
+
+    /// 煙渦第二排（CR-037 §4.5b）：選了立即換花紋、不收合；強調色退回時加註
+    private var smokeRow: some View {
+        HStack(spacing: 8) {
+            ForEach(SmokeVariantChoice.allCases, id: \.self) { choice in
+                let selected = model.smokeVariant == choice
+                let note = choice == .accent && selected ? model.smokeAccentFallback.map(Self.fallbackNote) : nil
+                Button {
+                    model.smokeVariant = choice
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(choice.title)
+                        if let note { Text(note).font(.caption2).opacity(0.75) }
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .padding(.horizontal, 16)
+                    .frame(height: 44)
+                    .foregroundStyle(selected ? Color.black : Color.white)
+                    .background(Capsule().fill(selected ? Color.white : Color.white.opacity(0.08)))
+                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.16)))
+                }
+                .accessibilityLabel(note.map { Text(choice.title) + Text(verbatim: " ") + Text($0) } ?? Text(choice.title))
+                .accessibilityAddTraits(selected ? .isSelected : [])
+                .accessibilityIdentifier(AccessibilityID.turntableSmokeVariant(choice.rawValue))
+                .accessibilityFocused($focusedVariant, equals: choice)
+            }
+        }
+        .padding(8)
+        .background(Capsule().fill(Color.black.opacity(0.42)))
+        // 展開時 VoiceOver 焦點移到目前選項
+        .onAppear { focusedVariant = model.smokeVariant }
+    }
+
+    static func fallbackNote(_ ink: SmokeInk) -> LocalizedStringKey {
+        ink == .light ? "(Light Ink for this song)" : "(Dark Ink for this song)"
     }
 
     /// 原版的小唱片預覽（#5-1 G6）、SWIRL 系列的自製灰階圖（CR-037）；RANDOM 或缺素材＝圓底加符號
@@ -193,6 +259,60 @@ private extension Label where Title == Text, Icon == Image {
             .background(Circle().fill(Color.black.opacity(0.3)))
             .overlay(Circle().strokeBorder(Color.white.opacity(0.1)))
             .foregroundStyle(.white)
+    }
+}
+
+/// 煙渦第二排的位置（CR-037 §4.5b）：水平中心對齊主排上的 SMOKE 圖示，超出畫面時整排往內平移、左右各留邊界
+enum SmokeRowLayout {
+    static let iconSize: CGFloat = 40
+    static let iconSpacing: CGFloat = 20
+    static let rowPadding: CGFloat = 12
+    static let margin: CGFloat = 16
+
+    /// 主排寬度與 SMOKE 圖示中心相對主排中心的位移（由 allCases 的順序推出，不寫死索引）
+    static var rowWidth: CGFloat {
+        let n = CGFloat(RecordStyle.allCases.count)
+        return n * iconSize + (n - 1) * iconSpacing + 2 * rowPadding
+    }
+
+    static var smokeOffsetFromRowCenter: CGFloat {
+        let index = CGFloat(RecordStyle.allCases.firstIndex(of: .smoke) ?? 0)
+        return rowPadding + index * (iconSize + iconSpacing) + iconSize / 2 - rowWidth / 2
+    }
+
+    static func centerX(anchorX: CGFloat, rowWidth: CGFloat, containerWidth: CGFloat) -> CGFloat {
+        let half = rowWidth / 2
+        let low = margin + half, high = containerWidth - margin - half
+        guard low <= high else { return containerWidth / 2 }
+        return min(max(anchorX, low), high)
+    }
+}
+
+/// SMOKE 主按鈕的展開狀態與提示（VoiceOver）
+private struct SmokeButtonAccessibility: ViewModifier {
+    let isSmoke: Bool
+    let isOpen: Bool
+
+    func body(content: Content) -> some View {
+        if isSmoke {
+            content
+                .accessibilityValue(Text(isOpen ? "Expanded" : "Collapsed"))
+                .accessibilityHint(Text("Shows Smoke variants"))
+        } else {
+            content
+        }
+    }
+}
+
+extension SmokeVariantChoice {
+    var title: LocalizedStringKey {
+        switch self {
+        case .auto: "Auto"
+        case .water: "Water"
+        case .darkInk: "Dark Ink"
+        case .lightInk: "Light Ink"
+        case .accent: "Accent"
+        }
     }
 }
 

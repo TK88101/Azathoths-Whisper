@@ -11,6 +11,25 @@ struct VinylRecordView: View {
     let angle: Double
     /// 磨砂盤的主色與霧濃淡（v2.1 T8）；Release 恆 `.standard`
     var tuning: TransparentTuning = .standard
+    /// SWIRL 系列的花紋配方（CR-037）；其他樣式＝nil
+    var swirl: SwirlRecipe? = nil
+    var swirlStore: SwirlArtworkStore = .shared
+
+    /// 烘焙邊長上限（M1 一張 4 MiB；顯示時放大，花紋本身柔和）
+    static let swirlBakeLimit = 1024
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var swirlKey: SwirlArtworkStore.Key? {
+        guard let swirl else { return nil }
+        let palette = SwirlPalette.resolve(swirl, colors: colors, reduceTransparency: reduceTransparency)
+        return SwirlArtworkStore.Key(recipe: swirl, colors: palette, side: min(Self.swirlBakeLimit, max(1, Int((side * displayScale).rounded()))))
+    }
+
+    private var shadowOpacity: Double {
+        if let key = swirlKey { return key.colors.opacity < 1 ? 0.08 : 0.2 }
+        return transparentFinish?.shadowOpacity ?? 0.2
+    }
 
     private var s: CGFloat { side / TurntableMetrics.recordSize }
 
@@ -52,7 +71,40 @@ struct VinylRecordView: View {
         }
         .frame(width: side, height: side)
         // 投影放在合成圖層之外：drawingGroup 的範圍只有唱片大小，往下偏移的模糊陰影放在裡面會被切出一條直邊（#5-1 實機發現）
-        .background(Circle().fill(Color.black.opacity(finish?.shadowOpacity ?? 0.2)).blur(radius: 12 * s).offset(y: 12 * s))
+        .background(Circle().fill(Color.black.opacity(shadowOpacity)).blur(radius: 12 * s).offset(y: 12 * s))
+        // SWIRL：顯示期間登記使用中（不被淘汰）；鍵改變（換歌、換尺寸、換色、Reduce Transparency）即換一張
+        .task(id: swirlKey) {
+            if let key = swirlKey { await swirlStore.use(key) }
+        }
+    }
+
+    /// SWIRL 系列（CR-037 §4.4）：烘好的盤面（底色＋花紋，已含不透明度）只旋轉；未就緒先畫底色，就緒後淡入（Reduce Motion＝直接出現）
+    @ViewBuilder private func swirlLayers() -> some View {
+        if let key = swirlKey {
+            let state = swirlStore.state(for: key)
+            ZStack {
+                if case .ready(let face) = state {
+                    Image(decorative: face.image, scale: 1).resizable()
+                        .rotationEffect(.degrees(angle))
+                        .transition(reduceMotion ? .identity : .opacity)
+                } else {
+                    swirlBaseFill(key.colors)
+                }
+            }
+            .animation(reduceMotion ? nil : .easeIn(duration: 0.2), value: state?.isReady == true)
+            base(.screen)
+        }
+    }
+
+    @ViewBuilder private func swirlBaseFill(_ palette: SwirlColors) -> some View {
+        switch palette.base {
+        case .solid(let color):
+            Circle().fill(color.color.opacity(palette.opacity))
+        case .gradient(let from, let to):
+            Circle().fill(LinearGradient(colors: [from.color, to.color], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .opacity(palette.opacity)
+                .rotationEffect(.degrees(angle))
+        }
     }
 
     @ViewBuilder private func styleLayers(_ finish: TransparentFinish?) -> some View {
@@ -85,9 +137,7 @@ struct VinylRecordView: View {
                 .blendMode(layer.blend == .colorBurn ? .colorBurn : .hardLight)
             base(.screen)
         case .smoke, .streak, .flake, .chunk:
-            // CR-037 T6 前的過渡：只畫主色底（花紋烘焙在 T4–T6 接上）
-            Circle().fill(colors.primary.color)
-            base(.screen)
+            swirlLayers()
         }
     }
 

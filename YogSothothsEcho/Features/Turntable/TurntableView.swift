@@ -154,7 +154,7 @@ struct TurntableView: View {
     private func record(_ deck: TurntableDeck, _ layout: TurntableLayout) -> some View {
         TimelineView(.animation(paused: model.nowPlaying.clock?.event.state != .playing)) { timeline in
             VinylRecordView(side: layout.record.width, style: deck.style, splash: deck.splash, colors: deck.colors, label: deck.label,
-                            angle: model.recordAngle(at: timeline.date.timeIntervalSinceReferenceDate), tuning: Self.tuning)
+                            angle: model.recordAngle(at: timeline.date.timeIntervalSinceReferenceDate), tuning: Self.tuning, swirl: deck.swirl)
         }
         .scaleEffect(layout.recordVisibleScale)
         .accessibilityElement()

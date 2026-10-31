@@ -76,6 +76,8 @@ enum AccessibilityID {
     static let turntableTuningOtherHaze = "turntable.tuning.otherHaze"
     static let turntableNotice = "turntable.notice"
     static func turntableStyle(_ raw: String) -> String { "turntable.style.\(raw)" }
+    /// CR-037 煙渦第二排的五個選項（SmokeVariantChoice 的 rawValue）
+    static func turntableSmokeVariant(_ raw: String) -> String { "turntable.smokeVariant.\(raw)" }
     /// CR-034 唱機皮膚切換（皮膚 id）：選擇器的格子
     static func turntableSkin(_ id: String) -> String { "turntable.skin.\(id)" }
     /// CR-034 增補 A：唱機浮層開選擇器的圓鈕、設定頁「唱機外觀」那一列

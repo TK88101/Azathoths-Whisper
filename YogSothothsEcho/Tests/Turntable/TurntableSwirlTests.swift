@@ -81,6 +81,23 @@ struct TurntableSwirlTests {
         #expect(model.isSmokeRowOpen && model.overlay.holds.contains(.smokeVariants))
     }
 
+    /// 第二排位置：對齊 SMOKE、靠邊時往內推、左右留 16 pt；容器比第二排還窄＝置中
+    @Test func smokeRowStaysInsideTheContainer() {
+        #expect(SmokeRowLayout.rowWidth == CGFloat(9 * 40 + 8 * 20 + 24))
+        #expect(SmokeRowLayout.smokeOffsetFromRowCenter == CGFloat(12 + 5 * 60 + 20 - 272))
+        #expect(SmokeRowLayout.centerX(anchorX: 600, rowWidth: 400, containerWidth: 1200) == 600)
+        #expect(SmokeRowLayout.centerX(anchorX: 100, rowWidth: 400, containerWidth: 1200) == 216)
+        #expect(SmokeRowLayout.centerX(anchorX: 1150, rowWidth: 400, containerWidth: 1200) == 984)
+        #expect(SmokeRowLayout.centerX(anchorX: 100, rowWidth: 400, containerWidth: 300) == 150)
+    }
+
+    /// 新 4 個圖示在公開 asset catalog（沒有本機 MD Vinyl 素材也有）
+    @Test func swirlIconsAreBundled() {
+        for style in RecordStyle.allCases where style.isSwirl {
+            #expect(TurntableOverlay.iconImage(style.icon) != nil, "\(style)")
+        }
+    }
+
     @Test func accentFallbackReadsTheShownRecord() async {
         let model = makeModel(colors: Self.tealOnly)
         await start(track: "000000000000004a")

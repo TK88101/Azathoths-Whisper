@@ -15,6 +15,27 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "%lld 首" } }
       }
     },
+    "(Dark Ink for this song)" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "(Dark Ink for this song)" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "（この曲は濃墨）" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "（本曲改用深墨）" } }
+      }
+    },
+    "(Light Ink for this song)" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "(Light Ink for this song)" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "（この曲は淡墨）" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "（本曲改用淺墨）" } }
+      }
+    },
+    "Accent" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Accent" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アクセント" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "強調色" } }
+      }
+    },
     "Album Color" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Album Color" } },
@@ -48,6 +69,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Appearance" } },
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "外観" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "外觀" } }
+      }
+    },
+    "Auto" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "自動" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "自動" } }
       }
     },
     "Background" : {
@@ -127,6 +155,13 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "關閉" } }
       }
     },
+    "Collapsed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Collapsed" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "折りたたみ中" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "已收合" } }
+      }
+    },
     "Connected" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Connected" } },
@@ -176,6 +211,13 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "暗色" } }
       }
     },
+    "Dark Ink" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dark Ink" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "濃墨" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "深墨" } }
+      }
+    },
     "Default" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Default" } },
@@ -195,6 +237,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Done" } },
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "完了" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "完成" } }
+      }
+    },
+    "Expanded" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Expanded" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "展開中" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "已展開" } }
       }
     },
     "Flake" : {
@@ -265,6 +314,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Light" } },
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "ライト" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "亮色" } }
+      }
+    },
+    "Light Ink" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Light Ink" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "淡墨" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "淺墨" } }
       }
     },
     "Loading albums… %lld of %lld" : {
@@ -498,6 +554,13 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "以側封顯示" } }
       }
     },
+    "Shows Smoke variants" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Shows Smoke variants" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "スモークのバリエーションを表示" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "顯示煙渦的變化選項" } }
+      }
+    },
     "Silver Blue" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Silver Blue" } },
@@ -664,6 +727,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Waiting for your Mac… Turn on Remote Settings in Azathoth's Whisper." } },
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "Mac を待っています… Azathoth's Whisper の Remote Settings をオンにしてください。" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "正在等你的 Mac… 請在 Azathoth's Whisper 打開 Remote Settings。" } }
+      }
+    },
+    "Water" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Water" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ウォーター" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "水感" } }
       }
     },
     "Your Mac can't read the Music library." : {
