@@ -236,6 +236,7 @@ iPad アプリは [Releases ページ](https://github.com/TK88101/Azathoths-Whis
 ### iPad アプリをソースからビルドする
 
 必要なもの：**Xcode 16 以降**（Swift 6、iOS 18 SDK）、XcodeGen。Xcode 27 でビルドと動作を確認しています。
+レコードスタイルのシェーダーには Xcode の **Metal Toolchain** が必要です。`xcodebuild -showComponent MetalToolchain` で未インストールと表示されたら、`xcodebuild -downloadComponent MetalToolchain` を一度実行してください。
 
 ```bash
 cd Azathoths-Whisper/YogSothothsEcho

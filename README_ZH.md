@@ -240,6 +240,7 @@ iPad App 以 `.ipa` 放在 [Releases 頁面](https://github.com/TK88101/Azathoth
 ### 從源碼建置 iPad App
 
 需求：**Xcode 16+**（Swift 6、iOS 18 SDK）、XcodeGen。實際以 Xcode 27 建置驗證。
+唱片樣式的著色器需要 Xcode 的 **Metal Toolchain**；若 `xcodebuild -showComponent MetalToolchain` 顯示未安裝，先執行一次 `xcodebuild -downloadComponent MetalToolchain`。
 
 ```bash
 cd Azathoths-Whisper/YogSothothsEcho

@@ -269,6 +269,7 @@ To unpair, remove the iPad under **Paired iPads** on the Mac.
 ### Building the iPad app from source
 
 Requirements: **Xcode 16+** (Swift 6, iOS 18 SDK), XcodeGen. Built and verified with Xcode 27.
+The record-style shaders need Xcode's **Metal Toolchain**; if `xcodebuild -showComponent MetalToolchain` says it is not installed, run `xcodebuild -downloadComponent MetalToolchain` once.
 
 ```bash
 cd Azathoths-Whisper/YogSothothsEcho
