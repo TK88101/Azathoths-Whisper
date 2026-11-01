@@ -146,3 +146,10 @@
 | 2 | simplify 層級／簡化／重用（三方同指，P2） | 讓位規則仍手寫 `glow‖heat`、只靠註解；`haloRadius > 0` 當布林用 | **採納**（記憶：同一語義兩輪被找到不同處＝定義散落，改收斂）：`usesHalo`／`haloRadius`／`movesYieldingLinesOutOfHalo` 三個判斷集中定義，行為不變 |
 - 遺留 P2：①`.neon` 與 `.cityNeon` 近似、`neonLines` 的 pink／cyan 欄名對 neon 已不貼切；②stomp 測試內聯 wordHit 公式（刻意作獨立預言，未改）；③heat 半徑斷言重述公式；④steel 測試以 haze 的前景層為預期；⑤G1 配對以字串參數；⑥`theAppOffersTheSignedEligibleAndPlayableSpace` 與基線差異測試部分重疊；⑦配方摘要每批多一個 pre 常數（可改逐團雜湊）。
 - 安全評審：未派（無認證／個資／檔案／外部 API 改動）。
+
+## 附錄 E　全量測試與使用者在場（2026-11-01）
+- **全量單元**（ec553e2 前一版、`-enableCodeCoverage`，以完整名稱 skip `BatchOverlappingLoadTests/overlappingLoadSuspendsPollingUntilLastCompletes()`）：1,991 條，1,961 綠、5 紅、25 略過。紅：`LyricsFXContrastTests` 4 條 120 s 超時（e734671 起的既有問題，與本批無關）；`LibraryGateReportTests.anUnfinishedSignedBandIsCountedAsMonoAndBlocksTheGate`——fixture 拿 Aphex Twin 當「組不出的署名團」，本批補件後失效（預期連帶），改用仍組不出的 Cannibal Corpse，單獨重跑 28 條綠（ec553e2）。coverage_gate 96.5%（5308/5503，豁免 483／490）exit 0；`no_playback_gate.sh` 0；Scripts 443 綠。
+- **V8 曲庫檢查重掃**（17:28，Debug 版 ec553e2）：署名待補元件 178 首／4 位→**0**（該列消失）；素面 373 首／50 位→195 首／46 位（有詞 53／13→46／11）；身分未定 1,144／135 不變。
+- **真視窗目視**（使用者播 Rammstein，角落 `~`＝估算時間，與本批無關）：OswaldInd＋steel＋march 逐字砸下、FrakturInd＋純黑＋heat 兩組，使用者：「對」。
+- **`LyricsFXUITests`**（17:36–17:38，ABC 輸入法、正式版已關）：18／18 綠，含新增 `testASignedIndustrialBandGetsItsComposedStyleRegardlessOfGenre`。
+- **每幀量測**（18:09–18:12，`-O` 量測版、密集預覽、真視窗前景 4/4、每份 6 個 5 秒窗丟第一個；另一 session 的 YSE 測試結束後、負載 3.9）：steel＋march＋stomp＋heat p50 0.76–0.90 ms、p95 1.38–1.51 ms；Fraktur＋forge＋heat p50 0.74–0.84、p95 1.31–1.48；neon＋neonstroke p50 0.68–0.80、p95 1.24–1.47；grid＋rgbsplit p50 0.77–0.92、p95 1.38–1.53——**4 份皆達標**（2／3 ms；每格上限 8.3 ms）。腳本 `tools/t7-batch5.sh`。
