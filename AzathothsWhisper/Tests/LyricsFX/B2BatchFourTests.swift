@@ -62,14 +62,14 @@ struct B2BatchFourIsolationTests {
         }
     }
 
-    /// 基線（c6e0a53）54 團合格集合的聯集涵蓋當時目錄的每一個元件；目錄裡不在聯集的＝本批新元件。
-    /// 下一批重產基線後這裡會變成空集合——下面兩條會紅在「找不到新元件」，那時連同 `batchesAfterTheBaseline` 一起退役或改寫，不要讓它空轉
+    /// 「本批新元件」＝c6e0a53 基線 54 團合格集合聯集之外的元件。B2 批 5 重產基線後聯集會吞掉它們，
+    /// 所以凍結成 `b2-batch4-new-components.json`（批 5 計劃 T1②；由 c6e0a53 基線算出一次，不再重算）
     private func newComponents() throws -> [FXComponent] {
-        let known = Set(try BandCandidatesBaseline.load().bands.flatMap { band in
-            band.eligible.flatMap { slot, ids in ids.map { "\(slot):\($0)" } }
-        })
-        let new = LyricsFXCatalog.all.filter { !known.contains("\($0.slot.rawValue):\($0.id)") }
-        #expect(!new.isEmpty, "基線已含本批的元件，這組測試在空轉")
+        struct Frozen: Decodable { let components: [String] }
+        let url = try GoldenFixtures.fixturesRoot().appendingPathComponent("LyricsFX/b2-batch4-new-components.json")
+        let frozen = try JSONDecoder().decode(Frozen.self, from: Data(contentsOf: url)).components
+        let new = LyricsFXCatalog.all.filter { frozen.contains("\($0.slot.rawValue):\($0.id)") }
+        #expect(new.count == frozen.count, "凍結清單裡有元件已從目錄消失")
         return new
     }
 

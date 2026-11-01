@@ -11,8 +11,10 @@ import Testing
 @Suite("Recipe golden")
 struct RecipeGoldenTests {
     static let seeds: ClosedRange<UInt64> = 1...20
-    /// e0818da＋fit 軸序修正上 `digest()` 的值（逐行與本分支的 `printTheLines()` 輸出比對一致）
-    static let recordedDigest: UInt64 = 0x2f80_4412_4f79_d4dc
+    /// B2 批 5（docs/plans/2026-11-01-lyrics-fx-signed-bands-components.md V4）：5 個署名團由 mono 變組合後的 `digest()`
+    static let recordedDigest: UInt64 = 0xd99a_08d7_32a6_f6ff
+    /// e0818da＋fit 軸序修正上錄下的值；批 5 之後由 `onlyTheBatchFiveBandsChanged` 繼續守住其餘 profile
+    static let preBatchFiveDigest: UInt64 = 0x2f80_4412_4f79_d4dc
 
     /// 只取既有的 profile（樂團表＋B1 的兩條曲風列）；不用 `ReadabilityAudit.profiles`——它之後會加入 J-Pop 變體。
     /// ⑥b 新增的 17 列不屬「既有」（它們的可玩與對比由 `GenreRowTests`、`LyricsFXContrastTests` 把關），摘要值不變
@@ -53,5 +55,14 @@ struct RecipeGoldenTests {
     @Test func existingProfilesDrawTheSameRecipesAsBeforeJPop() {
         let digest = Self.digest()
         #expect(digest == Self.recordedDigest, "摘要 \(String(digest, radix: 16))")
+    }
+
+    /// 批 5 只改了這 5 團：把它們的行還原成批 5 之前的 mono，摘要必須回到 `preBatchFiveDigest`（其餘 profile 一字不差）
+    @Test func onlyTheBatchFiveBandsChanged() {
+        let restored = Self.lines().map { line in
+            let parts = line.split(separator: "|", maxSplits: 2).map(String.init)
+            return B2BatchFive.bands.contains(parts[0]) ? "\(parts[0])|\(parts[1])|mono" : line
+        }
+        #expect(FXHash.fnv1a64(restored.joined(separator: "\n")) == Self.preBatchFiveDigest)
     }
 }

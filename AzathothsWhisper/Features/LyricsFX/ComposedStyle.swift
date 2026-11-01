@@ -134,6 +134,30 @@ enum ComposedStyle {
     static let thumpScale: CGFloat = 0.04
     /// 光暈：原型 shadowBlur 18 × glowAmt(polish 0.4)≈14.8；Canvas 的 blur 約為 SwiftUI shadow 半徑的 2 倍
     static let glowRadius: CGFloat = 7.4
+    /// B2 批 5 heat（字緣紅光）：原型停穩後 shadowBlur 14 × 0.5＝7，照 glow 的同一換算（14.8 → glowRadius）
+    static let heatGlowRadius: CGFloat = glowRadius * 7 / 14.8
+    /// B2 批 5 stomp（行軍重踏）：原型每個詞起點後 0.15 s 內整屏下沉、最深 0.012 畫面高
+    static let stompWindow = 0.15
+    static let stompDepth: CGFloat = 0.012
+
+    // 光暈層的三個判斷集中在這裡（simcodex R1：heat 曾漏掉韓文行；R2：讓位規則原本只靠註解）
+
+    /// 有光暈層：glow、neonstroke、heat。韓文行一律不進光暈層（drawPlain 讀它）
+    static func usesHalo(_ effects: Set<FXEffect>) -> Bool {
+        effects.contains(.glow) || effects.contains(.neonstroke) || effects.contains(.heat)
+    }
+
+    /// 光暈層半徑：glow／neonstroke 全強度、heat 半強度，沒有光暈層＝0
+    static func haloRadius(for effects: Set<FXEffect>) -> CGFloat {
+        guard usesHalo(effects) else { return 0 }
+        return effects.contains(.glow) || effects.contains(.neonstroke) ? glowRadius : heatGlowRadius
+    }
+
+    /// 讓位中的舊句移出光暈層：glow、heat（點陣與向量在淡字光暈邊緣會差幾個像素）。
+    /// neonstroke 不在內——描邊共用半徑但不受影響，舊句留在光暈層
+    static func movesYieldingLinesOutOfHalo(_ effects: Set<FXEffect>) -> Bool {
+        effects.contains(.glow) || effects.contains(.heat)
+    }
     /// 霓虹描邊寬（em 比例）
     static let strokeRatio: CGFloat = 0.06
     /// 倒影：在字下方 0.95 em、4% 透明度
@@ -213,8 +237,8 @@ enum ComposedStyle {
             }
             let first = frame.glyphs.count
             draw(entry, time: time, size: size, style: lineStyle, measurer: measurer, into: &frame, specks: &specks)
-            // 光暈只給現行句：讓位中的舊句移到光暈層外（點陣與向量在淡字光暈邊緣會差幾個像素；霓虹描邊共用半徑但不受影響）
-            if style.effects.contains(.glow), entry.yield < 1 {
+            // 光暈只給現行句：讓位中的舊句移到光暈層外
+            if movesYieldingLinesOutOfHalo(style.effects), entry.yield < 1 {
                 frame.unlit += frame.glyphs[first...]
                 frame.glyphs.removeSubrange(first...)
             }
@@ -229,10 +253,13 @@ enum ComposedStyle {
         if style.effects.contains(.thump), let current {
             frame.zoom = 1 + thumpScale * CGFloat(wordHit(current.line, time: time, window: thumpWindow))
         }
+        if style.effects.contains(.stomp), let current {
+            frame.shake.height += stompDepth * size.height * CGFloat(wordHit(current.line, time: time, window: stompWindow))
+        }
         if style.effects.contains(.speedlines), let current, time - current.line.start < speedLineWindow {
             frame.back.append(speedLines(size: size, time: time, color: style.palette.fg, fade: 1 - (time - current.line.start) / speedLineWindow))
         }
-        if style.effects.contains(.glow) || style.effects.contains(.neonstroke) { frame.glow = glowRadius }
+        frame.glow = haloRadius(for: style.effects)
         return frame
     }
 
@@ -332,7 +359,7 @@ enum ComposedStyle {
                 rotation: 0, scaleX: 1, scaleY: 1, opacity: alpha, color: .fg, stroke: 0
             )
         }
-        if style.effects.contains(.glow) || style.effects.contains(.neonstroke) { frame.unlit += glyphs } else { frame.glyphs += glyphs }
+        if usesHalo(style.effects) { frame.unlit += glyphs } else { frame.glyphs += glyphs }
     }
 
     /// 繪製端相鄰同色、同量化透明度才合成一次填色。暈開的副本同色但每字透明度可能不同（燭火閃爍讓每個字各自明滅），

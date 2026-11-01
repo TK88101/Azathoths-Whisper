@@ -17,6 +17,8 @@ enum BackdropKind: String, Sendable {
     case bluehour
     /// ⑥a J-Pop：sparkle＝淡天藍漸層＋閃爍四芒星（きらきら）；cityNeon＝粉紅漸層＋霓虹橫線＋半個夕陽（シティポップ）
     case sparkle, cityNeon
+    /// B2 批 5（工業／電子補件）：steel＝頂上一盞冷白聚光（Rammstein）；neon＝下半粉紅漸層＋強調色／暗色交替橫線（電子團）
+    case steel, neon
 
     /// 這個背景要配暗底還是亮底的配色（nil＝都可以）；組合器在背景之後抽配色時先濾成相容者（B2 計劃 §7.3）。
     /// sunset、shafts 會把整面塗成淺色／深色漸層，等於自帶底色（T3 對比測試抓到：配錯邊時字幾乎看不見）
@@ -24,7 +26,7 @@ enum BackdropKind: String, Sendable {
         switch self {
         case .ampGlow, .spot, .smokeHaze, .prism, .stars, .shafts, .gig, .bokeh, .bluehour, .cityNeon: .dark
         case .halftone, .sunset, .sparkle: .light
-        case .void, .film, .snow, .ash, .crimsonFog, .embers, .haze, .paper, .tapeLeak, .flat, .xerox, .checker, .skyGrad, .scan, .grid: nil
+        case .void, .film, .snow, .ash, .crimsonFog, .embers, .haze, .paper, .tapeLeak, .flat, .xerox, .checker, .skyGrad, .scan, .grid, .steel, .neon: nil
         }
     }
 }
@@ -46,6 +48,8 @@ enum FXEffect: String, Sendable {
     case rgbsplit
     /// B2 批 4：字停住後往下拖出 `ComposedStyle.weepCopies` 份漸淡的副本（墨水往下暈開）
     case weep
+    /// B2 批 5：stomp＝每個詞起點整屏往下沉一下（行軍重踏）；heat＝字緣紅光（光暈層、配色強調色、半強度）
+    case stomp, heat
 }
 
 struct EnterSpec: Sendable {

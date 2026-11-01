@@ -128,3 +128,28 @@
 - §8-1 逐字版 march：使用者「做吧」（說明：整詞砸下改一個字一個字砸下，做好先給他看，不像就停下回報）。
 - §8-2 Fredoka、§8-3 Cannibal Corpse 另案：照草案。
 - §8-4 分支：⑧ 未合 main → 從 `wip/lyrics-library-gate` 疊開 `wip/lyrics-fx-b2-batch5`。
+
+## 附錄 C　實作記錄（2026-11-01，`wip/lyrics-fx-b2-batch5`，自 fcb1c3e）
+- **T0**：程式重產基線確認 mono 署名團＝Aphex Twin、Cannibal Corpse、Daft Punk、Fatboy Slim、Rammstein、The Chemical Brothers（F1 屬實）。全量單元基線沿用 2271b8e（2026-10-29，增補計劃附錄 F：1,978 條 1,946 綠、7 紅）——其後 app／單元 target 只改了 UI 測試讀法（推測不影響，未重跑）。
+- **T1①②**：基線以 fcb1c3e 重產（61 團；舊 54 團零差異——Cannibal Corpse 只是 `"playable": null` 與省略欄位的寫法差，解碼皆 nil），sha256 `d472d724…`；`ExistingBandCandidatesTests` 推進到批 5；批 4 新元件凍結為 `b2-batch4-new-components.json`（164 個＝emo＋J-Pop＋⑦ 通用，由 c6e0a53 基線算出，sha256 `cf1d3c04…`）。相關 4 suite 17 條綠。
+- **T2**：`composer.before-b2-5.js` sha256 `83d8e715…`，`check.js --batch 4` 對批 4 對照檔差異 0。`patch_b2_5.py`：5 團標 linked／batch 5；march 改逐字；strobe、pyro 退役（改掛無人使用的標籤）；Rammstein 加 `forge`（drop＋type 逐字）、`shutdown`（shrink＋fall）只帶 industrial；**Fredoka 不搬**（google/fonts 只剩 wdth＋wght 兩軸可變字檔，`everyCatalogFontIsRegistered` 不收——批 2 §9 同一先例；計劃 §8-2 的前提不成立，依先例處置）。`check.js --batch 5`：61 團只有 5 團變、未預期 0；`precheck` 外溢 0。
+- **T3 探針（本機 v19）**：P17——Rammstein 第一輪使用者：「你管這個背景叫噴火？不要這個噴火了」→ pyro 退役（連帶 T4 不再需要「目前行開始時間」資料流，該項取消）；第二輪「這次沒問題了」。The Chemical Brothers、Fatboy Slim、Daft Punk、Aphex Twin 各「沒問題」。匯出 `b2-batch5-signed.json`（linked／new；`playable` 待 T5 由 app 算出補入）。
+- 要新做（`need.js`）：背景 steel、neon；進場 march、forge；退場 burnout、shutdown；字型 OswaldInd、FrakturInd；效果 stomp、heat；配色 steelFire、blackRed、neonPink。新繪製行為只剩 steel、neon、stomp、heat 四個。
+- **T4–T5**（43bcd88）：steel／neon、stomp／heat 先紅後綠；目錄由 `gen_swift.js --batch 5` 產生 13 個新元件＋同掛 15 個既有元件（只補缺的 X 標籤）；app 合格集合與簽字對照逐槽一致、相對基線只有 5 團變；可讀性閘門三組 4,022 s 綠。Fredoka 未搬，故 About／README 字型清單不需改。
+
+## 附錄 D　simcodex（2026-11-01，2 輪，第 2 輪提前結束；審 `fcb1c3e..HEAD`）
+| 輪 | 來源 | 意見 | 處置 |
+|---|---|---|---|
+| 1 | simplify 簡化／層級／重用＋codex review [P2] | heat 走光暈層，但 `drawPlain` 只排除 glow／neonstroke → 韓文行帶紅光，違反 ⑤「韓文行無特效」 | **採納**：先紅（`PlainLinePolicyTests` 參數化 heat 案例）後綠；光暈判斷收斂 |
+| 1 | 驗證時發現 | `RecipeGoldenTests` 摘要變（2f80…→d99a…）| **採納**（V4 預期）：證明把 5 團還原為 mono 恰回 2f80…；新增 `onlyTheBatchFiveBandsChanged` 永久守住其餘 profile |
+| 2 | codex review [P1] | stomp 測試第 60 行「矛盾的零位移斷言」 | **駁回（誤判）**：該行是未帶 stomp 的 `plan(t)`（fx1 預設 none），且該測試實跑綠 |
+| 2 | simplify 層級／簡化／重用（三方同指，P2） | 讓位規則仍手寫 `glow‖heat`、只靠註解；`haloRadius > 0` 當布林用 | **採納**（記憶：同一語義兩輪被找到不同處＝定義散落，改收斂）：`usesHalo`／`haloRadius`／`movesYieldingLinesOutOfHalo` 三個判斷集中定義，行為不變 |
+- 遺留 P2：①`.neon` 與 `.cityNeon` 近似、`neonLines` 的 pink／cyan 欄名對 neon 已不貼切；②stomp 測試內聯 wordHit 公式（刻意作獨立預言，未改）；③heat 半徑斷言重述公式；④steel 測試以 haze 的前景層為預期；⑤G1 配對以字串參數；⑥`theAppOffersTheSignedEligibleAndPlayableSpace` 與基線差異測試部分重疊；⑦配方摘要每批多一個 pre 常數（可改逐團雜湊）。
+- 安全評審：未派（無認證／個資／檔案／外部 API 改動）。
+
+## 附錄 E　全量測試與使用者在場（2026-11-01）
+- **全量單元**（ec553e2 前一版、`-enableCodeCoverage`，以完整名稱 skip `BatchOverlappingLoadTests/overlappingLoadSuspendsPollingUntilLastCompletes()`）：1,991 條，1,961 綠、5 紅、25 略過。紅：`LyricsFXContrastTests` 4 條 120 s 超時（e734671 起的既有問題，與本批無關）；`LibraryGateReportTests.anUnfinishedSignedBandIsCountedAsMonoAndBlocksTheGate`——fixture 拿 Aphex Twin 當「組不出的署名團」，本批補件後失效（預期連帶），改用仍組不出的 Cannibal Corpse，單獨重跑 28 條綠（ec553e2）。coverage_gate 96.5%（5308/5503，豁免 483／490）exit 0；`no_playback_gate.sh` 0；Scripts 443 綠。
+- **V8 曲庫檢查重掃**（17:28，Debug 版 ec553e2）：署名待補元件 178 首／4 位→**0**（該列消失）；素面 373 首／50 位→195 首／46 位（有詞 53／13→46／11）；身分未定 1,144／135 不變。
+- **真視窗目視**（使用者播 Rammstein，角落 `~`＝估算時間，與本批無關）：OswaldInd＋steel＋march 逐字砸下、FrakturInd＋純黑＋heat 兩組，使用者：「對」。
+- **`LyricsFXUITests`**（17:36–17:38，ABC 輸入法、正式版已關）：18／18 綠，含新增 `testASignedIndustrialBandGetsItsComposedStyleRegardlessOfGenre`。
+- **每幀量測**（18:09–18:12，`-O` 量測版、密集預覽、真視窗前景 4/4、每份 6 個 5 秒窗丟第一個；另一 session 的 YSE 測試結束後、負載 3.9）：steel＋march＋stomp＋heat p50 0.76–0.90 ms、p95 1.38–1.51 ms；Fraktur＋forge＋heat p50 0.74–0.84、p95 1.31–1.48；neon＋neonstroke p50 0.68–0.80、p95 1.24–1.47；grid＋rgbsplit p50 0.77–0.92、p95 1.38–1.53——**4 份皆達標**（2／3 ms；每格上限 8.3 ms）。腳本 `tools/t7-batch5.sh`。
