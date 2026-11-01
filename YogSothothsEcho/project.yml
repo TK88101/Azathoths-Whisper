@@ -58,6 +58,11 @@ targets:
         # 只在 Debug 關沙盒，Release 保持開啟（simplify P2-5／security LOW）
         Debug:
           ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+          # CR-038 液態黑膠小樣：只 Debug（DEBUG 由 XcodeGen 預設帶入，target 層覆寫時明寫、不依賴繼承）
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG LIQUID_SAMPLE"
+        Release:
+          # CR-038：小樣著色器不進 Release（L-T5 以 metallib 掃描驗證）
+          EXCLUDED_SOURCE_FILE_NAMES: "LiquidVinyl.metal"
     info:
       path: App/Info.plist
       properties:
@@ -92,6 +97,11 @@ targets:
           if [ "${CONFIGURATION}" = "Debug" ]; then
             /usr/libexec/PlistBuddy -c "Delete :UIFileSharingEnabled" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}" 2>/dev/null || true
             /usr/libexec/PlistBuddy -c "Add :UIFileSharingEnabled bool true" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+            # CR-038 §4.5：量測 JSON 記建置 commit（有未提交改動加 -dirty）
+            COMMIT=$(git -C "${SRCROOT}" rev-parse --short HEAD 2>/dev/null || echo unknown)
+            if [ -n "$(git -C "${SRCROOT}" status --porcelain 2>/dev/null)" ]; then COMMIT="${COMMIT}-dirty"; fi
+            /usr/libexec/PlistBuddy -c "Delete :YSEBuildCommit" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :YSEBuildCommit string ${COMMIT}" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
           fi
           touch "${DERIVED_FILE_DIR}/file-sharing.stamp"
 
@@ -108,6 +118,10 @@ targets:
         TARGETED_DEVICE_FAMILY: "2"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Yog-Sothoth's Echo.app/Yog-Sothoth's Echo"
         BUNDLE_LOADER: "$(TEST_HOST)"
+      configs:
+        # CR-038：小樣的單元測試跟 App 同旗標
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG LIQUID_SAMPLE"
 
   YogSothothsEchoUITests:
     type: bundle.ui-testing

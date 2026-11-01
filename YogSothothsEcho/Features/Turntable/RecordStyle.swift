@@ -118,7 +118,7 @@ enum TransparentFinish: Equatable {
 }
 
 /// 磨砂盤的可調量（v2.1 T8／T10）：主色濃淡、材質（霧）濃淡，分紅色與其他兩組（使用者以調整面板實機定案）；
-/// `standard` 是唯一基準，Release 恆用它，DEBUG 由調整面板（`TransparentTuningStore`）覆寫
+/// `standard` 是唯一基準（DEBUG 調整面板已於開發者工具清理移除）
 struct TransparentTuning: Equatable {
     struct Look: Equatable {
         let frostedTint: Double
@@ -156,39 +156,6 @@ struct TransparentTuning: Equatable {
     /// 依盤面實際的疊色挑一組；無色磨砂（nil）＝其他
     func look(for tint: RGBColor?) -> Look { tint.map(Self.isRed) == true ? red : other }
 }
-
-#if DEBUG
-/// 調整面板的單一真相：所有唱片讀同一份；寫入即存進 UserDefaults，重開 app 保留
-@MainActor
-@Observable
-final class TransparentTuningStore {
-    static let shared = TransparentTuningStore(defaults: .standard)
-    private static let prefix = "debug.transparentTuning."
-
-    @ObservationIgnored private let defaults: UserDefaults
-    var tuning: TransparentTuning {
-        didSet {
-            for (key, value) in Self.entries(tuning) { defaults.set(value, forKey: Self.prefix + key) }
-        }
-    }
-
-    init(defaults: UserDefaults) {
-        self.defaults = defaults
-        let standard = TransparentTuning.standard
-        func read(_ key: String, _ fallback: Double) -> Double { defaults.object(forKey: Self.prefix + key) as? Double ?? fallback }
-        tuning = TransparentTuning(
-            red: .init(frostedTint: read("redTint", standard.red.frostedTint), material: read("redMaterial", standard.red.material)),
-            other: .init(frostedTint: read("otherTint", standard.other.frostedTint), material: read("otherMaterial", standard.other.material)))
-    }
-
-    func reset() { tuning = .standard }
-
-    private static func entries(_ tuning: TransparentTuning) -> [(String, Double)] {
-        [("redTint", tuning.red.frostedTint), ("redMaterial", tuning.red.material),
-         ("otherTint", tuning.other.frostedTint), ("otherMaterial", tuning.other.material)]
-    }
-}
-#endif
 
 /// SPLASH 兩層圖案的配色組合；`hashCode % 3` 為截斷取餘（可能為負）：1 → 1、2 → 2、其餘 → 3
 enum SplashStyle: Equatable {

@@ -266,47 +266,6 @@ struct OpaqueDiscTests {
         #expect(AlbumPalette.textColor(on: RGBColor(hex: 0xF2D21B)) == .black)
     }
 }
-
-#if DEBUG
-/// DEBUG 調整面板的儲存：單一真相、寫入即持久化、重設回 standard（獨立 UserDefaults suite）
-@MainActor
-struct TransparentTuningStoreTests {
-    private func defaults() -> UserDefaults {
-        let name = "TransparentTuningStoreTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
-        defaults.removePersistentDomain(forName: name)
-        return defaults
-    }
-
-    @Test func startsAtStandardAndPersistsChanges() {
-        let suite = defaults()
-        let store = TransparentTuningStore(defaults: suite)
-        #expect(store.tuning == .standard)
-        let changed = TransparentTuning(red: .init(frostedTint: 0.5, material: 0.4), other: .init(frostedTint: 0.15, material: 0.6))
-        store.tuning = changed
-        #expect(TransparentTuningStore(defaults: suite).tuning == changed)
-    }
-
-    /// 只存了部分鍵：其餘回 standard，不互相覆寫
-    @Test func missingKeysFallBackIndividually() {
-        let suite = defaults()
-        suite.set(0.42, forKey: "debug.transparentTuning.redTint")
-        let tuning = TransparentTuningStore(defaults: suite).tuning
-        #expect(tuning.red == .init(frostedTint: 0.42, material: TransparentTuning.standard.red.material))
-        #expect(tuning.other == TransparentTuning.standard.other)
-    }
-
-    @Test func resetReturnsToStandard() {
-        let suite = defaults()
-        let store = TransparentTuningStore(defaults: suite)
-        store.tuning = TransparentTuning(red: .init(frostedTint: 0.1, material: 0.5), other: .init(frostedTint: 0.1, material: 0.5))
-        store.reset()
-        #expect(store.tuning == .standard)
-        #expect(TransparentTuningStore(defaults: suite).tuning == .standard)
-    }
-}
-#endif
-
 // 播完沒有封面時的封套：同 MD 佔位圖最頻色的純色（不再用帶「M」的原版素材）
 struct CoverPlaceholderTests {
     @Test func placeholderIsPlainDarkGrey() {

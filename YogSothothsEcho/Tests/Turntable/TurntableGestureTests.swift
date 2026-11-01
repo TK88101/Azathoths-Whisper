@@ -100,18 +100,18 @@ struct TurntableOverlayTests {
         #expect(!overlay.isVisible)
     }
 
-    /// DEBUG 調整面板拖滑桿期間不得自動隱藏：編輯中停計時，放手重新計時 5 s（v2.1 T8）
+    /// 停表期間不得自動隱藏：持有中停計時，結束重新計時 5 s（v2.1 T8 原以 DEBUG 調整面板滑桿驗；滑桿於開發者工具清理移除，改以煙渦第二排驗同一機制）
     @Test func editingPausesAutoHide() async {
         let sleeper = QueueSleeper()
         let overlay = TurntableOverlayState(sleep: { await sleeper.sleep($0) })
         overlay.toggle()
         await settleMain()
-        overlay.beginHold(.tuningSlider)
+        overlay.beginHold(.smokeVariants)
         await settleMain()
         await sleeper.wakeOldest()           // 編輯前的計時醒來：已作廢
         await settleMain()
         #expect(overlay.isVisible)
-        overlay.endHold(.tuningSlider)
+        overlay.endHold(.smokeVariants)
         await settleMain()
         #expect(await sleeper.waiting == 1)
         await sleeper.wakeOldest()
@@ -119,15 +119,15 @@ struct TurntableOverlayTests {
         #expect(!overlay.isVisible)
     }
 
-    /// 增補 A r1-4：停表原因可疊加——滑桿放手時選擇器仍開著＝不重新計時；全部結束才計時
+    /// 增補 A r1-4：停表原因可疊加——第二排收合時選擇器仍開著＝不重新計時；全部結束才計時
     @Test func holdReasonsCompose() async {
         let sleeper = QueueSleeper()
         let overlay = TurntableOverlayState(sleep: { await sleeper.sleep($0) })
         overlay.toggle()
         await settleMain()
-        overlay.beginHold(.tuningSlider)
+        overlay.beginHold(.smokeVariants)
         overlay.beginHold(.skinPicker)
-        overlay.endHold(.tuningSlider)
+        overlay.endHold(.smokeVariants)
         await settleMain()
         await sleeper.wakeOldest()           // 停表前的計時：已作廢
         await settleMain()
@@ -172,7 +172,7 @@ struct TurntableOverlayTests {
         let overlay = TurntableOverlayState(sleep: { await sleeper.sleep($0) })
         overlay.toggle()
         overlay.beginHold(.skinPicker)
-        overlay.beginHold(.tuningSlider)
+        overlay.beginHold(.smokeVariants)
         overlay.endAllHolds()
         #expect(overlay.holds.isEmpty)
         await settleMain()

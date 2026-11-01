@@ -13,6 +13,10 @@ struct VinylRecordView: View {
     var tuning: TransparentTuning = .standard
     /// SWIRL 系列的花紋配方（CR-037）；其他樣式＝nil
     var swirl: SwirlRecipe? = nil
+    #if LIQUID_SAMPLE
+    /// CR-038 液態黑膠小樣（Debug）：有值時盤面換成液態層，蓋過樣式
+    var liquid: LiquidFrame? = nil
+    #endif
 
     /// 烘焙邊長上限（M1 一張 4 MiB；顯示時放大，花紋本身柔和）
     static let swirlBakeLimit = 1024
@@ -46,7 +50,7 @@ struct VinylRecordView: View {
 
     var body: some View {
         let finish = transparentFinish
-        let usesMaterial = finish?.usesMaterial == true
+        let usesMaterial = finish?.usesMaterial == true && !isLiquid
         let swirlKey = makeSwirlKey()
         let translucent = swirlKey.map { $0.colors.opacity < 1 } ?? usesMaterial
         ZStack {
@@ -57,8 +61,7 @@ struct VinylRecordView: View {
                     .opacity(tuning.look(for: TransparentFinish.tint(for: colors)).material)
             }
             ZStack {
-                styleLayers(finish, swirlKey: swirlKey)
-                rotationCue(RotationCue.cue(style: style, finish: finish), finish: finish)
+                faceLayers(finish, swirlKey: swirlKey)
                 Circle().strokeBorder(AngularGradient(stops: Self.rimStops, center: .center), lineWidth: 3 * s)
                 if usesMaterial { Circle().strokeBorder(Color.white.opacity(0.22), lineWidth: 1.2 * s) }
                 labelView.rotationEffect(.degrees(angle))
@@ -68,11 +71,35 @@ struct VinylRecordView: View {
         }
         .frame(width: side, height: side)
         // 投影放在合成圖層之外：drawingGroup 的範圍只有唱片大小，往下偏移的模糊陰影放在裡面會被切出一條直邊（#5-1 實機發現）
-        .background(Circle().fill(Color.black.opacity(TransparentFinish.shadowOpacity(translucent: translucent))).blur(radius: 12 * s).offset(y: 12 * s))
+        .background(Circle().fill(Color.black.opacity(TransparentFinish.shadowOpacity(translucent: translucent || isLiquid))).blur(radius: 12 * s).offset(y: 12 * s))
         // SWIRL：顯示期間登記使用中（不被淘汰）；鍵改變（換歌、換尺寸、換色、Reduce Transparency）即換一張
         .task(id: swirlKey) {
             if let swirlKey { await SwirlArtworkStore.shared.use(swirlKey) }
         }
+    }
+
+    private var isLiquid: Bool {
+        #if LIQUID_SAMPLE
+        liquid != nil
+        #else
+        false
+        #endif
+    }
+
+    /// 盤面（樣式層＋轉動參照）；CR-038 小樣的單一整合點：液態層＋不轉的溝紋高光
+    @ViewBuilder private func faceLayers(_ finish: TransparentFinish?, swirlKey: SwirlArtworkStore.Key?) -> some View {
+        #if LIQUID_SAMPLE
+        if let liquid {
+            LiquidVinylLayer(frame: liquid, side: side)
+            base(.screen)
+        } else {
+            styleLayers(finish, swirlKey: swirlKey)
+            rotationCue(RotationCue.cue(style: style, finish: finish), finish: finish)
+        }
+        #else
+        styleLayers(finish, swirlKey: swirlKey)
+        rotationCue(RotationCue.cue(style: style, finish: finish), finish: finish)
+        #endif
     }
 
     /// SWIRL 系列（CR-037 §4.4）：烘好的盤面（底色＋花紋，已含不透明度）只旋轉；未就緒先畫底色，就緒後淡入（Reduce Motion＝直接出現）

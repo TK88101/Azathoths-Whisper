@@ -54,21 +54,6 @@ final class TurntableUITests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: sign * dx * 400, dy: sign * dy * 400)))
     }
 
-    /// v2.1 T8：DEBUG 調整面板的滑桿拖到兩端，不得被場景的甩動手勢吃掉而切歌
-    func testTuningSlidersDoNotSkipTracks() {
-        let tint = app.sliders[AccessibilityID.turntableTuningTint], haze = app.sliders[AccessibilityID.turntableTuningOtherHaze]
-        for _ in 0..<5 where !tint.exists {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.985, dy: 0.5)).tap()
-            _ = tint.waitForExistence(timeout: 1.5)
-        }
-        XCTAssertTrue(tint.exists && haze.exists)
-        for slider in [tint, haze] {
-            slider.adjust(toNormalizedSliderPosition: 0)
-            slider.adjust(toNormalizedSliderPosition: 1)
-        }
-        XCTAssertEqual(closeAndReadTitle(), "Synthetic Song 01")
-    }
-
     /// 叫出浮層（同 closeAndReadTitle：點最右側中間的空白）
     private func showOverlay(waitingFor element: XCUIElement) {
         for _ in 0..<5 where !element.exists {

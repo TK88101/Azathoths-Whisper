@@ -24,10 +24,14 @@ struct TurntableOverlay: View {
                     }
                     Spacer()
                     #if DEBUG
-                    tuningPanel
-                    measurement
-                    if model.resolvedStyle.isSwirl { swirlSeedControl }
-                    if model.skin.spec.spriteLayers != nil { spriteDiagnostics }
+                    // 量測與診斷收在「Developer tools」開關後（預設關）
+                    if DeveloperTools.shared.isOn {
+                        measurement
+                        if model.skin.spec.spriteLayers != nil { spriteDiagnostics }
+                    }
+                    #endif
+                    #if LIQUID_SAMPLE
+                    liquidSampleControls
                     #endif
                     stylePicker
                 }
@@ -75,19 +79,38 @@ struct TurntableOverlay: View {
         .background(.ultraThinMaterial, in: Capsule())
     }
 
-    /// CR-037 §4.7：換一組花紋種子（只存記憶體、App 重開即消失）；生效中顯示 override
-    private var swirlSeedControl: some View {
-        HStack(spacing: 12) {
-            Button { model.swirlDebugSalt += 1 } label: { Text(verbatim: "swirl seed +1") }
-            if model.swirlDebugSalt != 0 {
-                Text(verbatim: "override \(model.swirlDebugSalt)")
-                Button { model.swirlDebugSalt = 0 } label: { Text(verbatim: "reset") }
-            }
+    #if LIQUID_SAMPLE
+    /// CR-038 液態黑膠小樣（§4.4）：預覽畫布、live 開關、preset、Reduce Motion 預覽；只存記憶體
+    private var liquidSampleControls: some View {
+        @Bindable var sample = LiquidSample.shared
+        return HStack(spacing: 12) {
+            Button { sample.isPreviewPresented = true } label: { Text(verbatim: "Liquid preview") }
+                .accessibilityIdentifier(AccessibilityID.liquidPreviewButton)
+            Toggle(isOn: $sample.isLive) { Text(verbatim: "Liquid live") }.fixedSize()
+                .accessibilityIdentifier(AccessibilityID.liquidLiveToggle)
+            LiquidSampleOptions(sample: sample)
+            if DeveloperTools.shared.isOn { liquidMeasureButtons(sample) }
         }
         .font(.caption.monospacedDigit())
         .padding(8)
         .background(.ultraThinMaterial, in: Capsule())
     }
+
+    /// §4.5-2／3／4：live 開著才能量；暖機 5 s 不計。RM preview 開著時量的是 Reduce Motion 預覽
+    private func liquidMeasureButtons(_ sample: LiquidSample) -> some View {
+        let monitor = TurntableMeasurement.shared
+        let context = ["preset": sample.preset.rawValue, "reduceMotionPreview": "\(sample.reduceMotionPreview)",
+                       "skin": model.skin.spec.id, "blurReady": "\(model.backgroundSource != nil)"]
+        return HStack(spacing: 8) {
+            Button { monitor.start(sample.reduceMotionPreview ? .liquidReduceMotion : .liquidLive, context: context) } label: {
+                Text(verbatim: "measure live 5+30 s")
+            }
+            Button { monitor.start(.liquidG7, context: context) } label: { Text(verbatim: "measure G7 (swipe ×5)") }
+            if let result = monitor.lastResult { Text(verbatim: result) }
+        }
+        .disabled(!sample.isLive || monitor.running != nil)
+    }
+    #endif
 
     /// CR-034 附錄 F 在場對照：A′（關唱機保留）、E（解碼優先序）開關、清快取（模擬冷開）、存 trace
     private var spriteDiagnostics: some View {
@@ -103,40 +126,6 @@ struct TurntableOverlay: View {
         .font(.caption.monospacedDigit())
         .padding(8)
         .background(.ultraThinMaterial, in: Capsule())
-    }
-
-    /// v2.1 T8／T10 調整面板：磨砂盤紅色／其他兩組的主色與霧，拖動即時套用、重開保留；拖動中浮層不自動隱藏
-    private var tuningPanel: some View {
-        let store = TransparentTuningStore.shared
-        let tuning = store.tuning
-        return VStack(alignment: .leading, spacing: 6) {
-            tuningRow("紅 主色", value: tuning.red.frostedTint, id: AccessibilityID.turntableTuningTint) {
-                store.tuning = TransparentTuning(red: .init(frostedTint: $0, material: store.tuning.red.material), other: store.tuning.other)
-            }
-            tuningRow("紅 霧", value: tuning.red.material, id: AccessibilityID.turntableTuningHaze) {
-                store.tuning = TransparentTuning(red: .init(frostedTint: store.tuning.red.frostedTint, material: $0), other: store.tuning.other)
-            }
-            tuningRow("其他 主色", value: tuning.other.frostedTint, id: AccessibilityID.turntableTuningOtherTint) {
-                store.tuning = TransparentTuning(red: store.tuning.red, other: .init(frostedTint: $0, material: store.tuning.other.material))
-            }
-            tuningRow("其他 霧", value: tuning.other.material, id: AccessibilityID.turntableTuningOtherHaze) {
-                store.tuning = TransparentTuning(red: store.tuning.red, other: .init(frostedTint: store.tuning.other.frostedTint, material: $0))
-            }
-            Button { store.reset() } label: { Text(verbatim: "重設") }
-        }
-        .font(.caption.monospacedDigit())
-        .padding(10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func tuningRow(_ title: String, value: Double, id: String, set: @escaping (Double) -> Void) -> some View {
-        HStack(spacing: 8) {
-            Text(verbatim: title).frame(width: 64, alignment: .leading)
-            Slider(value: Binding(get: { value }, set: set), in: 0...1, step: 0.05) { editing in editing ? model.overlay.beginHold(.tuningSlider) : model.overlay.endHold(.tuningSlider) }
-                .frame(width: 240)
-                .accessibilityIdentifier(id)
-            Text(verbatim: String(format: "%.2f", value)).frame(width: 40, alignment: .trailing)
-        }
     }
     #endif
 

@@ -63,10 +63,6 @@ final class TurntableViewModel {
             overlay.poke()
         }
     }
-    #if DEBUG
-    /// DEBUG「換種子」（§4.7）：只存記憶體，接在 trackID 後面改變花紋種子
-    var swirlDebugSalt = 0
-    #endif
 
     @ObservationIgnored private let store: SettingsStore
     /// 序列圖解碼尺寸用（畫面像素 / pt）；視圖出現時更新
@@ -203,16 +199,7 @@ final class TurntableViewModel {
         let ownArtwork = albumID != nil && coverAlbum == albumID
         return TurntableDeck(trackID: nowPlaying.currentTrackID, albumID: albumID, label: label, style: resolvedStyle, splash: splashStyle,
                              cover: ownArtwork ? cover : nil, colors: ownArtwork ? colors : .fallback,
-                             swirl: SwirlRecipe.make(style: resolvedStyle, trackID: swirlSeedID, smoke: smokeVariant))
-    }
-
-    private var swirlSeedID: String? {
-        #if DEBUG
-        guard swirlDebugSalt != 0 else { return nowPlaying.currentTrackID }
-        return (nowPlaying.currentTrackID ?? "") + "#\(swirlDebugSalt)"
-        #else
-        nowPlaying.currentTrackID
-        #endif
+                             swirl: SwirlRecipe.make(style: resolvedStyle, trackID: nowPlaying.currentTrackID, smoke: smokeVariant))
     }
 
     // MARK: 煙渦第二排（CR-037 §4.5b）
@@ -465,6 +452,9 @@ final class TurntableViewModel {
     // MARK: 轉場
 
     private func begin(_ direction: SwipeTransition.Direction) {
+        #if LIQUID_SAMPLE
+        LiquidSwipeMarker.mark()
+        #endif
         transitionSerial += 1
         let serial = transitionSerial
         outgoingDeck = liveDeck
