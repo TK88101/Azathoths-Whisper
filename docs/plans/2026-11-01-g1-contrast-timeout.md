@@ -41,7 +41,7 @@
 - `LyricsFXContrastTests.core(text:empty:width:height:)` 改為 `UnsafeBufferPointer` 索引迴圈（F5 的寫法），回傳型別、順序、語義不變。
 - **參考實作（characterization oracle）**：現有閉包版改名 `referenceCore` 留在測試檔，只供等價測試使用（註明「判定式的可讀版本；改 `core` 時兩者要一起改」）。
 - **等價測試 `fastCoreMatchesTheReferenceDefinition`**（Codex R1-2、Q4：選樣寫成可稽核矩陣）：
-  - 真實渲染：固定 12 組**分層具名**配對——`reachablePairs` 依背景 `tone` 分三層（亮、暗、無 tone），各層依 id 排序取前 4 組、且配色不重複（實作時把選出的 12 組 id 寫死在測試裡，日後元件增加不改選樣）× 語言 {英, 日} × 效果 {none, glow, neonstroke, rgbsplit, misreg, reflect} 中輪流指派（每組配對各取英日兩種、效果依序輪換，共 24 個輸入，6 種效果各至少 4 次）；新舊版輸出逐位相同。成本估約 24 × 0.22 s ≈ 5–6 s。
+  - 真實渲染：固定 12 組**分層具名**配對——`reachablePairs` 依背景 `tone` 分三層（亮、暗、無 tone），各層依 id 排序取 4 組，背景與配色先都不重複、該層背景用完才允許重複背景（亮層只有 halftone、sunset 兩種；原句「配色不重複」會讓每層 4 組都是同一個背景，實作時修正）；選出的 12 組 id 寫死在測試裡，日後元件增加不改選樣× 語言 {英, 日} × 效果 {none, glow, neonstroke, rgbsplit, misreg, reflect} 中輪流指派（每組配對各取英日兩種、效果依序輪換，共 24 個輸入，6 種效果各至少 4 次）；新舊版輸出逐位相同。成本估約 24 × 0.22 s ≈ 5–6 s。
   - 合成遮罩（不渲染，直接給 `text`／`empty` 位元組）：①全空 → `[]`；②全滿 5×5 → 內部 3×3 的 9 個索引；③1 像素寬的直線 → `[]`；④3×3 實心 → 中心 1 個；⑤寬或高 < 3（2×5、5×2）→ `[]`；⑥通道差恰為 48（不算）與 49（算）各一。每案預期索引寫死在測試裡，新舊兩版都要等於預期。
 - 不動：`minimum`、`percentile`、`inkDifference`、`reachablePairs`、`playablePairs`、所有 `@Test` 的參數與斷言、`render`、`rgba`、`contrast`。
 
@@ -91,3 +91,10 @@
 - 異議 3 條，全採納：①「每 78 組取一」不保證跨亮暗 → 改分層具名選樣；②基準 xcresult 也可能漏報 → 差集只防既有案例消失、識別碼含參數，G1 仍以 G2 具名驗證；③G1 是編譯紅要明記。
 - 投入順序 G1→G4：Codex 判妥當。
 - 最容易失敗的一步：**G2**——真實測試宿主的速度可能不符 CLI 外推，且會首次跑到兩週沒執行的 8 個參數案例，可能浮現真不及格（處置見 §9）。
+
+## 附錄 C 實作記錄（2026-11-02，`wip/lyrics-leftovers-2026-11`）
+- 選樣（scratchpad `g1count/` 依規則算出、寫死）：亮 halftone＋britRed、sunset＋chalk、halftone＋cream60、halftone＋mancSky；暗 ampGlow＋acid、bluehour＋bruise、bokeh＋dusk、genAmbBluehour＋genAmbDeep；無 ash＋ampRed、checker＋gigRed、crimsonFog＋ashGrey、embers＋bloodBlack。
+- `core` 改名 `referenceCore`（只供對照）；新增 `fastCore`；`contrast` 改用 `fastCore`。新增 `fastCoreMatchesTheReferenceOnRenderedLines`（24 輸入）、`fastAndReferenceCoreAgreeOnSyntheticMasks`（8 種合成遮罩，含 48／49 邊界）。
+- **紅燈**（G1）：`fastCore` 暫時回傳空陣列 → 渲染等價 24 個輸入全紅、合成遮罩 `fastCore` 3 個非空案例紅、`referenceCore` 全部符合預期。過程中一處測試資料寫錯已改正（非放寬）：合成遮罩底色 10 加 255 以 `&+` 溢位繞回 9，「全滿」變成差 1；底色改 0。
+- **綠燈**（G2，`-default-test-execution-time-allowance 120`）：`LyricsFXContrastTests` 11 條全綠（583.8 s）。4 個原超時方法的 **12 個具名案例全部 passed**：單條 46.7／47.8 s；兩個參數化方法各 5 個效果 46.3–47.9 s。最慢 47.9 s ≤ 60 s → F6 快取不做（§3 條件）。實測約 4.9 倍（CLI 外推約 10 倍偏樂觀，以實測為準），離 120 s 約 2.5 倍餘裕。F2 那 8 個兩週沒跑的效果案例全數通過，未浮現新的不及格配對。
+- **全量基線（改動前，同日 00:02–01:27，`full-1102-0002.xcresult`）**：2,006 條，1,977 綠、25 略過、4 紅＝本計劃要修的 4 條超時；coverage_gate exit 0（96.5%，豁免 489／490）。
