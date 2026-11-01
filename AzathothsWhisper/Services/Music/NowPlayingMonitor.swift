@@ -190,7 +190,14 @@ actor NowPlayingMonitor {
         let serial = readSerial
         let before = lastSignature
         let started = ContinuousClock.now
+        #if DEBUG
+        // I-68 量測：請求 ID 經 TaskLocal 帶進 `nowPlaying`；理由含換歌通知時收走待配對的通知
+        let probe = AELatencyProbe.readBegan(takesSignals: reasons.contains(.playerSignal))
+        await AELatencyProbe.$requestID.withValue(probe.request) { await read() }
+        AELatencyProbe.readFinished(probe)
+        #else
         await read()
+        #endif
         let elapsed = ContinuousClock.now - started
         let milliseconds = Int(elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000)
         let reasonText = reasons.map(\.rawValue).sorted().joined(separator: "+")
@@ -202,7 +209,7 @@ actor NowPlayingMonitor {
     private func read() async {
         do {
             // D9：曲目＋歌詞一次讀完（同一個釘住的 specifier），不再分兩次各自解析 current track
-            guard let read = try await music.nowPlaying() else {
+            guard let read = try await nowPlaying() else {
                 if !lastWasNotPlaying {
                     lastWasNotPlaying = true
                     lastSignature = nil
@@ -229,11 +236,31 @@ actor NowPlayingMonitor {
             lastLyrics = read.lyrics.map(LyricsFingerprint.of)
             lastMetadata = read.metadata
             continuation.yield(.trackChanged(track, existingLyrics: read.lyrics, metadata: read.metadata))
+            #if DEBUG
+            AELatencyProbe.trackChangedEmitted()
+            #endif
         } catch MusicError.permissionDenied {
             continuation.yield(.permissionDenied)
         } catch {
             // 其餘失敗（Music 未啟動、AE 暫時性錯誤）安靜跳過本輪，下一輪重試——對齊原版行為
         }
+    }
+
+    /// I-68 量測：DEBUG 下記 `nowPlaying` 的呼叫端總時（含排隊）；Release 直接轉呼叫
+    private func nowPlaying() async throws -> NowPlayingRead? {
+        #if DEBUG
+        let started = AELatencyProbe.nowPlayingStarted()
+        do {
+            let read = try await music.nowPlaying()
+            AELatencyProbe.nowPlayingFinished(startedMs: started, outcome: read == nil ? .none : .track)
+            return read
+        } catch {
+            AELatencyProbe.nowPlayingFinished(startedMs: started, outcome: .failed)
+            throw error
+        }
+        #else
+        return try await music.nowPlaying()
+        #endif
     }
 
     /// 同一首：歌詞指紋變了（含由讀不到變成讀得到）才發。讀失敗不是改詞，也不抹掉上次的指紋

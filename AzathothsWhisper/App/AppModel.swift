@@ -205,7 +205,16 @@ final class AppModel {
         lyricsFX.artistDecision = { [weak self] artist in self?.decisionBook.decision(forArtist: artist)?.choice }
         lyricsFX.artistConsensus = { [weak self] artist in self?.consensusTable[ArtistDecisionBook.key(artist)] }
         let scanner = LibraryGateScanner(music: music)
+        #if DEBUG
+        // I-68 量測：每次掃描一個 token（重掃時舊掃描的 AE 停不下來，區間會重疊）
+        libraryCheck.scanLibrary = { progress in
+            try await AELatencyProbe.measuringScan(isComplete: { if case .complete = $0 { true } else { false } }) {
+                try await scanner.scan(progress: progress)
+            }
+        }
+        #else
         libraryCheck.scanLibrary = { progress in try await scanner.scan(progress: progress) }
+        #endif
         libraryCheck.artistStyles = { [weak self] in self?.artistBook }
         libraryCheck.onDecisionsChanged = { [weak self] book in try self?.saveDecisions(book) }
         libraryCheck.onConsensusComputed = { [weak self] snapshot in self?.receiveConsensus(snapshot) }
@@ -430,6 +439,9 @@ final class AppModel {
         await monitor.start()
         // 換歌當下就讀，不等下一次 3 秒輪詢（F1）；輪詢保留作通知漏送時的保底
         playerSignal.start { [monitor, weak self] in
+            #if DEBUG
+            AELatencyProbe.signalReceived()   // I-68 量測：跳進 actor 之前取時間
+            #endif
             Task { await monitor.playerDidChange() }
             self?.lyricsFX.positionClock.resync()
         }
