@@ -140,11 +140,23 @@ enum ComposedStyle {
     static let stompWindow = 0.15
     static let stompDepth: CGFloat = 0.012
 
-    /// 光暈層半徑：glow／neonstroke 全強度、heat 半強度，其餘 0（不用光暈層）。
-    /// 「有沒有光暈層」只在這裡定義：整格光暈與韓文行避開光暈層都讀它（simcodex R1：heat 曾漏掉韓文行）
+    // 光暈層的三個判斷集中在這裡（simcodex R1：heat 曾漏掉韓文行；R2：讓位規則原本只靠註解）
+
+    /// 有光暈層：glow、neonstroke、heat。韓文行一律不進光暈層（drawPlain 讀它）
+    static func usesHalo(_ effects: Set<FXEffect>) -> Bool {
+        effects.contains(.glow) || effects.contains(.neonstroke) || effects.contains(.heat)
+    }
+
+    /// 光暈層半徑：glow／neonstroke 全強度、heat 半強度，沒有光暈層＝0
     static func haloRadius(for effects: Set<FXEffect>) -> CGFloat {
-        if effects.contains(.glow) || effects.contains(.neonstroke) { return glowRadius }
-        return effects.contains(.heat) ? heatGlowRadius : 0
+        guard usesHalo(effects) else { return 0 }
+        return effects.contains(.glow) || effects.contains(.neonstroke) ? glowRadius : heatGlowRadius
+    }
+
+    /// 讓位中的舊句移出光暈層：glow、heat（點陣與向量在淡字光暈邊緣會差幾個像素）。
+    /// neonstroke 不在內——描邊共用半徑但不受影響，舊句留在光暈層
+    static func movesYieldingLinesOutOfHalo(_ effects: Set<FXEffect>) -> Bool {
+        effects.contains(.glow) || effects.contains(.heat)
     }
     /// 霓虹描邊寬（em 比例）
     static let strokeRatio: CGFloat = 0.06
@@ -225,9 +237,8 @@ enum ComposedStyle {
             }
             let first = frame.glyphs.count
             draw(entry, time: time, size: size, style: lineStyle, measurer: measurer, into: &frame, specks: &specks)
-            // 光暈只給現行句：讓位中的舊句移到光暈層外（點陣與向量在淡字光暈邊緣會差幾個像素；霓虹描邊共用半徑但不受影響，
-            // 所以這裡刻意不用 haloRadius——neonstroke 的舊句留在光暈層）
-            if style.effects.contains(.glow) || style.effects.contains(.heat), entry.yield < 1 {
+            // 光暈只給現行句：讓位中的舊句移到光暈層外
+            if movesYieldingLinesOutOfHalo(style.effects), entry.yield < 1 {
                 frame.unlit += frame.glyphs[first...]
                 frame.glyphs.removeSubrange(first...)
             }
@@ -348,7 +359,7 @@ enum ComposedStyle {
                 rotation: 0, scaleX: 1, scaleY: 1, opacity: alpha, color: .fg, stroke: 0
             )
         }
-        if haloRadius(for: style.effects) > 0 { frame.unlit += glyphs } else { frame.glyphs += glyphs }
+        if usesHalo(style.effects) { frame.unlit += glyphs } else { frame.glyphs += glyphs }
     }
 
     /// 繪製端相鄰同色、同量化透明度才合成一次填色。暈開的副本同色但每字透明度可能不同（燭火閃爍讓每個字各自明滅），
