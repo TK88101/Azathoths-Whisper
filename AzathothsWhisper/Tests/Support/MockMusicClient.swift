@@ -28,6 +28,15 @@ actor MockMusicClient: MusicControlling {
     private var libraryResult: Result<[LibraryArtistAlbum], MusicError> = .success([])
     private var artistTracksResult: [String: [ArtistTrack]] = [:]
     private(set) var artistTracksRequests: [String] = []
+    private var snapshotResult: Result<[LibraryTrackRow], MusicError> = .success([])
+    private var artistLyricsResult: [String: Result<[ArtistLyricsRow], MusicError>] = [:]
+    private(set) var artistLyricsRequests: [String] = []
+    /// `artistLyrics` 每次呼叫前等這個閘門（量「同時只排一個工作」與取消用）
+    private var artistLyricsGate: LyricsGate?
+    func gateArtistLyrics(_ gate: LyricsGate) { artistLyricsGate = gate }
+    private var artistLyricsInFlight = 0
+    /// 同時在途的 `artistLyrics` 最大數（scanner 必須一次只排一個）
+    private(set) var maxArtistLyricsInFlight = 0
     private(set) var albumTracksCalls = 0
     /// 最後一次 albumTracks 的查詢參數——驗「用事件的 albumKey 而非重讀 currentTrack」
     private(set) var lastAlbumTracksQuery: (artist: String, album: String)?
@@ -221,6 +230,24 @@ actor MockMusicClient: MusicControlling {
     func artistTracks(artist: String) async throws -> [ArtistTrack] {
         artistTracksRequests.append(artist)
         return artistTracksResult[artist] ?? []
+    }
+
+    func setSnapshot(_ rows: [LibraryTrackRow]) { snapshotResult = .success(rows) }
+    func failSnapshot(_ error: MusicError) { snapshotResult = .failure(error) }
+    func setArtistLyrics(_ rows: [ArtistLyricsRow], for artist: String) { artistLyricsResult[artist] = .success(rows) }
+    func failArtistLyrics(_ error: MusicError, for artist: String) { artistLyricsResult[artist] = .failure(error) }
+
+    func libraryTrackSnapshot() async throws -> [LibraryTrackRow] {
+        try snapshotResult.get()
+    }
+
+    func artistLyrics(artist: String) async throws -> [ArtistLyricsRow] {
+        artistLyricsRequests.append(artist)
+        artistLyricsInFlight += 1
+        maxArtistLyricsInFlight = max(maxArtistLyricsInFlight, artistLyricsInFlight)
+        defer { artistLyricsInFlight -= 1 }
+        if let artistLyricsGate { await artistLyricsGate.wait() }
+        return try (artistLyricsResult[artist] ?? .success([])).get()
     }
 
     func albumTracks(artist: String, album: String) async throws -> [AlbumTrack] {

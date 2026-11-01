@@ -257,25 +257,51 @@ struct MusicAppleEventsClient: MusicControlling {
 
     func artistTracks(artist: String) async throws -> [ArtistTrack] {
         try await run { app in
-            Self.readPairs(app, #selector(getter: MusicTrackProto.album), #selector(getter: MusicTrackProto.lyrics)) { all in
-                (all.filtered(using: NSPredicate(format: "artist == %@", artist)) as NSArray) as? SBElementArray
-            }
+            Self.readPairs(app, #selector(getter: MusicTrackProto.album), #selector(getter: MusicTrackProto.lyrics)) { Self.tracks($0, byArtist: artist) }
             .map { ArtistTrack(album: $0, lyrics: $1) }
         }
     }
 
-    /// ⑥b：在 `libraryBudget` 內對（篩選後的）整庫讀兩欄字串；兩欄長度不一＝整批作廢
+    func libraryTrackSnapshot() async throws -> [LibraryTrackRow] {
+        try await run { app in
+            try LibraryColumns.trackRows(Self.readColumns(app, [
+                #selector(getter: MusicTrackProto.persistentID), #selector(getter: MusicTrackProto.name),
+                #selector(getter: MusicTrackProto.artist), #selector(getter: MusicTrackProto.album), #selector(getter: MusicTrackProto.genre),
+            ]) { $0 })
+        }
+    }
+
+    func artistLyrics(artist: String) async throws -> [ArtistLyricsRow] {
+        try await run { app in
+            try LibraryColumns.lyricsRows(Self.readColumns(app, [#selector(getter: MusicTrackProto.persistentID), #selector(getter: MusicTrackProto.lyrics)]) {
+                Self.tracks($0, byArtist: artist)
+            })
+        }
+    }
+
+    /// ⑥b：兩欄讀取失敗時沿用「回空陣列」的既有語義
     private static func readPairs(
         _ app: MusicAppProto, _ first: Selector, _ second: Selector, elements: (SBElementArray) -> SBElementArray?
     ) -> [(String, String)] {
+        (try? LibraryColumns.pairs(readColumns(app, [first, second], elements: elements))) ?? []
+    }
+
+    /// `whose artist == X`：Swift 端 filtered(using:) 回傳 [Any]，要轉回 SBElementArray 才能批次取值（spike 陷阱 1）
+    private static func tracks(_ all: SBElementArray, byArtist artist: String) -> SBElementArray? {
+        (all.filtered(using: NSPredicate(format: "artist == %@", artist)) as NSArray) as? SBElementArray
+    }
+
+    /// 在 `libraryBudget` 內對（篩選後的）整庫讀多欄字串；預算用完＝nil。欄數與長度的檢查在 `LibraryColumns`
+    private static func readColumns(
+        _ app: MusicAppProto, _ selectors: [Selector], elements: (SBElementArray) -> SBElementArray?
+    ) -> [[String]]? {
         let budget = AEBudget(total: libraryBudget, start: .now)
         let sbApp = app as? SBApplication
         let setTimeout: (Int) -> Void = { sbApp?.timeout = $0 }
         guard budget.spend(setTimeout: setTimeout), let all = app.tracks?(), let chosen = elements(all),
-              let columns = budget.readColumns([first, second], setTimeout: setTimeout, read: { chosen.array(byApplying: $0) }),
-              columns.count == 2, columns[0].count == columns[1].count
-        else { return [] }
-        return zip(columns[0], columns[1]).map { ($0 as? String ?? "", $1 as? String ?? "") }
+              let columns = budget.readColumns(selectors, setTimeout: setTimeout, read: { chosen.array(byApplying: $0) })
+        else { return nil }
+        return columns.map { column in column.map { $0 as? String ?? "" } }
     }
 
     private func run<T: Sendable>(

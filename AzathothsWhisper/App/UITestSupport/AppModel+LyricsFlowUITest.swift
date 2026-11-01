@@ -56,6 +56,7 @@ extension AppModel {
         if let genres = LyricsFXPreviewFixture.artistGenres(in: environment) {
             model.lyricsFX.artistGenres = { _ in .verified(genres) }
         }
+        LibraryCheckUITestFixture.installIfRequested(on: model, environment: environment)
         return model
     }
 }

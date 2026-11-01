@@ -106,6 +106,8 @@ struct LyricsFXContrastTests {
                 for palette in palettes {
                     guard case .palette(let colors) = palette.payload else { continue }
                     if let tone = kind.tone, !tone.accepts(colors) { continue }
+                    // ⑧：G1 不及格而硬禁止的配對畫面上不會出現（`everyBannedPairReallyFailsTheMinimum` 另外釘住它們確實不及格）
+                    if ReadabilityPolicy.isUnreadable(backdrop: backdrop.id, palette: palette.id) { continue }
                     pairs.insert("\(backdrop.id)|\(palette.id)")
                 }
             }
@@ -181,6 +183,15 @@ struct LyricsFXContrastTests {
                     #expect(LyricsFXCatalog.palette(palette).map(tone.accepts) == true, "\(band.name)：\(backdrop) 配到不相容的 \(palette)")
                 }
             }
+        }
+    }
+
+    /// ⑧ 計劃 §4.6：被禁的配對要真的不及格（日後元件改色讓它讀得到了，這條會紅、提醒解禁）。英文或日文行任一不及格即算
+    @Test func everyBannedPairReallyFailsTheMinimum() {
+        for pair in ReadabilityPolicy.unreadablePairs {
+            let english = Self.readabilityFailure(backdrop: pair.backdrop, palette: pair.palette)
+            let japanese = Self.readabilityFailure(backdrop: pair.backdrop, palette: pair.palette, lyrics: Self.japanese)
+            #expect(english != nil || japanese != nil, "\(pair.palette)＋\(pair.backdrop) 已讀得到")
         }
     }
 

@@ -36,8 +36,11 @@ struct GenreRowTests {
         #expect(SongProfileResolver.compose(genres: ["folk rock"]) == nil)
     }
 
-    /// 曲庫出現過的列組合（2026-10-24 探查：驗證者的 MB 前 3 曲風，以同一套關鍵字規則換算；只存列 id）＋R3-3 的固定代表組合
+    /// 曲庫出現過的列組合（2026-10-24 探查：驗證者的 MB 前 3 曲風，以同一套關鍵字規則換算；只存列 id）＋R3-3 的固定代表組合；
+    /// ⑧ 2026-10-28 曲庫重掃補上漏掉的三組（hardrock＋thrash、metalcore＋nu、metalcore＋poppunk＋punk）。
+    /// 與 ⑦ 的通用組合一起構成 `ReadabilityPolicy.combinations`（`ReadabilityPolicyTests` 斷言一致），G1–G3 也走同一份
     static let libraryCombinations: [[String]] = [
+        ["hardrock", "thrash"], ["metalcore", "nu"], ["metalcore", "poppunk", "punk"],
         ["altindie", "arena"], ["altindie", "classicrock"], ["altindie", "gothic"], ["altindie", "nu"], ["altindie", "punk"], ["altindie", "symphonic"], ["arena", "classicrock"], ["black", "death"], ["black", "death", "melodeath"], ["black", "death", "symphonic"], ["black", "death", "thrash"], ["black", "doom"], ["black", "gothic"], ["black", "gothic", "symphonic"], ["black", "symphonic"], ["black", "thrash"], ["classicrock", "death"], ["classicrock", "doom"], ["classicrock", "hardrock"], ["classicrock", "punk"], ["death", "doom"], ["death", "doom", "melodeath"], ["death", "melodeath"], ["death", "melodeath", "metalcore"], ["death", "melodeath", "symphonic"], ["death", "metalcore"], ["doom", "gothic"], ["doom", "metalcore"], ["gothic", "hardrock", "nu"], ["gothic", "nu"], ["gothic", "punk"], ["gothic", "symphonic"], ["hardrock", "nu"], ["metalcore", "thrash"], ["symphonic", "death"], ["metal"],
     ]
 
@@ -95,7 +98,7 @@ struct GenreRowTests {
         }
     }
 
-    /// R3-3：曲庫出現過的組合都要組得出來、對比過關（`LyricsFXContrastTests` 用同一份集合）
+    /// R3-3：曲庫出現過的組合都要組得出來（對比與 G2／G3 經 `ReadabilityPolicy.combinations` 納入 `ReadabilityAudit.profiles`，⑧）
     @Test(arguments: libraryCombinations)
     func libraryCombinationsArePlayable(ids: [String]) throws {
         let rows = try ids.map(row)

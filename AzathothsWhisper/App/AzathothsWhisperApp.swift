@@ -15,6 +15,12 @@ struct AzathothsWhisperApp: App {
             RootView(model: model)
         }
         .defaultSize(width: 1200, height: 800)
+
+        // ⑧ 曲庫檢查視窗：標題同選單寫死英文（A-07 的同一慣例）
+        Window(Text(verbatim: LibraryCheckMenuButton.title), id: LibraryCheckMenuButton.windowID) {
+            LibraryCheckView(model: model.libraryCheck)
+        }
+        .defaultSize(width: 1100, height: 760)
         .commands {
             // 原版無「新增窗口」概念，移除 File ▸ New
             CommandGroup(replacing: .newItem) {}
@@ -33,6 +39,8 @@ struct AzathothsWhisperApp: App {
                 Button { model.openRemoteSettings() } label: {
                     Text(verbatim: "Remote Settings...")
                 }
+                // ⑧ 曲庫檢查（曲庫閘門計劃 §4.5）：獨立視窗，主視窗照常運作
+                LibraryCheckMenuButton()
             }
 
             // 系統 Help 菜單的標題由 AppKit 提供且會被在地化（日文＝ヘルプ），
@@ -44,6 +52,19 @@ struct AzathothsWhisperApp: App {
                     Text(verbatim: "About")
                 }
             }
+        }
+    }
+}
+
+/// 選單項目要拿 `openWindow`：環境值只在 View 內讀得到
+struct LibraryCheckMenuButton: View {
+    static let title = "Library Check"
+    static let windowID = "library-check"
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button { openWindow(id: Self.windowID) } label: {
+            Text(verbatim: "Library Check...")
         }
     }
 }

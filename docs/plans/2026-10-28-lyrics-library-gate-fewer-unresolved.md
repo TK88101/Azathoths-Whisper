@@ -1,0 +1,277 @@
+# 歌詞特效 ⑧ 增補：減少曲庫檢查裡「掃不出結果」的歌（計劃 v0.6，使用者 2026-10-28 拍板 A、B）
+
+狀態：**v0.4**（Codex 2 輪收斂見附錄 B；使用者 2026-10-28 拍板見附錄 C：A 做、B 做且改為「整位歌手統一」；R3 見附錄 C）。母計劃 docs/plans/2026-10-28-lyrics-library-gate.md（⑧ v1.0，附錄 H 為本增補的起點）。分支 `wip/lyrics-library-gate`（c846ee1）。
+
+## 0. 複述
+- 使用者 2026-10-28 在場 #1 看到曲庫檢查「身分未定 1,173 首／素面 572 首」，指示：「讓它盡量把掃不出來結果的狀況能少就少一些」。附錄 H 點名兩類：①日文歌手的**無詞曲**判不出日文 → 素面＋身分未定（Yorushika）；②知名樂團 MB 同名多筆（ambiguous）＋Apple 只標 Rock／Alternative → 整位素面（HIM 223 首、Muse 43 首）。
+- 本增補：先唯讀量各類原因的曲數（§2），再提出**自動**減少的辦法（§4），手動處理（⑧ 已有的指定樣式／照目前樣式）不在本增補的改動範圍。
+- 「掃不出結果」＝曲庫檢查裡 G-ID（身分未定）或 G-COMP（素面）不合格的曲；署名待補元件 178 首／4 團不在本增補（⑧ §10-1，另立補元件計劃）。
+
+## 1. 使用者決定（既定前提，不重議）
+1. ⑧ 閘門四項定義與「達標＝四項皆 0」（⑧ §1-1、§4.1）；本增補**不改計數定義**，只讓自動判定多判出來。
+2. 日文歌一律 J-Pop、不開例外（⑥a §1-1）。
+3. Apple 只標 Rock／Alternative 的曲**不做通用列**（⑦ §9-1 (a)）。
+4. MB：每位歌手只查一次、**不主動重查**；手動重查介面是非目標（⑥b §1-3、§3、§9-2；⑧ §10-3 再確認）。
+5. 樣式以「樂團」為單位、Apple 曲風不得為主，只能當最後參考（使用者 2026-10-19，母計劃 §2 優先順）。
+6. 母計劃 §2 的「同歌手曲庫共識」層定義：**只採署名／使用者指定／驗證過的 MB 為根據**（2026-10-19 Codex 3 輪收斂）。
+7. Music 只讀＋寫 lyrics；不改 Music 標籤。
+
+## 2. 事實
+
+### 2.1 唯讀量測（2026-10-28，本 session）
+方法同 ⑧ 附錄 A：JXA 唯讀讀整庫 persistentID、artist、genre、lyrics、name、album（12,271 首），**直接呼叫 app 的 `LibraryGateReport`**（本分支原始碼以 `swiftc` 編入）逐首判定；只印計數與歌手名（不印曲名、歌詞）；含歌詞的 JSON 用完即刪。基線與在場 #1 畫面一致：G-ID 1,173 首／137 位、G-COMP 572 首／57 位（署名待補 178／4）、G-READ 0、G-SRC 0、任一不合格 1,429 首／148 位。
+
+**不合格曲（非署名，1,251 首）依「歌詞×同歌手證據」分類**（同歌手＝寫法家族 `ArtistDecisionBook.key`）：
+
+| 類 | 定義 | 首 | 位 |
+|---|---|---|---|
+| J | 無詞，且同歌手的有詞曲全是日文歌 | **29** | 2 |
+| J4 | 無詞，同歌手沒有有詞曲，名稱只含漢字 | 1 | 1 |
+| N1 | 無詞，同歌手的有詞曲都不是日文歌 | 326 | 17 |
+| N2 | 無詞，同歌手沒有有詞曲，名稱為拉丁字母 | 544 | 101 |
+| L2 | 有詞、非日文歌，同歌手沒有日文歌 | 351 | 40 |
+
+- 「無詞但同歌手的有詞曲**多數**是日文歌」「任一首是日文歌」「再加上歌手／專輯名含假名」四種規則模擬結果**完全相同**（都只把 61 首無詞曲改判日文，其中 29 首原本不合格）。→ 類①（附錄 H-1）**實際只有 29 首／2 位**：Yorushika 19 首（其中 13 首素面＋身分未定、6 首只身分未定）、Kenshi Yonezu 10 首（只身分未定）；`Kenshi Yonezu + …` 這類合作寫法 3 首無詞、自成寫法家族且無有詞曲，不在其中。
+- 不合格曲的 MB 狀態：ambiguous 555 首／20 位、noAlbumMatch 414／78、notFound 204／39、verified 無曲風 57／7、verified 有曲風但碰不到列 21／1（Brandon Flowers：MB 曲風只有 `rock`）。
+
+**素面（非署名 394 首／53 位）**：Apple 曲風全是 ロック／オルタナティブ／Rock／Alternative（＋`Hrad Rock` 6、`R&B/Soul` 1），MB 不是 unresolved 就是無曲風／只有 rock（同 ⑧ §2.2）。其中 **186 首／6 位**的同歌手其他曲有 Apple 曲風命中曲風列（例：HIM 有 86 首 `Hard Rock` 組得出，132 首 `Alternative`／`Rock` 素面；Muse 11 首 `Indie Rock` 組得出，32 首素面）。186 首中**有詞 89 首／5 位**（播放時會由素面變特效：HIM 62、Muse 9、Tracedawn 9、Rhapsody 8、1 位 1 首），無詞 97 首（只影響報表與日後補詞）。
+
+**模擬**（同一份曲庫、同一個 `LibraryGateReport`）：
+
+| 方案 | G-ID 首／位 | G-COMP 首／位（含署名 178／4） | 非署名素面 | 任一不合格 | 可批次「照目前樣式」歌手 |
+|---|---|---|---|---|---|
+| 基線 | 1,173／137 | 572／57 | 394／53 | 1,429／148 | 91 |
+| A：無詞曲依同歌手有詞曲推定日文 | 1,144／135 | 559／56 | 381／52 | 1,400／146 | — |
+| B：同歌手 Apple 曲風共識（只補素面曲） | 1,173／137 | 386／51 | 208／47 | 1,420／147 | 96 |
+| B＋含通用列當根據 | 1,173／137 | 363／49 | 185／45 | 1,420／147 | 98 |
+| **A＋B** | **1,144／135** | **373／50** | **195／46** | **1,391／145** | 95 |
+
+- **B 對閘門的淨效益只有 9 首**（任一不合格 1,429→1,420）：186 首裡 177 首仍是身分未定（G-ID 不變）。B 的實際收益是：①有詞 89 首播放時有特效；②需逐位指定樣式的非署名歌手 53→47；其中 5 位變成可批次「照目前樣式」（91→96），Tracedawn（MB verified 無曲風）補齊後不再待處理。
+- B 的「取多數（≥ 50 %）」與「取最多」結果相同（6 位都沒有平手或分散；這只是本次曲庫的觀測，不保證日後）；G-READ 在所有模擬下仍 0（B 借用的列組合本來就在曲庫出現過、已在 `ReadabilityPolicy.audited`）。
+- **A＋B 之後剩下的**：素面 195 首／46 位——MB unresolved 126／40（noAlbumMatch 84／21、notFound 33／17、ambiguous 9／2）、verified 無曲風 48／5、verified 只有 rock 21／1；身分未定但已有樣式 1,018 首／96 位（ambiguous 546／18、noAlbumMatch 330／58、notFound 142／20）。剩下的素面歌手 46 位裡 27 位只有 1 首（Apple 多標 ロック；推測多來自合輯，未核專輯）。
+- **合作寫法**（`A & B`／`A feat. B`／`A + B`…，取主名 A 的 MB 存檔）：不合格曲中可受益 22 首／8 位（主名 verified 21、主名署名 1）。
+- 剩下的 G-ID 只有兩條路：MB 重新判身分（§4.3，違反 §1-4，需使用者另簽）或使用者手動（⑧ 介面：全有樣式的歌手可一次批次）。
+
+### 2.2 程式現況（讀碼，已核）
+- `LibraryGateReport` 以 `(artist, genre, isJapanese)` 判定，無詞曲的 `isJapanese` 固定為 false（`Services/LibraryGate/LibraryGateScanner.swift:63-70`：`isJapanese = hasLyrics && …`）。
+- 播放時無詞曲不顯示特效（缺詞＝Editor 流程）；寫入歌詞後才以該曲歌詞判 J-Pop（`LyricsFXViewModel.swift:228` 傳 `LyricsEvidence.of(lyrics)`）。→ 類①只影響**報表**，不影響播放。
+- 判定層（`SongProfileResolver.explain`，`SongProfileResolver.swift:278-325`）：樂團表 → pending → J-Pop → 使用者樣式 → MB 曲風列 → genre nil pending → Apple 曲風列 → 通用（MB、Apple）→ `.noMatch`。判定只看單曲的 genre，沒有同歌手的任何資訊。
+- 啟動時 `ArtistStyleSync.run` 讀 `libraryArtistAlbums()`（artist／album，`ArtistStyleSync.swift:45`）；`libraryTrackSnapshot()`（五欄含 genre）目前只給 ⑧ 掃描用（`MusicControlling.swift:193`）。
+- MB 判身分（`ArtistIdentity.judge`、`MusicBrainzClient.identify`）：同名候選 > 8 直接 ambiguous、不 lookup；≥ 2 位候選對到曲庫專輯也是 ambiguous；候選不落盤（⑧ §2.1）→ 20 位 ambiguous 各屬哪一種**現在分不出來（TBD）**，要重查才知道。
+
+### 2.3 推論（推測，標明推理鏈）
+- 類②的根因不是「MB 同名多筆」本身，而是「判定只看單曲 genre」：HIM 就算 MB 判得出，MB 曲風（推測含 gothic rock／love metal 類）也只是讓它走 MB 層；但同一位歌手已有 86 首靠 Apple `Hard Rock` 組出樣式，同歌手其他曲卻素面——這在「以樂團為單位」（§1-5）的原則下是不一致的。B 用同歌手已組出的 Apple 曲風補上，不需要網路。
+- B 與 §1-6 衝突：母計劃的共識層只採署名／使用者／MB 為根據，**不採 Apple**。理由（推測，2026-10-19 的語境）：Apple 粗且常錯，不讓它擴散到同歌手其他曲。但 B 只補「否則素面」的曲、放在最後一層（§4.2），不覆蓋任何已有樣式的曲；擴散的是同歌手**自己**曲上的 Apple 標籤。是否接受＝價值判斷，**需使用者拍板**（§10-1）。
+- A 不與 §1-2 衝突：J-Pop 政策仍以歌詞判；A 只是報表對「還沒有歌詞的曲」做預測，寫入歌詞後以歌詞為準。
+
+## 3. 目標與非目標
+目標：
+- A：曲庫檢查對無詞曲依同歌手有詞曲推定「日文歌」，報表照 J-Pop 計，來源顯示「推定」與可核對的 m／n 證據；補詞後重判。
+- B **只在 §10-1 使用者明確同意時**做：判定最後一層加「同歌手 Apple 曲風共識」，只補否則素面的曲；預設（Codex 與我方一致）＝不做。
+- 一次性唯讀驗證：四集合（不受影響／A-only／B-only／A∩B）逐首比對，各集合首數與預期一致。
+
+非目標：
+- MB 重新判身分／改判身分規則（§4.3，違反 §1-4；使用者另簽才另立計劃）。
+- AI／Jev 自動分類層（§4.5；母計劃只預留位置，不構成對新外送、新服務的授權）。
+- 合作寫法取主名（22 首；誤套風險見 §4.4）。
+- 為 Rock／Alternative 做通用列（§1-3）；改既有列、元件、`ReadabilityPolicy`。
+- 改 G-ID／G-COMP 的定義或把任何不合格列成不擋的例外（⑧ 附錄 C Codex 最擔心的事）。
+- 署名待補 4 團（另立計劃）；Python 1.x。
+
+## 4. 設計
+
+### 4.1 A：無詞曲的日文推定（只在報表）
+- 推定規則（`LibraryGateReport` 內的私有純函式，不另開檔；R1-14）：以寫法家族（`ArtistDecisionBook.key`）彙總**有詞曲數 n、其中日文歌數 m**；家族 `m * 2 > n`（n ≥ 1）時，該家族的**無詞曲**推定為日文歌。與 ⑥b §2「日文歌手＝有詞的曲中日文歌過半」同一定義；量測下 > 與 ≥ 結果相同。
+- `Row` 帶結構化依據 `JapaneseEstimate(familyKey, lyricsSongs: n, japaneseSongs: m)`（nil＝非推定）；判定以「實際日文 或 推定日文」走 J-Pop。`VerdictKey` 必含推定旗標（R1-8：同歌手同曲風、一首有詞非日文一首無詞推定日文，判定不得共用）。
+- G-ID、G-COMP、G-SRC 都合格（R2 Codex 撤回「G-SRC 不合格」）：G-SRC 的要求是可判讀且可追溯，推定有規則與證據即可追溯。來源欄顯示：「J-Pop（推定）：此曲無詞；同歌手有詞 n 首中 m 首日文（> 半數）。寫入歌詞後重判」（三語，n、m 為插值）。
+- 理由（R2 判定成立）：閘門對無詞曲本來就只能預測（播放時無詞不顯示特效）；現行預設 `isJapanese=false`（`LibraryGateScanner.swift:63-70`）也是未經驗證的預測，且對 Yorushika 已被同家族有詞曲反證；A 以有證據的預測取代它。每次重掃以當下歌詞重判，不落盤、不影響播放。
+- 不動：`SongProfileResolver`、`LyricsFXViewModel`、`ArtistStyleSync`（播放與 MB 查詢行為 0 差異）。
+
+### 4.2 B：同歌手 Apple 曲風共識（使用者 2026-10-28 拍板：做，整位統一；v0.4 依 R3 改寫）
+- **使用者原話**（2026-10-28）：「像 HIM 或 Muse 這種，按照這個歌手大多數的分類去走就行，不一定非得說某首歌是什麼風格……就以相同的樂團或相同的藝人去做分類就行」；「沒歌詞的歌，如果是純音樂，判定不出來沒有任何問題」。→ 母計劃 §2 共識層定義修訂：根據另加「同歌手自己的 Apple 曲風（多數）」，位置見下。
+- **落層（R3-1，兩個 tier）**：`樂團表 → pending → J-Pop → 使用者樣式 → MB 曲風列 → genre nil pending → 【Apple 曲風列 tier：家族共識，否則逐曲】 → 通用 MB → 【通用 Apple tier：家族共識，否則逐曲】 → noMatch`。MB 層與通用 MB 層不動（MB 是歌手層級資料，本來就整位一致）。
+- **證據（R3-2、R3-4）**：`preConsensusAppleEvidence`——只由每首**原始** Apple genre 對 `keywordRows`／`genericRows` 的命中計算，永不讀共識結果；以 persistentID 去重。**資格**＝關掉 B 時實際會走到該 tier 並被採用的曲（即舊 resolver 的 key 為 `.rows(.appleGenre, …)` 或 `.rows(.genericApple, …)`）；署名、J-Pop、使用者樣式、MB 命中的曲不當證據；A 的報表推定不參與（A 只在報表、推定曲走 J-Pop）。
+- **採用條件（R3-3）**：每個 tier 各自計票，`證據數 ≥ 2 且 勝出列組合票數 × 2 > 證據數`（嚴格過半已排除平手）。共識值＝`(tier, canonical 列 id 集合, 勝出票數, 證據數)`；resolver 直接合成這組列，不再以 genre 字串二次比對（R1-10）。
+- **退路（R3-3）**：共識不存在／未過門檻／列 id 已失效／合成組不出／被可讀性拒絕／快照不可用 → 一律退回**同 tier 的逐曲判定**（現況行為），trace 記原因；不得因共識失敗跳過逐曲直接 noMatch。
+- **快照（R3-5、R1-6；v0.5 實作中修訂）**：共識表只由**完整且為當前 generation 的曲庫檢查掃描**算出（同一份報表、同一套證據資格；要判日文歌需要歌詞，啟動時讀整庫拿不到歌詞，無法滿足 R3-4），存成 `Application Support/…/ArtistConsensus/consensus.json`（`schemaVersion`、`builtAt`、`catalogFingerprint`＝曲風列與通用列的 id＋關鍵字＋`ReadabilityPolicy.version` 的 SHA-256、表）；防線沿用 `ArtistDecisionStore`。播放啟動時載入；指紋不符、壞檔、沒有檔案＝不可用 → 逐曲退路。**不新增任何整庫 AE 讀取**（B0 量測因此取消）。取消、讀取失敗、舊 generation 不寫檔。新加入曲庫的歌手要下次掃描後才有共識。定格：載入或更新後下次播放生效。曲庫檢查畫面的報表永遠用自己掃描算出的表，不會「未就緒」；播放端不可用時只記日誌（計數，不記名字）。**過期語義（R5）**：播放端的共識是「最近一次成功完整掃描當時」的結果，不驗證目前曲庫；之後 Apple 曲風或歌詞改變、新增曲，要下次掃描才反映（使用者重掃即可）。**MB 存檔在掃描後變動**（只會是掃描時還沒查過的歌手查完；每位只查一次、不重查）時，播放端以目前的 MB 判斷是否停用共識（MB 命中通用列優先），報表的共識證據要重掃後才一致——曲庫檢查畫面此時已顯示「需重新掃描」（⑧ R1-12 既有機制），不另做失效條件（R7）。指紋＝依序列出每個曲風列與通用列的 id、關鍵字、是否通用，加 `ReadabilityPolicy.version`，以固定格式串接後 SHA-256；列的軸值與標籤改變由播放時的組得出／可讀性檢查退路兜底。寫入一律 atomic（暫檔＋改名）；播放只在啟動時讀、寫入在主執行緒，無並行讀寫。這是可重建的衍生資料：版本不符或壞檔＝視為沒有，下次完整掃描直接覆寫成新版；路徑是符號連結時不讀不寫。
+- **來源欄（G-SRC，R3-6 部分採納）**：顯示 tier、勝出列、`勝出票數／證據數`、快照時間、是否走逐曲退路（與原因）。證據曲清單不另列 persistentID；改為在「逐首來源」分頁**新增「Apple 曲風」欄**（原始字串）與**依寫法家族篩選**（從來源欄或待處理歌手點進去即篩出該家族全部曲），可逐首重建票數（R4 Codex 勝：現有頁面沒有這兩項，原駁回理由不成立）。
+- **量測（v0.3 合併計票的近似，B 完成後依兩 tier 重量）**：素面→有樣式約 199 首／7 位；已有樣式而改變 25 首（有詞 7）／3 位：Negative 15（altindie→gothic）、HIM 5（gothic→hardrock）、Duir 5（black+death→metal）。
+- **注意**：HIM 的多數是 Apple `Hard Rock`（86 首），所以自動判定給 HIM 的是 hardrock 列，不是使用者心中的哥德金屬（MB 對 HIM 是 ambiguous，沒有 MB 曲風）。使用者若要哥德金屬，在曲庫檢查對 HIM 指定 gothic 列（使用者樣式層在前）。
+- **實作中修正（v0.6，U3 真曲庫逐首比對發現；附錄 C R6）**：
+  1. **MB 命中通用列時不用 Apple 多數**：Björk（MB verified，前 3 曲風碰到通用列 electronic＋experimental＋pop）有 96 首靠 MB 通用列，27 首 Apple 標 `Indie Rock` 走 altindie；原設計（R3-1 共識 tier 排在通用 MB 之前）讓 27 首的多數把 96 首也改成 altindie。改為：MB 曲風命中任何通用列＝MB 已給出歌手層級樣式，兩個共識 tier 都停用，該歌手照舊逐曲判定（Björk 123 首 0 差異）。依據：使用者「MusicBrainz 可能比我分得更準」，與 MB > Apple 的既定優先順。
+  2. **泛用列不參與計票**：Duir 6 首 Apple 只命中泛用 metal、5 首組出 black＋death，多數票讓黑金屬退成泛用 metal。改為：同一 tier 內有任何具體命中時，只含泛用曲風列（`isGeneric`）的證據不算票（與 ⑥b generic 抑制同一原則）；只有泛用證據時照常計票。Duir 11 首整位 black＋death。
+- **不變式（R3-7）**：B 作用域外逐首 0 差異（含所有 J-Pop、使用者樣式、署名、MB 命中曲）；B 作用域內的差異逐首都要有可重算的 pre-consensus 多數證據；未過門檻或共識失敗的曲與舊 resolver 逐首 0 差異。
+
+### 4.3 MB 重新判身分（**本增補不做**；列出供 §10-2 拍板）
+- 能解決：剩下 G-ID 1,144 首／135 位的一部分＋素面 126 首／40 位的一部分；效果 **TBD**（候選不落盤，必須重查才知道 ambiguous 屬「> 8 位同名」還是「多位對上」）。
+- 草案方向：①同名 > 8：依 MB 搜尋分數取前幾位 lookup，恰一位對到 ≥ 2 張非泛用專輯＝驗證；②多位對上：對到的非泛用專輯數嚴格最多且 ≥ 2＝驗證；③verified 無曲風：加 `inc=tags`。請求上限沿用每位 12、全部約 135 × 12 ≈ 1,600 請求、約 30 分鐘。
+- 與既定衝突：⑥b §1-3「不主動重查」、§3 非目標、§9-2；⑧ §10-3。使用者若要，先簽「一次性重查 unresolved 歌手」，另立計劃，第一步是只量不寫的診斷查詢。
+
+### 4.4 合作寫法取主名（不做）
+- 22 首／8 位。風險：`Earth, Wind & Fire` 會取到 `Earth`；若曲庫恰有同名 verified 歌手（`Earth` 是 drone 樂團）就誤套。為 22 首加一條誤套風險不划算；這 8 位用 ⑧ 介面指定即可。
+
+### 4.5 AI／Jev 自動分類層（不做；列 §10-3）
+- 母計劃 §2 的「驗證過的自動分類（MusicBrainz；之後 Jev 同位置）」只是架構位置預留。剩下的素面 46 位、身分未定 135 位成因混雜（MB unresolved、verified 無曲風或只有 rock、Apple 粗分類），AI 層能解多少要先做唯讀診斷，不可預計收益。另立計劃時至少定義：外送資料與供應商、保留與失敗行為、可重現的模型／提示版本、信心門檻與「不確定不採用」、人工抽驗集與回退、對 G-ID／G-COMP／G-SRC 各自的效益量測。
+
+## 5. 任務清單（單人主 session 依序；每項先紅後綠）
+| # | 任務 | DoD |
+|---|---|---|
+| U1 | 推定規則（`LibraryGateReport` 內純函式）＋`JapaneseEstimate` | 真值表：全日文／過半推定／恰一半不推定／無有詞曲不推定／有詞曲全非日文不推定／有詞曲本身不受影響；鍵＝寫法家族（大小寫寫法合併、`AC/DC` 與 `ACDC` 各自彙總） |
+| U2 | 報表判定接上推定＋`VerdictKey` 含推定旗標＋來源文字（三語、m／n 插值） | 推定曲＝J-Pop、MB 狀態「不適用」、G-ID／G-COMP／G-SRC 合格且來源文字含 m／n；混列回歸（同歌手同曲風、有詞非日文＋無詞推定）各自判定；有詞子集計數不變；`LibraryCheckPresentationTests` 三語齊 |
+| U3 | 一次性唯讀驗證（四集合） | main vs 本分支逐首：不受影響集合 0 差異；A-only 恰 29 首（Yorushika 19、Kenshi Yonezu 10），每首釘住推定旗標與 m／n；B 未做時 B-only＝0。附掃描時間；固定計數只作本次交叉核對，不寫進自動測試 |
+| U4 | ACCEPTANCE I-68 更新（A：無詞曲推定日文、來源顯示推定） | 依據、驗證方式、使用者簽字欄 |
+| U5 | 全量單元＋coverage_gate＋no_playback_gate＋Scripts 測試 | 全綠（已知 flaky 以完整名稱＋括號 skip 並列出） |
+| U6 | 使用者在場：真機曲庫檢查重掃（一次一項） | 畫面 G-ID 1,144／135、G-COMP 559／56（基線曲庫未變時）；Yorushika 無詞曲來源顯示推定與 m／n |
+
+§10-1 使用者已同意 B：另加（B0 取消，見 §4.2 快照 v0.5）**B1** `preConsensusAppleEvidence`＋共識純函式（真值表：兩 tier 分開計票、≥ 2 且嚴格過半、資格排除署名／J-Pop／使用者樣式／MB 命中、被共識改寫的曲不增加分子分母、persistentID 去重）、**B2** resolver 兩個 tier（真值表：共識優先於逐曲、各種失敗退回同 tier 逐曲並記 trace、J-Pop 與使用者樣式 profile 不受影響、`RecipeGoldenTests` `2f80…` 不變）、**B3** `ArtistConsensusStore`＋接線（往返、壞檔、符號連結、超大檔、新版本不覆寫、指紋不符＝不可用；舊 generation／取消／讀取失敗不寫；載入後 VM 下次播放生效）、**B4** 來源欄（tier、勝出列、票數／證據數、快照時間、退路原因；三語）＋逐首來源分頁「Apple 曲風」欄與寫法家族篩選（VM 測試：篩選結果＝該家族全部曲、票數可由列重算）、**B5** ACCEPTANCE：I-68 改寫判定順序與不變式描述、新 ⚠️ 條目（「素面→有樣式」「已有樣式→改樣式」各依有詞／無詞分計）、母計劃 §2 優先順修訂；U3 加 B 作用域逐首核對。
+
+## 6. 測試策略
+- 單元：U1、U2（測試字串與歌手名自編，不用真歌詞、真歌手名）。
+- 整合：替身 Music 跑小曲庫（日文家族含無詞曲、日文過半／恰一半家族、有詞非日文家族、署名）→ 掃描器＋報表計數。
+- E2E：沿用 `LibraryCheckUITests` 一條（假曲庫加一首推定日文的無詞曲），使用者在場跑。
+- 一次性唯讀：U6（不進測試 target：測試不得讀使用者曲庫）。
+
+## 7. 驗收
+1. §5 各 DoD 綠；全量單元綠（列明 flaky）；coverage ≥ 80 %；`no_playback_gate.sh` 綠。
+2. U3 四集合與 U6 在場計數。
+3. I-68 更新簽字（B 若做，另簽新條目）。
+
+## 8. 影響面
+A：`LibraryGateReport`（推定規則、`JapaneseEstimate`、`VerdictKey`）、`Features/LibraryCheck` 來源文字、`Localizable.xcstrings`、`ACCEPTANCE.md`、對應測試。不動：`SongProfileResolver`、`LyricsFXViewModel`、`LibraryGateScanner` 的讀取、MB 查詢、`ArtistStyleBook` 格式、元件、列、`ReadabilityPolicy`、Music 寫入——播放行為 0 差異。
+B（若做）：另加 `SongProfileResolver.explain`、`ProfileExplanation.Layer`、`LyricsFXViewModel` 注入點、`AppModel`、母計劃 §2。
+
+## 9. 風險與回退
+- A 推定錯（日文歌手的無詞曲其實是英文歌）：只影響報表；補詞後重掃即以歌詞重判。推定規則與 ⑥b 日文歌手定義同一門檻。
+- 收益有限（如實記錄）：A 只少 29 首；剩下的「掃不出結果」主要靠使用者用 ⑧ 介面處理（批次「照目前樣式」＋逐位指定），或另簽的 B／MB 重查／AI 層。
+- B（若做）：Apple 錯標在同家族擴散——前提①⑤限制；使用者樣式層在 B 之前可覆蓋。
+- 回退：A 只在報表，拿掉推定規則即回到現況。
+
+## 10. 待拍板（Codex 2 輪後的結論，見附錄 B）
+1. **B（同歌手 Apple 曲風共識）**：建議**不做**（Codex 與我方一致）。理由：直接修訂母計劃「共識層不採 Apple」的既定原則；閘門淨效益 9 首。做的話換到：有詞 89 首播放由素面變特效、需逐位指定的歌手少 6 位（5 位可改用批次、1 位自動完成）；代價是 Apple 錯標在同歌手內擴散，且要先滿足 §4.2 六項前提。不做時，HIM、Muse、Rhapsody 等 6 位在曲庫檢查裡逐位「指定樣式」即可（效果相同且由你選樣式）。
+2. **MB 一次性重查**（§4.3）：建議**不做**。違反 ⑥b「不主動重查」，效益 TBD。若要探索，另簽「少量代表性 ambiguous／noAlbumMatch 歌手的唯讀診斷（不寫入、不改身分）」，量出可解比例後再決定。
+3. **AI／Jev 自動分類層**（§4.5）：本增補不做；要不要另立「唯讀診斷＋方案評估」計劃。
+
+## 附錄 A 量測程式
+- scratchpad `m8/`：`readlib.js`（JXA 唯讀六欄）、`main.swift`（直接用 `LibraryGateReport`；分類、A／B 模擬、合作寫法）、`stubs.swift`／`extra.swift`（沿用 ⑧ 附錄 A）、`files.txt`（⑧ 交叉核對清單＋`LyricsText.swift`）。`swiftc -O -swift-version 6`。輸出 `out2.txt`／`out3.txt`（計數＋歌手名，無曲名歌詞）。不進 repo。
+
+## 附錄 B Codex 評審與辯論紀錄（2026-10-28）
+
+### R1 處置
+| # | 嚴重度 | 意見 | 處置 |
+|---|---|---|---|
+| 1 | 阻斷 | A 把預測當已知判定，讓 G-ID／G-COMP 合格 | **駁回（帶證據回餵 R2）**：現行無詞曲 `isJapanese=false` 本身就是預測（`LibraryGateScanner.swift:63-70`）；⑧ §4.1 對無詞曲量的就是補詞後的預期判定；A 以有證據的預測取代已被反證的預設 → R2 Codex 判**成立** |
+| 2 | 阻斷 | B 違反 §1-6 共識層不採 Apple | **採納**：B 預設不做，列 §10-1 交使用者；若做，先正式修訂母計劃 |
+| 3 | 高 | B 閘門淨效益只有 9 首 | **採納**：§2.1、§10-1 正面寫出 |
+| 4 | 高 | B 證據無門檻 | **採納為 B 前提①** |
+| 5 | 高 | B 以寫法家族聚合會放大同名異人誤套 | **採納為 B 前提①⑤**（可追溯＋門檻）；不另做多實體偵測（同 ⑧ R4 A-2 已知限制） |
+| 6 | 高 | 播放與報表不是同一份快照 | **採納為 B 前提③** |
+| 7 | 高 | U6「非 B 集合 0 差異」與 A 的 29 首矛盾 | **採納**：U3 四集合 |
+| 8 | 中 | `VerdictKey` 須含推定旗標 | **採納**：U2 DoD＋混列回歸測試 |
+| 9 | 中 | 推定不是已解決來源，G-SRC 不該合格 | **部分採納**：顯示「推定」＋依據採納；「G-SRC 不合格」駁回（否則只是把 29 首搬到 G-SRC）→ R2 Codex 撤回 |
+| 10 | 中 | 共識應傳列 id，不傳 genre 字串 | **採納為 B 前提②** |
+| 11 | 中 | 啟動另讀整庫的延遲未量 | **採納為 B 前提④** |
+| 12 | 中 | 固定計數不能當自動測試 oracle | **採納**：只作一次性交叉核對、附掃描時間 |
+| 13 | 低 | 合作寫法維持不做 | 一致；不加 UI 分組（範圍外） |
+| 14 | 低 | A 實作面過大 | **部分採納**：推定函式放 `LibraryGateReport` 內、不開新檔；三語來源文字保留（G-SRC 可判讀的必要條件） |
+| §10-1 | — | B 不做 | 一致（價值判斷交使用者） |
+| §10-2 | — | MB 重查不做；若探索，先限量唯讀診斷、另簽 | 一致 |
+
+### R2 判定與新意見
+| 項 | Codex 判定 | 處置 |
+|---|---|---|
+| 反駁 1-1 現行預設也是預測 | 部分成立（保守預設 vs 正向推定，證據強度不對稱） | 結案；A 用與 ⑥b 相同的「過半」門檻 |
+| 反駁 1-2／1-3／1-4 | 成立；撤回「G-SRC 不合格」 | **我方勝**（證據：`LibraryGateScanner.swift:63-70`、⑧ §4.1） |
+| 反駁 2 B 的操作／播放收益 | 部分成立：可批次淨增 5 位（第 6 位 Tracedawn 自動完成）；播放改變要量化 | **採納**：補量有詞 89 首／5 位、無詞 97 首；立場不變（預設不做） |
+| 問題 3 AI 層 | 成立：列 §10 另立；剩餘集合成因混雜，收益不得預計 | **採納**：§4.5、§10-3 |
+| 新 P1 推定要帶 m／n | — | **採納**：`JapaneseEstimate`、來源文字插值、U3 逐首釘住 |
+| 新 P1 四集合依有無詞分計 | — | **採納**：U3＋B 附加說明 |
+| 新 P2 「6 位」表述 | — | **採納**：§2.1、§10-1 |
+| 新 P2 AI 層列 §10 | — | **採納** |
+
+收斂判定：R2 無阻斷、無我方需再回餵的新證據；剩餘三項為價值判斷，交使用者（§10）。
+- 勝負：A 的 G-SRC 處理我方勝（證據）；B 不做、MB 不重查、AI 層另立與 Codex 一致；U6 矛盾、`VerdictKey`、m／n 證據為 Codex 勝。
+
+## 附錄 C 使用者拍板（2026-10-28）
+- A：做（使用者：「Yorushika 的分類確實是判錯了，它就是 J-Pop」）。
+- B：做，語義改為整位歌手統一（原話見 §4.2）。
+
+### R3（2026-10-28，審 v0.3 新語義）處置
+| # | 嚴重度 | 意見 | 處置 |
+|---|---|---|---|
+| 1 | 阻斷 | 落層互斥（MB 後取代 Apple vs 最後一層） | **採納**：兩個 tier，§4.2 |
+| 2 | 阻斷 | 證據可能自我強化 | **採納**：`preConsensusAppleEvidence` 只看原始 genre |
+| 3 | 高 | 退路未涵蓋各種失敗 | **採納**：一律退回同 tier 逐曲並記 trace；刪「無平手」贅述 |
+| 4 | 高 | 證據資格不明 | **採納**：只取關掉 B 時會被 Apple tier 採用的曲 |
+| 5 | 高 | 快照未就緒的暫態 | **採納**：明示來源狀態、catalogVersion |
+| 6 | 中 | 來源欄要列證據 persistentID 清單 | **部分採納**：列 tier、勝出列、票數／證據數、快照時間、退路；persistentID 清單駁回 → R4 Codex 判駁回理由不成立（現有頁面無 Apple 曲風欄、只有文字搜尋）→ **Codex 勝**：加「Apple 曲風」欄與寫法家族篩選，仍不列 persistentID |
+
+### R4（2026-10-28）
+- R3 七條「未落實」：Codex 以程式現況判定，本階段只是計劃，不構成計劃缺陷（駁回，無需再辯）。
+- R3-6：見上表，Codex 勝。無其他新阻斷／高級意見 → **收斂，v0.4 定稿**。
+
+| 7 | 中 | I-68 與不變式描述已不成立 | **採納**：B5 |
+純音樂無詞曲判不出不是問題（不另做處理；閘門範圍仍依 ⑧ §10-2 全曲庫）。
+- MB 重查、AI 層：使用者未要求 → 依 §10 建議不做。
+
+### R5（2026-10-28，實作中修訂的快速複審）
+- 修訂（共識表改存最近一次完整掃描的結果、播放載入存檔、不新增整庫讀取）：**成立**。
+- 採納 4 條：過期語義明定為「以最近一次完整掃描為準」；指紋含列的順序、關鍵字、通用旗標與 policy 版本；atomic 寫入、無並行讀寫；版本不符視為沒有、新掃描可覆寫（衍生資料，不同於使用者決定檔）。
+- 「指紋不含曲庫證據」：駁回為缺陷——播放端無法在不讀整庫的前提下驗證曲庫（Codex 同條也接受 as-of 語義），改以明文過期語義處理。
+
+### R6（2026-10-28，實作中修正；U3 實測觸發）
+- 見 §4.2「實作中修正」兩條；測試先紅後綠（`anArtistStyledByMBGenericRowsKeepsMBAndPerSongApple`、`anArtistWithAnMBGenericStyleGetsNoAppleMajority`、`specificRowsOutvoteTheGenericMetalRow`）。原 `aGenreTierMajorityComesBeforeGenericMB` 測試把第 1 條的錯誤行為寫成預期，已改寫。
+
+## 附錄 D U3 真曲庫逐首比對（2026-10-28T14:05Z，c846ee1 vs 工作樹，唯讀）
+| 集合 | 首 | 說明 |
+|---|---|---|
+| 不受影響 | 10,779 | 判定、樣式、四項逐首 0 差異 |
+| A（推定日文） | 61 | 全部改判 J-Pop（只在報表）；其中原本不合格 29（Yorushika 19、Kenshi Yonezu 10）；6 位：Yorushika 19、MONGOL800 13、星野源 12、Kenshi Yonezu 10、YOASOBI 4、back number 3 |
+| B 樣式相同 | 1,219 | 來源改記為同歌手多數，但列組合與原本相同（樣式不變） |
+| B 素面→有樣式 | 186（有詞 89） | HIM 132、Muse 32、Rhapsody 10、Tracedawn 9、Sóley… 2、Outlying 1 |
+| B 改樣式 | 26（有詞 7） | Negative 15（altindie→gothic）、Duir 6（metal→black＋death）、HIM 5（gothic→hardrock） |
+- 計數：G-ID 1,144／135、G-COMP 373／50（署名待補 178）、G-READ 0、G-SRC 0；有詞子集 G-ID 316、G-COMP 53；待處理歌手 145、可批次 95；共識表 99 位。
+
+### R7（2026-10-28，v0.6 快速複審）
+- 修正 1、2：**成立**，實作與文字一致（含 MB 通用列組不出時仍退回逐曲 Apple，不直接素面）。
+- 高：掃描後 MB 存檔變動時，播放端（讀目前 MB）與報表保存的共識證據可能不同步 → **採納其第二個選項**：明文定義為「需重掃後才一致」，寫進 §4.2 過期語義。理由：MB 只會對掃描當時還沒查過的歌手變動（每位只查一次），且畫面已顯示「需重新掃描」；把 MB 狀態納入快照失效條件要再存一份 MB 摘要，收益只在首次背景查詢期間。
+
+## 附錄 E 實作記錄與 simcodex（2026-10-28，`wip/lyrics-library-gate`：79810f5 → 31c92e6 → 2271b8e）
+- **TDD**：A（報表推定 7 條）紅→綠；B1／B2（共識 6＋判定 10 條）實作先寫、紅燈事後補做（移開實作確認型別未定義）；報表共識、存檔、接線、畫面、U3 兩處修正、simcodex 各修正皆先紅後綠。U6 假曲庫計數由單元測試 `theUITestFixtureStartsWithOnePlainSongAndTwoOpenIdentities` 先守（UI 測試待使用者在場）。
+- **simcodex 3 輪**（審 c846ee1..HEAD＋工作樹）：
+| 輪 | 來源 | 意見 | 處置 |
+|---|---|---|---|
+| 1 | simplify 簡化／效率 P1 | 報表第一段白建一萬多筆 Row、兩段都逐首重判；`consensusVote` 存兩份可推導值；`vote(for:)` 死碼；寫法家族鍵每首算一次 | **採納**：每種判定鍵只判一次、第二段只重判有共識的歌手；刪 `consensusVote`，來源欄以層→tier 查報表共識；家族鍵每寫法算一次 |
+| 1 | simplify 效率／層級 P1 | 每次使用者決定都重寫共識檔；回呼註解與實際觸發不符 | **採納**：表沒變不寫；註解改正（決定也會改變證據，保留觸發） |
+| 1 | simplify 層級 P1 | MB 優先停用共識時沒留 trace，畫面說不出原因 | **採納**：新 outcome `overriddenByMB`、來源欄附註（三語 1 條） |
+| 1 | simplify 重用 P2 | generic 抑制兩處定義 | **採納**：`SongProfileResolver.preferSpecific` 一處 |
+| 1 | security-reviewer | 無 CRITICAL／HIGH／MEDIUM；LOW：目錄符號連結（同既有三個存檔）、竄改檔塞超長列清單會讓播放每次逐一比對、竄改可指定任意真列組合 | **採納 L2**：載入時丟掉空／重複／比目錄長的票；L1、L3 延後（同既有存檔／屬完整性） |
+| 1 | codex review [P2] | 寫檔失敗後同一張表不再重試 | **採納**：另記「已寫入的表」；`aFailedConsensusWriteIsRetriedOnTheNextScan` |
+| 1 | codex review [P2] | 同一 persistentID 重複出現會多算票 | **採納**：計票以 persistentID 去重；`aRepeatedTrackIsOneVote` |
+| 2 | simplify 簡化 P1 | 家族鍵查法寫 5 次、計票去重靠副作用、「兩 tier 皆空＝沒有共識」兩處、`isMostlyJapanese` 被內聯 | **採納** |
+| 2 | simplify 效率／層級 | 無 P1；層↔tier 對應三處（P2，兩份都點到） | **採納**：只定義在 `Tier.appleLayer／consensusLayer` |
+| 2 | codex review [P1] | `Tier` 拿掉 String 後失去 Equatable、無法編譯 | **駁回（誤報）**：無關聯值的 enum 自動 Equatable／Hashable；已編譯且 143 條測試綠 |
+| 3 | codex review | 無問題 | — |
+| 3 | simplify 四角度 | 無 P1 | 收斂 |
+- 每輪驗證：相關 14 suite 143→145 條綠；真曲庫逐首比對（附錄 D）每輪重跑結果不變。
+- **遺留 P2**：①四個存檔（Decision／Style／Timing／Consensus）檔案防線與 JSON coder 抽共用（含目錄符號連結）；②SHA-256 轉十六進位四處；③`Snapshot.builtAt` 目前只有測試讀；④`SourceText` 手寫 init；⑤`Verdict.familyKey` 可推導；⑥證據以「權重」代替逐首展開；⑦報表移出主執行緒；⑧`Key.layer` 存取子；⑨`family` 閉包的退路分支、`plain[key]!`；⑩`AppleGenreConsensus` 兩個 tier 以字典存（只在要第三個 tier 時）。
+
+## 附錄 F 全量測試（2026-10-28 23:0x–10-29 00:49，2271b8e）
+- 全量單元（`-enableCodeCoverage`，已知 flaky `BatchOverlappingLoadTests/overlappingLoadSuspendsPollingUntilLastCompletes()` 以完整名稱 skip）：**1,978 條，通過 1,946、失敗 7、略過 25**。
+- 失敗 7 條，兩類，**都與本次修改無關**：
+  1. `CoverFlowStripRenderGeometryTests` 3 條（上螢幕，`items.count >= 5`）：單獨重跑全綠（0.8–5 s）。與記憶中「Cover Flow 上螢幕測試 AX 讀到 0 個屬環境暫態」同型；本次未改任何 Cover Flow 程式。**未以重跑結案**，列為環境遺留。
+  2. `LyricsFXContrastTests` 4 條（G1 主字對比）：**超過每條 120 s 上限**，不是判定失敗。改上限 600 s 量：修改前 c846ee1 單條 234.4 s、修改後 233.6 s（同機前後緊接），兩版皆通過；這 4 條用到的程式（可讀性稽核集合、元件目錄、Composer）本次 0 改動。⑧ 10-28 全量同設定通過——推測本機目前較慢（fileproviderd 約 55 % CPU），待機器閒時重跑全量確認；不放寬上限。
+- coverage_gate（傳入本次 xcresult）：**exit 0**，Services+Infra 96.5 %（5309/5503），豁免 483／490；新增或修改檔：AppleGenreConsensus 100 %、ArtistConsensusStore 100 %、ProfileExplanation 100 %、SongProfileResolver 99.2 %、LibraryGateReport 95.6 %。
+- `no_playback_gate.sh` exit 0；Scripts 443 條綠。
+- **更正（2026-11-01，閒置重跑）**：機器閒置（負載約 3.9、無 fileproviderd 占用、AC 電源、無降溫紀錄）下照 120 s 上限重跑 `LyricsFXContrastTests`（3f742da）：同樣 4 條超時、其餘 5 條綠。查歷次紀錄：e734671（2026-10-22，⑤ 加日文行）時整組已是 2,754 s「全綠」，10-29 量得單條 232–234 s、整組 2,806 s。→ **已核事實**：這 4 條從 10-22 起每條約 230 s，本來就超過 120 s 上限；與本次改動無關，也不是機器變慢。上面「推測本機較慢」不成立；「⑧ 10-28 全量同設定通過」與此矛盾，推測該次全量沒有套 120 s 上限（未能取得該次 xcresult 核對）。處置（加速或給這 4 條專屬時限）另議，未改測試。
+
+## 附錄 G 使用者在場 U6（2026-11-01 11:11，Debug 版 3f742da，derivedData 在 session scratchpad）
+- 開 Debug 版前已關掉 `/Users/Shared/YSE-1.0/app/` 的正式版（只剩一個 Azathoth's Whisper 在跑），使用者點完鑰匙圈授權框後 Rescan。
+- 畫面計數與附錄 D **完全一致**：身分未定 1,144 首／135 位（有詞 316／36）、素面 373 首／50 位（有詞 53／13），其中署名待補 178 首／4 位；可讀性未檢查 0、缺來源 0；狀態「Gate not met」。待處理歌手前幾位：HIM 223、Rammstein 78（署名）、Negative 68、The London Suede 58、Daft Punk 54（署名）、Muse 43、Rhapsody 42。
+- Yorushika（Every song 分頁）：無詞曲（例 Train Window，使用者確認是純音樂）來源顯示「J-Pop (estimated: no lyrics yet) 50/50」、Issues OK；有詞曲為「J-Pop policy (Japanese lyrics)」。**U6 達標**。
+- 掃描耗時：本次未從 OSLog 取得（`log show` 查無 library-gate 行），TBD。
+- **`LibraryCheckUITests`（使用者在場，11:38–11:40，ABC 輸入法、正式版已關）**：第 1 次紅在 `:24`「處理前：素面 1 首（）」——計數元素存在但讀到空字串。根因（已核）：測試讀 `.label`，macOS 的 SwiftUI `Text` 內容在 AX `value`、`label` 為空；repo 既有讀法都用 `.value`（`BatchUITests.swift:75`、`LyricsFlowUITests.swift:29`）。這條測試自 a91991a 寫成後首次實跑。修正：四處讀取改 `.value`（`text(_:)`、`waitForValuePrefix`），斷言內容不變。第 2 次 **綠**（12.4 s）。
+
+## 附錄 H /thecure：⑧ 三件簽字（2026-11-01，Codex 2 輪＋整體確認「無い」）
+- 結論（使用者 2026-11-01「可以」）：豁免預算 470→490 **批准**；I-69 **簽字**，簽字文字載明 7 紅的例外與出處（不屬本條、不因簽字視為解決）；I-68 **暫緩**——T0 DoD「掃描中 nowPlaying 延遲最壞 ≤ 1.5 s」未量、無量測點，另立 DEBUG-only 量測小計劃；G1 4 條的測試政策（加速或專屬時限）另立項交使用者；合併／push 另問。
+- 勝負：490、I-68 暫緩、I-69 可獨立於 I-68 簽——一致；「I-69 無條件可簽」**Codex 勝**（本檔 §7-1 要求全量綠、G1 非 flaky）。
+- Codex 最擔心：G1 被反覆寫成「與本次無關」卻無正式例外機制，日後會掩蓋真回歸；量測若無單調時鐘與關聯 ID，掃描與切歌併發時數字無法歸因。

@@ -56,7 +56,8 @@ enum LyricsEvidence: Equatable, Sendable {
 enum ProfileSource: Equatable, Sendable {
     /// `verifiedArtistGenre`＝MB 驗證過的歌手曲風命中曲風列（⑥b 計劃 §4.3）；`genreRow`＝Apple 曲風命中；
     /// `generic`＝前面都組不出時命中通用列（⑦ 計劃 §4.1）
-    case signedBand, jpopPolicy, verifiedArtistGenre, genreRow, generic, noMatch
+    /// `userStyle`＝使用者在曲庫檢查指定的列（⑧ 計劃 §4.3）
+    case signedBand, jpopPolicy, userStyle, verifiedArtistGenre, genreRow, generic, noMatch
 
     /// 由歌詞內容決定的來源：寫入或改詞可能讓它出現或消失
     var dependsOnLyrics: Bool { self == .jpopPolicy }
@@ -68,6 +69,8 @@ enum ProfileResolution: Equatable, Sendable {
     case signedBand(SongProfile)
     /// 日文歌一律 J-Pop（使用者 2026-10-22）；變體由 VM 選（`JPopPolicy`）
     case jpop
+    /// 使用者指定的列（⑧）
+    case userStyle(SongProfile)
     /// MB 驗證過的歌手曲風命中曲風列（⑥b）
     case artistGenreRow(SongProfile)
     case genreRow(SongProfile)
@@ -81,6 +84,7 @@ enum ProfileResolution: Equatable, Sendable {
         case .pending: nil
         case .signedBand: .signedBand
         case .jpop: .jpopPolicy
+        case .userStyle: .userStyle
         case .artistGenreRow: .verifiedArtistGenre
         case .genreRow: .genreRow
         case .genericRow: .generic
@@ -90,7 +94,7 @@ enum ProfileResolution: Equatable, Sendable {
 
     var profile: SongProfile? {
         switch self {
-        case .signedBand(let profile), .artistGenreRow(let profile), .genreRow(let profile), .genericRow(let profile): profile
+        case .signedBand(let profile), .userStyle(let profile), .artistGenreRow(let profile), .genreRow(let profile), .genericRow(let profile): profile
         case .pending, .jpop, .noMatch: nil
         }
     }
@@ -112,7 +116,10 @@ enum SongProfileResolver {
 
     /// 樂團覆寫表：使用者在探針 P2、P9–P11 給的判據，原樣抄自原型 `composer.js:123-152` 的 TARGETS（等 D 段 Jev 取代）。
     /// 鍵＝`normalizedArtist`
-    static let overrides: [String: SongProfile] = overrides(from: bandTable)
+    static let overrides: [String: SongProfile] = signedBands.mapValues(\.profile)
+
+    /// 署名團（正式名＋profile）；`overrides` 由它推出，同一份鍵與撞鍵規則（simcodex R1）
+    private static let signedBands: [String: BandEntry] = bands(from: bandTable)
 
     /// 覆寫表的一列：正式名＋曲庫裡實際出現的其他寫法（合作名等；不做模糊比對，沒列到的照舊走曲風）
     struct BandEntry: Sendable {
@@ -190,8 +197,12 @@ enum SongProfileResolver {
 
     /// 撞鍵時先列的團勝出（Release 不因資料錯誤在啟動時 trap）
     static func overrides(from table: [BandEntry]) -> [String: SongProfile] {
+        bands(from: table).mapValues(\.profile)
+    }
+
+    private static func bands(from table: [BandEntry]) -> [String: BandEntry] {
         assert(duplicateKeys(in: table).isEmpty, "樂團覆寫表有重複的鍵")
-        return Dictionary(table.flatMap { band in band.keys.map { ($0, band.profile) } }, uniquingKeysWith: { first, _ in first })
+        return Dictionary(table.flatMap { band in band.keys.map { ($0, band) } }, uniquingKeysWith: { first, _ in first })
     }
 
     /// 單一關鍵字列的軸值由覆寫表中該曲風的代表樂團平均而來（可追溯，不另行手填）。
@@ -264,37 +275,99 @@ enum SongProfileResolver {
     static let hardAxes: Set<FXAxis> = [.raw, .aggression, .speed, .decay, .cold, .theatrical]
 
     static func resolve(
-        artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown,
-        rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows
+        artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown, decision: ArtistDecision.Choice? = nil,
+        consensus: AppleGenreConsensus? = nil, rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows
     ) -> ProfileResolution {
-        if let profile = signedProfile(artist) { return .signedBand(profile) }
-        if lyrics == .unknown { return .pending }
-        if lyrics == .text(isJapanese: true) { return .jpop }
+        explain(
+            artist: artist, genre: genre, lyrics: lyrics, artistGenres: artistGenres, decision: decision, consensus: consensus, rows: rows, genericRows: genericRows
+        ).resolution
+    }
+
+    /// 判定的唯一實作（⑧ 計劃 §4.2）：結果＋來源 key＋每一層的嘗試
+    static func explain(
+        artist: String, genre: String?, lyrics: LyricsEvidence, artistGenres: ArtistGenres = .unknown, decision: ArtistDecision.Choice? = nil,
+        consensus: AppleGenreConsensus? = nil, rows: [KeywordRow] = keywordRows, genericRows: [KeywordRow] = genericRows,
+        rejected: Set<ProfileExplanation.AuditKey> = ReadabilityPolicy.rejected
+    ) -> ProfileExplanation {
+        if let band = signedBand(artist) { return ProfileExplanation(resolution: .signedBand(band.profile), key: .signed(band.name), trace: []) }
+        if lyrics == .unknown { return ProfileExplanation(resolution: .pending, key: .pending, trace: []) }
+        if lyrics == .text(isJapanese: true) { return ProfileExplanation(resolution: .jpop, key: .jpop, trace: []) }
+        var trace: [ProfileExplanation.Attempt] = []
+        /// 試一層：命中的列合成；組不出或被可讀性拒絕就當沒命中（⑥b R3-4），都記進 trace
+        func attempt(_ layer: ProfileExplanation.Layer, _ hit: [KeywordRow]) -> (SongProfile, [String])? {
+            let ids = hit.map(\.id).sorted()
+            guard let profile = compose(rows: hit) else {
+                trace.append(.init(layer: layer, rowIDs: [], outcome: .noHit))
+                return nil
+            }
+            guard Composer.isComposable(profile) else {
+                trace.append(.init(layer: layer, rowIDs: ids, outcome: .notComposable))
+                return nil
+            }
+            guard !rejected.contains(.rows(ids)) else {
+                trace.append(.init(layer: layer, rowIDs: ids, outcome: .rejectedByReadability))
+                return nil
+            }
+            trace.append(.init(layer: layer, rowIDs: ids, outcome: .adopted))
+            return (profile, ids)
+        }
+        func adopted(_ resolution: ProfileResolution, _ layer: ProfileExplanation.Layer, _ ids: [String]) -> ProfileExplanation {
+            ProfileExplanation(resolution: resolution, key: .rows(layer, ids), trace: trace)
+        }
+        // 使用者指定的列（⑧ §4.3）：排在 J-Pop 之後（日文歌一律 J-Pop、不開例外）、MB 之前；組不出或被拒絕就落下一層。
+        // 找不到這個列（存檔裡的舊 id）也記下要求的 id，畫面才說得出原因
+        if case .style(let rowID) = decision {
+            let chosen = (rows + genericRows).filter { $0.id == rowID }
+            if chosen.isEmpty {
+                trace.append(.init(layer: .userStyle, rowIDs: [rowID], outcome: .noHit))
+            } else if let (profile, ids) = attempt(.userStyle, chosen) {
+                return adopted(.userStyle(profile), .userStyle, ids)
+            }
+        }
         // MB 還沒查、認不出、或碰不到任何列：不等，落到 Apple 曲風（只升不降，⑥b §4.3）
         // 每個曲風字串只正規化一次，四層共用（⑦ simcodex 效率）
         let mb: [GenreStyleResolver.NormalizedGenre]? = if case .verified(let genres) = artistGenres { genres.map(GenreStyleResolver.normalized) } else { nil }
-        if let mb, let profile = playable(compose(normalized: mb, rows: rows)) { return .artistGenreRow(profile) }
+        if let mb, let (profile, ids) = attempt(.mbGenre, hits(normalized: mb, rows: rows)) { return adopted(.artistGenreRow(profile), .mbGenre, ids) }
         // genre nil＝讀取失敗、還不知道：要等它，Apple 的既有列優先於通用列（⑦ 計劃 §4.1）
-        guard let genre else { return .pending }
+        guard let genre else { return ProfileExplanation(resolution: .pending, key: .pending, trace: trace) }
+        /// 同歌手共識（增補計劃 §4.2）：整位用同一組列；列不在目錄、組不出或被拒絕就退回同層的逐曲判定，都記進 trace
+        func attemptConsensus(_ layer: ProfileExplanation.Layer, _ vote: AppleGenreConsensus.Vote?, from pool: [KeywordRow]) -> (SongProfile, [String])? {
+            guard let vote else { return nil }
+            let chosen = pool.filter { vote.rowIDs.contains($0.id) }
+            guard chosen.count == vote.rowIDs.count else {
+                trace.append(.init(layer: layer, rowIDs: vote.rowIDs, outcome: .noHit))
+                return nil
+            }
+            return attempt(layer, chosen)
+        }
+        // MB 給得出歌手層級的樣式（命中通用列）時，以 MB 為準、不用 Apple 多數（U3 真曲庫實測；使用者：MB 可能分得更準）；停用也記 trace
+        let mbGenericHits = mb.map { hits(normalized: $0, rows: genericRows) }
+        let mbOverrides = mbGenericHits?.isEmpty == false
+        let usableConsensus = mbOverrides ? nil : consensus
+        if mbOverrides, let consensus {
+            for tier in AppleGenreConsensus.Tier.allCases {
+                if let vote = consensus.vote(for: tier) { trace.append(.init(layer: tier.consensusLayer, rowIDs: vote.rowIDs, outcome: .overriddenByMB)) }
+            }
+        }
         let apple = [GenreStyleResolver.normalized(genre)]
-        if let profile = playable(compose(normalized: apple, rows: rows)) { return .genreRow(profile) }
-        // 通用層：先 MB（比 Apple 細），再 Apple
-        if let mb, let profile = playable(compose(normalized: mb, rows: genericRows)) { return .genericRow(profile) }
-        return playable(compose(normalized: apple, rows: genericRows)).map(ProfileResolution.genericRow) ?? .noMatch
+        if let (profile, ids) = attemptConsensus(.appleConsensus, usableConsensus?.genreRows, from: rows) { return adopted(.genreRow(profile), .appleConsensus, ids) }
+        if let (profile, ids) = attempt(.appleGenre, hits(normalized: apple, rows: rows)) { return adopted(.genreRow(profile), .appleGenre, ids) }
+        // 通用層：先 MB（比 Apple 細），再 Apple（同歌手共識優先於逐曲）
+        if let mbGenericHits, let (profile, ids) = attempt(.genericMB, mbGenericHits) { return adopted(.genericRow(profile), .genericMB, ids) }
+        if let (profile, ids) = attemptConsensus(.genericAppleConsensus, usableConsensus?.genericRows, from: genericRows) {
+            return adopted(.genericRow(profile), .genericAppleConsensus, ids)
+        }
+        if let (profile, ids) = attempt(.genericApple, hits(normalized: apple, rows: genericRows)) { return adopted(.genericRow(profile), .genericApple, ids) }
+        return ProfileExplanation(resolution: .noMatch, key: .none, trace: trace)
     }
 
     /// 要不要為這位歌手查 MB：樂團表的團一律以表為準（與 `resolve` 的第一層同一個判斷）
     static func needsArtistGenres(_ artist: String) -> Bool {
-        signedProfile(artist) == nil
+        signedBand(artist) == nil
     }
 
-    private static func signedProfile(_ artist: String) -> SongProfile? {
-        overrides[normalizedArtist(artist)]
-    }
-
-    /// 組不出六槽的目標值不算命中（⑥b R3-4）：讓下一層有機會，而不是靜默變成素面
-    private static func playable(_ profile: SongProfile?) -> SongProfile? {
-        profile.flatMap { Composer.isComposable($0) ? $0 : nil }
+    private static func signedBand(_ artist: String) -> BandEntry? {
+        signedBands[normalizedArtist(artist)]
     }
 
     /// genre 命中的所有關鍵字列合成一個目標值；無命中＝nil
@@ -308,9 +381,19 @@ enum SongProfileResolver {
     }
 
     private static func compose(normalized: [GenreStyleResolver.NormalizedGenre], rows: [KeywordRow]) -> SongProfile? {
-        let hits = rows.filter { row in row.keywords.contains { keyword in normalized.contains { GenreStyleResolver.genre($0, matches: keyword) } } }
-        let specific = hits.filter { !$0.isGeneric }
-        return compose(rows: specific.isEmpty ? hits : specific)
+        compose(rows: hits(normalized: normalized, rows: rows))
+    }
+
+    /// 命中的列，已套 generic 抑制
+    private static func hits(normalized: [GenreStyleResolver.NormalizedGenre], rows: [KeywordRow]) -> [KeywordRow] {
+        let matched = rows.filter { row in row.keywords.contains { keyword in normalized.contains { GenreStyleResolver.genre($0, matches: keyword) } } }
+        return preferSpecific(matched) { $0.isGeneric }
+    }
+
+    /// generic 抑制的唯一定義：有任何非 generic 的就只留它們，否則全留（逐曲命中與同歌手共識計票共用）
+    static func preferSpecific<Item>(_ items: [Item], isGeneric: (Item) -> Bool) -> [Item] {
+        let specific = items.filter { !isGeneric($0) }
+        return specific.isEmpty ? items : specific
     }
 
     /// 指定的列直接合成（不比對、不抑制 generic）；空＝nil

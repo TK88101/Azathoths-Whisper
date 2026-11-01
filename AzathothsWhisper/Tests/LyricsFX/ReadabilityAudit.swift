@@ -160,8 +160,20 @@ enum ReadabilityAudit {
         }
     }
 
-    /// 涵蓋：全部 profile（樂團表＋曲風列）
+    /// 涵蓋：全部 profile（樂團表＋曲風列＋通用列＋⑧ 的多列組合 `ReadabilityPolicy.combinations`）
     static var profiles: [(name: String, profile: SongProfile)] {
+        singleProfiles + combinationProfiles
+    }
+
+    /// ⑧ 計劃 §4.6：曲庫實際出現的多列組合，名稱 `combo:a+b`
+    static var combinationProfiles: [(name: String, profile: SongProfile)] {
+        let rows = SongProfileResolver.keywordRows + SongProfileResolver.genericRows
+        return ReadabilityPolicy.combinations.compactMap { ids in
+            SongProfileResolver.compose(rows: rows.filter { ids.contains($0.id) }).map { ("combo:" + ids.joined(separator: "+"), $0) }
+        }
+    }
+
+    static var singleProfiles: [(name: String, profile: SongProfile)] {
         SongProfileResolver.bandTable.map { ($0.name, $0.profile) }
             + SongProfileResolver.keywordRows.compactMap { row in
                 SongProfileResolver.compose(genre: row.keywords[0], rows: [row]).map { ("genre:\(row.keywords[0])", $0) }

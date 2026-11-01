@@ -74,6 +74,14 @@ actor SerialAEQueueMusicClient: MusicControlling {
         await enqueue("artistTracks") { [] }
     }
 
+    func libraryTrackSnapshot() async throws -> [LibraryTrackRow] {
+        await enqueue("libraryTrackSnapshot") { [] }
+    }
+
+    func artistLyrics(artist: String) async throws -> [ArtistLyricsRow] {
+        await enqueue("artistLyrics") { [] }
+    }
+
     func setLyrics(persistentID: String, lyrics: String) async throws -> Bool {
         await enqueue("setLyrics") { true }
     }

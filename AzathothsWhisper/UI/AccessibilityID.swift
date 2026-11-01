@@ -48,4 +48,16 @@ enum AccessibilityID {
     static let fetchCount = "editor-fetch-count"
     /// DEBUG 限定：a11y value＝本次啟動的強制重讀請求次數（AC3：點非播放卡不得觸發）
     static let hydrateCount = "editor-hydrate-count"
+
+    // ⑧ 曲庫檢查視窗（曲庫閘門計劃 §4.5）
+    static let libraryCheckStatus = "librarycheck-status"
+    static let libraryCheckRescan = "librarycheck-rescan"
+    static let libraryCheckIdentityCount = "librarycheck-count-identity"
+    static let libraryCheckComposedCount = "librarycheck-count-composed"
+    static let libraryCheckReadabilityCount = "librarycheck-count-readability"
+    static let libraryCheckSourceCount = "librarycheck-count-source"
+    static let libraryCheckBulkKeep = "librarycheck-bulk-keep"
+    static let libraryCheckArtistPrefix = "librarycheck-artist-"
+    static let libraryCheckChooseStyle = "librarycheck-choose-style"
+    static let libraryCheckKeepFallback = "librarycheck-keep-fallback"
 }
