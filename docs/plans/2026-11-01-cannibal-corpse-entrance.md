@@ -1,9 +1,9 @@
-# Cannibal Corpse 補進場元件：兩條路的影響面（計劃 v0.3，/thecure 收斂；待使用者拍板）
+# Cannibal Corpse 補進場元件：兩條路的影響面（計劃 v0.6：①已拍板、探針已簽；實作段 Codex 3 輪收斂，待使用者審閱）
 
 ## 0. 複述
 - 目標＝Cannibal Corpse（樂團表署名團，目前組不出、播放素面）補進場槽，讓它可播放。本計劃只量兩條路的影響面、收斂成一個結論交使用者拍板；**拍板後才進原型探針**（元件長什麼樣、動畫怎麼走，在探針上由使用者簽）。
 - 完成標準（本計劃）＝影響面量測（受影響 profile 數、配方摘要變動範圍、曲庫首數）＋ /thecure 收斂的單一結論。
-- 不做＝寫任何 app 程式、做原型、改其他團。
+- 不做（v0.1–v0.3）＝寫 app 程式、做原型、改其他團。v0.4 起：使用者拍板①、探針簽字後，依 §4c 實作；仍不改其他團。
 
 ## 1. 使用者決定與既有約束（不重議）
 - 批 5 計劃 F6：death／grind 都不專屬，只有兩條路——①改它的目標值（加私有標籤）；②連帶 death 系多團與 death 列重簽（2026-11-01 開工口令照錄）。
@@ -44,6 +44,42 @@
   4. 驗收：最終兩個元件各自驗「除 Cannibal 外全部 band／曲風列／通用列／組合的合格集合不變」（簽字基線 `ExistingBandCandidatesTests` 只有 Cannibal 進場清單改變）；death 列不含私有標籤、Cannibal 含；除 Cannibal 外所有 profile 與私有標籤不相交；`RecipeGoldenTests` 只有 Cannibal 的行改變（還原 mono 恰回 `d99a…`）；Cannibal 的 G1–G3；V1（每槽 ≥ 2、可播放、端到端）；ACCEPTANCE 新條目含凍結例外的簽字。
 - 拍板後另寫實作計劃；本計劃到此為止。
 
+## 4b. 原型探針（2026-11-02，scratchpad `cc-probe/cannibal-probe.html`，預覽頁副本、不進 repo）
+- 副本內與 app 一致：拿掉 slam、所有進場去掉 death／grind；Cannibal 加私有標籤，只讓候選進場掛上。
+- 候選與使用者回饋（一次一項）：① drop「自上砸落壓扁」（原型本來設計給 death／melodeath，B2 批 3 搬進 app 時只帶批 3 專屬標籤）→「沒問題」；② stamp「蓋章砸入」→「對」；③ negative「影印負片瞬現」→「沒問題」。
+- 採用三個全收（V1 只要求 ≥ 2；多一個候選讓「每次換一套」變化更多；使用者可隨時說拿掉哪個）。三者都是既有元件、模板與繪製不變，只同掛私有標籤；皆非 J-Pop、非 gen*（F8）。
+- **探針第 2 版（同檔）**：第 1 版用的是原型完整元件，Cannibal 會抽到 app 沒有的字型 AmazDooM、Butcherman、MetalMania 與退場 split（B1 只搬了子集；scratchpad `proto/elig.js` 比對）。改成只留 app 目錄有的元件（`LyricsFXCatalog.swift` 的 324 個），預設三個進場混抽＝實裝樣子。使用者看整體樣子（字型、背景、進場、退場、配色）回「對」（2026-11-02）。
+
+## 4c. 實作（使用者 2026-11-02 拍板①、探針兩版皆簽；v0.5 依 Codex R1 修訂）
+### 已核事實（2026-11-02）
+- app 照本節改完後 Cannibal 每槽合格（fit > 0）：font Anton／Catacombs／Grimoire；backdrop film／void；enter drop／negative／stamp；exit cut／fall；fx none／shake；palette ashGrey／boneBlood（scratchpad `cc/` VARIANT=R）。V1 每槽 ≥ 2 成立。
+- 原型（副本加同樣改法）多出 font AmazDooM／Butcherman／MetalMania、exit split（app 沒有）；保留 slam 時 enter 也多 slam（`proto/elig.js`）。
+- `ExistingBandCandidatesTests.existingBandsOnlyChangeWhereTheUserSignedIt`（`:84-107`）只允許簽字對照檔 `linked` 裡決定 `new` 的團改變，且 `now.eligible == signed.eligible`、`now.playable == signed.playable`；`batchesAfterTheBaseline = [5]`（`:110`）。對照檔由 `tools/export_signed.js --batch n` 從原型匯出，連帶團的 eligible＝原型 fit > 0。
+### 設計
+1. `FXTag` 新增私有標籤 `cannibal`；加進 `genreRowPrivateTags`。Cannibal 目標值標籤 `[.death, .grind]` → `[.death, .grind, .cannibal]`，十軸逐位不變。`drop`、`stamp`、`negative` 各加 `.cannibal`（原標籤保留）。
+2. **簽字對照檔**：新增 `b2-batch6-signed.json`（`bands` 空、`linked` 只有 Cannibal、decision `new`、`playable` 由 app 算出填入），`batchesAfterTheBaseline` → `[5, 6]`。不改已簽的批 5 對照檔、不重錄整份基線。
+3. **原型同步**（`tools/patch_b2_6.py`，照批 5 先例，輸入是 `composer.before-b2-6.js` 複本）：Cannibal 標 `linked:true,b2:true,batch:6` 並加 `cannibal`；三個進場加 `cannibal`；`slam` 退役（改掛 `retiredSlam`，同批 5 的 strobe／pyro 寫法；反映使用者 2026-10-19 的決定）。
+4. **原型多出的 4 個未搬元件**（AmazDooM、Butcherman、MetalMania、split）：`export_signed.js` 加 `--app-catalog` 選項，連帶團的 eligible 取「原型 fit > 0 ∩ app 目錄」（`lib.appCatalog()` 已有），只在本批使用；不改這 4 個元件的標籤——改標籤會連帶改掉原型裡 Arch Enemy、Slayer、Fleshgod 等死金團的設計，而它們日後可能搬進 app。使用者簽的探針第 2 版正是「只用 app 現有元件」，與此一致。
+5. `LibraryGateReport`（Codex R2：Cannibal 補完後不能再當負向案例，報表建構流程也沒有注入點）兩個最小接縫，正式流程不加注入：
+   - internal static 純函式 resolution→(是否組合, 無樣式原因)，參數 `isComposable` 預設 `Composer.isComposable`；`verdict` 照舊以預設值呼叫。
+   - 計數彙整抽成 internal `init(rows:consensus:)`：正式 `init(tracks:…)` 照舊建列後交給它算 identity／composed／signedPending／readability／source 與 `passed`（`LibraryGateReport.swift:146-162` 的計數段原樣搬入）。測試以人造的一列（`noStyleReason == .signedBandMissingParts`、issues 含 `.composed`）驗證 composed＝1、signedPending＝1、`!passed`。
+### 任務（單人主 session 依序 C1 → C0 → C2 → C3 → C5 → C4 → C6–C10；每步留下實際紅燈證據）
+| # | 任務 | DoD |
+|---|---|---|
+| C1 | 改前快照（**任何 production source 修改前**） | 只加 print 測試（test 檔），在未改的工作樹錄下全部 `ReadabilityAudit.profiles`＋J-Pop 三變體的逐槽合格集合，存 `Tests/Fixtures/LyricsFX/profile-candidates-pre-cannibal.json`（記 HEAD 與 `LyricsFXCatalog.swift`／`SongProfileResolver.swift` 的 sha256）；先 checkpoint commit 固定 |
+| C0 | 標籤可解析（紅） | 測試以 `FXTag(rawValue: "cannibal")` 斷言存在且在 `genreRowPrivateTags`（可編譯的行為紅燈） |
+| C2 | 隔離測試（紅） | 新 `CannibalCorpseEntranceTests`：①帶 `cannibal` 的元件恰為 enter 的 drop／negative／stamp，且各自標籤＝改前標籤＋`cannibal`；②除 Cannibal 外所有 band、keywordRows、genericRows、組合 profile 的標籤不含 `cannibal`；death 列不含；③對 C1 快照逐 profile 逐槽比較，**只允許 Cannibal 的 enter 改變**；④J-Pop 三變體目錄的元件 id 集合不變；所有 generic 元件仍恰一個 generic 標籤；⑤Cannibal 十軸與 death、grind 逐位不變、resolver 解析出的署名 profile 含 `cannibal` |
+| C3 | 可播放（紅） | ⑥`isComposable`；進場合格集合恰為 {drop, negative, stamp}；⑦V1：`PlayableSpace` 非 nil、五必選槽各 ≥ 2、每個入選背景 ≥ 2 個未禁且亮暗相容的配色；⑧端到端：resolver 得署名結果、`compose` 非 mono |
+| C5 | 報表接縫（先於 C4） | 設計 5 的兩個接縫；純函式單測涵蓋 `.pending`／`.noMatch`／`.signedBand`（可組／不可組，注入判斷）／其他 resolution；`init(rows:)` 人造列測 composed、signedPending、reason、`!passed`；原 `anUnfinishedSignedBandIsCountedAsMonoAndBlocksTheGate` 的四個斷言由這兩層承接（不刪不放寬，不再用 Cannibal）；`LibraryGateReportTests` 全綠 |
+| C4 | 實作 | 設計 1；C0–C3 全綠 |
+| C6 | 原型同步＋對照檔 | `patch_b2_6.py` 先跑在複本；`export_signed.js`：`--app-catalog` 只准配 `--batch 6`（否則拒絕），按（槽, id）取交集，並在匯出時自檢每槽輸出＝`eligible(原型) ∩ appCatalog()`、AmazDooM／Butcherman／MetalMania／split 不在輸出；`--dry` 逐槽比對＝app；寫入 `b2-batch6-signed.json`（`playable` 由 app 算）；`CannibalCorpseEntranceTests` 加 fixture 斷言：linked 只有 Cannibal、decision new、eligible／playable＝app（現有 `SignedBatchChecks` 只查 `bands`，連帶團沒有 tags 欄位，故由本檔負責）；`batchesAfterTheBaseline=[5,6]`；`ExistingBandCandidatesTests` 全綠 |
+| C7 | 摘要 | `RecipeGoldenTests` 錄新摘要；加 `onlyCannibalChanged`（Cannibal 還原 mono 恰回 `d99a…`） |
+| C8 | 可讀性 | G1：`reachablePairs` 集合不變、`playablePairs` 的配對鍵不變（只允許 Cannibal 加進既有配對的來源名）；`LyricsFXContrastTests`、`ReadabilityGateTests` 全綠；Cannibal 新增為 auditable 是預期變化 |
+| C9 | 全量＋閘門 | 全量單元（120 s）0 紅、具名差集無消失；coverage_gate；`no_playback_gate.sh`；Scripts |
+| C10 | 文件 | ACCEPTANCE I-71：Cannibal 新目標值與一次性凍結例外、三個進場 id、`b2-batch6-signed.json`、快照差集僅 Cannibal enter、J-Pop／generic 目錄未受影響、原型同步狀態（`patch_b2_6.py`、`--app-catalog`）、G1–G3 結果、曲庫 0 首；使用者簽字 |
+- 不做每幀量測：三個進場模板都已在其他團上線並量過，沒有新繪製。
+- 不新增 UI 測試：Cannibal 不在使用者曲庫；端到端以 C3-⑧ 證明。
+
 ## 5. 影響面（本計劃）
 - 只新增本計劃文件；量測程式在 scratchpad。
 
@@ -71,3 +107,32 @@
 - Codex 直接執行 `cc/run` 確認 ②a 14、②b 23、① 1；異議一項（證據可追溯性）：上界成立的條件是假想元件無 req／forbid → 已寫進 §2 表頭；`out-*.txt` 已重產並含 `L|` 行。
 - 致命缺漏：無。順序（拍板 → 原型探針簽核 → 實作計劃）：妥當。
 - 最容易失敗的一步：探針時把既有元件同掛私有標籤，尤其誤掛 J-Pop／`gen*`（§4-3 已禁止）。
+
+## 附錄 C 使用者拍板
+- 2026-11-02：「照①做」。下一步原型探針（≥ 2 個進場候選，不得同掛 J-Pop／gen*，不得用 slam），使用者簽字後另寫實作計劃。
+
+### R1（2026-11-02，審 v0.4 實作段）處置
+| 嚴重度 | 意見 | 處置（v0.5） |
+|---|---|---|
+| 嚴重 | 沒有簽字授權，`existingBandsOnlyChangeWhereTheUserSignedIt` 會擋 | **採納**：批 6 對照檔、`[5, 6]`（設計 2、C6） |
+| 嚴重 | 原型是活來源，未同步會讓工具把 death 進場帶回 | **採納**：`patch_b2_6.py`（slam 退役）＋`--app-catalog`；另發現原型多 4 個未搬元件（已核），選擇以匯出時取交集處理、不改它們的標籤（設計 4，待 R2 判） |
+| 高 | 報表注入點不足 | **採納**：只抽 resolution→verdict 純函式（設計 5、C5） |
+| 高 | 直接引用 `.cannibal` 是編譯紅、C1 太大包 | **採納**：C0 用 rawValue；拆成 C0–C3 |
+| 高 | 隔離只證明「不帶標籤」，沒證明合格集合不變 | **採納**：C1 改前快照＋C2-③逐槽差集 |
+| 中 | J-Pop／generic 目錄未直接斷言 | **採納**：C2-④ |
+| 中 | G1 不變式不精確 | **採納**：C8 |
+| 中 | fixture 會靜默丟掉未知標籤 | **採納**：C6 round-trip 斷言 |
+| 中 | I-71 內容不足 | **採納**：C10 |
+
+### R2（2026-11-02，審 v0.5）處置
+| 嚴重度 | 意見 | 處置（v0.6） |
+|---|---|---|
+| — | 設計 4（匯出取交集、不改 4 個未搬元件的標籤） | **Codex 判正確**（不污染未搬元件將來服務的其他死金團；與 app-only 探針一致） |
+| 嚴重 | 報表計數層無法重建「署名團組不出」 | **採納**：計數彙整抽 `init(rows:consensus:)`，人造列測試（設計 5、C5） |
+| 高 | C1 快照在 C0 之後，不是真正的改前 | **採納**：C1 移到最前、production source 修改前、先 checkpoint |
+| 中 | 連帶團 fixture 沒有 tags，現有檢查查不到 `cannibal` round-trip | **採納**：由 `CannibalCorpseEntranceTests` 驗 resolver profile 與 fixture（C2-⑤、C6） |
+| 中 | 匯出交集沒有自動證明 | **採納**：`--app-catalog` 限批 6、匯出自檢（C6） |
+| 順序 | C1 → C0–C3 → C5 → C4 → C6–C10 | **採納** |
+
+### R3（2026-11-02，審 v0.6）
+- Codex：「無異議。R2 處置已完整納入 v0.6，且與 `LibraryGateReport.swift:100–215` 的現況相符。」
