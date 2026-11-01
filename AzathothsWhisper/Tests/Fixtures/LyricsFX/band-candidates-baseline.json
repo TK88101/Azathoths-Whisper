@@ -882,8 +882,7 @@
      "boneBlood"
     ]
    },
-   "name": "Cannibal Corpse",
-   "playable": null
+   "name": "Cannibal Corpse"
   },
   {
    "eligible": {
@@ -5382,9 +5381,878 @@
      ]
     }
    }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "bluehour",
+     "gig",
+     "spot",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "lurch",
+     "punch",
+     "scrawl",
+     "slide",
+     "stamp",
+     "swoop"
+    ],
+    "exit": [
+     "cut",
+     "rip",
+     "sink",
+     "wither"
+    ],
+    "font": [
+     "Anton",
+     "CourierPrime",
+     "IMFell",
+     "Marker",
+     "Oswald",
+     "RockSalt",
+     "ShadowsLight"
+    ],
+    "fx": [
+     "flicker",
+     "jitter",
+     "misreg",
+     "none",
+     "reflect",
+     "shake",
+     "thump",
+     "weep",
+     "wobble"
+    ],
+    "palette": [
+     "bruise",
+     "gigRed",
+     "mallPink",
+     "mono",
+     "revenge"
+    ]
+   },
+   "name": "The Used",
+   "playable": {
+    "backdrop": [
+     "bluehour",
+     "gig",
+     "spot",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "lurch",
+     "punch",
+     "scrawl",
+     "slide",
+     "swoop"
+    ],
+    "exit": [
+     "cut",
+     "rip",
+     "sink",
+     "wither"
+    ],
+    "font": [
+     "Anton",
+     "IMFell",
+     "Marker",
+     "Oswald",
+     "RockSalt"
+    ],
+    "fx1": [
+     "jitter",
+     "misreg",
+     "shake",
+     "weep",
+     "wobble"
+    ],
+    "fx2": [
+     "flicker",
+     "jitter",
+     "misreg",
+     "shake",
+     "weep",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "bluehour": [
+      "bruise",
+      "gigRed",
+      "mallPink",
+      "mono",
+      "revenge"
+     ],
+     "gig": [
+      "bruise",
+      "gigRed",
+      "mallPink",
+      "mono",
+      "revenge"
+     ],
+     "spot": [
+      "bruise",
+      "gigRed",
+      "mallPink",
+      "mono",
+      "revenge"
+     ],
+     "void": [
+      "bruise",
+      "gigRed",
+      "mallPink",
+      "mono",
+      "revenge"
+     ],
+     "xerox": [
+      "bruise",
+      "gigRed",
+      "mallPink",
+      "mono",
+      "revenge"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "bluehour",
+     "spot",
+     "void"
+    ],
+    "enter": [
+     "lurch",
+     "scrawl",
+     "swoop"
+    ],
+    "exit": [
+     "sink",
+     "wither"
+    ],
+    "font": [
+     "CourierPrime",
+     "IMFell",
+     "RockSalt",
+     "ShadowsLight"
+    ],
+    "fx": [
+     "flicker",
+     "jitter",
+     "none",
+     "reflect",
+     "weep"
+    ],
+    "palette": [
+     "bruise",
+     "mallPink",
+     "parade",
+     "revenge"
+    ]
+   },
+   "name": "My Chemical Romance",
+   "playable": {
+    "backdrop": [
+     "bluehour",
+     "spot",
+     "void"
+    ],
+    "enter": [
+     "lurch",
+     "scrawl",
+     "swoop"
+    ],
+    "exit": [
+     "sink",
+     "wither"
+    ],
+    "font": [
+     "CourierPrime",
+     "IMFell",
+     "RockSalt",
+     "ShadowsLight"
+    ],
+    "fx1": [
+     "flicker",
+     "jitter",
+     "none",
+     "reflect",
+     "weep"
+    ],
+    "fx2": [
+     "flicker",
+     "jitter",
+     "none",
+     "reflect",
+     "weep"
+    ],
+    "paletteByBackdrop": {
+     "bluehour": [
+      "bruise",
+      "mallPink",
+      "parade",
+      "revenge"
+     ],
+     "spot": [
+      "bruise",
+      "mallPink",
+      "parade",
+      "revenge"
+     ],
+     "void": [
+      "bruise",
+      "mallPink",
+      "parade",
+      "revenge"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "bluehour",
+     "bokeh",
+     "haze",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "ease",
+     "fadeUp"
+    ],
+    "exit": [
+     "drift",
+     "fade",
+     "fadeShort",
+     "sink",
+     "up"
+    ],
+    "font": [
+     "CormorantIt",
+     "CourierPrime",
+     "Gochi",
+     "Grotesk",
+     "ShadowsLight"
+    ],
+    "fx": [
+     "breathe",
+     "none",
+     "reflect"
+    ],
+    "palette": [
+     "bruise",
+     "overcast",
+     "parka",
+     "polaroid"
+    ]
+   },
+   "name": "Death Cab for Cutie",
+   "playable": {
+    "backdrop": [
+     "bluehour",
+     "bokeh",
+     "haze",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "bloom",
+     "ease",
+     "fadeUp"
+    ],
+    "exit": [
+     "drift",
+     "fade",
+     "fadeShort",
+     "sink",
+     "up"
+    ],
+    "font": [
+     "CormorantIt",
+     "CourierPrime",
+     "Gochi",
+     "Grotesk",
+     "ShadowsLight"
+    ],
+    "fx1": [
+     "breathe",
+     "none",
+     "reflect"
+    ],
+    "fx2": [
+     "breathe",
+     "none",
+     "reflect"
+    ],
+    "paletteByBackdrop": {
+     "bluehour": [
+      "bruise",
+      "overcast",
+      "parka",
+      "polaroid"
+     ],
+     "bokeh": [
+      "bruise",
+      "overcast",
+      "parka",
+      "polaroid"
+     ],
+     "haze": [
+      "bruise",
+      "overcast",
+      "parka",
+      "polaroid"
+     ],
+     "tapeLeak": [
+      "bruise",
+      "overcast",
+      "parka",
+      "polaroid"
+     ],
+     "void": [
+      "bruise",
+      "overcast",
+      "parka",
+      "polaroid"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "sunset",
+     "tapeLeak",
+     "void",
+     "xerox"
+    ],
+    "enter": [
+     "ease",
+     "lurch",
+     "pop",
+     "punch",
+     "scrawl",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "dropOut",
+     "rip",
+     "slideOut",
+     "snapOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Archivo",
+     "Bebas",
+     "Marker",
+     "Oswald",
+     "RockSalt",
+     "Rubik",
+     "ShadowsLight"
+    ],
+    "fx": [
+     "jitter",
+     "misreg",
+     "none",
+     "shake",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mallPink",
+     "mono",
+     "polaroid",
+     "revenge",
+     "skateTeal",
+     "sunsetInk"
+    ]
+   },
+   "name": "A Day to Remember",
+   "playable": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "sunset",
+     "tapeLeak",
+     "xerox"
+    ],
+    "enter": [
+     "lurch",
+     "punch",
+     "scrawl",
+     "slide",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "dropOut",
+     "rip",
+     "slideOut",
+     "snapOut"
+    ],
+    "font": [
+     "Anton",
+     "Archivo",
+     "Bebas",
+     "Marker",
+     "RockSalt"
+    ],
+    "fx1": [
+     "jitter",
+     "shake",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "fx2": [
+     "jitter",
+     "shake",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "flat": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal"
+     ],
+     "gig": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal"
+     ],
+     "sunset": [
+      "sunsetInk"
+     ],
+     "tapeLeak": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal"
+     ],
+     "xerox": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "bokeh",
+     "flat",
+     "gig",
+     "skyGrad",
+     "sunset",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "ease",
+     "hop",
+     "pop",
+     "punch",
+     "slide"
+    ],
+    "exit": [
+     "drift",
+     "dropOut",
+     "rip",
+     "slideOut",
+     "snapOut",
+     "up"
+    ],
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Gochi",
+     "Marker",
+     "Oswald",
+     "Rubik",
+     "ShadowsLight"
+    ],
+    "fx": [
+     "bob",
+     "none",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mallPink",
+     "mono",
+     "polaroid",
+     "skateTeal",
+     "sunsetInk"
+    ]
+   },
+   "name": "New Found Glory",
+   "playable": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "skyGrad",
+     "sunset",
+     "tapeLeak"
+    ],
+    "enter": [
+     "ease",
+     "hop",
+     "pop",
+     "punch",
+     "slide"
+    ],
+    "exit": [
+     "drift",
+     "dropOut",
+     "rip",
+     "slideOut",
+     "snapOut"
+    ],
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Marker",
+     "Rubik",
+     "ShadowsLight"
+    ],
+    "fx1": [
+     "bob",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "fx2": [
+     "bob",
+     "none",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "flat": [
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal",
+      "sunsetInk"
+     ],
+     "gig": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal"
+     ],
+     "skyGrad": [
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal",
+      "sunsetInk"
+     ],
+     "sunset": [
+      "sunsetInk"
+     ],
+     "tapeLeak": [
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal",
+      "sunsetInk"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "bokeh",
+     "flat",
+     "gig",
+     "skyGrad",
+     "sunset",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "ease",
+     "hop",
+     "pop",
+     "punch",
+     "slide"
+    ],
+    "exit": [
+     "drift",
+     "dropOut",
+     "rip",
+     "slideOut",
+     "snapOut",
+     "up"
+    ],
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Gochi",
+     "Marker",
+     "Oswald",
+     "Rubik",
+     "ShadowsLight"
+    ],
+    "fx": [
+     "bob",
+     "none",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mallPink",
+     "mono",
+     "polaroid",
+     "skateTeal",
+     "sunsetInk"
+    ]
+   },
+   "name": "You Me At Six",
+   "playable": {
+    "backdrop": [
+     "bokeh",
+     "flat",
+     "gig",
+     "skyGrad",
+     "tapeLeak"
+    ],
+    "enter": [
+     "ease",
+     "hop",
+     "pop",
+     "punch",
+     "slide"
+    ],
+    "exit": [
+     "drift",
+     "dropOut",
+     "slideOut",
+     "snapOut",
+     "up"
+    ],
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Oswald",
+     "Rubik",
+     "ShadowsLight"
+    ],
+    "fx1": [
+     "bob",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "fx2": [
+     "bob",
+     "none",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "bokeh": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal"
+     ],
+     "flat": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal"
+     ],
+     "gig": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal"
+     ],
+     "skyGrad": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal"
+     ],
+     "tapeLeak": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal"
+     ]
+    }
+   }
+  },
+  {
+   "eligible": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "sunset",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "ease",
+     "pop",
+     "punch",
+     "slide"
+    ],
+    "exit": [
+     "dropOut",
+     "rip",
+     "slideOut",
+     "snapOut",
+     "up"
+    ],
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Marker",
+     "Oswald",
+     "Rubik",
+     "ShadowsLight"
+    ],
+    "fx": [
+     "none",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "palette": [
+     "gigRed",
+     "mallPink",
+     "mono",
+     "polaroid",
+     "skateTeal",
+     "sunsetInk"
+    ]
+   },
+   "name": "The Story So Far",
+   "playable": {
+    "backdrop": [
+     "flat",
+     "gig",
+     "sunset",
+     "tapeLeak",
+     "void"
+    ],
+    "enter": [
+     "ease",
+     "pop",
+     "punch",
+     "slide"
+    ],
+    "exit": [
+     "dropOut",
+     "rip",
+     "slideOut",
+     "snapOut",
+     "up"
+    ],
+    "font": [
+     "Archivo",
+     "Bebas",
+     "Marker",
+     "Oswald",
+     "Rubik"
+    ],
+    "fx1": [
+     "none",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "fx2": [
+     "none",
+     "speedlines",
+     "thump",
+     "tilt",
+     "wobble"
+    ],
+    "paletteByBackdrop": {
+     "flat": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "sunsetInk"
+     ],
+     "gig": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "polaroid",
+      "skateTeal"
+     ],
+     "sunset": [
+      "sunsetInk"
+     ],
+     "tapeLeak": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "sunsetInk"
+     ],
+     "void": [
+      "gigRed",
+      "mallPink",
+      "mono",
+      "skateTeal",
+      "sunsetInk"
+     ]
+    }
+   }
   }
  ],
  "generatedBy": "ExistingBandCandidatesTests/printTheBaseline()",
  "schema": 1,
- "sourceRevision": "c6e0a53"
+ "sourceRevision": "fcb1c3e"
 }

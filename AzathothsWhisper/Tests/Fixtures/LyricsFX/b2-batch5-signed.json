@@ -1,0 +1,199 @@
+{
+ "signed": "2026-11-01",
+ "probe": "P17",
+ "note": "B2 批 5：使用者看原型探針後簽字的樂團目標值與每槽合格元件（原型 fit>0，不含サビ／關鍵字觸發的效果）。只含樂團名與元件代號，不含曲庫資料。",
+ "bands": [],
+ "linked": [
+  {
+   "name": "Rammstein",
+   "decision": "new",
+   "signed": "2026-11-01",
+   "reason": "2026-11-01 探針 P17：使用者看本機探針頁 v19 逐團確認（Rammstein 拿掉火焰噴發後「這次沒問題了」；The Chemical Brothers、Fatboy Slim、Daft Punk、Aphex Twin「沒問題」）",
+   "eligible": {
+    "font": [
+     "FrakturInd",
+     "OswaldInd"
+    ],
+    "backdrop": [
+     "steel",
+     "void"
+    ],
+    "enter": [
+     "forge",
+     "march"
+    ],
+    "exit": [
+     "burnout",
+     "shutdown"
+    ],
+    "fx": [
+     "heat",
+     "none",
+     "stomp"
+    ],
+    "palette": [
+     "blackRed",
+     "steelFire"
+    ]
+   }
+  },
+  {
+   "name": "The Chemical Brothers",
+   "decision": "new",
+   "signed": "2026-11-01",
+   "reason": "2026-11-01 探針 P17：使用者看本機探針頁 v19 逐團確認（Rammstein 拿掉火焰噴發後「這次沒問題了」；The Chemical Brothers、Fatboy Slim、Daft Punk、Aphex Twin「沒問題」）",
+   "eligible": {
+    "font": [
+     "Anton",
+     "Dela",
+     "Oswald",
+     "SpaceMono"
+    ],
+    "backdrop": [
+     "flat",
+     "grid",
+     "neon",
+     "void"
+    ],
+    "enter": [
+     "flip",
+     "slide"
+    ],
+    "exit": [
+     "slideOut",
+     "tumbleOut"
+    ],
+    "fx": [
+     "neonstroke",
+     "none",
+     "rgbsplit",
+     "speedlines",
+     "thump"
+    ],
+    "palette": [
+     "mono",
+     "neonPink",
+     "terminal",
+     "yellowBlack"
+    ]
+   }
+  },
+  {
+   "name": "Fatboy Slim",
+   "decision": "new",
+   "signed": "2026-11-01",
+   "reason": "2026-11-01 探針 P17：使用者看本機探針頁 v19 逐團確認（Rammstein 拿掉火焰噴發後「這次沒問題了」；The Chemical Brothers、Fatboy Slim、Daft Punk、Aphex Twin「沒問題」）",
+   "eligible": {
+    "font": [
+     "Anton",
+     "Dela",
+     "Grotesk",
+     "Oswald",
+     "SpaceMono"
+    ],
+    "backdrop": [
+     "flat",
+     "grid",
+     "haze",
+     "neon",
+     "void"
+    ],
+    "enter": [
+     "flip",
+     "pop",
+     "slide"
+    ],
+    "exit": [
+     "slideOut",
+     "tumbleOut",
+     "up"
+    ],
+    "fx": [
+     "neonstroke",
+     "none",
+     "rgbsplit",
+     "speedlines",
+     "thump"
+    ],
+    "palette": [
+     "mono",
+     "neonPink",
+     "terminal",
+     "yellowBlack"
+    ]
+   }
+  },
+  {
+   "name": "Daft Punk",
+   "decision": "new",
+   "signed": "2026-11-01",
+   "reason": "2026-11-01 探針 P17：使用者看本機探針頁 v19 逐團確認（Rammstein 拿掉火焰噴發後「這次沒問題了」；The Chemical Brothers、Fatboy Slim、Daft Punk、Aphex Twin「沒問題」）",
+   "eligible": {
+    "font": [
+     "Dela",
+     "Grotesk",
+     "SpaceMono"
+    ],
+    "backdrop": [
+     "grid",
+     "haze",
+     "neon",
+     "void"
+    ],
+    "enter": [
+     "flip",
+     "pop"
+    ],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "fx": [
+     "neonstroke",
+     "none",
+     "rgbsplit",
+     "thump"
+    ],
+    "palette": [
+     "neonPink",
+     "terminal"
+    ]
+   }
+  },
+  {
+   "name": "Aphex Twin",
+   "decision": "new",
+   "signed": "2026-11-01",
+   "reason": "2026-11-01 探針 P17：使用者看本機探針頁 v19 逐團確認（Rammstein 拿掉火焰噴發後「這次沒問題了」；The Chemical Brothers、Fatboy Slim、Daft Punk、Aphex Twin「沒問題」）",
+   "eligible": {
+    "font": [
+     "Grotesk",
+     "SpaceMono"
+    ],
+    "backdrop": [
+     "grid",
+     "haze",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "flip"
+    ],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "fx": [
+     "none",
+     "rgbsplit",
+     "thump"
+    ],
+    "palette": [
+     "mono",
+     "terminal"
+    ]
+   }
+  }
+ ],
+ "unassigned": []
+}

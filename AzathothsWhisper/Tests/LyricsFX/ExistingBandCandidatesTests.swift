@@ -74,9 +74,9 @@ struct ExistingBandCandidatesTests {
     @Test func theBaselineCoversEveryBandThatWasInTheTableWhenItWasTaken() throws {
         let baseline = try BandCandidatesBaseline.load()
         #expect(baseline.schema == 1)
-        // B2 批 4 計劃 §2.7：基線在批 3 合併後的 main（c6e0a53）重產
-        #expect(baseline.sourceRevision == "c6e0a53")
-        #expect(Set(baseline.bands.map(\.name)) == Set((SongProfileResolver.batchOne + SongProfileResolver.batchTwo + SongProfileResolver.batchThree + SongProfileResolver.batchFour).map(\.name)))
+        // B2 批 5 計劃 T1①：基線在補元件前的 wip/lyrics-library-gate（fcb1c3e，含批 4 emo 7 團）重產
+        #expect(baseline.sourceRevision == "fcb1c3e")
+        #expect(Set(baseline.bands.map(\.name)) == Set(SongProfileResolver.bandTable.map(\.name)))
     }
 
     /// 合格集合或可抽空間與基線不同的既有團，必須正好是各批對照檔裡簽了「新版」或「單色」的連帶團，而且變成的樣子就是簽的那個樣子；
@@ -106,13 +106,13 @@ struct ExistingBandCandidatesTests {
         #expect(changed == expected, "簽了要變卻沒變的團：\(expected.subtracting(changed).sorted())")
     }
 
-    /// 基線之後才簽的批次（基線已含批 3 的結果，B2 批 4 計劃 §2.7）
-    static let batchesAfterTheBaseline = [4]
+    /// 基線之後才簽的批次（基線已含批 4 的結果，B2 批 5 計劃 T1①）
+    static let batchesAfterTheBaseline = [5]
 
-    /// 批 1–3 的新團是使用者在真視窗簽過的，後面的批次不得把它們列為連帶
+    /// 批 1–4 的新團是使用者在真視窗簽過的，後面的批次不得把它們列為連帶
     @Test func theBandsSignedInEarlierBatchesAreNeverLinked() throws {
         let linked = Set(try SignedBatchFile.linkedBands(batches: Self.batchesAfterTheBaseline).map(\.name))
-        #expect(linked.isDisjoint(with: (SongProfileResolver.batchTwo + SongProfileResolver.batchThree + SongProfileResolver.batchFour).map(\.name)))
+        #expect(linked.isDisjoint(with: (SongProfileResolver.batchTwo + SongProfileResolver.batchThree + SongProfileResolver.batchFour + SongProfileResolver.batchFive).map(\.name)))
     }
 
     /// 連帶團必須是基線裡就有的既有團；本批的新團不得冒充連帶（B2 批 3 計劃 §4.3、附錄 A.1 #2）

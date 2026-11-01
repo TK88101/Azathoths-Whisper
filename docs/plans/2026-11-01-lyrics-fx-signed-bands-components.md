@@ -128,3 +128,10 @@
 - §8-1 逐字版 march：使用者「做吧」（說明：整詞砸下改一個字一個字砸下，做好先給他看，不像就停下回報）。
 - §8-2 Fredoka、§8-3 Cannibal Corpse 另案：照草案。
 - §8-4 分支：⑧ 未合 main → 從 `wip/lyrics-library-gate` 疊開 `wip/lyrics-fx-b2-batch5`。
+
+## 附錄 C　實作記錄（2026-11-01，`wip/lyrics-fx-b2-batch5`，自 fcb1c3e）
+- **T0**：程式重產基線確認 mono 署名團＝Aphex Twin、Cannibal Corpse、Daft Punk、Fatboy Slim、Rammstein、The Chemical Brothers（F1 屬實）。全量單元基線沿用 2271b8e（2026-10-29，增補計劃附錄 F：1,978 條 1,946 綠、7 紅）——其後 app／單元 target 只改了 UI 測試讀法（推測不影響，未重跑）。
+- **T1①②**：基線以 fcb1c3e 重產（61 團；舊 54 團零差異——Cannibal Corpse 只是 `"playable": null` 與省略欄位的寫法差，解碼皆 nil），sha256 `d472d724…`；`ExistingBandCandidatesTests` 推進到批 5；批 4 新元件凍結為 `b2-batch4-new-components.json`（164 個＝emo＋J-Pop＋⑦ 通用，由 c6e0a53 基線算出，sha256 `cf1d3c04…`）。相關 4 suite 17 條綠。
+- **T2**：`composer.before-b2-5.js` sha256 `83d8e715…`，`check.js --batch 4` 對批 4 對照檔差異 0。`patch_b2_5.py`：5 團標 linked／batch 5；march 改逐字；strobe、pyro 退役（改掛無人使用的標籤）；Rammstein 加 `forge`（drop＋type 逐字）、`shutdown`（shrink＋fall）只帶 industrial；**Fredoka 不搬**（google/fonts 只剩 wdth＋wght 兩軸可變字檔，`everyCatalogFontIsRegistered` 不收——批 2 §9 同一先例；計劃 §8-2 的前提不成立，依先例處置）。`check.js --batch 5`：61 團只有 5 團變、未預期 0；`precheck` 外溢 0。
+- **T3 探針（本機 v19）**：P17——Rammstein 第一輪使用者：「你管這個背景叫噴火？不要這個噴火了」→ pyro 退役（連帶 T4 不再需要「目前行開始時間」資料流，該項取消）；第二輪「這次沒問題了」。The Chemical Brothers、Fatboy Slim、Daft Punk、Aphex Twin 各「沒問題」。匯出 `b2-batch5-signed.json`（linked／new；`playable` 待 T5 由 app 算出補入）。
+- 要新做（`need.js`）：背景 steel、neon；進場 march、forge；退場 burnout、shutdown；字型 OswaldInd、FrakturInd；效果 stomp、heat；配色 steelFire、blackRed、neonPink。新繪製行為只剩 steel、neon、stomp、heat 四個。
