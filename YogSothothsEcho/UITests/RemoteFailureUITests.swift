@@ -51,7 +51,9 @@ final class RemoteFailureUITests: XCTestCase {
         let text = notice(app, AccessibilityID.albumTracksNotice)
         XCTAssertTrue(text.waitForExistence(timeout: 5))
         XCTAssertTrue(text.label.contains("Couldn't confirm what's playing"))
-        app.buttons["Resync"].firstMatch.tap()
+        // CR-040：明確點按鈕中心＝驗證「使用者點 Resync」的行為。XCTest 自動命中點偶爾選到框右上角內 1 pt，
+        // 該點不觸發（已重現的觸控死點，另案 F2）；此處不是 XCTest 自動命中點的保證
+        app.buttons["Resync"].firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(waitFor("exists == false", on: text, timeout: 5))
     }
 }
