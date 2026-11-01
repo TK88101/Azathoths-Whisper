@@ -21,20 +21,25 @@ final class LibraryCheckUITests: AppUITestCase {
         let composed = element(ID.libraryCheckComposedCount)
         XCTAssertTrue(composed.waitForExistence(timeout: Self.timeout))
         // 假曲庫另有一位日文歌手的無詞曲：推定日文（增補計劃 §4.1）而不計入素面與身分未定
-        XCTAssertTrue((composed.label as String).hasPrefix("1 "), "處理前：素面 1 首（\(composed.label)）")
-        XCTAssertTrue((element(ID.libraryCheckIdentityCount).label as String).hasPrefix("2 "), "處理前：身分未定 2 首")
+        // macOS 的 SwiftUI Text 內容在 AX value、label 是空字串（同 BatchUITests／LyricsFlowUITests 的讀法）
+        XCTAssertTrue(text(composed).hasPrefix("1 "), "處理前：素面 1 首（\(text(composed))）")
+        XCTAssertTrue(text(element(ID.libraryCheckIdentityCount)).hasPrefix("2 "), "處理前：身分未定 2 首")
 
         let row = element(ID.libraryCheckArtistPrefix + "paper harbour")
         XCTAssertTrue(row.waitForExistence(timeout: Self.timeout))
         row.menuButtons[ID.libraryCheckChooseStyle].click()
         app.menuItems["punk"].click()
 
-        XCTAssertTrue(waitForLabelPrefix(composed, "0 "), "指定樣式後素面 0 首（\(composed.label)）")
-        XCTAssertTrue((element(ID.libraryCheckIdentityCount).label as String).hasPrefix("1 "), "指定樣式也解除該歌手的身分未定")
+        XCTAssertTrue(waitForValuePrefix(composed, "0 "), "指定樣式後素面 0 首（\(text(composed))）")
+        XCTAssertTrue(text(element(ID.libraryCheckIdentityCount)).hasPrefix("1 "), "指定樣式也解除該歌手的身分未定")
     }
 
-    private func waitForLabelPrefix(_ element: XCUIElement, _ prefix: String) -> Bool {
-        let predicate = NSPredicate(format: "label BEGINSWITH %@", prefix)
+    private func text(_ element: XCUIElement) -> String {
+        element.value as? String ?? ""
+    }
+
+    private func waitForValuePrefix(_ element: XCUIElement, _ prefix: String) -> Bool {
+        let predicate = NSPredicate(format: "value BEGINSWITH %@", prefix)
         return XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)], timeout: Self.timeout) == .completed
     }
 }

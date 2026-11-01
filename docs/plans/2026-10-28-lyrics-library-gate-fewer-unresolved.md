@@ -262,3 +262,16 @@ B（若做）：另加 `SongProfileResolver.explain`、`ProfileExplanation.Layer
   2. `LyricsFXContrastTests` 4 條（G1 主字對比）：**超過每條 120 s 上限**，不是判定失敗。改上限 600 s 量：修改前 c846ee1 單條 234.4 s、修改後 233.6 s（同機前後緊接），兩版皆通過；這 4 條用到的程式（可讀性稽核集合、元件目錄、Composer）本次 0 改動。⑧ 10-28 全量同設定通過——推測本機目前較慢（fileproviderd 約 55 % CPU），待機器閒時重跑全量確認；不放寬上限。
 - coverage_gate（傳入本次 xcresult）：**exit 0**，Services+Infra 96.5 %（5309/5503），豁免 483／490；新增或修改檔：AppleGenreConsensus 100 %、ArtistConsensusStore 100 %、ProfileExplanation 100 %、SongProfileResolver 99.2 %、LibraryGateReport 95.6 %。
 - `no_playback_gate.sh` exit 0；Scripts 443 條綠。
+- **更正（2026-11-01，閒置重跑）**：機器閒置（負載約 3.9、無 fileproviderd 占用、AC 電源、無降溫紀錄）下照 120 s 上限重跑 `LyricsFXContrastTests`（3f742da）：同樣 4 條超時、其餘 5 條綠。查歷次紀錄：e734671（2026-10-22，⑤ 加日文行）時整組已是 2,754 s「全綠」，10-29 量得單條 232–234 s、整組 2,806 s。→ **已核事實**：這 4 條從 10-22 起每條約 230 s，本來就超過 120 s 上限；與本次改動無關，也不是機器變慢。上面「推測本機較慢」不成立；「⑧ 10-28 全量同設定通過」與此矛盾，推測該次全量沒有套 120 s 上限（未能取得該次 xcresult 核對）。處置（加速或給這 4 條專屬時限）另議，未改測試。
+
+## 附錄 G 使用者在場 U6（2026-11-01 11:11，Debug 版 3f742da，derivedData 在 session scratchpad）
+- 開 Debug 版前已關掉 `/Users/Shared/YSE-1.0/app/` 的正式版（只剩一個 Azathoth's Whisper 在跑），使用者點完鑰匙圈授權框後 Rescan。
+- 畫面計數與附錄 D **完全一致**：身分未定 1,144 首／135 位（有詞 316／36）、素面 373 首／50 位（有詞 53／13），其中署名待補 178 首／4 位；可讀性未檢查 0、缺來源 0；狀態「Gate not met」。待處理歌手前幾位：HIM 223、Rammstein 78（署名）、Negative 68、The London Suede 58、Daft Punk 54（署名）、Muse 43、Rhapsody 42。
+- Yorushika（Every song 分頁）：無詞曲（例 Train Window，使用者確認是純音樂）來源顯示「J-Pop (estimated: no lyrics yet) 50/50」、Issues OK；有詞曲為「J-Pop policy (Japanese lyrics)」。**U6 達標**。
+- 掃描耗時：本次未從 OSLog 取得（`log show` 查無 library-gate 行），TBD。
+- **`LibraryCheckUITests`（使用者在場，11:38–11:40，ABC 輸入法、正式版已關）**：第 1 次紅在 `:24`「處理前：素面 1 首（）」——計數元素存在但讀到空字串。根因（已核）：測試讀 `.label`，macOS 的 SwiftUI `Text` 內容在 AX `value`、`label` 為空；repo 既有讀法都用 `.value`（`BatchUITests.swift:75`、`LyricsFlowUITests.swift:29`）。這條測試自 a91991a 寫成後首次實跑。修正：四處讀取改 `.value`（`text(_:)`、`waitForValuePrefix`），斷言內容不變。第 2 次 **綠**（12.4 s）。
+
+## 附錄 H /thecure：⑧ 三件簽字（2026-11-01，Codex 2 輪＋整體確認「無い」）
+- 結論（使用者 2026-11-01「可以」）：豁免預算 470→490 **批准**；I-69 **簽字**，簽字文字載明 7 紅的例外與出處（不屬本條、不因簽字視為解決）；I-68 **暫緩**——T0 DoD「掃描中 nowPlaying 延遲最壞 ≤ 1.5 s」未量、無量測點，另立 DEBUG-only 量測小計劃；G1 4 條的測試政策（加速或專屬時限）另立項交使用者；合併／push 另問。
+- 勝負：490、I-68 暫緩、I-69 可獨立於 I-68 簽——一致；「I-69 無條件可簽」**Codex 勝**（本檔 §7-1 要求全量綠、G1 非 flaky）。
+- Codex 最擔心：G1 被反覆寫成「與本次無關」卻無正式例外機制，日後會掩蓋真回歸；量測若無單調時鐘與關聯 ID，掃描與切歌併發時數字無法歸因。
