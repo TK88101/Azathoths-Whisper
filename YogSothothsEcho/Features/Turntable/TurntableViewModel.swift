@@ -247,18 +247,22 @@ final class TurntableViewModel {
         return skin.playbackAngle(state: event.state, position: nowPlaying.position() ?? 0, duration: event.duration)
     }
 
+    private var isPlaying: Bool { nowPlaying.clock?.event.state == .playing }
+
     /// CR-039：唱片 TimelineView 是否要每幀更新（煞停後停表，見 RecordTimelinePolicy）
     var recordTimelineNeedsTicks: Bool {
-        RecordTimelinePolicy.needsTicks(isPlaying: nowPlaying.clock?.event.state == .playing, phase: swipe.phase,
-                                        reduceMotion: swipe.reduceMotion)
+        RecordTimelinePolicy.needsTicks(isPlaying: isPlaying, phase: swipe.phase, reduceMotion: swipe.reduceMotion)
     }
 
-    /// 停表時兩盤共讀的靜止角（純讀；spin 的狀態由 tick 中的 `recordAngle(at:)` 推進）
-    var restingRecordAngle: Double? { spin.restingAngle }
+    /// 畫面上的唱片角（TimelineView 每次給 date 呼叫）：停表且有靜止角＝兩盤共讀靜止角，不推進 spin；否則照 `recordAngle(at:)`
+    func displayedRecordAngle(at now: Double) -> Double {
+        if !recordTimelineNeedsTicks, let resting = spin.restingAngle { return resting }
+        return recordAngle(at: now)
+    }
 
     /// 唱片角：轉場抬臂中煞停（與抬臂同時）；否則播放中才轉（TimelineView 每幀呼叫）
     func recordAngle(at now: Double) -> Double {
-        let motion: RecordSpin.Motion = swipe.armLifted ? .braking : nowPlaying.clock?.event.state == .playing ? .spinning : .still
+        let motion: RecordSpin.Motion = swipe.armLifted ? .braking : isPlaying ? .spinning : .still
         spin.update(motion, at: now)
         return spin.angle(at: now)
     }

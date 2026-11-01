@@ -77,6 +77,15 @@ struct TurntableViewModelTests {
         }
     }
 
+    /// 換專輯轉場 clearing 之後各段（sheathing 160、exchanging 330、drawing 200、placing 150）依序放行；每段後呼叫 check
+    private func finishNewAlbumTransition(_ check: () -> Void = {}) async {
+        for ms in [150, 160, 330, 200] {
+            await fire(.milliseconds(ms))
+            check()
+        }
+        await fire(.milliseconds(150))
+    }
+
     private func swipeLeft(reduceMotion: Bool = false) async {
         model.swipeChanged(CGSize(width: -5, height: 0))
         model.swipeEnded(CGSize(width: -80, height: 0), reduceMotion: reduceMotion)
@@ -431,31 +440,26 @@ struct TurntableViewModelTests {
         #expect(model.swipe.phase == .lifting(.next, ready: true) && model.recordTimelineNeedsTicks)
         await fire(Self.lift)
         #expect(model.swipe.phase == .clearing(.next) && !model.recordTimelineNeedsTicks)
-        for ms in [150, 160, 330, 200] {
-            await fire(.milliseconds(ms))
-            #expect(!model.recordTimelineNeedsTicks, "after \(ms) ms phase \(model.swipe.phase)")
-        }
-        await fire(.milliseconds(150))
+        await finishNewAlbumTransition { #expect(!model.recordTimelineNeedsTicks, "phase \(model.swipe.phase)") }
         #expect(model.swipe.phase == .idle && model.recordTimelineNeedsTicks)
     }
 
-    /// 停表期間兩盤共讀同一個靜止角（＝煞停終止角）；恢復後從靜止角接續
-    @Test func restingAngleIsTheBrakeEndAndResumeIsContinuous() async {
+    /// 停表期間畫面角＝煞停終止角，與 TimelineView 給的時間無關（兩盤讀到同一值）；恢復後從該角接續
+    @Test func frozenDisplayAngleIsTheBrakeEndAndResumeIsContinuous() async {
         await start()
-        _ = model.recordAngle(at: 0)
-        _ = model.recordAngle(at: 1)
-        #expect(model.restingRecordAngle == nil)
+        _ = model.displayedRecordAngle(at: 0)
+        _ = model.displayedRecordAngle(at: 1)
         reply(.applied, PlaybackSamples.t9, album: PlaybackSamples.otherAlbum)
         await swipeLeft()
-        _ = model.recordAngle(at: 2)          // lifting 的第一個 tick：開始煞停
-        let brakeEnd = model.recordAngle(at: 2.35)
+        _ = model.displayedRecordAngle(at: 2)          // lifting 的第一個 tick：開始煞停
+        let brakeEnd = model.displayedRecordAngle(at: 2.35)
         await fire(Self.lift)
         #expect(!model.recordTimelineNeedsTicks)
-        #expect(abs((model.restingRecordAngle ?? -1) - brakeEnd) < 1e-9)
-        for ms in [150, 160, 330, 200, 150] { await fire(.milliseconds(ms)) }
+        for t in [2.4, 3.0, 50.0] { #expect(abs(model.displayedRecordAngle(at: t) - brakeEnd) < 1e-9, "t \(t)") }
+        await finishNewAlbumTransition()
         #expect(model.swipe.phase == .idle)
-        #expect(abs(model.recordAngle(at: 10) - brakeEnd) < 1e-9)
-        #expect(abs(model.recordAngle(at: 11) - (brakeEnd + RecordSpin.degreesPerSecond).truncatingRemainder(dividingBy: 360)) < 1e-9)
+        #expect(abs(model.displayedRecordAngle(at: 10) - brakeEnd) < 1e-9)
+        #expect(abs(model.displayedRecordAngle(at: 11) - (brakeEnd + RecordSpin.degreesPerSecond).truncatingRemainder(dividingBy: 360)) < 1e-9)
     }
 
     /// Reduce Motion：不煞停，等回覆（awaiting）期間唱片照轉

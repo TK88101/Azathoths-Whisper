@@ -56,6 +56,7 @@
 		2C306567E34F9DDB078DD966 /* TonearmGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06CC6039D296A167BE9E90FF /* TonearmGeometryTests.swift */; };
 		2C52F66707A217F3E5767F98 /* SwirlPaletteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBA8D51CE064AF693614B80C /* SwirlPaletteTests.swift */; };
 		2D1433C2510EE89E0B2D9A08 /* LibraryShortRetryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCC18DB0FB08F8C22425C718 /* LibraryShortRetryTests.swift */; };
+		2D8D0AAC0595393C68D40E6A /* G7TraceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8D3506A7686AEC855EA66B /* G7TraceTests.swift */; };
 		2E086A82B093616972F146C5 /* SpineWrapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FBF23C7113B4D8ADAAA9413 /* SpineWrapTests.swift */; };
 		2E28D41A1A2C2E8A17A55F00 /* PlaybackUITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504A58A5424F398F31C4BBCD /* PlaybackUITestSupport.swift */; };
 		2E4450CD833B25895EB5CAA8 /* SpriteSkin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A9B2C1FF6F276C8AE9A894 /* SpriteSkin.swift */; };
@@ -180,6 +181,7 @@
 		A12A0A5C2A0E06FDDA0F112A /* PlaybackPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E90898F060FE597EAFD100F /* PlaybackPresentation.swift */; };
 		A23F14DC11B1C0E1685F291B /* SpineWearTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD1F9277937BD7FFE8D49324 /* SpineWearTests.swift */; };
 		A2E713A0A21F0E1B077EE8D2 /* DetailArtworkFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 046856F43552BFB8BAFC4BBA /* DetailArtworkFetcher.swift */; };
+		A2E76BF2B9C15DC3E0232BFE /* G7Trace.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCC9C129E5BD36F9FF35C5E1 /* G7Trace.swift */; };
 		A3CE6EF6C996D6E9EC13DA8C /* LibraryViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A1D467681506DD84663EB4 /* LibraryViewModelTests.swift */; };
 		A4BC019151C3BA563F60EC35 /* SpineProjectionRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FE0FBDAFA21E9F62BF9DA0 /* SpineProjectionRenderTests.swift */; };
 		A58261014959215C89CB5CB2 /* CoverSleeveState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7D3ECAFC33AFBF40992BDF0 /* CoverSleeveState.swift */; };
@@ -368,6 +370,7 @@
 		3885CEEEAB4465F666888B60 /* MemoryLRUTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryLRUTests.swift; sourceTree = "<group>"; };
 		39AAB950F0EF4BB4BF8EFEDA /* failed-light.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "failed-light.png"; sourceTree = "<group>"; };
 		3AD40E34B694218D8055F107 /* TurntableOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurntableOverlay.swift; sourceTree = "<group>"; };
+		3B8D3506A7686AEC855EA66B /* G7TraceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = G7TraceTests.swift; sourceTree = "<group>"; };
 		3E206A8513E900498B49AD01 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		3FA0F9E30211D2E20C4F57DA /* TurntableSkinUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurntableSkinUITests.swift; sourceTree = "<group>"; };
 		412F9E68DA0822E50F8B934D /* SpineStackGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpineStackGlyph.swift; sourceTree = "<group>"; };
@@ -551,6 +554,7 @@
 		D9BF7C7178D5558037BB429C /* FrontFoldMaskTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontFoldMaskTests.swift; sourceTree = "<group>"; };
 		DAD76AC98479B3C97A9C368E /* RotationCue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotationCue.swift; sourceTree = "<group>"; };
 		DC36A2EF666BA58B669F55D4 /* VinylAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VinylAssets.swift; sourceTree = "<group>"; };
+		DCC9C129E5BD36F9FF35C5E1 /* G7Trace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = G7Trace.swift; sourceTree = "<group>"; };
 		DD34439535864112E452E222 /* LiquidVinylRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidVinylRenderTests.swift; sourceTree = "<group>"; };
 		DFD3B616AC749F75140D2D86 /* DeveloperTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperTools.swift; sourceTree = "<group>"; };
 		E0D7104EEA736D246123DE8D /* ConnectionViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionViewModelTests.swift; sourceTree = "<group>"; };
@@ -823,6 +827,7 @@
 				6825558D136CFE6CE542C1AF /* DetailArtworkFetcherTests.swift */,
 				2B484D56B658A893981B4EA4 /* DetailArtworkLoaderTests.swift */,
 				95C0FB50D859B86B9EA47960 /* DetailArtworkStoreTests.swift */,
+				3B8D3506A7686AEC855EA66B /* G7TraceTests.swift */,
 				1CD40835F8AB855F4E8E9E75 /* LabelLayoutTests.swift */,
 				0E7FABECEB0AC0124E4E55B4 /* LiquidCheckpointDump.swift */,
 				81F5F94A7D2C9EEC539D31F4 /* LiquidMotionTests.swift */,
@@ -969,6 +974,7 @@
 			children = (
 				36D7E2CF8D9D2C78AE6B687F /* AlbumPalette.swift */,
 				C7D3ECAFC33AFBF40992BDF0 /* CoverSleeveState.swift */,
+				DCC9C129E5BD36F9FF35C5E1 /* G7Trace.swift */,
 				CFB74D13119A17C955F659AD /* LabelRing.swift */,
 				BC9970214BAACAE9B0E0A19E /* RecordSpin.swift */,
 				0CABCE4F99B11787ECC04195 /* RecordStyle.swift */,
@@ -1292,6 +1298,7 @@
 				9713D6684EDC02FA2CD331D5 /* EchoClientTests.swift in Sources */,
 				6D14915685C10D7E6B96BFF5 /* FaceTextureCacheTests.swift in Sources */,
 				825B52165E259E0BA7651998 /* FrontFoldMaskTests.swift in Sources */,
+				2D8D0AAC0595393C68D40E6A /* G7TraceTests.swift in Sources */,
 				AC6100DED05AD362F7DDB490 /* GeniusGlyphTests.swift in Sources */,
 				FC781B1B1213EEB373C8E299 /* KeychainIdentitySmokeTests.swift in Sources */,
 				C25169EA453DA69BB516FA8A /* LabelLayoutTests.swift in Sources */,
@@ -1414,6 +1421,7 @@
 				8ACA84AD07BED43C4B3F2EED /* EchoClient.swift in Sources */,
 				90EC2087DCE99264D3AE85AA /* FaceTexture.swift in Sources */,
 				E21317E10093D517E543ED0C /* FadingNotice.swift in Sources */,
+				A2E76BF2B9C15DC3E0232BFE /* G7Trace.swift in Sources */,
 				694879BB0BE8EF092C1BF425 /* GeniusGlyph.swift in Sources */,
 				61CD6B0339973D345DDB31F8 /* Glass.swift in Sources */,
 				4B700B5F5F622E9FB16292F9 /* LabelRing.swift in Sources */,

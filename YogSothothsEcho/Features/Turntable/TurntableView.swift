@@ -181,10 +181,8 @@ struct TurntableView: View {
     }
 
     private func recordFace(_ deck: TurntableDeck, _ layout: TurntableLayout, now: Double) -> VinylRecordView {
-        // CR-039：停表時兩盤共讀靜止角（不取 TimelineView 最後一次 callback，也不推進 spin）
-        let angle = RecordTimelinePolicy.displayAngle(needsTicks: model.recordTimelineNeedsTicks, resting: model.restingRecordAngle) {
-            model.recordAngle(at: now)
-        }
+        // CR-039：停表時兩盤共讀靜止角（不取 TimelineView 最後一次 callback）
+        let angle = model.displayedRecordAngle(at: now)
         var face = VinylRecordView(side: layout.record.width, style: deck.style, splash: deck.splash, colors: deck.colors, label: deck.label,
                                    angle: angle, swirl: deck.swirl)
         #if LIQUID_SAMPLE
