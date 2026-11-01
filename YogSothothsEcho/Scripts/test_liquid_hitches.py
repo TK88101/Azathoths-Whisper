@@ -71,6 +71,32 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(lh.parse_hitches(self.XML), [(1 * NS, 20 * MS), (2 * NS, 20 * MS)])
 
 
+class RealExportShapeTests(unittest.TestCase):
+    """2026-11-01 實機 trace：toc 有 hitches／hitches-gpu／hitches-renders 等 6 張含 hitch 的表；
+    主表 `hitches` 同一次卡頓會因多個 surface 重複出現、且含 SpringBoard 等其他行程"""
+
+    XML = """<?xml version="1.0"?>
+<trace-query-result>
+<node><schema name="hitches"><col><mnemonic>start</mnemonic></col><col><mnemonic>duration</mnemonic></col><col><mnemonic>process</mnemonic></col></schema>
+<row><start-time id="1" fmt="00:04.643">4643550000</start-time><duration id="2" fmt="8.34 ms">8340000</duration><process id="3" fmt="Yog-Sothoth's Echo (4527)"><pid id="4" fmt="4527">4527</pid></process></row>
+<row><start-time ref="1"/><duration ref="2"/><process id="5" fmt="SpringBoard (37)"><pid id="6" fmt="37">37</pid></process></row>
+<row><start-time ref="1"/><duration ref="2"/><process ref="3"/></row>
+<row><start-time id="7" fmt="00:08.395">8395639000</start-time><duration id="8" fmt="75.04 ms">75040000</duration><process ref="3"/></row>
+<row><start-time id="9" fmt="00:09.000">9000000000</start-time><duration ref="2"/><process ref="5"/></row>
+</node>
+</trace-query-result>"""
+
+    def test_only_the_named_process_and_each_hitch_once(self):
+        self.assertEqual(lh.parse_hitches(self.XML, process="Yog-Sothoth's Echo"),
+                         [(4643550000, 8340000), (8395639000, 75040000)])
+
+    def test_hitch_tables_selects_only_the_main_table(self):
+        toc = '<trace-toc><run number="1"><data>' + ''.join(
+            f'<table schema="{s}"/>' for s in ["hitches", "hitches-gpu", "hitches-renders", "hitches-updates",
+                                              "hitches-framewait", "hitches-frame-lifetimes", "os-signpost"]) + '</data></run></trace-toc>'
+        self.assertEqual(lh.hitch_tables(toc), ["hitches"])
+
+
 class SwipeParseTests(unittest.TestCase):
     """Points of Interest 的「G7 swipe」事件時間（實際 schema 待實機 trace 確認＝TBD；解析器只認含該名稱的列與時間欄）"""
 

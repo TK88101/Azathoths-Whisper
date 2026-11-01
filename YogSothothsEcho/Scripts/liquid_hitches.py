@@ -55,35 +55,50 @@ def segments(hitches, starts, length_ns):
     }
 
 
-def _value(element, ids):
-    """xctrace export 以 id 定義、ref 引用重複值"""
+def _resolve(element, ids):
+    """xctrace export 以 id 定義、ref 引用重複值；回傳 (text, fmt)。子元素的 id 也要記下（process 內含 pid）"""
     if element is None:
         return None
     ref = element.get("ref")
     if ref is not None:
         return ids.get(ref)
-    text = (element.text or "").strip()
-    if element.get("id") is not None:
-        ids[element.get("id")] = text
-    return text
+    value = ((element.text or "").strip(), element.get("fmt") or "")
+    for node in element.iter():
+        if node.get("id") is not None:
+            ids[node.get("id")] = value if node is element else ((node.text or "").strip(), node.get("fmt") or "")
+    return value
 
 
-def parse_hitches(xml_text):
-    """取 schema 名含 hitch 的表格，每列的 (start ns, duration ns)"""
+HITCH_SCHEMA = "hitches"
+
+
+def hitch_tables(toc_text):
+    """只取主表 `hitches`（hitches-gpu／-renders／-updates／-framewait／-frame-lifetimes 是同一批卡頓的細分，重讀會重複計算）"""
+    root = ET.fromstring(toc_text)
+    return sorted({t.get("schema") for t in root.iter("table") if t.get("schema") == HITCH_SCHEMA})
+
+
+def parse_hitches(xml_text, process=None):
+    """主表的 (start ns, duration ns)；process 給定時只取該行程（fmt 含此字串）。
+    同一次卡頓會因多個 surface 重複出現：以起點去重、取最長"""
     root = ET.fromstring(xml_text)
-    result = []
+    found = {}
     for node in root.iter("node"):
         schema = node.find("schema")
-        if schema is None or "hitch" not in (schema.get("name") or "").lower():
+        if schema is None or schema.get("name") != HITCH_SCHEMA:
             continue
         ids = {}
         for row in node.findall("row"):
             # 每列都要走過全部欄位，id 定義才會被記下
-            values = {child.tag: _value(child, ids) for child in row}
-            start, duration = values.get("start-time"), values.get("duration")
-            if start and duration:
-                result.append((int(start), int(duration)))
-    return result
+            cells = {child.tag: _resolve(child, ids) for child in row}
+            start, duration = cells.get("start-time"), cells.get("duration")
+            if not start or not duration or not start[0] or not duration[0]:
+                continue
+            if process is not None and process not in (cells.get("process") or ("", ""))[1]:
+                continue
+            begin = int(start[0])
+            found[begin] = max(found.get(begin, 0), int(duration[0]))
+    return sorted(found.items())
 
 
 SWIPE_EVENT = "G7 swipe"
@@ -97,7 +112,7 @@ def parse_swipes(xml_text):
     for node in root.iter("node"):
         ids = {}
         for row in node.findall("row"):
-            values = [(child.tag, _value(child, ids)) for child in row]
+            values = [(child.tag, (_resolve(child, ids) or ("", ""))[0]) for child in row]
             if not any(v == SWIPE_EVENT for _, v in values):
                 continue
             time = next((v for tag, v in values if tag in TIME_TAGS and v), None)
@@ -126,12 +141,12 @@ def record(device, seconds, label, out_dir):
     print(trace)
 
 
-def analyze(trace, swipes):
+def analyze(trace, swipes, process):
     toc = _run(["xcrun", "xctrace", "export", "--input", str(trace), "--toc"], 120)
     if toc.returncode != 0:
         sys.exit(f"export toc failed: {toc.stderr.strip()[-300:]}")
     toc_root = ET.fromstring(toc.stdout)
-    tables = [t.get("schema") for t in toc_root.iter("table") if "hitch" in (t.get("schema") or "").lower()]
+    tables = hitch_tables(toc.stdout)
     if not tables:
         sys.exit("no hitch table in trace (schemas: %s)" % sorted({t.get("schema") for t in toc_root.iter("table")}))
     summary = toc_root.find(".//summary")
@@ -142,8 +157,8 @@ def analyze(trace, swipes):
                          f'/trace-toc/run[@number="1"]/data/table[@schema="{schema}"]'], 300)
         if exported.returncode != 0:
             sys.exit(f"export {schema} failed: {exported.stderr.strip()[-300:]}")
-        hitches.extend(parse_hitches(exported.stdout))
-    report = {"template": TEMPLATE, "tables": sorted(set(tables)), "hitch_count": len(hitches),
+        hitches.extend(parse_hitches(exported.stdout, process=process))
+    report = {"template": TEMPLATE, "tables": tables, "process": process, "hitch_count": len(hitches),
               "xctrace": _run(["xcrun", "xctrace", "version"], 30).stdout.strip()}
     if duration_s:
         report["whole"] = window_stats(hitches, 0, int(duration_s * NS_PER_S))
@@ -173,12 +188,13 @@ def main():
     a = sub.add_parser("analyze")
     a.add_argument("trace")
     a.add_argument("--swipes", default="", help="comma-separated seconds from recording start")
+    a.add_argument("--process", default="Yog-Sothoth's Echo", help="only count hitches of this process (substring)")
     args = parser.parse_args()
     if args.command == "record":
         record(args.device, args.seconds, args.label, args.out)
     else:
         swipes = [float(x) for x in args.swipes.split(",") if x.strip()]
-        analyze(Path(args.trace), swipes)
+        analyze(Path(args.trace), swipes, args.process)
 
 
 if __name__ == "__main__":
