@@ -171,6 +171,15 @@ final class LyricsFXUITests: AppUITestCase {
         waitForRecipe({ ["IMFell", "RockSalt", "CourierPrime", "ShadowsLight"].contains($0) }, "My Chemical Romance 應抽到 emo 群字型")
     }
 
+    /// B2 批 5：原本素面的署名工業團補件後同樣不看曲風——Rammstein 曲風寫 Electronic，仍得到工業專屬字型（不是電子通用列的字）
+    func testASignedIndustrialBandGetsItsComposedStyleRegardlessOfGenre() {
+        start(.lyricsFX, extra: [
+            Scenario.raisedStyleVariable: "lyricsFX", LyricsFXPreviewFixture.artistVariable: "Rammstein", LyricsFXPreviewFixture.genreVariable: "Electronic",
+        ])
+        waitForStyle("lyricsFX")
+        waitForRecipe({ ["OswaldInd", "FrakturInd"].contains($0) }, "Rammstein 應抽到工業專屬字型")
+    }
+
     /// I-18：認不得的曲風 → mono
     func testAnUnknownGenreStaysMono() {
         start(.lyricsFX, extra: [Scenario.raisedStyleVariable: "lyricsFX"])

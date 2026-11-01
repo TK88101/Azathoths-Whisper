@@ -139,6 +139,13 @@ enum ComposedStyle {
     /// B2 批 5 stomp（行軍重踏）：原型每個詞起點後 0.15 s 內整屏下沉、最深 0.012 畫面高
     static let stompWindow = 0.15
     static let stompDepth: CGFloat = 0.012
+
+    /// 光暈層半徑：glow／neonstroke 全強度、heat 半強度，其餘 0（不用光暈層）。
+    /// 「有沒有光暈層」只在這裡定義：整格光暈與韓文行避開光暈層都讀它（simcodex R1：heat 曾漏掉韓文行）
+    static func haloRadius(for effects: Set<FXEffect>) -> CGFloat {
+        if effects.contains(.glow) || effects.contains(.neonstroke) { return glowRadius }
+        return effects.contains(.heat) ? heatGlowRadius : 0
+    }
     /// 霓虹描邊寬（em 比例）
     static let strokeRatio: CGFloat = 0.06
     /// 倒影：在字下方 0.95 em、4% 透明度
@@ -218,7 +225,8 @@ enum ComposedStyle {
             }
             let first = frame.glyphs.count
             draw(entry, time: time, size: size, style: lineStyle, measurer: measurer, into: &frame, specks: &specks)
-            // 光暈只給現行句：讓位中的舊句移到光暈層外（點陣與向量在淡字光暈邊緣會差幾個像素；霓虹描邊共用半徑但不受影響）
+            // 光暈只給現行句：讓位中的舊句移到光暈層外（點陣與向量在淡字光暈邊緣會差幾個像素；霓虹描邊共用半徑但不受影響，
+            // 所以這裡刻意不用 haloRadius——neonstroke 的舊句留在光暈層）
             if style.effects.contains(.glow) || style.effects.contains(.heat), entry.yield < 1 {
                 frame.unlit += frame.glyphs[first...]
                 frame.glyphs.removeSubrange(first...)
@@ -240,11 +248,7 @@ enum ComposedStyle {
         if style.effects.contains(.speedlines), let current, time - current.line.start < speedLineWindow {
             frame.back.append(speedLines(size: size, time: time, color: style.palette.fg, fade: 1 - (time - current.line.start) / speedLineWindow))
         }
-        if style.effects.contains(.glow) || style.effects.contains(.neonstroke) {
-            frame.glow = glowRadius
-        } else if style.effects.contains(.heat) {
-            frame.glow = heatGlowRadius
-        }
+        frame.glow = haloRadius(for: style.effects)
         return frame
     }
 
@@ -344,7 +348,7 @@ enum ComposedStyle {
                 rotation: 0, scaleX: 1, scaleY: 1, opacity: alpha, color: .fg, stroke: 0
             )
         }
-        if style.effects.contains(.glow) || style.effects.contains(.neonstroke) { frame.unlit += glyphs } else { frame.glyphs += glyphs }
+        if haloRadius(for: style.effects) > 0 { frame.unlit += glyphs } else { frame.glyphs += glyphs }
     }
 
     /// 繪製端相鄰同色、同量化透明度才合成一次填色。暈開的副本同色但每字透明度可能不同（燭火閃爍讓每個字各自明滅），

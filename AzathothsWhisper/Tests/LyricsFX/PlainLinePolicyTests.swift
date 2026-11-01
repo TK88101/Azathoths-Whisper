@@ -38,8 +38,11 @@ struct PlainLinePolicyTests {
         #expect(frame.boxes.isEmpty)
     }
 
-    @Test func aKoreanLineStaysOutOfTheGlowLayer() {
-        let frame = plan(5)
+    /// glow／neonstroke／heat（B2 批 5 字緣紅光）都走光暈層：韓文行一律不進光暈層
+    @Test(arguments: ["glow", "neonstroke", "heat"])
+    func aKoreanLineStaysOutOfTheGlowLayer(fx: String) {
+        let frame = plan(5, fx1: fx, fx2: "none")
+        #expect(frame.glow > 0)
         #expect(koreanGlyphs(frame.glyphs).isEmpty)
         #expect(!koreanGlyphs(frame.unlit).isEmpty)
     }
