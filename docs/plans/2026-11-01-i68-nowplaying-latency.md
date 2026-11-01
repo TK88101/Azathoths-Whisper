@@ -182,3 +182,9 @@
 - 每輪驗證：受影響 18 suite 174 條綠（第 1 輪修正後）、probe 兩個 suite 15 條綠（第 3 輪）；Scripts 471 條綠；`no_playback_gate.sh` 綠；豁免檔 489／490；probe 覆蓋 168／175。
 - AppModel 的 `scanLibrary` 保留 DEBUG／Release 各一整行：合併成一個閉包會改到 Release 那一行原文。
 - 遺留 P2：報表無效輸出與 `render` 的格式兩處定義；`MockMusicClient` 帶 probe 專用欄位（可改測試端包裝）；monitor 端決定 `nochange`／`notplaying` 語意（可改傳 Bool）。
+
+## 附錄 D 使用者在場 #1（2026-11-01 22:0x–23:1x）
+- 第一份錄製（`onsite-1.ndjson`）在掃描前被我設的 `alarm 3600` 截斷（22:04 開、23:03 停）——上限設太短，非程式問題；第二份混到舊行程的行（報表會判無效），作廢；第三份（`onsite-3.ndjson`，Debug 版重開前開錄）有效。證據檔只在 session scratchpad、不 commit（含本機路徑）。
+- 開量前關卡：只有一個 Debug 行程、`boot` 為第一行、已有 `np`＋對應 `run` → 通過。
+- 報表（`onsite-3-snapshot.ndjson`）：**達標**。掃描中 19 筆，最大 200 ms、p50 85 ms、p95 200 ms；掃描前 722 筆最大 206 ms；掃描後 60 筆最大 130 ms。最慢一筆 run=992：等待 118 ms（前面是 `artistLyrics` 執行 112 ms）、執行 82 ms。掃描讀取：snapshot 1 次 173 ms；`artistLyrics` 491 次，p50 20 ms、最慢 787 ms。換歌通知批次 8 批，`changed` 3 批：157／109／131 ms。
+- 推測（非實測）：`nowPlaying` 若恰好排在最慢的 787 ms 讀取後，約 880 ms，仍低於 1.5 s。
