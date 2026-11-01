@@ -207,11 +207,7 @@ final class AppModel {
         let scanner = LibraryGateScanner(music: music)
         #if DEBUG
         // I-68 量測：每次掃描一個 token（重掃時舊掃描的 AE 停不下來，區間會重疊）
-        libraryCheck.scanLibrary = { progress in
-            try await AELatencyProbe.measuringScan(isComplete: { if case .complete = $0 { true } else { false } }) {
-                try await scanner.scan(progress: progress)
-            }
-        }
+        libraryCheck.scanLibrary = { progress in try await AELatencyProbe.measuringScan { try await scanner.scan(progress: progress) } }
         #else
         libraryCheck.scanLibrary = { progress in try await scanner.scan(progress: progress) }
         #endif

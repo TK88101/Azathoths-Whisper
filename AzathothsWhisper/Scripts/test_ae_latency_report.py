@@ -14,11 +14,12 @@ APP, PID = 42, 900
 HEADER = 'Filtering the log data using "subsystem == "com.ibridgezhao.azathothswhisper" AND category == "latency""'
 
 
+def record(message: object, category: str = "latency") -> str:
+    return json.dumps({"subsystem": "com.ibridgezhao.azathothswhisper", "category": category, "eventMessage": message})
+
+
 def ndjson(*messages: str, category: str = "latency") -> list[str]:
-    lines = [HEADER]
-    for message in messages:
-        lines.append(json.dumps({"subsystem": "com.ibridgezhao.azathothswhisper", "category": category, "eventMessage": message}))
-    return lines
+    return [HEADER] + [record(message, category) for message in messages]
 
 
 def boot() -> str:
@@ -82,9 +83,7 @@ class ParsingTests(unittest.TestCase):
     def test_verdict_uses_the_maximum_during_scan(self):
         self.assertEqual(report.verdict(report.analyze(valid_session())), "達標")
         slow = valid_session()
-        slow[slow.index(json.dumps({"subsystem": "com.ibridgezhao.azathothswhisper", "category": "latency",
-                                    "eventMessage": np(2, 1_500, 2_270)}))] = json.dumps(
-            {"subsystem": "com.ibridgezhao.azathothswhisper", "category": "latency", "eventMessage": np(2, 0, 1_501)})
+        slow[slow.index(record(np(2, 1_500, 2_270)))] = record(np(2, 0, 1_501))
         # 這裡把一筆改到 1,501 ms，但起點早於掃描，仍與掃描區間相交 → 算掃描中
         self.assertEqual(report.verdict(report.analyze(slow)), "未達標")
 
@@ -120,8 +119,7 @@ class InvalidTests(unittest.TestCase):
         self.assertInvalid(lines, "boot")
 
     def test_another_launch_mixed_in(self):
-        self.assertInvalid(valid_session() + [json.dumps({"subsystem": "com.ibridgezhao.azathothswhisper", "category": "latency",
-                                                          "eventMessage": f"np app=7 pid={PID} req=9 scan=- start=1 end=2 total=1"})], "app=")
+        self.assertInvalid(valid_session() + [record(f"np app=7 pid={PID} req=9 scan=- start=1 end=2 total=1")], "app=")
 
     def test_unparseable_line(self):
         self.assertInvalid(valid_session() + ["not json"], "解析")
@@ -161,6 +159,52 @@ class InvalidTests(unittest.TestCase):
         # 拿掉兩筆後序號不連續會先報；這裡把序號補齊再測「掃描中 0 筆」
         lines = [line.replace("run=4 ", "run=3 ").replace("run=6 ", "run=4 ") for line in lines]
         self.assertInvalid(lines, "0 筆")
+
+
+class MalformedInputTests(unittest.TestCase):
+    """畸形輸入一律「量測無效」（退出碼 3），不得崩潰成退出碼 1（＝未達標）"""
+
+    def assertInvalid(self, lines: list[str]):
+        result = report.analyze(lines)
+        self.assertFalse(result.valid)
+        self.assertEqual(report.verdict(result), "量測無效")
+
+    def test_json_that_is_not_an_object(self):
+        self.assertInvalid(valid_session() + ["[1, 2]", "7"])
+
+    def test_event_message_that_is_not_a_string(self):
+        self.assertInvalid(valid_session() + [record(5)])
+
+    def test_run_request_that_is_not_a_number(self):
+        self.assertInvalid(valid_session() + ndjson(run(7, "abc", "nowPlaying()", 1, 2, 3))[1:])
+
+    def test_np_scan_list_that_is_malformed(self):
+        self.assertInvalid(valid_session() + ndjson(np(9, 1, 2, scans="3,,x"))[1:])
+
+    def test_main_returns_3_for_a_file_that_is_not_utf8(self):
+        import os
+        import tempfile
+        with tempfile.NamedTemporaryFile("wb", suffix=".ndjson", delete=False) as handle:
+            handle.write(b"\xff\xfe not utf-8")
+        try:
+            self.assertEqual(report.main([handle.name]), 3)
+        finally:
+            os.unlink(handle.name)
+
+    def test_main_returns_3_for_any_unexpected_failure(self):
+        import os
+        import tempfile
+        from unittest import mock
+        with tempfile.NamedTemporaryFile("w", suffix=".ndjson", delete=False, encoding="utf-8") as handle:
+            handle.write("\n".join(valid_session()))
+        try:
+            with mock.patch.object(report, "analyze", side_effect=RuntimeError("boom")):
+                self.assertEqual(report.main([handle.name]), 3)
+        finally:
+            os.unlink(handle.name)
+
+    def test_main_returns_3_for_a_missing_file(self):
+        self.assertEqual(report.main(["/nonexistent/ae-latency.ndjson"]), 3)
 
 
 class FilteringTests(unittest.TestCase):

@@ -16,13 +16,11 @@ struct AELatencyProbeTests {
         #expect(old != new)
         #expect(ledger.activeScans == [old, new])
         // 重掃：舊的取消、新的已開始、舊的晚結束——只結束自己
-        let r1 = ledger.endScan(old)
-        #expect(r1)
+        ledger.endScan(old)
         #expect(ledger.activeScans == [new])
-        let r2 = ledger.endScan(old)
-        #expect(!r2)
-        let r3 = ledger.endScan(new)
-        #expect(r3)
+        ledger.endScan(old)
+        #expect(ledger.activeScans == [new])
+        ledger.endScan(new)
         #expect(ledger.activeScans.isEmpty)
     }
 
@@ -42,8 +40,8 @@ struct AELatencyProbeTests {
 
     @Test func aReadTakesTheSignalsPendingAtItsStart() {
         var ledger = AELatencyLedger()
-        _ = ledger.receiveSignal(atMs: 100)
         _ = ledger.receiveSignal(atMs: 140)
+        _ = ledger.receiveSignal(atMs: 100)   // 時間在鎖外取，可能微幅亂序：取最早的
         let r4 = ledger.takeSignals()
         #expect(r4 == AELatencyLedger.SignalBatch(first: 1, last: 2, count: 2, earliestMs: 100))
         // 讀取進行中才到的通知歸下一批
@@ -63,36 +61,30 @@ struct AELatencyProbeTests {
     @Test func aReadThatEmitsTrackChangedIsChangedWithItsTime() {
         var ledger = AELatencyLedger()
         let request = ledger.newRequest()
-        ledger.recordNowPlaying(request: request, outcome: .track)
+        ledger.recordNowPlaying(request: request, result: .nochange)
         ledger.recordTrackChanged(request: request, atMs: 480)
-        let r7 = ledger.finishRead(request: request)
-        #expect(r7 == AELatencyLedger.ReadSummary(result: .changed, changedAtMs: 480))
+        let summary = ledger.finishRead(request: request)
+        #expect(summary == AELatencyLedger.ReadSummary(result: .changed, changedAtMs: 480))
     }
 
-    @Test(arguments: [
-        (AELatencyLedger.NowPlayingOutcome.track, AELatencyLedger.ReadResult.nochange),
-        (.none, .notplaying),
-        (.failed, .error),
-    ])
-    func readsWithoutTrackChangedHaveNoTime(outcome: AELatencyLedger.NowPlayingOutcome, expected: AELatencyLedger.ReadResult) {
+    @Test(arguments: [AELatencyLedger.ReadResult.nochange, .notplaying, .error])
+    func readsWithoutTrackChangedKeepTheirResultAndHaveNoTime(result: AELatencyLedger.ReadResult) {
         var ledger = AELatencyLedger()
         let request = ledger.newRequest()
-        ledger.recordNowPlaying(request: request, outcome: outcome)
-        let r8 = ledger.finishRead(request: request)
-        #expect(r8 == AELatencyLedger.ReadSummary(result: expected, changedAtMs: nil))
+        ledger.recordNowPlaying(request: request, result: result)
+        let summary = ledger.finishRead(request: request)
+        #expect(summary == AELatencyLedger.ReadSummary(result: result, changedAtMs: nil))
     }
 
-    @Test func aReadWithoutAnyNowPlayingRecordIsAnError() {
+    @Test func aReadWithoutAnyNowPlayingRecordIsAnErrorAndRecordsAreCleared() {
         var ledger = AELatencyLedger()
         let request = ledger.newRequest()
-        let r9 = ledger.finishRead(request: request)
-        #expect(r9 == AELatencyLedger.ReadSummary(result: .error, changedAtMs: nil))
-        // 結束後清掉，同一 ID 再結束不會讀到舊紀錄
-        ledger.recordNowPlaying(request: request, outcome: .track)
+        let missing = ledger.finishRead(request: request)
+        #expect(missing == AELatencyLedger.ReadSummary(result: .error, changedAtMs: nil))
         ledger.recordTrackChanged(request: request, atMs: 5)
         _ = ledger.finishRead(request: request)
-        let r10 = ledger.finishRead(request: request)
-        #expect(r10 == AELatencyLedger.ReadSummary(result: .error, changedAtMs: nil))
+        let again = ledger.finishRead(request: request)
+        #expect(again == AELatencyLedger.ReadSummary(result: .error, changedAtMs: nil))
     }
 
     // MARK: 毫秒
@@ -109,23 +101,21 @@ struct AELatencyProbeTests {
     static func allowedLine() -> Regex<(Substring, Substring?)> { /^[a-z]+( [A-Za-z][A-Za-z0-9]*=[-0-9A-Za-z(),:]+| begin| end)*$/ }
 
     static let sampleLines: [String] = [
-        AELatencyFormat.boot(app: 42, pid: 900),
-        AELatencyFormat.scan(app: 42, pid: 900, token: 3, phase: .begin, t: 10),
-        AELatencyFormat.scan(app: 42, pid: 900, token: 3, phase: .end(.complete), t: 70_010),
-        AELatencyFormat.nowPlaying(app: 42, pid: 900, request: 5, scans: [3, 4], startMs: 100, endMs: 260),
-        AELatencyFormat.nowPlaying(app: 42, pid: 900, request: 6, scans: [], startMs: 300, endMs: 310),
+        AELatencyFormat.boot(),
+        AELatencyFormat.scan(token: 3, phase: .begin, t: 10),
+        AELatencyFormat.scan(token: 3, phase: .end(.complete), t: 70_010),
+        AELatencyFormat.nowPlaying(request: 5, scans: [3, 4], startMs: 100, endMs: 260),
+        AELatencyFormat.nowPlaying(request: 6, scans: [], startMs: 300, endMs: 310),
         AELatencyFormat.run(
-            app: 42, pid: 900, run: 9, request: 5, operation: "nowPlaying()",
-            enqueuedMs: 100, startMs: 180, endMs: 250, scansAtEnqueue: [3], scansAtStart: []
+            run: 9, request: 5, operation: "nowPlaying()", enqueuedMs: 100, startMs: 180, endMs: 250, scansAtEnqueue: [3], scansAtStart: []
         ),
         AELatencyFormat.run(
-            app: 42, pid: 900, run: 10, request: nil, operation: "artistLyrics(artist:)",
-            enqueuedMs: 1, startMs: 2, endMs: 3, scansAtEnqueue: [], scansAtStart: [3]
+            run: 10, request: nil, operation: "artistLyrics(artist:)", enqueuedMs: 1, startMs: 2, endMs: 3, scansAtEnqueue: [], scansAtStart: [3]
         ),
-        AELatencyFormat.signal(app: 42, pid: 900, id: 2, t: 400),
-        AELatencyFormat.batch(app: 42, pid: 900, request: 7, batch: .init(first: 2, last: 4, count: 3, earliestMs: 400), result: .changed, e2eMs: 120),
-        AELatencyFormat.batch(app: 42, pid: 900, request: 8, batch: .init(first: 5, last: 5, count: 1, earliestMs: 500), result: .nochange, e2eMs: nil),
-    ]
+        AELatencyFormat.signal(id: 2, t: 400),
+        AELatencyFormat.batch(request: 7, batch: .init(first: 2, last: 4, count: 3, earliestMs: 400), result: .changed, e2eMs: 120),
+        AELatencyFormat.batch(request: 8, batch: .init(first: 5, last: 5, count: 1, earliestMs: 500), result: .nochange, e2eMs: nil),
+    ].map { $0.rendered(app: 42, pid: 900) }
 
     @Test func everyLineUsesOnlyFixedWordsNumbersAndFunctionNames() {
         for line in Self.sampleLines {

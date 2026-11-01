@@ -249,13 +249,13 @@ actor NowPlayingMonitor {
     /// I-68 量測：DEBUG 下記 `nowPlaying` 的呼叫端總時（含排隊）；Release 直接轉呼叫
     private func nowPlaying() async throws -> NowPlayingRead? {
         #if DEBUG
-        let started = AELatencyProbe.nowPlayingStarted()
+        let started = AELatencyProbe.nowMs()
         do {
             let read = try await music.nowPlaying()
-            AELatencyProbe.nowPlayingFinished(startedMs: started, outcome: read == nil ? .none : .track)
+            AELatencyProbe.nowPlayingFinished(startedMs: started, result: read == nil ? .notplaying : .nochange)
             return read
         } catch {
-            AELatencyProbe.nowPlayingFinished(startedMs: started, outcome: .failed)
+            AELatencyProbe.nowPlayingFinished(startedMs: started, result: .error)
             throw error
         }
         #else

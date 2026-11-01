@@ -28,16 +28,24 @@ KNOWN_OPS = {
 SCAN_OPS = {"libraryTrackSnapshot()", "artistLyrics(artist:)"}
 
 FIELD = re.compile(r"^[A-Za-z][A-Za-z0-9]*=[-0-9A-Za-z(),:]+$")
-SCHEMA = {
-    "boot": ["app", "pid"],
-    "scan": ["app", "pid", "scan", "t"],
-    "np": ["app", "pid", "req", "scan", "start", "end", "total"],
-    "run": ["app", "pid", "run", "req", "op", "enq", "start", "end", "wait", "exec", "scanAtEnq", "scanAtStart"],
-    "sig": ["app", "pid", "sig", "t"],
-    "batch": ["app", "pid", "req", "sigs", "n", "result", "e2e"],
+TOKEN_LIST = re.compile(r"^(-|[0-9]+(,[0-9]+)*)$")
+REQUEST = re.compile(r"^(-|[0-9]+)$")
+INTEGER = re.compile(r"^[0-9]+$")
+# 每種事件的必要欄位與格式（同名欄位在不同事件意義不同：`scan=` 在 scan 是 token、在 np 是 token 清單）
+SCHEMA: dict[str, dict[str, re.Pattern]] = {
+    "boot": {"app": INTEGER, "pid": INTEGER},
+    "scan": {"app": INTEGER, "pid": INTEGER, "scan": INTEGER, "t": INTEGER},
+    "np": {"app": INTEGER, "pid": INTEGER, "req": INTEGER, "scan": TOKEN_LIST, "start": INTEGER, "end": INTEGER,
+           "total": INTEGER},
+    "run": {"app": INTEGER, "pid": INTEGER, "run": INTEGER, "req": REQUEST, "op": re.compile(r"^[A-Za-z]+\([A-Za-z:]*\)$"),
+            "enq": INTEGER, "start": INTEGER, "end": INTEGER, "wait": INTEGER, "exec": INTEGER,
+            "scanAtEnq": TOKEN_LIST, "scanAtStart": TOKEN_LIST},
+    "sig": {"app": INTEGER, "pid": INTEGER, "sig": INTEGER, "t": INTEGER},
+    "batch": {"app": INTEGER, "pid": INTEGER, "req": INTEGER, "sigs": re.compile(r"^[0-9]+-[0-9]+$"), "n": INTEGER,
+              "result": re.compile(r"^(changed|nochange|notplaying|error)$"), "e2e": REQUEST},
 }
-INTEGER_FIELDS = {"app", "pid", "t", "start", "end", "total", "run", "enq", "wait", "exec", "sig", "n"}
-# `scan=` 在 scan 事件是 token（整數），在 np 是 token 清單（`3,4` 或 `-`）
+OUTCOME = re.compile(r"^(complete|incomplete|cancelled|error)$")
+EXIT_CODES = {"達標": 0, "未達標": 1, "量測無效": 3}
 
 
 @dataclass
@@ -97,9 +105,10 @@ def nearest_rank(values: list[int], percentile: float) -> int | None:
     return ordered[max(1, math.ceil(percentile * len(ordered))) - 1]
 
 
-def parse_event(message: str) -> Event | None:
-    parts = message.split(" ")
-    kind, rest = parts[0], parts[1:]
+def parse_event(message: object) -> Event | None:
+    if not isinstance(message, str):
+        return None
+    kind, *rest = message.split(" ")
     if kind not in SCHEMA:
         return None
     fields: dict[str, str] = {}
@@ -112,15 +121,9 @@ def parse_event(message: str) -> Event | None:
             fields[key] = value
         else:
             return None
-    if kind == "scan" and (len(flags) != 1 or (flags[0] == "end") != ("outcome" in fields)):
+    if kind == "scan" and (len(flags) != 1 or (flags[0] == "end") != bool(OUTCOME.match(fields.get("outcome", "")))):
         return None
-    if any(key not in fields for key in SCHEMA[kind]):
-        return None
-    if any(key in fields and not fields[key].isdigit() for key in INTEGER_FIELDS):
-        return None
-    if kind == "scan" and not fields["scan"].isdigit():
-        return None
-    if kind in ("np", "batch") and not fields["req"].isdigit():
+    if any(not pattern.match(fields.get(key, "")) for key, pattern in SCHEMA[kind].items()):
         return None
     return Event(kind, fields, flags)
 
@@ -137,9 +140,12 @@ def read_events(lines: list[str]) -> tuple[list[Event], list[str]]:
         except json.JSONDecodeError:
             problems.append(f"第 {number} 行無法解析（不是 JSON）")
             continue
+        if not isinstance(record, dict):
+            problems.append(f"第 {number} 行不是 JSON 物件")
+            continue
         if record.get("subsystem") != SUBSYSTEM or record.get("category") != CATEGORY:
             continue
-        event = parse_event(record.get("eventMessage", ""))
+        event = parse_event(record.get("eventMessage"))
         if event is None:
             problems.append(f"第 {number} 行事件無法解析")
             continue
@@ -276,10 +282,17 @@ def main(arguments: list[str]) -> int:
     if len(arguments) != 1:
         print("用法：ae_latency_report.py <ndjson 檔>", file=sys.stderr)
         return 2
-    with open(arguments[0], encoding="utf-8") as handle:
-        result = analyze(handle.read().splitlines())
-    print(render(result))
-    return {"達標": 0, "未達標": 1}.get(verdict(result), 3)
+    # 邊界統一攔截：任何讀檔或分析中的例外都是「量測無效」（退出碼 3）。
+    # 未捕捉例外的預設退出碼是 1，會被讀成「未達標」＝假結論
+    try:
+        with open(arguments[0], encoding="utf-8") as handle:
+            result = analyze(handle.read().splitlines())
+        text, code = render(result), EXIT_CODES[verdict(result)]
+    except Exception as error:  # noqa: BLE001 — fail-closed 邊界
+        print(f"判定：量測無效\n  無效原因：讀檔或分析失敗（{type(error).__name__}）")
+        return EXIT_CODES["量測無效"]
+    print(text)
+    return code
 
 
 if __name__ == "__main__":

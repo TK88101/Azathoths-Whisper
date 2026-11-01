@@ -165,3 +165,20 @@
 ## 附錄 B 實作記錄（2026-11-01，`wip/lyrics-leftovers-2026-11`）
 - **L1**：`Tests/Services/AELatencyProbeTests.swift` 先寫 → **編譯紅**（`AELatencyLedger`／`AELatencyFormat`／`AELatencyProbe` 未定義）→ 實作 `Services/Music/AELatencyProbe.swift`（整檔 `#if DEBUG`）→ 13 條綠。過程中兩處是測試本身寫錯、已改正（非放寬）：`#expect` 內不能呼叫 mutating 方法（先取值再斷言）；allow-list 正則的欄位名漏了數字（`e2e`），欄位名仍限固定字樣。
 - **L2**：`NowPlayingMonitorLatencyProbeTests` 先紅（替身看到的請求 ID 為空）→ 接線後綠。接線位置與計劃的差異：掃描 token 的作用域放在 `AppModel` 組裝 `scanLibrary` 的閉包（`AELatencyProbe.measuringScan`），不改 `LibraryGateScanner` 本身——效果相同、scanner 零改動。`run` 的本體改名 `enqueue`（原計劃寫 `perform`，撞到 `no_playback_gate.sh` R3 禁止的 `perform(` 字樣，改名、閘門不動）。受影響 18 suite 174 條綠；`no_playback_gate.sh` exit 0。
+
+## 附錄 C simcodex（2026-11-01，3 輪；審 `main...HEAD`＋各輪工作樹修改）
+| 輪 | 來源 | 意見 | 處置 |
+|---|---|---|---|
+| 1 | codex review --base main [P2] | `MockMusicClient` 無條件引用 DEBUG-only 的 `AELatencyProbe`，Release 組態編測試會失敗 | **採納**：包 `#if DEBUG` |
+| 1 | security-reviewer | 無 CRITICAL／HIGH。M1：報表遇畸形輸入（非物件 JSON、非字串訊息、`run` 的 `req` 非數字、非 UTF-8、缺檔）會崩潰成退出碼 1＝與「未達標」撞號；L1：`emit` 收任意字串＋`.public`，型別保證有後門；L5：證據檔含本機路徑 | **採納 M1**（每事件欄位表＋讀不了檔回 3，各補測試）、**L1**（`AELatencyLine` 初始化器 fileprivate、`emit` 改 private）、**L5**（證據檔只放 scratchpad、不 commit，ACCEPTANCE 只貼報表輸出）。L4（Release 多一層轉呼叫）功能等價，記錄不改 |
+| 1 | simplify 簡化 P1 | 兩套讀取結果列舉＋兩個結構；每個格式函式都傳 `app`／`pid` | **採納**：合併為 `ReadSummary`；前綴在 `AELatencyLine.rendered` 統一加 |
+| 1 | simplify P2 | 計數器、通知批次、`endScan` 回傳值、`nowPlayingStarted`、掃描結果判斷 | **採納**（便宜）；`isComplete` 放 probe 檔的 private extension，不改 Release 的 scanner |
+| 1 | simplify 重用 P1 | 毫秒換算改用 `Duration.inSeconds` | **駁回**：Double 截斷會把 290 ms 算成 289（0.29 存成 0.28999…）；整數換算才精確 |
+| 1 | simplify 層級 P2 | 以測試讀 Swift 原始碼比對 `op` 清單 | **駁回**：/thecure 整體確認 #5 已判定太脆弱，維持報表端清單＋清單外即無效 |
+| 2 | codex review --uncommitted | 無 | — |
+| 2 | simplify 層級 P1 | 報表逐種補洞；未預料的例外仍會變退出碼 1 | **採納**：`main()` 入口統一攔所有例外回 3，補測試 |
+| 3 | codex review --uncommitted [P1] | 巢狀 `RunToken` 不加型別名呼叫外層靜態成員會編不過 | **駁回（誤報）**：重建後 `AELatencyProbeTests`＋`NowPlayingMonitorLatencyProbeTests` 15 條綠，Swift 巢狀型別可直接用外層靜態成員 |
+| 3 | simplify 簡化 P1 | `EXIT_CODES.get` 的預設值是死碼 | **採納** |
+- 每輪驗證：受影響 18 suite 174 條綠（第 1 輪修正後）、probe 兩個 suite 15 條綠（第 3 輪）；Scripts 471 條綠；`no_playback_gate.sh` 綠；豁免檔 489／490；probe 覆蓋 168／175。
+- AppModel 的 `scanLibrary` 保留 DEBUG／Release 各一整行：合併成一個閉包會改到 Release 那一行原文。
+- 遺留 P2：報表無效輸出與 `render` 的格式兩處定義；`MockMusicClient` 帶 probe 專用欄位（可改測試端包裝）；monitor 端決定 `nochange`／`notplaying` 語意（可改傳 Bool）。

@@ -4,7 +4,8 @@ import OSLog
 import os
 
 // I-68 量測（docs/plans/2026-11-01-i68-nowplaying-latency.md）：整檔只在 DEBUG。
-// 只記數字、固定字樣與編譯期函式名（`StaticString`）——曲名、歌手、ID、歌詞在型別上就傳不進來。
+// 日誌行只能由 `AELatencyFormat` 造出（`AELatencyLine` 的初始化器是 fileprivate），參數只有整數、列舉與 `StaticString`——
+// 曲名、歌手、ID、歌詞在型別上就傳不進來。
 
 /// 量測帳本：純值型別，鎖與日誌在 `AELatencyProbe`
 struct AELatencyLedger: Sendable {
@@ -16,7 +17,6 @@ struct AELatencyLedger: Sendable {
     }
 
     enum ScanOutcome: String, Sendable { case complete, incomplete, cancelled, error }
-    enum NowPlayingOutcome: Sendable { case track, none, failed }
     enum ReadResult: String, Sendable { case changed, nochange, notplaying, error }
 
     struct ReadSummary: Equatable, Sendable {
@@ -24,72 +24,77 @@ struct AELatencyLedger: Sendable {
         let changedAtMs: Int?
     }
 
-    private struct ReadRecord: Sendable {
-        var outcome: NowPlayingOutcome?
-        var changedAtMs: Int?
+    private struct Counter: Sendable {
+        private var last = 0
+        mutating func next() -> Int {
+            last += 1
+            return last
+        }
     }
 
-    private var nextScan = 1
-    private var nextRequest = 1
-    private var nextRun = 1
-    private var nextSignal = 1
+    private var scans = Counter()
+    private var requests = Counter()
+    private var runs = Counter()
+    private var signals = Counter()
     /// 進行中的掃描（重掃時舊掃描的 AE 停不下來，可以同時兩個）
     private(set) var activeScans: [Int] = []
-    private var pendingSignals: [(id: Int, ms: Int)] = []
-    private var reads: [Int: ReadRecord] = [:]
+    private var pending: SignalBatch?
+    private var reads: [Int: ReadSummary] = [:]
 
     mutating func beginScan() -> Int {
-        defer { nextScan += 1 }
-        activeScans.append(nextScan)
-        return nextScan
+        let token = scans.next()
+        activeScans.append(token)
+        return token
     }
 
-    /// 只結束自己；不在進行中回 false
-    mutating func endScan(_ token: Int) -> Bool {
-        guard let index = activeScans.firstIndex(of: token) else { return false }
-        activeScans.remove(at: index)
-        return true
+    /// 只結束自己
+    mutating func endScan(_ token: Int) {
+        activeScans.removeAll { $0 == token }
     }
 
-    mutating func newRequest() -> Int {
-        defer { nextRequest += 1 }
-        return nextRequest
-    }
-
-    mutating func newRun() -> Int {
-        defer { nextRun += 1 }
-        return nextRun
-    }
+    mutating func newRequest() -> Int { requests.next() }
+    mutating func newRun() -> Int { runs.next() }
 
     mutating func receiveSignal(atMs ms: Int) -> Int {
-        defer { nextSignal += 1 }
-        pendingSignals.append((nextSignal, ms))
-        return nextSignal
+        let id = signals.next()
+        pending = SignalBatch(
+            first: pending?.first ?? id, last: id, count: (pending?.count ?? 0) + 1, earliestMs: min(pending?.earliestMs ?? ms, ms)
+        )
+        return id
     }
 
     /// 讀取開始時收走當時待配對的通知；之後才到的歸下一批
     mutating func takeSignals() -> SignalBatch? {
-        guard let first = pendingSignals.first, let last = pendingSignals.last else { return nil }
-        defer { pendingSignals = [] }
-        return SignalBatch(first: first.id, last: last.id, count: pendingSignals.count, earliestMs: pendingSignals.map(\.ms).min() ?? first.ms)
+        defer { pending = nil }
+        return pending
     }
 
-    mutating func recordNowPlaying(request: Int, outcome: NowPlayingOutcome) {
-        reads[request, default: ReadRecord()].outcome = outcome
+    mutating func recordNowPlaying(request: Int, result: ReadResult) {
+        reads[request] = ReadSummary(result: result, changedAtMs: nil)
     }
 
     mutating func recordTrackChanged(request: Int, atMs ms: Int) {
-        reads[request, default: ReadRecord()].changedAtMs = ms
+        reads[request] = ReadSummary(result: .changed, changedAtMs: ms)
     }
 
+    /// 沒有任何 nowPlaying 紀錄的讀取算 error；讀完即清
     mutating func finishRead(request: Int) -> ReadSummary {
-        let record = reads.removeValue(forKey: request)
-        if let changed = record?.changedAtMs { return ReadSummary(result: .changed, changedAtMs: changed) }
-        switch record?.outcome {
-        case .track: return ReadSummary(result: .nochange, changedAtMs: nil)
-        case .none?: return ReadSummary(result: .notplaying, changedAtMs: nil)
-        case .failed, nil: return ReadSummary(result: .error, changedAtMs: nil)
-        }
+        reads.removeValue(forKey: request) ?? ReadSummary(result: .error, changedAtMs: nil)
+    }
+}
+
+/// 一行事件：只能由 `AELatencyFormat` 造出；`app=`／`pid=` 前綴在輸出時統一加
+struct AELatencyLine: Equatable, Sendable {
+    private let kind: String
+    private let body: String
+
+    fileprivate init(_ kind: String, _ body: String = "") {
+        self.kind = kind
+        self.body = body
+    }
+
+    func rendered(app: Int, pid: Int32) -> String {
+        body.isEmpty ? "\(kind) app=\(app) pid=\(pid)" : "\(kind) app=\(app) pid=\(pid) \(body)"
     }
 }
 
@@ -100,44 +105,40 @@ enum AELatencyFormat {
         case end(AELatencyLedger.ScanOutcome)
     }
 
+    /// 整數換算（不經 Double：0.29 s 走浮點會截成 289 ms）
     static func milliseconds(_ duration: Duration) -> Int {
         Int(duration.components.seconds) * 1_000 + Int(duration.components.attoseconds / 1_000_000_000_000_000)
     }
 
-    static func boot(app: Int, pid: Int32) -> String {
-        "boot app=\(app) pid=\(pid)"
-    }
+    static func boot() -> AELatencyLine { AELatencyLine("boot") }
 
-    static func scan(app: Int, pid: Int32, token: Int, phase: ScanPhase, t: Int) -> String {
+    static func scan(token: Int, phase: ScanPhase, t: Int) -> AELatencyLine {
         switch phase {
-        case .begin: "scan app=\(app) pid=\(pid) scan=\(token) begin t=\(t)"
-        case .end(let outcome): "scan app=\(app) pid=\(pid) scan=\(token) end outcome=\(outcome.rawValue) t=\(t)"
+        case .begin: AELatencyLine("scan", "scan=\(token) begin t=\(t)")
+        case .end(let outcome): AELatencyLine("scan", "scan=\(token) end outcome=\(outcome.rawValue) t=\(t)")
         }
     }
 
-    static func nowPlaying(app: Int, pid: Int32, request: Int, scans: [Int], startMs: Int, endMs: Int) -> String {
-        "np app=\(app) pid=\(pid) req=\(request) scan=\(list(scans)) start=\(startMs) end=\(endMs) total=\(endMs - startMs)"
+    static func nowPlaying(request: Int, scans: [Int], startMs: Int, endMs: Int) -> AELatencyLine {
+        AELatencyLine("np", "req=\(request) scan=\(list(scans)) start=\(startMs) end=\(endMs) total=\(endMs - startMs)")
     }
 
     // swiftlint:disable:next function_parameter_count
     static func run(
-        app: Int, pid: Int32, run: Int, request: Int?, operation: StaticString,
-        enqueuedMs: Int, startMs: Int, endMs: Int, scansAtEnqueue: [Int], scansAtStart: [Int]
-    ) -> String {
-        "run app=\(app) pid=\(pid) run=\(run) req=\(request.map(String.init) ?? "-") op=\(operation) "
+        run: Int, request: Int?, operation: StaticString, enqueuedMs: Int, startMs: Int, endMs: Int, scansAtEnqueue: [Int], scansAtStart: [Int]
+    ) -> AELatencyLine {
+        AELatencyLine("run", "run=\(run) req=\(request.map(String.init) ?? "-") op=\(operation) "
             + "enq=\(enqueuedMs) start=\(startMs) end=\(endMs) wait=\(startMs - enqueuedMs) exec=\(endMs - startMs) "
-            + "scanAtEnq=\(list(scansAtEnqueue)) scanAtStart=\(list(scansAtStart))"
+            + "scanAtEnq=\(list(scansAtEnqueue)) scanAtStart=\(list(scansAtStart))")
     }
 
-    static func signal(app: Int, pid: Int32, id: Int, t: Int) -> String {
-        "sig app=\(app) pid=\(pid) sig=\(id) t=\(t)"
+    static func signal(id: Int, t: Int) -> AELatencyLine {
+        AELatencyLine("sig", "sig=\(id) t=\(t)")
     }
 
-    static func batch(
-        app: Int, pid: Int32, request: Int, batch: AELatencyLedger.SignalBatch, result: AELatencyLedger.ReadResult, e2eMs: Int?
-    ) -> String {
-        "batch app=\(app) pid=\(pid) req=\(request) sigs=\(batch.first)-\(batch.last) n=\(batch.count) "
-            + "result=\(result.rawValue) e2e=\(e2eMs.map(String.init) ?? "-")"
+    static func batch(request: Int, batch: AELatencyLedger.SignalBatch, result: AELatencyLedger.ReadResult, e2eMs: Int?) -> AELatencyLine {
+        AELatencyLine("batch", "req=\(request) sigs=\(batch.first)-\(batch.last) n=\(batch.count) "
+            + "result=\(result.rawValue) e2e=\(e2eMs.map(String.init) ?? "-")")
     }
 
     private static func list(_ tokens: [Int]) -> String {
@@ -145,7 +146,7 @@ enum AELatencyFormat {
     }
 }
 
-/// 全域薄殼：鎖住帳本、單調時鐘、OSLog（category `latency`，`.notice` 會落盤；`log stream` 才是驗收證據）
+/// 全域薄殼：鎖住帳本、單調時鐘、OSLog（category `latency`，`.notice`；`log stream` 才是驗收證據）
 enum AELatencyProbe {
     /// monitor 每次讀取的請求 ID；`run` 在呼叫端 task 上（`queue.async` 之前）快照
     @TaskLocal static var requestID: Int?
@@ -158,19 +159,19 @@ enum AELatencyProbe {
     private static let origin = ContinuousClock.now
     private static let ledger = OSAllocatedUnfairLock(initialState: AELatencyLedger())
     /// 靜態初始化只跑一次且執行緒安全：保證 `boot` 是本次啟動的第一行
-    private static let booted: Void = log.notice("\(AELatencyFormat.boot(app: app, pid: pid), privacy: .public)")
+    private static let booted: Void = log.notice("\(AELatencyFormat.boot().rendered(app: app, pid: pid), privacy: .public)")
 
     static func nowMs() -> Int {
         AELatencyFormat.milliseconds(ContinuousClock.now - origin)
     }
 
-    static func activeScans() -> [Int] {
+    private static func activeScans() -> [Int] {
         ledger.withLock { $0.activeScans }
     }
 
-    static func emit(_ line: String) {
+    private static func emit(_ line: AELatencyLine) {
         _ = booted
-        log.notice("\(line, privacy: .public)")
+        log.notice("\(line.rendered(app: app, pid: pid), privacy: .public)")
     }
 
     // MARK: AE 工作 block
@@ -184,12 +185,11 @@ enum AELatencyProbe {
 
         /// 在佇列 block 內包住 body：開始／結束各記一次；錯誤照拋
         func measure<T>(_ body: () throws -> T) rethrows -> T {
-            let startMs = AELatencyProbe.nowMs()
-            let scansAtStart = AELatencyProbe.activeScans()
+            let startMs = nowMs()
+            let scansAtStart = activeScans()
             defer {
-                AELatencyProbe.emit(AELatencyFormat.run(
-                    app: AELatencyProbe.app, pid: AELatencyProbe.pid, run: run, request: request, operation: operation,
-                    enqueuedMs: enqueuedMs, startMs: startMs, endMs: AELatencyProbe.nowMs(),
+                emit(AELatencyFormat.run(
+                    run: run, request: request, operation: operation, enqueuedMs: enqueuedMs, startMs: startMs, endMs: nowMs(),
                     scansAtEnqueue: scansAtEnqueue, scansAtStart: scansAtStart
                 ))
             }
@@ -205,15 +205,13 @@ enum AELatencyProbe {
 
     // MARK: 掃描
 
-    static func measuringScan<T: Sendable>(
-        isComplete: @Sendable (T) -> Bool, _ body: @Sendable () async throws -> T
-    ) async throws -> T {
+    static func measuringScan(_ body: @Sendable () async throws -> LibraryScanOutcome) async throws -> LibraryScanOutcome {
         let token = ledger.withLock { $0.beginScan() }
-        emit(AELatencyFormat.scan(app: app, pid: pid, token: token, phase: .begin, t: nowMs()))
+        emit(AELatencyFormat.scan(token: token, phase: .begin, t: nowMs()))
         do {
-            let value = try await body()
-            endScan(token, isComplete(value) ? .complete : .incomplete)
-            return value
+            let outcome = try await body()
+            endScan(token, outcome.isComplete ? .complete : .incomplete)
+            return outcome
         } catch is CancellationError {
             endScan(token, .cancelled)
             throw CancellationError()
@@ -224,8 +222,8 @@ enum AELatencyProbe {
     }
 
     private static func endScan(_ token: Int, _ outcome: AELatencyLedger.ScanOutcome) {
-        _ = ledger.withLock { $0.endScan(token) }
-        emit(AELatencyFormat.scan(app: app, pid: pid, token: token, phase: .end(outcome), t: nowMs()))
+        ledger.withLock { $0.endScan(token) }
+        emit(AELatencyFormat.scan(token: token, phase: .end(outcome), t: nowMs()))
     }
 
     // MARK: nowPlaying 與換歌
@@ -238,7 +236,7 @@ enum AELatencyProbe {
     static func signalReceived() {
         let t = nowMs()
         let id = ledger.withLock { $0.receiveSignal(atMs: t) }
-        emit(AELatencyFormat.signal(app: app, pid: pid, id: id, t: t))
+        emit(AELatencyFormat.signal(id: id, t: t))
     }
 
     /// monitor 一次讀取開始：新請求 ID；理由含換歌通知時收走待配對的通知
@@ -246,18 +244,15 @@ enum AELatencyProbe {
         ledger.withLock { ReadToken(request: $0.newRequest(), batch: takesSignals ? $0.takeSignals() : nil) }
     }
 
-    static func nowPlayingStarted() -> Int {
-        nowMs()
-    }
-
-    static func nowPlayingFinished(startedMs: Int, outcome: AELatencyLedger.NowPlayingOutcome) {
+    /// `result`：讀到曲目＝nochange（之後送出 trackChanged 會改成 changed）、沒在播＝notplaying、丟錯＝error
+    static func nowPlayingFinished(startedMs: Int, result: AELatencyLedger.ReadResult) {
         guard let request = requestID else { return }
         let endMs = nowMs()
         let scans = ledger.withLock { ledger in
-            ledger.recordNowPlaying(request: request, outcome: outcome)
+            ledger.recordNowPlaying(request: request, result: result)
             return ledger.activeScans
         }
-        emit(AELatencyFormat.nowPlaying(app: app, pid: pid, request: request, scans: scans, startMs: startedMs, endMs: endMs))
+        emit(AELatencyFormat.nowPlaying(request: request, scans: scans, startMs: startedMs, endMs: endMs))
     }
 
     static func trackChangedEmitted() {
@@ -269,8 +264,13 @@ enum AELatencyProbe {
     static func readFinished(_ token: ReadToken) {
         let summary = ledger.withLock { $0.finishRead(request: token.request) }
         guard let batch = token.batch else { return }
-        let e2e = summary.changedAtMs.map { $0 - batch.earliestMs }
-        emit(AELatencyFormat.batch(app: app, pid: pid, request: token.request, batch: batch, result: summary.result, e2eMs: e2e))
+        emit(AELatencyFormat.batch(request: token.request, batch: batch, result: summary.result, e2eMs: summary.changedAtMs.map { $0 - batch.earliestMs }))
+    }
+}
+
+private extension LibraryScanOutcome {
+    var isComplete: Bool {
+        if case .complete = self { true } else { false }
     }
 }
 #endif
