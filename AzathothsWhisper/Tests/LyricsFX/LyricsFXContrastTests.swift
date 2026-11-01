@@ -201,9 +201,11 @@ struct LyricsFXContrastTests {
             let name: String
             let width: Int
             let height: Int
-            /// 每個像素（列優先）的綠色通道差；其餘通道相同
+            /// 每個像素（列優先）的通道差；其餘通道相同
             let difference: (_ x: Int, _ y: Int) -> UInt8
             let expected: [Int]
+            /// 有差的通道（0 紅、1 綠、2 藍）：三個通道任一超過門檻都算字形
+            var channel = 1
         }
         let cases = [
             Case(name: "全空 5×5", width: 5, height: 5, difference: { _, _ in 0 }, expected: []),
@@ -215,12 +217,14 @@ struct LyricsFXContrastTests {
             Case(name: "高 2", width: 5, height: 2, difference: { _, _ in 255 }, expected: []),
             Case(name: "差恰為 48 不算", width: 3, height: 3, difference: { _, _ in UInt8(Self.inkDifference) }, expected: []),
             Case(name: "差 49 算", width: 3, height: 3, difference: { _, _ in UInt8(Self.inkDifference + 1) }, expected: [16]),
+            Case(name: "只有紅色差 49", width: 3, height: 3, difference: { _, _ in UInt8(Self.inkDifference + 1) }, expected: [16], channel: 0),
+            Case(name: "只有藍色差 49", width: 3, height: 3, difference: { _, _ in UInt8(Self.inkDifference + 1) }, expected: [16], channel: 2),
         ]
         for item in cases {
             let empty = [UInt8](repeating: 0, count: item.width * item.height * 4)
             var text = empty
             for y in 0..<item.height {
-                for x in 0..<item.width { text[(y * item.width + x) * 4 + 1] = item.difference(x, y) }
+                for x in 0..<item.width { text[(y * item.width + x) * 4 + item.channel] = item.difference(x, y) }
             }
             #expect(Self.fastCore(text: text, empty: empty, width: item.width, height: item.height) == item.expected, "\(item.name)")
             #expect(Self.referenceCore(text: text, empty: empty, width: item.width, height: item.height) == item.expected, "\(item.name)")
