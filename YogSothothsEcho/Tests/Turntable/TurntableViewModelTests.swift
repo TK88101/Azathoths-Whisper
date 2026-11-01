@@ -471,6 +471,31 @@ struct TurntableViewModelTests {
         #expect(model.swipe.phase == .awaiting(.next) && model.recordTimelineNeedsTicks)
     }
 
+    /// CR-039 增補：唱臂角只在播放中、未抬臂時隨進度變 → 只有那時 tick；轉場中抬臂、暫停都停表
+    @Test func armTimelineTicksOnlyWhileTheArmFollowsProgress() async {
+        await start()
+        #expect(model.armTimelineNeedsTicks)
+        reply(.applied, PlaybackSamples.t9, album: PlaybackSamples.otherAlbum)
+        await swipeLeft()
+        #expect(model.swipe.armLifted && !model.armTimelineNeedsTicks)
+        await fire(Self.lift)
+        await finishNewAlbumTransition { #expect(!model.armTimelineNeedsTicks, "phase \(model.swipe.phase)") }
+        #expect(model.swipe.phase == .idle && model.armTimelineNeedsTicks)
+    }
+
+    /// Reduce Motion 不抬臂：轉場中唱臂照跟進度；暫停時停表
+    @Test func armTimelineFollowsReduceMotionAndPause() async {
+        await start()
+        client.lock.withLock { client.holdControl = true }
+        await swipeLeft(reduceMotion: true)
+        #expect(!model.swipe.armLifted && model.armTimelineNeedsTicks)
+        // 時間戳要比 start() 的 at: 1 新，否則被當成舊事件略過
+        client.push(PlaybackSamples.event(PlaybackSamples.t1, .paused, at: 3))
+        await settle()
+        #expect(nowPlaying.clock?.event.state == .paused)
+        #expect(!model.armTimelineNeedsTicks)
+    }
+
     @Test func doesNotSpinWhilePaused() async {
         await start(.paused)
         _ = model.recordAngle(at: 0)

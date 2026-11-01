@@ -254,6 +254,13 @@ final class TurntableViewModel {
         RecordTimelinePolicy.needsTicks(isPlaying: isPlaying, phase: swipe.phase, reduceMotion: swipe.reduceMotion)
     }
 
+    /// CR-039 增補（使用者 2026-11-01 同意）：唱臂角只在播放中、未抬臂、不在進場時隨進度變（見 armAngle）→ 只有那時每幀更新；
+    /// 抬臂與落臂的動畫由 `.animation(value:)` 插值（序列圖唱臂是 Animatable），不靠 TimelineView
+    var armTimelineNeedsTicks: Bool {
+        if case .entering = layer { return false }
+        return isPlaying && !swipe.armLifted
+    }
+
     /// 畫面上的唱片角（TimelineView 每次給 date 呼叫）：停表且有靜止角＝兩盤共讀靜止角，不推進 spin；否則照 `recordAngle(at:)`
     func displayedRecordAngle(at now: Double) -> Double {
         if !recordTimelineNeedsTicks, let resting = spin.restingAngle { return resting }

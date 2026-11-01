@@ -252,7 +252,7 @@ struct TurntableView: View {
     }
 
     private func tonearm(_ layout: TurntableLayout) -> some View {
-        TimelineView(.animation(paused: model.nowPlaying.clock?.event.state != .playing)) { _ in
+        TimelineView(.animation(paused: !model.armTimelineNeedsTicks)) { _ in
             let angle = model.armAngle()
             switch layout.skin.spec.rendering {
             case .classicImages:
