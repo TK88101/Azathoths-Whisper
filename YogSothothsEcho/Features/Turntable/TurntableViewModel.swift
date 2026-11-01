@@ -33,7 +33,11 @@ final class TurntableViewModel {
     /// 選擇器預覽（設定頁與浮層共用這一個，r3-1）
     let previews: SkinPreviewRenderer
     let overlay: TurntableOverlayState
-    private(set) var swipe: SwipeTransition
+    private(set) var swipe: SwipeTransition {
+        didSet { g7Trace.observe(from: oldValue, to: swipe) }
+    }
+    /// CR-039 §4.4：G7 signpost（每次轉場一個 interval）
+    @ObservationIgnored private let g7Trace = G7Trace(sink: OSG7TraceSink())
     /// 唱機層（S6 §4.8）：存在與否由它決定；殼層只讀
     private(set) var layer: TurntableLayerState = .hidden
     /// 這一次進出唱機用的 Reduce Motion（含 DEBUG 強制）：狀態機與 TurntableView 的進場動畫讀同一份
@@ -242,6 +246,15 @@ final class TurntableViewModel {
         guard !swipe.armLifted, let event = nowPlaying.clock?.event else { return skin.restDegrees }
         return skin.playbackAngle(state: event.state, position: nowPlaying.position() ?? 0, duration: event.duration)
     }
+
+    /// CR-039：唱片 TimelineView 是否要每幀更新（煞停後停表，見 RecordTimelinePolicy）
+    var recordTimelineNeedsTicks: Bool {
+        RecordTimelinePolicy.needsTicks(isPlaying: nowPlaying.clock?.event.state == .playing, phase: swipe.phase,
+                                        reduceMotion: swipe.reduceMotion)
+    }
+
+    /// 停表時兩盤共讀的靜止角（純讀；spin 的狀態由 tick 中的 `recordAngle(at:)` 推進）
+    var restingRecordAngle: Double? { spin.restingAngle }
 
     /// 唱片角：轉場抬臂中煞停（與抬臂同時）；否則播放中才轉（TimelineView 每幀呼叫）
     func recordAngle(at now: Double) -> Double {

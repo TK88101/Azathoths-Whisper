@@ -172,16 +172,19 @@ struct TurntableView: View {
         #endif
     }
 
-    /// 非播放中暫停；CR-038 live 開著時液體還在晃就不暫停（收斂後 store 回報，才再暫停）
+    /// 唱片不轉就暫停（CR-039：非播放中、或轉場中煞停之後）；CR-038 live 開著時液體還在晃就不暫停（收斂後 store 回報，才再暫停）
     private func recordPaused(_ deck: TurntableDeck) -> Bool {
         #if LIQUID_SAMPLE
         if LiquidSample.shared.isLive, LiquidMotionStore.shared.isAnimating(Self.liquidKey(deck)) { return false }
         #endif
-        return model.nowPlaying.clock?.event.state != .playing
+        return !model.recordTimelineNeedsTicks
     }
 
     private func recordFace(_ deck: TurntableDeck, _ layout: TurntableLayout, now: Double) -> VinylRecordView {
-        let angle = model.recordAngle(at: now)
+        // CR-039：停表時兩盤共讀靜止角（不取 TimelineView 最後一次 callback，也不推進 spin）
+        let angle = RecordTimelinePolicy.displayAngle(needsTicks: model.recordTimelineNeedsTicks, resting: model.restingRecordAngle) {
+            model.recordAngle(at: now)
+        }
         var face = VinylRecordView(side: layout.record.width, style: deck.style, splash: deck.splash, colors: deck.colors, label: deck.label,
                                    angle: angle, swirl: deck.swirl)
         #if LIQUID_SAMPLE

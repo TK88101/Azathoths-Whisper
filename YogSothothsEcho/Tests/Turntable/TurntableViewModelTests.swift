@@ -422,6 +422,51 @@ struct TurntableViewModelTests {
         #expect(model.recordAngle(at: 10) == 180)
     }
 
+    /// CR-039 階段 A：換專輯轉場中，煞停（lifting）之後停表；回 idle 且播放中恢復
+    @Test func recordTimelineStopsAfterTheBrakeAndResumes() async {
+        await start()
+        #expect(model.recordTimelineNeedsTicks)
+        reply(.applied, PlaybackSamples.t9, album: PlaybackSamples.otherAlbum)
+        await swipeLeft()
+        #expect(model.swipe.phase == .lifting(.next, ready: true) && model.recordTimelineNeedsTicks)
+        await fire(Self.lift)
+        #expect(model.swipe.phase == .clearing(.next) && !model.recordTimelineNeedsTicks)
+        for ms in [150, 160, 330, 200] {
+            await fire(.milliseconds(ms))
+            #expect(!model.recordTimelineNeedsTicks, "after \(ms) ms phase \(model.swipe.phase)")
+        }
+        await fire(.milliseconds(150))
+        #expect(model.swipe.phase == .idle && model.recordTimelineNeedsTicks)
+    }
+
+    /// 停表期間兩盤共讀同一個靜止角（＝煞停終止角）；恢復後從靜止角接續
+    @Test func restingAngleIsTheBrakeEndAndResumeIsContinuous() async {
+        await start()
+        _ = model.recordAngle(at: 0)
+        _ = model.recordAngle(at: 1)
+        #expect(model.restingRecordAngle == nil)
+        reply(.applied, PlaybackSamples.t9, album: PlaybackSamples.otherAlbum)
+        await swipeLeft()
+        _ = model.recordAngle(at: 2)          // lifting 的第一個 tick：開始煞停
+        let brakeEnd = model.recordAngle(at: 2.35)
+        await fire(Self.lift)
+        #expect(!model.recordTimelineNeedsTicks)
+        #expect(abs((model.restingRecordAngle ?? -1) - brakeEnd) < 1e-9)
+        for ms in [150, 160, 330, 200, 150] { await fire(.milliseconds(ms)) }
+        #expect(model.swipe.phase == .idle)
+        #expect(abs(model.recordAngle(at: 10) - brakeEnd) < 1e-9)
+        #expect(abs(model.recordAngle(at: 11) - (brakeEnd + RecordSpin.degreesPerSecond).truncatingRemainder(dividingBy: 360)) < 1e-9)
+    }
+
+    /// Reduce Motion：不煞停，等回覆（awaiting）期間唱片照轉
+    @Test func reduceMotionKeepsTickingWhileAwaiting() async {
+        await start()
+        client.lock.withLock { client.holdControl = true }
+        await swipeLeft(reduceMotion: true)
+        await fire(Self.lift)
+        #expect(model.swipe.phase == .awaiting(.next) && model.recordTimelineNeedsTicks)
+    }
+
     @Test func doesNotSpinWhilePaused() async {
         await start(.paused)
         _ = model.recordAngle(at: 0)
