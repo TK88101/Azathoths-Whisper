@@ -8,7 +8,8 @@ import Testing
 struct LibraryGateReportTests {
     static let base = Date(timeIntervalSince1970: 1_790_000_000)
     /// 樂團表裡組不出六槽的團（⑦ §2.1 已核：缺 palette）
-    static let unfinishedBand = "Aphex Twin"
+    /// 樂團表裡仍組不出的署名團。B2 批 5 補完 Aphex Twin 等 5 團後，只剩 Cannibal Corpse（批 5 計劃 F6，另案）
+    static let unfinishedBand = "Cannibal Corpse"
 
     private func track(
         _ id: String, artist: String, album: String = "Paper Boats", genre: String = "Glimmerwave Foo", lyrics: Bool = true, japanese: Bool = false
