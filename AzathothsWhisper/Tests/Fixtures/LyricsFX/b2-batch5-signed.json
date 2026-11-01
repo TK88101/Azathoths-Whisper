@@ -35,6 +35,44 @@
      "blackRed",
      "steelFire"
     ]
+   },
+   "playable": {
+    "backdrop": [
+     "steel",
+     "void"
+    ],
+    "enter": [
+     "forge",
+     "march"
+    ],
+    "exit": [
+     "burnout",
+     "shutdown"
+    ],
+    "font": [
+     "FrakturInd",
+     "OswaldInd"
+    ],
+    "fx1": [
+     "heat",
+     "none",
+     "stomp"
+    ],
+    "fx2": [
+     "heat",
+     "none",
+     "stomp"
+    ],
+    "paletteByBackdrop": {
+     "steel": [
+      "blackRed",
+      "steelFire"
+     ],
+     "void": [
+      "blackRed",
+      "steelFire"
+     ]
+    }
    }
   },
   {
@@ -76,6 +114,68 @@
      "terminal",
      "yellowBlack"
     ]
+   },
+   "playable": {
+    "backdrop": [
+     "flat",
+     "grid",
+     "neon",
+     "void"
+    ],
+    "enter": [
+     "flip",
+     "slide"
+    ],
+    "exit": [
+     "slideOut",
+     "tumbleOut"
+    ],
+    "font": [
+     "Anton",
+     "Dela",
+     "Oswald",
+     "SpaceMono"
+    ],
+    "fx1": [
+     "neonstroke",
+     "none",
+     "rgbsplit",
+     "speedlines",
+     "thump"
+    ],
+    "fx2": [
+     "neonstroke",
+     "none",
+     "rgbsplit",
+     "speedlines",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "flat": [
+      "mono",
+      "neonPink",
+      "terminal",
+      "yellowBlack"
+     ],
+     "grid": [
+      "mono",
+      "neonPink",
+      "terminal",
+      "yellowBlack"
+     ],
+     "neon": [
+      "mono",
+      "neonPink",
+      "terminal",
+      "yellowBlack"
+     ],
+     "void": [
+      "mono",
+      "neonPink",
+      "terminal",
+      "yellowBlack"
+     ]
+    }
    }
   },
   {
@@ -121,6 +221,78 @@
      "terminal",
      "yellowBlack"
     ]
+   },
+   "playable": {
+    "backdrop": [
+     "flat",
+     "grid",
+     "haze",
+     "neon",
+     "void"
+    ],
+    "enter": [
+     "flip",
+     "pop",
+     "slide"
+    ],
+    "exit": [
+     "slideOut",
+     "tumbleOut",
+     "up"
+    ],
+    "font": [
+     "Anton",
+     "Dela",
+     "Grotesk",
+     "Oswald",
+     "SpaceMono"
+    ],
+    "fx1": [
+     "neonstroke",
+     "none",
+     "rgbsplit",
+     "speedlines",
+     "thump"
+    ],
+    "fx2": [
+     "neonstroke",
+     "none",
+     "rgbsplit",
+     "speedlines",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "flat": [
+      "mono",
+      "neonPink",
+      "terminal",
+      "yellowBlack"
+     ],
+     "grid": [
+      "mono",
+      "neonPink",
+      "terminal",
+      "yellowBlack"
+     ],
+     "haze": [
+      "mono",
+      "neonPink",
+      "terminal",
+      "yellowBlack"
+     ],
+     "neon": [
+      "mono",
+      "neonPink",
+      "terminal",
+      "yellowBlack"
+     ],
+     "void": [
+      "mono",
+      "neonPink",
+      "terminal",
+      "yellowBlack"
+     ]
+    }
    }
   },
   {
@@ -158,6 +330,57 @@
      "neonPink",
      "terminal"
     ]
+   },
+   "playable": {
+    "backdrop": [
+     "grid",
+     "haze",
+     "neon",
+     "void"
+    ],
+    "enter": [
+     "flip",
+     "pop"
+    ],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Dela",
+     "Grotesk",
+     "SpaceMono"
+    ],
+    "fx1": [
+     "neonstroke",
+     "none",
+     "rgbsplit",
+     "thump"
+    ],
+    "fx2": [
+     "neonstroke",
+     "none",
+     "rgbsplit",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "grid": [
+      "neonPink",
+      "terminal"
+     ],
+     "haze": [
+      "neonPink",
+      "terminal"
+     ],
+     "neon": [
+      "neonPink",
+      "terminal"
+     ],
+     "void": [
+      "neonPink",
+      "terminal"
+     ]
+    }
    }
   },
   {
@@ -192,6 +415,49 @@
      "mono",
      "terminal"
     ]
+   },
+   "playable": {
+    "backdrop": [
+     "grid",
+     "haze",
+     "void"
+    ],
+    "enter": [
+     "fadeUp",
+     "flip"
+    ],
+    "exit": [
+     "slideOut",
+     "up"
+    ],
+    "font": [
+     "Grotesk",
+     "SpaceMono"
+    ],
+    "fx1": [
+     "none",
+     "rgbsplit",
+     "thump"
+    ],
+    "fx2": [
+     "none",
+     "rgbsplit",
+     "thump"
+    ],
+    "paletteByBackdrop": {
+     "grid": [
+      "mono",
+      "terminal"
+     ],
+     "haze": [
+      "mono",
+      "terminal"
+     ],
+     "void": [
+      "mono",
+      "terminal"
+     ]
+    }
    }
   }
  ],

@@ -88,6 +88,13 @@ enum ComposedBackdrop {
             return [band(CGPoint(x: 0.5, y: 0.55), CGPoint(x: 0.5, y: 1), 0xFF6AA0, from: 0, to: 0.35),
                     .rects(lines.pink, RGB(hex: 0xFF6AA0), opacity: 0.5), .rects(lines.cyan, RGB(hex: 0x4FD3FF), opacity: 0.5),
                     .semicircle(center: CGPoint(x: 0.5, y: 0.55), radius: 0.28, top: RGB(hex: 0xFFB347), bottom: RGB(hex: 0xFF6AA0), opacity: 0.35)]
+        // B2 批 5（原型 html 組合模式 draw：steel、neon）
+        case .steel:
+            return [glow(0.5, -0.1, radius: 1.1 * aspect(size), 0xDCE4EB, 0.18)]
+        case .neon:
+            let lines = neonLines(size: size)
+            return [band(CGPoint(x: 0.5, y: 0.55), CGPoint(x: 0.5, y: 1), 0xFF2E88, from: 0, to: 0.3),
+                    .rects(lines.pink, palette.acc, opacity: 0.5), .rects(lines.cyan, palette.dim, opacity: 0.5)]
         }
     }
 
@@ -240,11 +247,11 @@ enum ComposedBackdrop {
             return [.vignette(strength: 0.7), .grain(opacity: 0.05, frame: grainFrame, overlay: false)]
         case .paper:
             return [.grain(opacity: 0.1, frame: grainFrame, overlay: false)]
-        case .embers, .haze, .tapeLeak, .scan, .grid:
+        case .embers, .haze, .tapeLeak, .scan, .grid, .steel:
             return [.grain(opacity: 0.05, frame: grainFrame, overlay: false)]
         case .xerox:
             return [.grain(opacity: 0.16, frame: grainFrame, overlay: false)]
-        case .halftone, .sunset, .flat, .checker, .skyGrad, .sparkle, .cityNeon:
+        case .halftone, .sunset, .flat, .checker, .skyGrad, .sparkle, .cityNeon, .neon:
             return []
         }
     }

@@ -80,7 +80,7 @@ enum LyricsFXCatalog {
         // B2 批 2（龐克系；原型 composer.js 的 B2 批 2 段）。標籤只收本批專屬的，其餘等它們的團進批次再補
         make(.font, "Bangers", [.bounce: 0.75, .bright: 0.7, .speed: 0.7, .aggression: 0.45], [.poppunk, .skatepunk, .ska, .rapmetal],
              .font(FontFace(id: "Bangers", family: "Bangers", weight: nil, uppercase: true))),
-        make(.font, "Dela", [.bounce: 0.6, .bright: 0.6, .aggression: 0.4, .speed: 0.6], [.poppunk],
+        make(.font, "Dela", [.bounce: 0.6, .bright: 0.6, .aggression: 0.4, .speed: 0.6], [.poppunk, .bigbeat, .electro, .house],
              .font(FontFace(id: "Dela", family: "Dela Gothic One", weight: nil, uppercase: true))),
         make(.font, "Gochi", [.warm: 0.7, .elegance: 0.45, .bounce: 0.35, .raw: 0.25, .theatrical: 0.5], [.poprock, .indieemo, .emopop],
              forbid: [.aggression: 0.5], .font(FontFace(id: "Gochi", family: "Gochi Hand", weight: nil))),
@@ -97,7 +97,7 @@ enum LyricsFXCatalog {
              .font(FontFace(id: "Barrio", family: "Barrio", weight: nil, uppercase: true))),
         make(.font, "BlackOps", [.aggression: 0.7, .raw: 0.45, .speed: 0.6], [.horrormetal, .cybermetal, .hardcore, .nu],
              .font(FontFace(id: "BlackOps", family: "Black Ops One", weight: nil, uppercase: true))),
-        make(.font, "SpaceMono", [.cold: 0.5, .bright: 0.4, .speed: 0.6, .bounce: 0.1], [.cybermetal],
+        make(.font, "SpaceMono", [.cold: 0.5, .bright: 0.4, .speed: 0.6, .bounce: 0.1], [.cybermetal, .techno, .idm, .electro, .house],
              .font(FontFace(id: "SpaceMono", family: "Space Mono", weight: .bold, uppercase: true))),
         // B2 批 4（emo 群；原型 composer.js 的 B2 批 4 段）。標籤只收本批私有的（emo／posthardcore／indieemo／emopop）
         make(.font, "CourierPrime", [.cold: 0.4, .elegance: 0.5, .raw: 0.3, .speed: 0.3, .aggression: 0.2], [.indieemo, .emo],
@@ -147,6 +147,11 @@ enum LyricsFXCatalog {
         make(.font, "genHipAnton", [.aggression: 0.55, .bounce: 0.6, .raw: 0.5], [.genHipHop], .font(FontFace(id: "Anton", family: "Anton", weight: nil, uppercase: true, sizeScale: 0.15 / 0.12, rasterizes: false))),
         make(.font, "genHipBebas", [.bounce: 0.7, .bright: 0.5], [.genHipHop], .font(FontFace(id: "Bebas", family: "Bebas Neue", weight: nil, uppercase: true))),
         make(.font, "genHipMarker", [.raw: 0.55, .warm: 0.55, .bounce: 0.75], [.genHipHop], .font(FontFace(id: "Marker", family: "Permanent Marker", weight: nil, uppercase: true))),
+        // B2 批 5（工業／電子 5 團補件，使用者 2026-11-01 看探針 P17 後簽字；由原型 composer.js 產生，不手抄）
+        make(.font, "FrakturInd", [.cold: 0.6, .theatrical: 0.75, .aggression: 0.6, .elegance: 0.4, .speed: 0.3], [.industrial],
+             .font(FontFace(id: "FrakturInd", family: "UnifrakturMaguntia", weight: nil))),
+        make(.font, "OswaldInd", [.cold: 0.7, .theatrical: 0.6, .aggression: 0.7, .speed: 0.3, .elegance: 0.2], [.industrial],
+             .font(FontFace(id: "OswaldInd", family: "Oswald", weight: .bold, uppercase: true))),
     ]
 
     // composer.js:36-40,43
@@ -187,7 +192,7 @@ enum LyricsFXCatalog {
              forbid: [.aggression: 0.6], .backdrop(.bokeh)),
         make(.backdrop, "checker", [.bounce: 0.9, .bright: 0.6, .speed: 0.7], [.ska],
              .backdrop(.checker)),
-        make(.backdrop, "flat", [.bright: 0.8, .bounce: 0.7, .warm: 0.5, .raw: 0.2], [.ska, .powerpop, .poprock, .poppunk, .skatepunk, .emopop],
+        make(.backdrop, "flat", [.bright: 0.8, .bounce: 0.7, .warm: 0.5, .raw: 0.2], [.ska, .powerpop, .poprock, .poppunk, .skatepunk, .emopop, .bigbeat],
              .backdrop(.flat)),
         make(.backdrop, "gig", [.aggression: 0.7, .raw: 0.5, .warm: 0.4, .speed: 0.7, .theatrical: 0.35], [.melodichc, .punk, .skatepunk, .ska, .rapmetal, .altmetal, .posthardcore, .emopop],
              .backdrop(.gig)),
@@ -196,7 +201,7 @@ enum LyricsFXCatalog {
         make(.backdrop, "xerox", [.raw: 0.7, .aggression: 0.55, .decay: 0.4, .speed: 0.6], [.punk, .skatepunk, .melodichc, .horrormetal, .posthardcore],
              .backdrop(.xerox)),
         // B2 批 3（Nu-metal；原型 composer.js 的 B2 批 3 段）。標籤只收本批專屬的（新團的私有子標籤＋連帶的 Korn／Hatebreed 的 nu、hardcore）
-        make(.backdrop, "grid", [.bright: 0.4, .aggression: 0.4, .cold: 0.4], [.cybermetal, .nu],
+        make(.backdrop, "grid", [.bright: 0.4, .aggression: 0.4, .cold: 0.4], [.cybermetal, .nu, .techno, .idm, .electro],
              .backdrop(.grid)),
         make(.backdrop, "scan", [.aggression: 0.5, .raw: 0.4, .bright: 0.2], [.cybermetal, .rapmetal, .nu, .hardcore],
              .backdrop(.scan)),
@@ -243,6 +248,11 @@ enum LyricsFXCatalog {
         make(.backdrop, "genHipSpot", [.theatrical: 0.5, .bright: 0.5], [.genHipHop], .backdrop(.spot)),
         make(.backdrop, "genHipSmokeHaze", [.raw: 0.5, .warm: 0.55], [.genHipHop], .backdrop(.smokeHaze)),
         make(.backdrop, "genHipFlat", [.bounce: 0.8, .bright: 0.5], [.genHipHop], .backdrop(.flat)),
+        // B2 批 5（工業／電子 5 團補件，使用者 2026-11-01 看探針 P17 後簽字；由原型 composer.js 產生，不手抄）
+        make(.backdrop, "neon", [.bright: 0.7, .theatrical: 0.5, .bounce: 0.5, .warm: 0.4], [.house, .electro, .frenchhouse],
+             .backdrop(.neon)),
+        make(.backdrop, "steel", [.cold: 0.85, .theatrical: 0.6, .aggression: 0.6, .bright: 0.2], [.industrial],
+             .backdrop(.steel)),
     ]
 
     // composer.js:55,57-61,64。淡入型（condense、smoke、rise）的時長依 P12 縮短 40%（使用者 2026-10-06：「漸入漸出稍長，字發虛」）
@@ -281,7 +291,7 @@ enum LyricsFXCatalog {
         // B2 批 2（龐克系；原型 composer.js 的 B2 批 2 段）。標籤只收本批專屬的，其餘等它們的團進批次再補
         make(.enter, "ease", [.elegance: 0.4, .bounce: 0.35, .speed: 0.5, .warm: 0.5], [.poprock, .powerpop, .indieemo, .emopop],
              .enter(EnterSpec(weights: [(.fadeUp, 3), (.pop, 1)], duration: 0.25...0.5))),
-        make(.enter, "pop", [.bounce: 0.9, .bright: 0.6, .speed: 0.6, .aggression: 0.2], [.ska, .poprock, .powerpop, .poppunk, .emopop],
+        make(.enter, "pop", [.bounce: 0.9, .bright: 0.6, .speed: 0.6, .aggression: 0.2], [.ska, .poprock, .powerpop, .poppunk, .emopop, .house, .frenchhouse],
              forbid: [.raw: 0.7], .enter(EnterSpec(weights: [(.pop, 4), (.fallIn, 2)], duration: 0.18...0.4))),
         make(.enter, "punch", [.aggression: 0.75, .speed: 0.9, .raw: 0.4], [.melodichc, .skatepunk, .emopop, .posthardcore],
              .enter(EnterSpec(weights: [(.stamp, 3), (.slide, 2)], duration: 0.08...0.2))),
@@ -292,7 +302,7 @@ enum LyricsFXCatalog {
         // B2 批 3（Nu-metal；原型 composer.js 的 B2 批 3 段）。標籤只收本批專屬的（新團的私有子標籤＋連帶的 Korn／Hatebreed 的 nu、hardcore）
         make(.enter, "drop", [.aggression: 0.8, .speed: 0.7, .raw: 0.4], [.horrormetal, .altmetal, .hardcore, .nu],
              .enter(EnterSpec(weights: [(.drop, 4), (.stamp, 1)], duration: 0.18...0.4))),
-        make(.enter, "flip", [.speed: 0.9, .aggression: 0.5, .cold: 0.4, .bounce: 0.3], [.cybermetal],
+        make(.enter, "flip", [.speed: 0.9, .aggression: 0.5, .cold: 0.4, .bounce: 0.3], [.cybermetal, .techno, .electro, .idm],
              .enter(EnterSpec(weights: [(.flip, 4), (.type, 1)], duration: 0.08...0.2))),
         make(.enter, "type", [.raw: 0.5, .aggression: 0.5, .speed: 0.9], [.cybermetal, .nu, .hardcore],
              .enter(EnterSpec(weights: [(.type, 5), (.flip, 1)], duration: 0.06...0.15))),
@@ -338,6 +348,11 @@ enum LyricsFXCatalog {
         // ⑦ 通用・嘻哈：只帶 genHipHop
         make(.enter, "genHipKick", [.bounce: 0.8, .aggression: 0.55], [.genHipHop], .enter(EnterSpec(weights: [(.stamp, 3), (.pop, 2), (.slide, 1)], duration: 0.12...0.28))),
         make(.enter, "genHipDrop", [.aggression: 0.55, .speed: 0.6], [.genHipHop], .enter(EnterSpec(weights: [(.drop, 4), (.stamp, 1)], duration: 0.18...0.4))),
+        // B2 批 5（工業／電子 5 團補件，使用者 2026-11-01 看探針 P17 後簽字；由原型 composer.js 產生，不手抄）
+        make(.enter, "forge", [.aggression: 0.75, .cold: 0.7, .theatrical: 0.6, .speed: 0.4, .bounce: 0], [.industrial],
+             .enter(EnterSpec(weights: [(.drop, 2), (.type, 3)], duration: 0.14...0.28))),
+        make(.enter, "march", [.aggression: 0.85, .theatrical: 0.7, .cold: 0.6, .speed: 0.35, .bounce: 0], [.industrial],
+             .enter(EnterSpec(weights: [(.drop, 3), (.stamp, 3)], duration: 0.22...0.35))),
     ]
 
     // composer.js:73-75,77
@@ -369,7 +384,7 @@ enum LyricsFXCatalog {
              .exit(ExitSpec(weights: [(.slideOut, 3), (.fall, 1)], duration: 0.25))),
         make(.exit, "snapOut", [.bounce: 0.65, .speed: 0.7, .bright: 0.6], [.poppunk, .ska, .powerpop, .poprock, .emopop],
              .exit(ExitSpec(weights: [(.shrink, 3), (.up, 1)], duration: 0.3))),
-        make(.exit, "tumbleOut", [.bounce: 0.7, .speed: 0.7, .aggression: 0.4], [.ska, .punk, .poppunk, .skatepunk, .punk77],
+        make(.exit, "tumbleOut", [.bounce: 0.7, .speed: 0.7, .aggression: 0.4], [.ska, .punk, .poppunk, .skatepunk, .punk77, .bigbeat],
              .exit(ExitSpec(weights: [(.tumbleOut, 3), (.fall, 1)], duration: 0.5))),
         // B2 批 3（Nu-metal；原型 composer.js 的 B2 批 3 段）。標籤只收本批專屬的（新團的私有子標籤＋連帶的 Korn／Hatebreed 的 nu、hardcore）
         make(.exit, "bands", [.aggression: 0.6, .speed: 0.8, .raw: 0.3], [.cybermetal, .rapmetal, .nu, .hardcore],
@@ -411,6 +426,11 @@ enum LyricsFXCatalog {
         // ⑦ 通用・嘻哈：只帶 genHipHop
         make(.exit, "genHipDropOut", [.bounce: 0.75, .speed: 0.6], [.genHipHop], .exit(ExitSpec(weights: [(.fall, 2), (.shrink, 2)], duration: 0.45))),
         make(.exit, "genHipSlideOut", [.speed: 0.6, .aggression: 0.5], [.genHipHop], .exit(ExitSpec(weights: [(.slideOut, 1)], duration: 0.4))),
+        // B2 批 5（工業／電子 5 團補件，使用者 2026-11-01 看探針 P17 後簽字；由原型 composer.js 產生，不手抄）
+        make(.exit, "burnout", [.theatrical: 0.8, .aggression: 0.6, .cold: 0.4], [.industrial],
+             .exit(ExitSpec(weights: [(.fade, 1)], duration: 0.9))),
+        make(.exit, "shutdown", [.aggression: 0.7, .cold: 0.7, .theatrical: 0.6, .speed: 0.5], [.industrial],
+             .exit(ExitSpec(weights: [(.shrink, 2), (.fall, 1)], duration: 0.4))),
     ]
 
     // composer.js:87,88,92,101
@@ -442,12 +462,12 @@ enum LyricsFXCatalog {
              forbid: [.elegance: 0.6], .fx(.ransom)),
         make(.fx, "ransomPop", [.bounce: 0.6, .bright: 0.65, .raw: 0.35, .speed: 0.85, .aggression: 0.45], [.poppunk],
              forbid: [.theatrical: 0.4], .fx(.ransom)),
-        make(.fx, "speedlines", [.speed: 0.9, .aggression: 0.5, .bounce: 0.4], [.melodichc, .skatepunk, .poppunk, .emopop],
+        make(.fx, "speedlines", [.speed: 0.9, .aggression: 0.5, .bounce: 0.4], [.melodichc, .skatepunk, .poppunk, .emopop, .bigbeat],
              .fx(.speedlines)),
         make(.fx, "tilt", [.bounce: 0.6, .bright: 0.55, .raw: 0.35], [.ska, .poppunk, .skatepunk, .powerpop, .emopop],
              .fx(.tilt)),
         // B2 批 3（Nu-metal；原型 composer.js 的 B2 批 3 段）。標籤只收本批專屬的（新團的私有子標籤＋連帶的 Korn／Hatebreed 的 nu、hardcore）
-        make(.fx, "rgbsplit", [.aggression: 0.5, .speed: 0.8, .bright: 0.4], [.cybermetal, .nu],
+        make(.fx, "rgbsplit", [.aggression: 0.5, .speed: 0.8, .bright: 0.4], [.cybermetal, .nu, .techno, .electro, .bigbeat],
              .fx(.rgbsplit)),
         // B2 批 4（emo 群；原型 composer.js 的 B2 批 4 段）。標籤只收本批私有的（emo／posthardcore／indieemo／emopop）
         make(.fx, "weep", [.theatrical: 0.7, .decay: 0.6, .elegance: 0.3, .raw: 0.4], [.emo],
@@ -485,6 +505,11 @@ enum LyricsFXCatalog {
         // ⑦ 通用・嘻哈：只帶 genHipHop
         make(.fx, "genHipThump", [.bounce: 0.8, .speed: 0.6], [.genHipHop], .fx(.thump)),
         make(.fx, "genHipWobble", [.bounce: 0.7, .raw: 0.5], [.genHipHop], .fx(.wobble)),
+        // B2 批 5（工業／電子 5 團補件，使用者 2026-11-01 看探針 P17 後簽字；由原型 composer.js 產生，不手抄）
+        make(.fx, "heat", [.theatrical: 0.7, .aggression: 0.6, .warm: 0.3], [.industrial],
+             .fx(.heat)),
+        make(.fx, "stomp", [.aggression: 0.8, .theatrical: 0.6, .speed: 0.3], [.industrial],
+             .fx(.stomp)),
     ]
 
     // composer.js:104-107,110,113
@@ -543,7 +568,7 @@ enum LyricsFXCatalog {
              .palette(FXPalette(bg: RGB(hex: 0x0C0A0A), fg: RGB(hex: 0xF2EDE4), acc: RGB(hex: 0xE0241B), dim: RGB(hex: 0x5A4B48)))),
         make(.palette, "mallPink", [.bright: 0.6, .bounce: 0.6, .aggression: 0.45, .speed: 0.7], [.poppunk, .poprock, .emo, .emopop],
              .palette(FXPalette(bg: RGB(hex: 0x111014), fg: RGB(hex: 0xFFFFFF), acc: RGB(hex: 0xFF3E8A), dim: RGB(hex: 0x54505C)))),
-        make(.palette, "mono", [.aggression: 0.5, .speed: 0.7, .raw: 0.3, .bright: 0.5], [.melodichc, .skatepunk, .ska, .punk, .cybermetal, .rapmetal, .nu, .hardcore, .posthardcore, .emopop],
+        make(.palette, "mono", [.aggression: 0.5, .speed: 0.7, .raw: 0.3, .bright: 0.5], [.melodichc, .skatepunk, .ska, .punk, .cybermetal, .rapmetal, .nu, .hardcore, .posthardcore, .emopop, .techno, .bigbeat],
              .palette(FXPalette(bg: RGB(hex: 0x000000), fg: RGB(hex: 0xFFFFFF), acc: RGB(hex: 0xB6FF00), dim: RGB(hex: 0x222222)))),
         make(.palette, "polaroid", [.warm: 0.7, .elegance: 0.5, .theatrical: 0.55, .bright: 0.55], [.poprock, .indieemo, .emopop],
              .palette(FXPalette(bg: RGB(hex: 0x17131C), fg: RGB(hex: 0xF6E9D8), acc: RGB(hex: 0xF2A07B), dim: RGB(hex: 0x6B5F73)))),
@@ -557,7 +582,7 @@ enum LyricsFXCatalog {
              .palette(FXPalette(bg: RGB(hex: 0xF4F1EA), fg: RGB(hex: 0x111111), acc: RGB(hex: 0xD81E1E), dim: RGB(hex: 0x9A968C)))),
         make(.palette, "weezBlue", [.bright: 0.7, .bounce: 0.5, .raw: 0.3, .cold: 0.25], [.powerpop],
              .palette(FXPalette(bg: RGB(hex: 0x0A5A8F), fg: RGB(hex: 0xFFFFFF), acc: RGB(hex: 0xFFE14D), dim: RGB(hex: 0x083F66)))),
-        make(.palette, "yellowBlack", [.bright: 0.9, .bounce: 0.8, .aggression: 0.4, .warm: 0.5], [.ska, .poppunk, .skatepunk],
+        make(.palette, "yellowBlack", [.bright: 0.9, .bounce: 0.8, .aggression: 0.4, .warm: 0.5], [.ska, .poppunk, .skatepunk, .bigbeat],
              .palette(FXPalette(bg: RGB(hex: 0xF5D90A), fg: RGB(hex: 0x111111), acc: RGB(hex: 0xFF2E2E), dim: RGB(hex: 0x6B5A00)))),
         // B2 批 3（Nu-metal；原型 composer.js 的 B2 批 3 段）。標籤只收本批專屬的（新團的私有子標籤＋連帶的 Korn／Hatebreed 的 nu、hardcore）
         make(.palette, "acid", [.aggression: 0.6, .bright: 0.5, .raw: 0.3], [.cybermetal, .rapmetal, .nu],
@@ -568,7 +593,7 @@ enum LyricsFXCatalog {
              .palette(FXPalette(bg: RGB(hex: 0x0D0907), fg: RGB(hex: 0xE6DCCB), acc: RGB(hex: 0xB8461C), dim: RGB(hex: 0x5E4A3C)))),
         make(.palette, "sangre", [.warm: 0.8, .aggression: 0.65, .theatrical: 0.5, .raw: 0.45], [.latinmetal],
              .palette(FXPalette(bg: RGB(hex: 0x120806), fg: RGB(hex: 0xF3E3C3), acc: RGB(hex: 0xE0522B), dim: RGB(hex: 0x6A3B2A)))),
-        make(.palette, "terminal", [.cold: 0.6, .bright: 0.5, .speed: 0.6], [.cybermetal],
+        make(.palette, "terminal", [.cold: 0.6, .bright: 0.5, .speed: 0.6], [.cybermetal, .techno, .idm, .electro],
              .palette(FXPalette(bg: RGB(hex: 0x04070A), fg: RGB(hex: 0x5CFFB0), acc: RGB(hex: 0x2EE6FF), dim: RGB(hex: 0x1E4C3A)))),
         // B2 批 4（emo 群；原型 composer.js 的 B2 批 4 段）。標籤只收本批私有的（emo／posthardcore／indieemo／emopop）
         make(.palette, "bruise", [.theatrical: 0.6, .cold: 0.5, .decay: 0.4, .elegance: 0.5], [.emo, .indieemo],
@@ -651,5 +676,12 @@ enum LyricsFXCatalog {
              .palette(FXPalette(bg: RGB(hex: 0x120909), fg: RGB(hex: 0xF7EDE6), acc: RGB(hex: 0xE53935), dim: RGB(hex: 0x5E4642)))),
         make(.palette, "genHipPurple", [.theatrical: 0.5, .bounce: 0.7], [.genHipHop],
              .palette(FXPalette(bg: RGB(hex: 0x100A1A), fg: RGB(hex: 0xF4EEFF), acc: RGB(hex: 0xA66BFF), dim: RGB(hex: 0x4F456B)))),
+        // B2 批 5（工業／電子 5 團補件，使用者 2026-11-01 看探針 P17 後簽字；由原型 composer.js 產生，不手抄）
+        make(.palette, "blackRed", [.cold: 0.6, .aggression: 0.8, .theatrical: 0.6], [.industrial],
+             .palette(FXPalette(bg: RGB(hex: 0x000000), fg: RGB(hex: 0xE9E9E9), acc: RGB(hex: 0xC1121F), dim: RGB(hex: 0x3A3A3A)))),
+        make(.palette, "neonPink", [.bright: 0.8, .bounce: 0.5, .warm: 0.4, .theatrical: 0.5], [.house, .frenchhouse, .electro],
+             .palette(FXPalette(bg: RGB(hex: 0x120A1F), fg: RGB(hex: 0xFFFFFF), acc: RGB(hex: 0xFF2E88), dim: RGB(hex: 0x2EE6FF)))),
+        make(.palette, "steelFire", [.cold: 0.7, .theatrical: 0.7, .aggression: 0.75], [.industrial],
+             .palette(FXPalette(bg: RGB(hex: 0x0B0C0D), fg: RGB(hex: 0xD6D9DC), acc: RGB(hex: 0xE2231A), dim: RGB(hex: 0x4A4F55)))),
     ]
 }

@@ -134,6 +134,11 @@ enum ComposedStyle {
     static let thumpScale: CGFloat = 0.04
     /// 光暈：原型 shadowBlur 18 × glowAmt(polish 0.4)≈14.8；Canvas 的 blur 約為 SwiftUI shadow 半徑的 2 倍
     static let glowRadius: CGFloat = 7.4
+    /// B2 批 5 heat（字緣紅光）：原型停穩後 shadowBlur 14 × 0.5＝7，照 glow 的同一換算（14.8 → glowRadius）
+    static let heatGlowRadius: CGFloat = glowRadius * 7 / 14.8
+    /// B2 批 5 stomp（行軍重踏）：原型每個詞起點後 0.15 s 內整屏下沉、最深 0.012 畫面高
+    static let stompWindow = 0.15
+    static let stompDepth: CGFloat = 0.012
     /// 霓虹描邊寬（em 比例）
     static let strokeRatio: CGFloat = 0.06
     /// 倒影：在字下方 0.95 em、4% 透明度
@@ -214,7 +219,7 @@ enum ComposedStyle {
             let first = frame.glyphs.count
             draw(entry, time: time, size: size, style: lineStyle, measurer: measurer, into: &frame, specks: &specks)
             // 光暈只給現行句：讓位中的舊句移到光暈層外（點陣與向量在淡字光暈邊緣會差幾個像素；霓虹描邊共用半徑但不受影響）
-            if style.effects.contains(.glow), entry.yield < 1 {
+            if style.effects.contains(.glow) || style.effects.contains(.heat), entry.yield < 1 {
                 frame.unlit += frame.glyphs[first...]
                 frame.glyphs.removeSubrange(first...)
             }
@@ -229,10 +234,17 @@ enum ComposedStyle {
         if style.effects.contains(.thump), let current {
             frame.zoom = 1 + thumpScale * CGFloat(wordHit(current.line, time: time, window: thumpWindow))
         }
+        if style.effects.contains(.stomp), let current {
+            frame.shake.height += stompDepth * size.height * CGFloat(wordHit(current.line, time: time, window: stompWindow))
+        }
         if style.effects.contains(.speedlines), let current, time - current.line.start < speedLineWindow {
             frame.back.append(speedLines(size: size, time: time, color: style.palette.fg, fade: 1 - (time - current.line.start) / speedLineWindow))
         }
-        if style.effects.contains(.glow) || style.effects.contains(.neonstroke) { frame.glow = glowRadius }
+        if style.effects.contains(.glow) || style.effects.contains(.neonstroke) {
+            frame.glow = glowRadius
+        } else if style.effects.contains(.heat) {
+            frame.glow = heatGlowRadius
+        }
         return frame
     }
 
