@@ -88,7 +88,10 @@ final class LabelPrintStore: G7TransitionObserver {
     static let shared = LabelPrintStore(renderer: ImageRendererLabelPrint())
 
     private static let log = Logger(subsystem: "com.ibridgezhao.yogsothothsecho", category: "turntable")
-    private static let signposter = OSSignposter(subsystem: "com.ibridgezhao.yogsothothsecho", category: "TurntableG7")
+    /// 與 G7 分開的 category（同 category 會被 g7_segments.py 當成 G7 列）；message＝`render=<n>`（n＝renderCount，連號供 parser 查缺號／重複）
+    static let renderSignpostCategory = "TurntableLabelPrint"
+    static func renderSignpostMessage(ordinal: Int) -> String { "render=\(ordinal)" }
+    private static let signposter = OSSignposter(subsystem: "com.ibridgezhao.yogsothothsecho", category: renderSignpostCategory)
 
     private var entries: [LabelPrintKey: Entry] = [:]
     @ObservationIgnored private let renderer: (any LabelPrintRendering)?
@@ -172,7 +175,8 @@ final class LabelPrintStore: G7TransitionObserver {
             return
         }
         renderCount += 1
-        let state = Self.signposter.beginInterval("LabelPrintRender", id: Self.signposter.makeSignpostID())
+        let message = Self.renderSignpostMessage(ordinal: renderCount)
+        let state = Self.signposter.beginInterval("LabelPrintRender", id: Self.signposter.makeSignpostID(), "\(message, privacy: .public)")
         let image = renderer.render(key)
         Self.signposter.endInterval("LabelPrintRender", state)
         guard let image else {

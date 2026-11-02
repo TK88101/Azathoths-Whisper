@@ -25,6 +25,9 @@ from liquid_hitches import _run, window_stats  # noqa: E402
 NS_PER_S = 1_000_000_000
 NS_PER_MS = 1_000_000
 CATEGORY = "TurntableG7"
+G7_NAMES = ("G7", "phase")  # G7Trace 的 interval 與相位 event；同 category 的其他 signpost 不屬於 G7
+LABEL_CATEGORY = "TurntableLabelPrint"
+LABEL_RENDER = "LabelPrintRender"
 PROCESS = "Yog-Sothoth's Echo"
 SEGMENTS = ("lifting", "awaiting", "animation")
 ANIMATION_PHASES = ("relabeling", "clearing", "crossfading")  # 動畫段的第一個相位（同專輯／換專輯／Reduce Motion）
@@ -100,7 +103,8 @@ def _int(cell):
 
 def intervals(rows, category=CATEGORY):
     """G7 Begin／phase／End（message 首欄＝轉場 ID）配成 interval；配不上的寫進 problems（任何一條＝量測無效）"""
-    marks = sorted((r for r in rows if _text(r.get("category")) == category), key=lambda r: _int(r.get("time")) or 0)
+    marks = sorted((r for r in rows if _text(r.get("category")) == category and _text(r.get("name")) in G7_NAMES),
+                   key=lambda r: _int(r.get("time")) or 0)
     open_, closed, problems = {}, [], []
     for row in marks:
         kind, name, time = _text(row.get("event-type")), _text(row.get("name")), _int(row.get("time"))
@@ -125,6 +129,41 @@ def intervals(rows, category=CATEGORY):
             closed.append(G7Interval(tid, begin, time, tuple(phases), " ".join(words[1:])))
     problems.extend(f"unclosed G7 {tid}" for tid in sorted(open_))
     return sorted(closed, key=lambda i: i.begin_ns), problems
+
+
+def label_renders(rows, category=LABEL_CATEGORY):
+    """§11.5 B8：LabelPrintRender（主執行緒同步、不重疊）——Begin `render=<n>` 配下一個 End。
+    n 須連號（可從中途開始：warm 錄製前已畫過）；缺號、重複、未閉合、孤立 End、格式錯＝problems（該次量測無效）；
+    任一次 > 16.67 ms＝不通過"""
+    marks = sorted((r for r in rows if _text(r.get("category")) == category and _text(r.get("name")) == LABEL_RENDER),
+                   key=lambda r: _int(r.get("time")) or 0)
+    durations, ordinals, problems, open_ = [], [], [], None
+    for row in marks:
+        kind, time, message = _text(row.get("event-type")), _int(row.get("time")), _text(row.get("message"))
+        if kind == "Begin":
+            if open_ is not None and open_[0] is not None:
+                problems.append(f"unclosed LabelPrintRender {open_[0]}")
+            ordinal = message[len("render="):] if message.startswith("render=") else ""
+            if not ordinal.isdigit() or time is None:
+                problems.append(f"malformed LabelPrintRender begin: {message!r}")
+                open_ = (None, time)  # 佔住：後面的 End 屬於它，不另報孤立 End
+                continue
+            open_ = (int(ordinal), time)
+        elif kind == "End":
+            if open_ is None or time is None:
+                problems.append("LabelPrintRender end without begin")
+                continue
+            if open_[0] is not None:
+                ordinals.append(open_[0])
+                durations.append(round((time - open_[1]) / NS_PER_MS, 3))
+            open_ = None
+    if open_ is not None and open_[0] is not None:
+        problems.append(f"unclosed LabelPrintRender {open_[0]}")
+    if ordinals and ordinals != list(range(ordinals[0], ordinals[0] + len(ordinals))):
+        problems.append(f"LabelPrintRender ordinals not contiguous: {ordinals}")
+    over = [ms for ms in durations if ms > FRAME_MS]
+    return {"count": len(durations), "durations_ms": durations, "max_ms": max(durations, default=None),
+            "over_limit_ms": over, "problems": problems, "passes": not problems and not over}
 
 
 def segments(interval):
@@ -288,7 +327,7 @@ def _samples_by_metric(tables, process):
 
 def analyze_tables(traces, mode, process=PROCESS, labels=None, require_label_misses=False):
     """多個 trace（每組一個；時間各自相對錄製起點）：各自歸屬後合併成 {段: {指標: [ns]}}；problems 帶 trace 標籤"""
-    per_group, problems, every_interval = [], [], []
+    per_group, problems, every_interval, renders = [], [], [], []
     by_segment = {name: {metric: [] for metric in METRICS} for name in SEGMENTS}
     # traces 可以是只能迭代一次的 generator（CLI 逐個匯出、用完即釋放）
     for index, tables in enumerate(traces):
@@ -300,6 +339,9 @@ def analyze_tables(traces, mode, process=PROCESS, labels=None, require_label_mis
             misses = label_misses(found)
             problems.extend(f"{label}: {problem}" for problem in misses["problems"])
             every_interval.extend(found)
+            rendered = label_renders(tables["os-signpost"])
+            problems.extend(f"{label}: {problem}" for problem in rendered["problems"])
+            renders.append(rendered)
         for metric, samples in _samples_by_metric(tables, process).items():
             for name, values in attribute(found, samples).items():
                 by_segment[name][metric].extend(values)
@@ -311,6 +353,11 @@ def analyze_tables(traces, mode, process=PROCESS, labels=None, require_label_mis
               "verdict": judge(count, problems, by_segment, mode, groups=len(per_group), label_misses=misses)}
     if misses is not None:
         report["label_misses"] = {key: misses[key] for key in ("total", "reasons", "per_interval")}
+        durations = [ms for rendered in renders for ms in rendered["durations_ms"]]
+        over = [ms for rendered in renders for ms in rendered["over_limit_ms"]]
+        # B8 的 S2 進唱機成本 gate：與 §6 的 verdict 分開報（任一次 > 16.67 ms＝S2 不通過）
+        report["label_render"] = {"count": len(durations), "durations_ms": durations, "max_ms": max(durations, default=None),
+                                  "over_limit_ms": over, "passes": all(rendered["passes"] for rendered in renders)}
     return report
 
 

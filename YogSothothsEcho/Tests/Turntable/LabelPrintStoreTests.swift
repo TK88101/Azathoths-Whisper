@@ -33,6 +33,14 @@ struct LabelPrintStoreTests {
         for _ in 0..<200 where !done() { await Task.yield(); try? await Task.sleep(for: .milliseconds(5)) }
     }
 
+    // MARK: Signpost 契約（Scripts/g7_segments.py 的 label_renders 依此解析；改這裡＝同步改 parser）
+
+    @Test func renderSignpostUsesOwnCategoryAndOrdinalMessage() {
+        #expect(LabelPrintStore.renderSignpostCategory == "TurntableLabelPrint")
+        #expect(LabelPrintStore.renderSignpostCategory != "TurntableG7")
+        #expect(LabelPrintStore.renderSignpostMessage(ordinal: 3) == "render=3")
+    }
+
     // MARK: Key
 
     @Test func keyAppliesLabelDiameterFormulaAndScale() {

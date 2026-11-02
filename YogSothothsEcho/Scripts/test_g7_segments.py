@@ -22,10 +22,17 @@ def fixture(name):
         return f.read()
 
 
-def signpost(time_ns, kind, name, message):
+def signpost(time_ns, kind, name, message, category="TurntableG7"):
     """合成的 os-signpost 列（與 load_rows 的輸出同形：欄位 → (fmt, raw)）"""
     return {"time": ("", str(time_ns)), "event-type": (kind, kind), "name": (name, name),
-            "category": ("TurntableG7", "TurntableG7"), "message": (message, message)}
+            "category": (category, category), "message": (message, message)}
+
+
+def render(ordinal, begin_s, duration_ms, category="TurntableLabelPrint"):
+    """CR-039 §11.3：一次 LabelPrintRender interval（Begin `render=<n>`、End 無 message）"""
+    begin = int(begin_s * S)
+    return [signpost(begin, "Begin", "LabelPrintRender", f"render={ordinal}", category),
+            signpost(begin + int(duration_ms * MS), "End", "LabelPrintRender", "", category)]
 
 
 def transition(tid, begin_s, phases, end_s, end_note=""):
@@ -326,6 +333,58 @@ class LabelMissTests(unittest.TestCase):
 def frame_rows(counts, start_s=0):
     return [{"start": ("", str((start_s + i) * S)), "duration": ("", str(S)), "count": (str(c), str(c))}
             for i, c in enumerate(counts)]
+
+
+class LabelRenderTests(unittest.TestCase):
+    """CR-039 §11.5 B4／B8：每次實際畫遮罩＝一個 LabelPrintRender interval；> 16.67 ms＝S2 不通過；缺、重複、未閉合＝無效"""
+
+    def test_g7_parser_ignores_other_signposts_in_its_category(self):
+        rows = new_album(1, 0.0, ZERO_NOTE) + render(1, 2.0, 3.0, category="TurntableG7")
+        found, problems = g7.intervals(rows)
+        self.assertEqual(problems, [])
+        self.assertEqual(len(found), 1)
+
+    def test_durations_and_pass(self):
+        report = g7.label_renders(render(1, 0.0, 2.5) + render(2, 5.0, 16.0))
+        self.assertEqual(report["problems"], [])
+        self.assertEqual(report["count"], 2)
+        self.assertEqual(report["durations_ms"], [2.5, 16.0])
+        self.assertTrue(report["passes"])
+
+    def test_over_one_frame_fails(self):
+        report = g7.label_renders(render(1, 0.0, 16.8))
+        self.assertEqual(report["problems"], [])
+        self.assertFalse(report["passes"])
+        self.assertEqual(report["over_limit_ms"], [16.8])
+
+    def test_ordinals_may_start_mid_session_but_must_be_contiguous(self):
+        self.assertEqual(g7.label_renders(render(4, 0.0, 2.0) + render(5, 1.0, 2.0))["problems"], [])
+        for rows in (render(1, 0.0, 2.0) + render(3, 1.0, 2.0),      # 缺號
+                     render(1, 0.0, 2.0) + render(1, 1.0, 2.0)):     # 重複
+            self.assertEqual(len(g7.label_renders(rows)["problems"]), 1)
+
+    def test_unclosed_orphan_end_and_malformed_are_problems(self):
+        begin_only = render(1, 0.0, 2.0)[:1]
+        end_only = render(1, 0.0, 2.0)[1:]
+        malformed = [signpost(0, "Begin", "LabelPrintRender", "render=x", "TurntableLabelPrint")] + end_only
+        for rows in (begin_only, end_only, malformed):
+            report = g7.label_renders(rows)
+            self.assertEqual(len(report["problems"]), 1, rows)
+            self.assertFalse(report["passes"])
+
+    def test_no_renders_is_valid(self):
+        report = g7.label_renders([])
+        self.assertEqual((report["count"], report["problems"], report["passes"]), (0, [], True))
+
+    def test_analyze_reports_renders_and_invalidates_on_problems(self):
+        tables = {name: [] for name in g7.TABLES}
+        tables["os-signpost"] = new_album(1, 0.0, ZERO_NOTE) + render(1, 3.0, 4.0)
+        report = g7.analyze_tables([tables], mode="cold", process=YSE, require_label_misses=True)
+        self.assertTrue(report["verdict"]["valid"], report["problems"])
+        self.assertEqual(report["label_render"]["durations_ms"], [4.0])
+        tables["os-signpost"] = new_album(1, 0.0, ZERO_NOTE) + render(1, 3.0, 4.0)[:1]
+        broken = g7.analyze_tables([tables], mode="cold", process=YSE, require_label_misses=True)
+        self.assertFalse(broken["verdict"]["valid"])
 
 
 class SteadyTests(unittest.TestCase):
