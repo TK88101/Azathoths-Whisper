@@ -97,6 +97,7 @@
 		518553A6DB0DF7EA21CAFD0E /* TurntableSkinUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA0F9E30211D2E20C4F57DA /* TurntableSkinUITests.swift */; };
 		5278305418B8BBD1893385DF /* TurntableSkinPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CF425BABB6C1B88C8CAEA23 /* TurntableSkinPicker.swift */; };
 		54D51F5694E3B7CB2311657C /* RemoteTransport in Frameworks */ = {isa = PBXBuildFile; productRef = FE47704AF71D52BA6C90E297 /* RemoteTransport */; };
+		558E5D0CAA517F4E1AFC48EE /* LabelPrintStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 826FE9CD6207E3115E61BE79 /* LabelPrintStoreTests.swift */; };
 		55A565D9A735DAF34EC1A039 /* SpineFoldShadingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB6DEADF943CB9539C75E47 /* SpineFoldShadingTests.swift */; };
 		564E40DA6D81AD2A4F2E6953 /* SkinPreviewRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDF7D68990D209FE6F35E990 /* SkinPreviewRenderer.swift */; };
 		56B202528F7E8D6ED8C2D5C7 /* TurntableSkinSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E78F40A6CE0EB18014AE1799 /* TurntableSkinSelectionTests.swift */; };
@@ -114,9 +115,11 @@
 		61DAACB740C2B30539B61868 /* SpineBakeSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D68F304DC9F2E99B3809AC39 /* SpineBakeSnapshotTests.swift */; };
 		6221EB18ED7FEE551C3C8A68 /* LiquidSampleState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F1B207BB2FF3C402FC5CB5D /* LiquidSampleState.swift */; };
 		62576B5C7AACEA5124A95149 /* VinylRecordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D998F2708A8EC72326227649 /* VinylRecordView.swift */; };
+		63C75BC22316C2364AF231C3 /* LabelPrintRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5808FBF51FA6EA3BB9B19152 /* LabelPrintRenderTests.swift */; };
 		64EB2FFEE5FFA4A0E3DEFF7E /* RemoteFailureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37750F899D9E7BA1F132D866 /* RemoteFailureUITests.swift */; };
 		650BE8410233B34060C320F9 /* connecting-light.png in Resources */ = {isa = PBXBuildFile; fileRef = 41A964B8AC8CDBC3A1428EFF /* connecting-light.png */; };
 		6579504A7C074D33B36A696D /* TurntableBackgroundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6286DE1E5D53399CCFC15999 /* TurntableBackgroundTests.swift */; };
+		670FEE7C015B5E31F65E864B /* LabelPrintStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4272C4DC1B6D9A24F89C5236 /* LabelPrintStore.swift */; };
 		67F4201B8B2C38B58CDDE25E /* pairing-dark-reduceTransparency.png in Resources */ = {isa = PBXBuildFile; fileRef = E1CD02436D1803F0ECAA4A1D /* pairing-dark-reduceTransparency.png */; };
 		694879BB0BE8EF092C1BF425 /* GeniusGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B3AAFB9812C62A3638319A8 /* GeniusGlyph.swift */; };
 		6A4661EFE7C1711AECFF923F /* BrowserAccessibilityViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AB9B545B0FCE573A9C811DE /* BrowserAccessibilityViewTests.swift */; };
@@ -375,6 +378,7 @@
 		3FA0F9E30211D2E20C4F57DA /* TurntableSkinUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurntableSkinUITests.swift; sourceTree = "<group>"; };
 		412F9E68DA0822E50F8B934D /* SpineStackGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpineStackGlyph.swift; sourceTree = "<group>"; };
 		41A964B8AC8CDBC3A1428EFF /* connecting-light.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "connecting-light.png"; sourceTree = "<group>"; };
+		4272C4DC1B6D9A24F89C5236 /* LabelPrintStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelPrintStore.swift; sourceTree = "<group>"; };
 		437E0D19E07E5BD8190DDD66 /* AlbumDetailPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumDetailPresentationTests.swift; sourceTree = "<group>"; };
 		4413ACA2FAC950CE9394352F /* TurntableGestureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurntableGestureTests.swift; sourceTree = "<group>"; };
 		45B40423B3E30880D47A0123 /* AlbumDetailUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumDetailUITests.swift; sourceTree = "<group>"; };
@@ -395,6 +399,7 @@
 		5460BA259B14B1B2710D14BA /* PairingStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingStyle.swift; sourceTree = "<group>"; };
 		5495F99343DAAF065C16F31D /* CarouselHitTestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarouselHitTestTests.swift; sourceTree = "<group>"; };
 		5740EA6F1CE9770CBAE489BA /* PaperFiberTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaperFiberTests.swift; sourceTree = "<group>"; };
+		5808FBF51FA6EA3BB9B19152 /* LabelPrintRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelPrintRenderTests.swift; sourceTree = "<group>"; };
 		587603E5C1A3019181BE662B /* BrowseArtworkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseArtworkTests.swift; sourceTree = "<group>"; };
 		592A1E07E44D9C12991E1B74 /* BottomDockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomDockTests.swift; sourceTree = "<group>"; };
 		59853F8E9BF842A874ADF7DA /* BrowserLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserLayout.swift; sourceTree = "<group>"; };
@@ -451,6 +456,7 @@
 		81AA83BE33CA5E7A55E76E22 /* BackgroundModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundModelTests.swift; sourceTree = "<group>"; };
 		81F5F94A7D2C9EEC539D31F4 /* LiquidMotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidMotionTests.swift; sourceTree = "<group>"; };
 		81FB08F42BD45F44BEB0A5B4 /* OrientationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrientationTests.swift; sourceTree = "<group>"; };
+		826FE9CD6207E3115E61BE79 /* LabelPrintStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelPrintStoreTests.swift; sourceTree = "<group>"; };
 		8384A1FA3C6FC13D694B3AE4 /* TurntableHitTestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurntableHitTestTests.swift; sourceTree = "<group>"; };
 		840AFA1B34DCF6BDA9589174 /* AlbumStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumStageView.swift; sourceTree = "<group>"; };
 		84CCCAB31660F317B96EE4CD /* SwirlArtworkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwirlArtworkStore.swift; sourceTree = "<group>"; };
@@ -829,6 +835,8 @@
 				95C0FB50D859B86B9EA47960 /* DetailArtworkStoreTests.swift */,
 				3B8D3506A7686AEC855EA66B /* G7TraceTests.swift */,
 				1CD40835F8AB855F4E8E9E75 /* LabelLayoutTests.swift */,
+				5808FBF51FA6EA3BB9B19152 /* LabelPrintRenderTests.swift */,
+				826FE9CD6207E3115E61BE79 /* LabelPrintStoreTests.swift */,
 				0E7FABECEB0AC0124E4E55B4 /* LiquidCheckpointDump.swift */,
 				81F5F94A7D2C9EEC539D31F4 /* LiquidMotionTests.swift */,
 				299AA98569237F161ECBB751 /* LiquidSampleStateTests.swift */,
@@ -975,6 +983,7 @@
 				36D7E2CF8D9D2C78AE6B687F /* AlbumPalette.swift */,
 				C7D3ECAFC33AFBF40992BDF0 /* CoverSleeveState.swift */,
 				DCC9C129E5BD36F9FF35C5E1 /* G7Trace.swift */,
+				4272C4DC1B6D9A24F89C5236 /* LabelPrintStore.swift */,
 				CFB74D13119A17C955F659AD /* LabelRing.swift */,
 				BC9970214BAACAE9B0E0A19E /* RecordSpin.swift */,
 				0CABCE4F99B11787ECC04195 /* RecordStyle.swift */,
@@ -1302,6 +1311,8 @@
 				AC6100DED05AD362F7DDB490 /* GeniusGlyphTests.swift in Sources */,
 				FC781B1B1213EEB373C8E299 /* KeychainIdentitySmokeTests.swift in Sources */,
 				C25169EA453DA69BB516FA8A /* LabelLayoutTests.swift in Sources */,
+				63C75BC22316C2364AF231C3 /* LabelPrintRenderTests.swift in Sources */,
+				558E5D0CAA517F4E1AFC48EE /* LabelPrintStoreTests.swift in Sources */,
 				029618DE2687626490DC51CD /* LibraryAnchorTests.swift in Sources */,
 				D32FDC8D7AA20E704996DCAC /* LibraryCatalogChangeEnduranceTests.swift in Sources */,
 				6AFCBCABB766C79AD4386D14 /* LibraryMeasurementTests.swift in Sources */,
@@ -1424,6 +1435,7 @@
 				A2E76BF2B9C15DC3E0232BFE /* G7Trace.swift in Sources */,
 				694879BB0BE8EF092C1BF425 /* GeniusGlyph.swift in Sources */,
 				61CD6B0339973D345DDB31F8 /* Glass.swift in Sources */,
+				670FEE7C015B5E31F65E864B /* LabelPrintStore.swift in Sources */,
 				4B700B5F5F622E9FB16292F9 /* LabelRing.swift in Sources */,
 				1020DC0BFAFAED0BF40DFE84 /* LibraryMeasurement.swift in Sources */,
 				42ADA83DF9077590386DAABC /* LibraryMetrics.swift in Sources */,

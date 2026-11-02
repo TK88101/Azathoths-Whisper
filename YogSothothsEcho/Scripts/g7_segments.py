@@ -60,6 +60,7 @@ class G7Interval:
     begin_ns: int
     end_ns: int
     phases: tuple  # ((相位名, 起點 ns), ...)
+    end_note: str = ""  # End message 轉場 ID 之後的部分（§11 S2：`misses=<n> reasons=…`）
 
 
 def load_rows(xml_text):
@@ -121,7 +122,7 @@ def intervals(rows, category=CATEGORY):
                 open_[tid][1].append((words[1], time))
         elif kind == "End":
             begin, phases = open_.pop(tid)
-            closed.append(G7Interval(tid, begin, time, tuple(phases)))
+            closed.append(G7Interval(tid, begin, time, tuple(phases), " ".join(words[1:])))
     problems.extend(f"unclosed G7 {tid}" for tid in sorted(open_))
     return sorted(closed, key=lambda i: i.begin_ns), problems
 
@@ -208,7 +209,42 @@ def _max_ms(values):
     return _ms(max(values, default=None))
 
 
-def judge(intervals, problems, by_segment, mode, groups=1):
+LABEL_MISS_REASONS = ("absent", "pending", "rendering", "failed")
+
+
+def _parse_label_note(note):
+    """`misses=<n> reasons=absent:a,pending:p,rendering:r,failed:f` → (n, {reason: count})；缺、重複、格式錯、合計不符＝None"""
+    tokens = note.split()
+    misses = [t for t in tokens if t.startswith("misses=")]
+    reasons = [t for t in tokens if t.startswith("reasons=")]
+    if len(misses) != 1 or len(reasons) != 1 or len(tokens) != 2:
+        return None
+    count = misses[0][len("misses="):]
+    pairs = [part.split(":") for part in reasons[0][len("reasons="):].split(",")]
+    if not count.isdigit() or [p[0] for p in pairs] != list(LABEL_MISS_REASONS) \
+            or not all(len(p) == 2 and p[1].isdigit() for p in pairs):
+        return None
+    by_reason = {name: int(value) for name, value in pairs}
+    return (int(count), by_reason) if sum(by_reason.values()) == int(count) else None
+
+
+def label_misses(found):
+    """§11.3／B4：每個 interval 的標籤 logical miss（signpost end note）；解析不了的列為 problems"""
+    totals = dict.fromkeys(LABEL_MISS_REASONS, 0)
+    per_interval, problems = [], []
+    for interval in found:
+        parsed = _parse_label_note(interval.end_note)
+        if parsed is None:
+            problems.append(f"G7 {interval.transition_id}: label misses note missing or malformed: {interval.end_note!r}")
+            continue
+        count, by_reason = parsed
+        per_interval.append(count)
+        for name, value in by_reason.items():
+            totals[name] += value
+    return {"total": sum(per_interval), "reasons": totals, "per_interval": per_interval, "problems": problems}
+
+
+def judge(intervals, problems, by_segment, mode, groups=1, label_misses=None):
     """warm（§6.2）：動畫段 update p99 ≤ 8.33、max ≤ 16.67；render、GPU max ≤ 16.67；hitch max ≤ 16.7（ms，含等號）。
     cold（§6.3）：只判整個 interval（三段）最長 hitch 不劣於修前 75.04 ms（修前未分段量，附錄 F）；其餘照報不判"""
     animation = by_segment["animation"]
@@ -234,8 +270,11 @@ def judge(intervals, problems, by_segment, mode, groups=1):
         checks = {"hitch_max": (_max_ms(every_hitch), COLD_PRE_FIX_HITCH_MS)}
     else:
         raise ValueError(f"unknown mode {mode!r} (warm or cold)")
-    failures ={name: {"value_ms": value, "limit_ms": limit}
+    failures = {name: {"value_ms": value, "limit_ms": limit}
                 for name, (value, limit) in checks.items() if value is not None and value > limit}
+    # §11.1：warm 每個 interval 標籤 miss 必須 0；cold 照報不判
+    if mode == "warm" and label_misses is not None and label_misses["total"] > 0:
+        failures["label_misses"] = {"value": label_misses["total"], "limit": 0}
     valid = not reasons
     return {"mode": mode, "valid": valid, "reasons": reasons, "passes": valid and not failures, "failures": failures}
 
@@ -247,9 +286,9 @@ def _samples_by_metric(tables, process):
             "gpu": linked_samples(tables["hitches-gpu"], swaps), "hitch": hitch_samples(tables["hitches"], process)}
 
 
-def analyze_tables(traces, mode, process=PROCESS, labels=None):
+def analyze_tables(traces, mode, process=PROCESS, labels=None, require_label_misses=False):
     """多個 trace（每組一個；時間各自相對錄製起點）：各自歸屬後合併成 {段: {指標: [ns]}}；problems 帶 trace 標籤"""
-    per_group, problems = [], []
+    per_group, problems, every_interval = [], [], []
     by_segment = {name: {metric: [] for metric in METRICS} for name in SEGMENTS}
     # traces 可以是只能迭代一次的 generator（CLI 逐個匯出、用完即釋放）
     for index, tables in enumerate(traces):
@@ -257,14 +296,22 @@ def analyze_tables(traces, mode, process=PROCESS, labels=None):
         found, found_problems = intervals(tables["os-signpost"])
         per_group.append({"group": label, "intervals": len(found)})
         problems.extend(f"{label}: {problem}" for problem in found_problems)
+        if require_label_misses:
+            misses = label_misses(found)
+            problems.extend(f"{label}: {problem}" for problem in misses["problems"])
+            every_interval.extend(found)
         for metric, samples in _samples_by_metric(tables, process).items():
             for name, values in attribute(found, samples).items():
                 by_segment[name][metric].extend(values)
     count = sum(group["intervals"] for group in per_group)
-    return {"intervals": count, "per_group": per_group, "problems": problems,
-            "segments": {name: {metric: stats(values) for metric, values in metrics.items()}
-                         for name, metrics in by_segment.items()},
-            "verdict": judge(count, problems, by_segment, mode, groups=len(per_group))}
+    misses = label_misses(every_interval) if require_label_misses else None
+    report = {"intervals": count, "per_group": per_group, "problems": problems,
+              "segments": {name: {metric: stats(values) for metric, values in metrics.items()}
+                           for name, metrics in by_segment.items()},
+              "verdict": judge(count, problems, by_segment, mode, groups=len(per_group), label_misses=misses)}
+    if misses is not None:
+        report["label_misses"] = {key: misses[key] for key in ("total", "reasons", "per_interval")}
+    return report
 
 
 def steady(frame_rows, hitches, warmup_s=STEADY_WARMUP_S, seconds=STEADY_SECONDS):
@@ -298,9 +345,10 @@ def export_table(trace, schema):
     return load_rows(exported.stdout)
 
 
-def analyze_traces(traces, mode, process):
+def analyze_traces(traces, mode, process, require_label_misses=False):
     tables = ({schema: export_table(trace, schema) for schema in TABLES} for trace in traces)
-    return dict(analyze_tables(tables, mode, process, labels=[Path(t).name for t in traces]), traces=[str(t) for t in traces])
+    report = analyze_tables(tables, mode, process, labels=[Path(t).name for t in traces], require_label_misses=require_label_misses)
+    return dict(report, traces=[str(t) for t in traces])
 
 
 def main():
@@ -309,13 +357,14 @@ def main():
     g = sub.add_parser("g7")
     g.add_argument("--mode", choices=("warm", "cold"), required=True)
     g.add_argument("--process", default=PROCESS)
+    g.add_argument("--label-misses", action="store_true", help="rc3 起：要求 signpost end 帶標籤 miss（§11.3）")
     g.add_argument("traces", nargs="+")
     s = sub.add_parser("steady")
     s.add_argument("--process", default=PROCESS)
     s.add_argument("trace")
     args = parser.parse_args()
     if args.command == "g7":
-        result = analyze_traces(args.traces, args.mode, args.process)
+        result = analyze_traces(args.traces, args.mode, args.process, args.label_misses)
     else:
         result = steady(export_table(args.trace, "displayed-surfaces-per-second"),
                         hitch_samples(export_table(args.trace, "hitches"), args.process))

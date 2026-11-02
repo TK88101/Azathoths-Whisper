@@ -6,7 +6,8 @@ import os
 protocol G7TraceSink: AnyObject {
     func begin(_ id: UInt64)
     func phase(_ id: UInt64, _ name: String)
-    func end(_ id: UInt64)
+    /// note＝轉場觀察者給的附註（§11 S2：`misses=<n> reasons=…`；沒有觀察者＝空字串）
+    func end(_ id: UInt64, note: String)
 }
 
 /// CR-039 §4.4：每次轉場一個 interval（送出 → 回 idle／取消），其內每次相位變更一個 event。
@@ -14,18 +15,20 @@ protocol G7TraceSink: AnyObject {
 @MainActor
 final class G7Trace {
     private let sink: G7TraceSink
+    private let observer: (any G7TransitionObserver)?
     private var activeID: UInt64?
     private var nextID: UInt64 = 0
 
-    init(sink: G7TraceSink) {
+    init(sink: G7TraceSink, observer: (any G7TransitionObserver)? = nil) {
         self.sink = sink
+        self.observer = observer
     }
 
     func observe(from old: SwipeTransition, to new: SwipeTransition) {
         guard new.isTransitioning else {
             if let id = activeID {
                 activeID = nil
-                sink.end(id)
+                sink.end(id, note: observer?.transitionEnded() ?? "")
             }
             return
         }
@@ -35,6 +38,7 @@ final class G7Trace {
         }
         nextID += 1
         activeID = nextID
+        observer?.transitionBegan()
         sink.begin(nextID)
         sink.phase(nextID, new.phase.traceName)
     }
@@ -55,10 +59,10 @@ final class OSG7TraceSink: G7TraceSink {
         signposter.emitEvent("phase", "\(id, privacy: .public) \(name, privacy: .public)")
     }
 
-    func end(_ id: UInt64) {
+    func end(_ id: UInt64, note: String) {
         guard let state = interval else { return }
         interval = nil
-        signposter.endInterval("G7", state, "\(id, privacy: .public)")
+        signposter.endInterval("G7", state, "\(id, privacy: .public) \(note, privacy: .public)")
     }
 }
 

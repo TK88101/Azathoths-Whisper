@@ -28,11 +28,11 @@ def signpost(time_ns, kind, name, message):
             "category": ("TurntableG7", "TurntableG7"), "message": (message, message)}
 
 
-def transition(tid, begin_s, phases, end_s):
+def transition(tid, begin_s, phases, end_s, end_note=""):
     rows = [signpost(int(begin_s * S), "Begin", "G7", str(tid))]
     rows += [signpost(int(t * S), "Event", "phase", f"{tid} {name}") for name, t in phases]
     if end_s is not None:
-        rows.append(signpost(int(end_s * S), "End", "G7", str(tid)))
+        rows.append(signpost(int(end_s * S), "End", "G7", f"{tid} {end_note}".strip()))
     return rows
 
 
@@ -40,8 +40,11 @@ NEW_ALBUM = [("lifting", 0.0), ("awaiting", 0.35), ("clearing", 0.6), ("sheathin
              ("exchanging", 0.91), ("drawing", 1.24), ("placing", 1.44)]
 
 
-def new_album(tid, at_s):
-    return transition(tid, at_s, [(n, at_s + t) for n, t in NEW_ALBUM], at_s + 1.6)
+def new_album(tid, at_s, end_note=""):
+    return transition(tid, at_s, [(n, at_s + t) for n, t in NEW_ALBUM], at_s + 1.6, end_note)
+
+
+ZERO_NOTE = "misses=0 reasons=absent:0,pending:0,rendering:0,failed:0"
 
 
 class LoadRowsTests(unittest.TestCase):
@@ -254,6 +257,70 @@ class FixtureEndToEndTests(unittest.TestCase):
     def test_warm_over_fixture_is_invalid_for_too_few_intervals(self):
         report = g7.analyze_tables([self.tables], mode="warm", process=YSE)
         self.assertFalse(report["verdict"]["valid"])
+
+
+class LabelMissTests(unittest.TestCase):
+    """§11.3／B4（yse-g7-hitch-fix.md v0.9）：signpost end 帶 `misses=<n> reasons=…`；warm 每個 interval 恰一個合法 misses=0，
+    >0＝不通過、缺／重複／格式錯／reasons 合計不符＝無效；cold 照報；不要求時（rc2 舊 trace）忽略"""
+
+    def found(self, *notes):
+        rows = []
+        for index, note in enumerate(notes):
+            rows += new_album(index + 1, 10.0 * index, note)
+        found, problems = g7.intervals(rows)
+        self.assertEqual(problems, [])
+        return found
+
+    def test_end_note_is_kept_on_interval(self):
+        (interval,) = self.found(ZERO_NOTE)
+        self.assertEqual(interval.end_note, ZERO_NOTE)
+
+    def test_zero_misses_parse(self):
+        report = g7.label_misses(self.found(ZERO_NOTE, ZERO_NOTE))
+        self.assertEqual(report["problems"], [])
+        self.assertEqual(report["total"], 0)
+        self.assertEqual(report["reasons"], {"absent": 0, "pending": 0, "rendering": 0, "failed": 0})
+
+    def test_counts_are_summed(self):
+        report = g7.label_misses(self.found("misses=2 reasons=absent:0,pending:1,rendering:0,failed:1", ZERO_NOTE))
+        self.assertEqual(report["total"], 2)
+        self.assertEqual(report["reasons"]["pending"], 1)
+        self.assertEqual(report["per_interval"], [2, 0])
+
+    def test_missing_duplicate_malformed_and_mismatched_are_problems(self):
+        for note in ("", f"{ZERO_NOTE} misses=0", "misses=x reasons=absent:0,pending:0,rendering:0,failed:0",
+                     "misses=1 reasons=absent:0,pending:0,rendering:0,failed:0", "misses=0 reasons=absent:0,pending:0",
+                     "misses=0"):
+            report = g7.label_misses(self.found(note))
+            self.assertEqual(len(report["problems"]), 1, note)
+
+    def test_warm_fails_on_any_miss(self):
+        report = g7.judge(intervals=30, problems=[], by_segment=metrics(), mode="warm", groups=3,
+                          label_misses={"total": 1, "problems": []})
+        self.assertTrue(report["valid"])
+        self.assertIn("label_misses", report["failures"])
+        ok = g7.judge(intervals=30, problems=[], by_segment=metrics(), mode="warm", groups=3,
+                      label_misses={"total": 0, "problems": []})
+        self.assertTrue(ok["passes"], ok)
+
+    def test_cold_reports_but_does_not_gate_misses(self):
+        report = g7.judge(intervals=1, problems=[], by_segment=metrics(update_count=10), mode="cold",
+                          label_misses={"total": 3, "problems": []})
+        self.assertTrue(report["passes"])
+
+    def test_analyze_requires_notes_only_when_asked(self):
+        rows = new_album(1, 0.0)
+        tables = {name: [] for name in g7.TABLES}
+        tables["os-signpost"] = rows
+        plain = g7.analyze_tables([tables], mode="cold", process=YSE)
+        self.assertTrue(plain["verdict"]["valid"])
+        self.assertNotIn("label_misses", plain)
+        asked = g7.analyze_tables([tables], mode="cold", process=YSE, require_label_misses=True)
+        self.assertFalse(asked["verdict"]["valid"])
+        tables["os-signpost"] = new_album(1, 0.0, "misses=1 reasons=absent:1,pending:0,rendering:0,failed:0")
+        cold = g7.analyze_tables([tables], mode="cold", process=YSE, require_label_misses=True)
+        self.assertTrue(cold["verdict"]["valid"])
+        self.assertEqual(cold["label_misses"]["total"], 1)
 
 
 def frame_rows(counts, start_s=0):

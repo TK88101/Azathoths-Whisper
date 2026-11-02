@@ -10,7 +10,16 @@ final class SpyG7Sink: G7TraceSink {
     private(set) var log: [String] = []
     func begin(_ id: UInt64) { log.append("begin \(id)") }
     func phase(_ id: UInt64, _ name: String) { log.append("phase \(id) \(name)") }
-    func end(_ id: UInt64) { log.append("end \(id)") }
+    func end(_ id: UInt64, note: String) { log.append(note.isEmpty ? "end \(id)" : "end \(id) \(note)") }
+}
+
+/// 轉場觀察者替身（§11 S2：LabelPrintStore 在 G7 begin／end 收到通知，end 回傳 note）
+@MainActor
+final class SpyG7Observer: G7TransitionObserver {
+    private(set) var log: [String] = []
+    var note = "misses=0 reasons=absent:0,pending:0,rendering:0,failed:0"
+    func transitionBegan() { log.append("began") }
+    func transitionEnded() -> String { log.append("ended"); return note }
 }
 
 /// 轉場值與 trace 一起推進的小 harness（每次變更都交給 trace 比對前後值）
@@ -20,10 +29,10 @@ private struct Harness {
     let trace: G7Trace
     var swipe = SwipeTransition(displayScale: 2)
 
-    init() {
+    init(observer: (any G7TransitionObserver)? = nil) {
         let sink = SpyG7Sink()
         self.sink = sink
-        trace = G7Trace(sink: sink)
+        trace = G7Trace(sink: sink, observer: observer)
     }
 
     mutating func step(_ change: (inout SwipeTransition) -> Void) {
@@ -61,6 +70,19 @@ struct G7TraceTests {
         h.step { $0.cancel() }
         h.send()
         #expect(h.sink.log == ["begin 1", "phase 1 lifting", "end 1", "begin 2", "phase 2 lifting"])
+    }
+
+    /// §11 S2：觀察者在 begin 前收到 began、在 end 時給 note（寫進 signpost end）；取消路徑同樣收尾
+    @Test func observerIsNotifiedAndEndCarriesNote() {
+        let observer = SpyG7Observer()
+        var h = Harness(observer: observer)
+        h.send()
+        #expect(observer.log == ["began"])
+        h.step { $0.cancel() }
+        #expect(observer.log == ["began", "ended"])
+        #expect(h.sink.log == ["begin 1", "phase 1 lifting", "end 1 misses=0 reasons=absent:0,pending:0,rendering:0,failed:0"])
+        h.step { $0.cancel() }
+        #expect(observer.log == ["began", "ended"])
     }
 
     /// 拖動、回彈不是轉場：不發 signpost

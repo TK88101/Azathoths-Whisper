@@ -37,7 +37,8 @@ final class TurntableViewModel {
         didSet { g7Trace.observe(from: oldValue, to: swipe) }
     }
     /// CR-039 §4.4：G7 signpost（每次轉場一個 interval）
-    @ObservationIgnored private let g7Trace = G7Trace(sink: OSG7TraceSink())
+    /// §11 S2：標籤印字快取同時是轉場觀察者（G7 中不畫、logical miss 寫進 end）
+    @ObservationIgnored private let g7Trace = G7Trace(sink: OSG7TraceSink(), observer: LabelPrintStore.shared)
     /// 唱機層（S6 §4.8）：存在與否由它決定；殼層只讀
     private(set) var layer: TurntableLayerState = .hidden
     /// 這一次進出唱機用的 Reduce Motion（含 DEBUG 強制）：狀態機與 TurntableView 的進場動畫讀同一份

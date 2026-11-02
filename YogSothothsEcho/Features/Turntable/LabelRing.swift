@@ -87,9 +87,16 @@ enum LabelLayout {
 }
 
 /// 標籤上的固定印字：外圈環狀字、內緣細圈、品牌字、條碼（不畫數字；取代 MD Vinyl 素材的印字；#5-1）。`diameter`＝標籤直徑
-struct LabelRing: View {
+struct LabelRing: View, Equatable {
     let diameter: CGFloat
-    let color: Color
+    let tint: RGBColor
+
+    private var color: Color { tint.color }
+
+    /// CR-039 §11 S1：輸入只有直徑與文字色（RGBColor 是值型別，比較穩定）
+    nonisolated static func == (lhs: LabelRing, rhs: LabelRing) -> Bool {
+        lhs.diameter == rhs.diameter && lhs.tint == rhs.tint
+    }
 
     var body: some View {
         ZStack {
