@@ -1,0 +1,52 @@
+{
+  "purpose": "CR-039 §11.5 B6：凍結的 D.8 LabelRing 分流規則；fixture＝rc2 Time Profiler trace（tp-rc2b.trace，2026-11-02 19:49:07 起 40 s）縮小匯出",
+  "extract_command": "YSE_UUID=93976A01-93D8-30DD-96B8-ECF2C8F6C9C5 python3 -I labelring_rule.py extract tp-rc2b.trace time-profile.xml '<rc2 dSYM>/Contents/Resources/DWARF/Yog-Sothoth's Echo' fixtures/labelring/rc2-d9.json",
+  "profile_export": "xcrun xctrace export --input tp-rc2b.trace --xpath '/trace-toc/run[@number=\"1\"]/data/table[@schema=\"time-profile\"]'",
+  "script_sha256": "afe5c677c850ed676decaff6aab231c219487344d7b342eb820b079c503cd615",
+  "fixture_sha256": "3ef139ef44432683e292131550984b9d1f8763ae488469d32450ffa5884ed8f1",
+  "expected": {
+    "per_transition": [
+      {
+        "id": 5,
+        "total_ms": 357.0,
+        "labelring_ms": 192.0,
+        "framework_only_ms": 164.0,
+        "labelring_in_over_budget": 0
+      },
+      {
+        "id": 6,
+        "total_ms": 361.0,
+        "labelring_ms": 167.0,
+        "framework_only_ms": 188.0,
+        "labelring_in_over_budget": 24
+      },
+      {
+        "id": 7,
+        "total_ms": 373.0,
+        "labelring_ms": 201.0,
+        "framework_only_ms": 166.0,
+        "labelring_in_over_budget": 5
+      },
+      {
+        "id": 8,
+        "total_ms": 365.0,
+        "labelring_ms": 173.0,
+        "framework_only_ms": 190.0,
+        "labelring_in_over_budget": 82
+      }
+    ],
+    "judgement": {
+      "registered_ids": [
+        5,
+        6,
+        7
+      ],
+      "share": 0.513,
+      "a_share": true,
+      "b_largest_and_lead": true,
+      "c_overlap": true,
+      "verdict": "eligible"
+    }
+  },
+  "note": "expected＝計劃附錄 D.9 表；全 trace 重算（analyze）亦同（2026-11-03）。改 labelring_rule.py＝規則改變：須重走評審、重算並更新本檔"
+}
