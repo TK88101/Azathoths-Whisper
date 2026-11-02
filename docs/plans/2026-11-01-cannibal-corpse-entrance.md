@@ -1,4 +1,4 @@
-# Cannibal Corpse 補進場元件：兩條路的影響面（計劃 v0.6：①已拍板、探針已簽；實作段 Codex 3 輪收斂，待使用者審閱）
+# Cannibal Corpse 補進場元件：兩條路的影響面（計劃 v0.6：已實作，I-71 使用者 2026-11-02 簽字）
 
 ## 0. 複述
 - 目標＝Cannibal Corpse（樂團表署名團，目前組不出、播放素面）補進場槽，讓它可播放。本計劃只量兩條路的影響面、收斂成一個結論交使用者拍板；**拍板後才進原型探針**（元件長什麼樣、動畫怎麼走，在探針上由使用者簽）。
@@ -145,4 +145,4 @@
 - **C8**：G1–G3 單獨跑超過我設的 1 小時上限被截斷（exit 142），改由全量涵蓋；新增「Cannibal 可抽的每組配對都已在 `reachablePairs`」斷言，綠。
 - **C9 全量**（f01d2e4，10:16–11:41）：2,024 條，1,998 綠、0 紅、26 略過；具名差集對前次全量：消失 0（`QueueSnapshot` 字典鍵順序同一案例）、新增 19（Cannibal 11、報表 2、快照 2、摘要 1、`UnreadablePairTests` 自動納入 Cannibal 2，另 1 筆為字典順序對應）。coverage_gate 96.5%（豁免 489／490）、`no_playback_gate.sh` 綠、Scripts 471 綠。
 - **simcodex**（1 輪即提前結束：codex review --base cf1c20a 無問題；simplify 四角度皆無 P1）。採納 3 條便宜 P2：測試標籤改直接引用 `FXTag.cannibal`（C0 鷹架）、刪孤兒註解、`onlyTheBatchFiveBandsChanged` 改名 `…AndCannibalChanged`；受影響 3 suite 45 條綠。遺留 P2：`composition` 的注入參數可改 `catalog:`；「合格集合」算法測試端 3 份、print-fixture 樣板 2 份、批 5 隔離／可播放檢查可抽共用 helper；測試端幾處重複計算（數十毫秒級）。
-- **C10**：ACCEPTANCE I-71（待簽）。
+- **C10**：ACCEPTANCE I-71，使用者 2026-11-02 簽字（「簽」）。
