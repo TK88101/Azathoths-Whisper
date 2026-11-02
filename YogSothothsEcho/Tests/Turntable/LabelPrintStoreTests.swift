@@ -26,7 +26,7 @@ struct LabelPrintStoreTests {
     private static let digits = "12345678901"   // 自編 11 碼（檢查碼由程式算）
 
     private static func key(_ side: CGFloat, scale: CGFloat = 2) -> LabelPrintKey {
-        LabelPrintKey.make(recordSide: side, displayScale: scale, digits: nil)
+        LabelPrintKey.make(recordSide: side, displayScale: scale, modules: nil)
     }
 
     private static func settle(until done: () -> Bool) async {
@@ -44,7 +44,7 @@ struct LabelPrintStoreTests {
     // MARK: Key
 
     @Test func keyAppliesLabelDiameterFormulaAndScale() {
-        let key = LabelPrintKey.make(recordSide: 700, displayScale: 2, digits: nil)
+        let key = LabelPrintKey.make(recordSide: 700, displayScale: 2, modules: nil)
         #expect(key.diameterCenti == Int((214.0 * 700 / 474 * 100).rounded()))
         #expect(key.scaleCenti == 200)
         #expect(abs(key.diameter - 214.0 * 700 / 474) < 0.01)
@@ -60,9 +60,9 @@ struct LabelPrintStoreTests {
 
     /// 條碼三態：合法＝模組序列；沒有＝nil；不合法＝與沒有相同（兩者都不畫條碼）
     @Test func barcodeFingerprintHasThreeStates() {
-        let valid = LabelPrintKey.make(recordSide: 700, displayScale: 2, digits: Self.digits)
-        let none = LabelPrintKey.make(recordSide: 700, displayScale: 2, digits: nil)
-        let invalid = LabelPrintKey.make(recordSide: 700, displayScale: 2, digits: "123")
+        let valid = LabelPrintKey.make(recordSide: 700, displayScale: 2, modules: UPCABarcode.modules(Self.digits))
+        let none = LabelPrintKey.make(recordSide: 700, displayScale: 2, modules: nil)
+        let invalid = LabelPrintKey.make(recordSide: 700, displayScale: 2, modules: UPCABarcode.modules("123"))
         #expect(valid.barcode == UPCABarcode.modules(Self.digits))
         #expect(valid != none)
         #expect(none.barcode == nil)
@@ -139,6 +139,8 @@ struct LabelPrintStoreTests {
         #expect(renderer.rendered.isEmpty)
         #expect(store.lookup(key) == .fallback(.pending))
         _ = store.transitionEnded()
+        #expect(renderer.rendered.isEmpty, "G7 signpost 收尾前不畫（simcodex r2）")
+        store.transitionClosed()
         #expect(renderer.rendered == [key])
         guard case .ready = store.lookup(key) else { Issue.record("not rendered after end"); return }
     }

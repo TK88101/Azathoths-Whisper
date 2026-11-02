@@ -18,8 +18,11 @@ final class SpyG7Sink: G7TraceSink {
 final class SpyG7Observer: G7TransitionObserver {
     private(set) var log: [String] = []
     var note = "misses=0 reasons=absent:0,pending:0,rendering:0,failed:0"
+    /// 記下 closed 當下 sink 的最後一筆：用來驗證「signpost end 之後才 closed」（pending 遮罩在 closed 才畫，不算進 G7）
+    weak var sink: SpyG7Sink?
     func transitionBegan() { log.append("began") }
     func transitionEnded() -> String { log.append("ended"); return note }
+    func transitionClosed() { log.append("closed after \(sink?.log.last ?? "-")") }
 }
 
 /// 轉場值與 trace 一起推進的小 harness（每次變更都交給 trace 比對前後值）
@@ -76,13 +79,15 @@ struct G7TraceTests {
     @Test func observerIsNotifiedAndEndCarriesNote() {
         let observer = SpyG7Observer()
         var h = Harness(observer: observer)
+        observer.sink = h.sink
         h.send()
         #expect(observer.log == ["began"])
         h.step { $0.cancel() }
-        #expect(observer.log == ["began", "ended"])
-        #expect(h.sink.log == ["begin 1", "phase 1 lifting", "end 1 misses=0 reasons=absent:0,pending:0,rendering:0,failed:0"])
+        let end = "end 1 misses=0 reasons=absent:0,pending:0,rendering:0,failed:0"
+        #expect(observer.log == ["began", "ended", "closed after \(end)"])
+        #expect(h.sink.log == ["begin 1", "phase 1 lifting", end])
         h.step { $0.cancel() }
-        #expect(observer.log == ["began", "ended"])
+        #expect(observer.log == ["began", "ended", "closed after \(end)"])
     }
 
     /// 拖動、回彈不是轉場：不發 signpost

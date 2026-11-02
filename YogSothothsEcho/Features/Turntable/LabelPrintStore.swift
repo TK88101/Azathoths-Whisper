@@ -38,11 +38,6 @@ struct LabelPrintKey: Hashable, Sendable {
         return LabelPrintKey(schema: currentSchema, diameterCenti: Int((diameter * 100).rounded()),
                              scaleCenti: Int((displayScale * 100).rounded()), barcode: modules)
     }
-
-    /// 測試用：從數字字串解析（正式路徑用 `VinylAssetsEasterEgg.modules`，只解析一次）
-    static func make(recordSide: CGFloat, displayScale: CGFloat, digits: String?) -> LabelPrintKey {
-        make(recordSide: recordSide, displayScale: displayScale, modules: digits.flatMap(UPCABarcode.modules))
-    }
 }
 
 enum LabelPrintMissReason: String, CaseIterable, Sendable {
@@ -76,6 +71,8 @@ struct ImageRendererLabelPrint: LabelPrintRendering {
 protocol G7TransitionObserver: AnyObject {
     func transitionBegan()
     func transitionEnded() -> String
+    /// G7 signpost 已收尾之後才呼叫：轉場中延後的工作在這裡做，不算進 G7 interval
+    func transitionClosed()
 }
 
 /// CR-039 §11 S2：標籤印字遮罩的快取。`lookup` 純讀（被觀察，畫好時視圖重繪）；`request` 在沒有 G7 時同步畫一次，
@@ -164,10 +161,15 @@ final class LabelPrintStore: G7TransitionObserver {
         isTransitioning = false
         let counts = Dictionary(grouping: misses.values, by: { $0 }).mapValues(\.count)
         misses = [:]
-        let pending = entries.compactMap { key, entry in if case .pending = entry { key } else { nil } }
-        for key in pending { render(key) }
         let reasons = LabelPrintMissReason.allCases.map { "\($0.rawValue):\(counts[$0, default: 0])" }.joined(separator: ",")
         return "misses=\(counts.values.reduce(0, +)) reasons=\(reasons)"
+    }
+
+    /// G7 中標成 pending 的鍵在 signpost 收尾後才畫（simcodex r2：在 end 前畫會把 ImageRenderer 算進轉場）
+    func transitionClosed() {
+        guard !isTransitioning else { return }
+        let pending = entries.compactMap { key, entry in if case .pending = entry { key } else { nil } }
+        for key in pending { render(key) }
     }
 
     private func recordMiss(_ key: LabelPrintKey) {

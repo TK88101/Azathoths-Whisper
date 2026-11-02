@@ -337,9 +337,10 @@ def analyze_tables(traces, mode, process=PROCESS, labels=None, require_label_mis
         problems.extend(f"{label}: {problem}" for problem in found_problems)
         if require_label_misses:
             # 每個 trace 各算一次（render 連號只在同一 trace 內有意義），最後合併
-            miss_results.append(label_misses(found))
-            render_results.append(label_renders(tables["os-signpost"]))
-            for result in (miss_results[-1], render_results[-1]):
+            misses, rendered = label_misses(found), label_renders(tables["os-signpost"])
+            miss_results.append(misses)
+            render_results.append(rendered)
+            for result in (misses, rendered):
                 problems.extend(f"{label}: {problem}" for problem in result["problems"])
         for metric, samples in _samples_by_metric(tables, process).items():
             for name, values in attribute(found, samples).items():

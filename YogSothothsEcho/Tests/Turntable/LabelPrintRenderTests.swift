@@ -65,7 +65,7 @@ struct LabelPrintRenderTests {
 
     @Test(arguments: [0.0, 37.0])
     func maskPathStaysWithinDriftBaseline(angle: Double) throws {
-        let key = LabelPrintKey.make(recordSide: Self.side, displayScale: Self.scale, digits: VinylAssetsEasterEgg.digits)
+        let key = LabelPrintKey.make(recordSide: Self.side, displayScale: Self.scale, modules: VinylAssetsEasterEgg.modules)
         print(Self.environmentLine(key))
         let cached = LabelPrintStore(renderer: ImageRendererLabelPrint())
         cached.request(key)
@@ -101,7 +101,7 @@ struct LabelPrintRenderTests {
 
     /// 遮罩圖＝偶數邊長的畫布、不小於標籤像素直徑（置中後圓心落在整數像素，顯示不縮放）
     @Test func imageRendererProducesEvenCanvasCoveringTheLabel() throws {
-        let key = LabelPrintKey.make(recordSide: Self.side, displayScale: Self.scale, digits: nil)
+        let key = LabelPrintKey.make(recordSide: Self.side, displayScale: Self.scale, modules: nil)
         let image = try #require(ImageRendererLabelPrint().render(key))
         #expect(image.width == key.canvasPixels && image.height == key.canvasPixels)
         #expect(key.canvasPixels.isMultiple(of: 2))

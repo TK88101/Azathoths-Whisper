@@ -106,7 +106,7 @@ struct LabelRing: View, Equatable {
                 context.stroke(Path(ellipseIn: CGRect(x: center.x - rim / 2, y: center.y - rim / 2, width: rim, height: rim)),
                                with: .color(color.opacity(0.25)), lineWidth: max(0.5, diameter * 0.0037))
                 drawRing(center: center, in: &context)
-                if let modules = VinylAssetsEasterEgg.digits.flatMap(UPCABarcode.modules) {
+                if let modules = VinylAssetsEasterEgg.modules {
                     for bar in LabelLayout.barcodeBars(modules, diameter: diameter) {
                         context.fill(Path(bar.offsetBy(dx: center.x, dy: center.y)), with: .color(color))
                     }

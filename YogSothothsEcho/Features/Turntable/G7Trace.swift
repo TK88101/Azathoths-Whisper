@@ -29,6 +29,7 @@ final class G7Trace {
             if let id = activeID {
                 activeID = nil
                 sink.end(id, note: observer?.transitionEnded() ?? "")
+                observer?.transitionClosed()
             }
             return
         }
