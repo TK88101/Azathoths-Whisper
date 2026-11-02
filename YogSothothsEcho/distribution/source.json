@@ -1,0 +1,47 @@
+{
+  "name": "Yog-Sothoth's Echo Source",
+  "identifier": "com.ibridgezhao.yogsothothsecho.source",
+  "subtitle": "iPad 黑膠遙控器",
+  "description": "Yog-Sothoth's Echo 的 SideStore 源。",
+  "iconURL": "https://raw.githubusercontent.com/TK88101/Azathoths-Whisper/main/YogSothothsEcho/distribution/icon.png",
+  "apps": [
+    {
+      "name": "Yog-Sothoth's Echo",
+      "bundleIdentifier": "com.ibridgezhao.yogsothothsecho",
+      "developerName": "TK88101",
+      "subtitle": "黑膠唱機造型的 Music 遙控器",
+      "localizedDescription": "把 iPad 變成黑膠唱機造型的遙控器，控制家中 Mac 上的 Music。需要 iPadOS 18 以上，與執行 Azathoth's Whisper 3.0.0 的 Mac 在同一個 Wi-Fi。",
+      "iconURL": "https://raw.githubusercontent.com/TK88101/Azathoths-Whisper/main/YogSothothsEcho/distribution/icon.png",
+      "tintColor": "1C1C1E",
+      "category": "entertainment",
+      "versions": [
+        {
+          "version": "1.0.1",
+          "buildVersion": "3",
+          "date": "2026-10-28T13:08:04Z",
+          "localizedDescription": "唱機外觀可換四款：Default、Pioneer、Rega、Technics。在設定頁或唱機畫面右上的圓鈕切換，選擇會保留。",
+          "downloadURL": "https://github.com/TK88101/Azathoths-Whisper/releases/download/yse-v1.0.1/YogSothothsEcho-1.0.1-3.ipa",
+          "size": 79406725,
+          "minOSVersion": "18.0"
+        },
+        {
+          "version": "1.0.0",
+          "buildVersion": "2",
+          "date": "2026-10-26T08:25:37Z",
+          "localizedDescription": "首個正式版。",
+          "downloadURL": "https://github.com/TK88101/Azathoths-Whisper/releases/download/yse-v1.0.0/YogSothothsEcho-1.0.0-2.ipa",
+          "size": 19751207,
+          "minOSVersion": "18.0"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {
+          "NSLocalNetworkUsageDescription": "Yog-Sothoth's Echo connects to Azathoth's Whisper on your Mac over the local network.",
+          "NSCameraUsageDescription": "Yog-Sothoth's Echo uses the camera only to scan the pairing code shown by Azathoth's Whisper on your Mac."
+        }
+      }
+    }
+  ],
+  "news": []
+}
