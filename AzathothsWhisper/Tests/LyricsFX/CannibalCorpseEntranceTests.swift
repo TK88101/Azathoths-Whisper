@@ -107,6 +107,39 @@ struct CannibalCorpseEntranceTests {
         for backdrop in space.backdrop { #expect((space.paletteByBackdrop[backdrop] ?? []).count >= 2, "\(backdrop)") }
     }
 
+    // MARK: C8 可讀性
+
+    /// 進場不影響背景／配色：Cannibal 抽得到的每組（背景, 配色）都已在 G1 的 `reachablePairs` 裡（改前就有，C2-③ 證明全部 profile 的背景、配色合格集合不變）
+    @MainActor @Test func everyPairCannibalCanDrawIsAlreadyAudited() throws {
+        let entry = try #require(CannibalCorpse.entry)
+        let space = try #require(PlayableSpace.of(entry.profile))
+        let audited = Set(LyricsFXContrastTests.reachablePairs.map { "\($0.backdrop)|\($0.palette)" })
+        for (backdrop, palettes) in space.paletteByBackdrop {
+            for palette in palettes { #expect(audited.contains("\(backdrop)|\(palette)"), "\(backdrop)＋\(palette)") }
+        }
+        #expect(ReadabilityPolicy.auditable.contains(.signed(CannibalCorpse.name)), "組得出的署名團自動列入稽核（預期變化）")
+    }
+
+    // MARK: C6 簽字對照檔（現有 `SignedBatchChecks` 只查 `bands`，連帶團沒有 tags 欄位，故由這裡負責）
+
+    @Test func theBatchSixFileSignsOnlyCannibalWithWhatTheAppOffers() throws {
+        let file = try SignedBatchFile.load(batch: 6)
+        #expect(file.bands.isEmpty)
+        let linked = try #require(file.linked)
+        #expect(linked.map(\.name) == [CannibalCorpse.name])
+        let signed = try #require(linked.first)
+        #expect(signed.decision == .new)
+        let entry = try #require(CannibalCorpse.entry)
+        let now = BandCandidatesBaseline.current(of: entry)
+        #expect(signed.eligible == now.eligible, "對照檔的合格集合（原型 ∩ app 目錄）與 app 不同")
+        #expect(signed.playable == now.playable)
+        #expect(signed.eligible?[FXSlot.enter.rawValue] == CannibalCorpse.entrances.sorted())
+        // 原型有、app 沒搬的 4 個元件不得出現（export_signed.js --app-catalog）
+        for (slot, id) in [("font", "AmazDooM"), ("font", "Butcherman"), ("font", "MetalMania"), ("exit", "split")] {
+            #expect(signed.eligible?[slot]?.contains(id) == false, "\(slot):\(id)")
+        }
+    }
+
     @Test func resolvingAndComposingGivesAComposedStyle() throws {
         let entry = try #require(CannibalCorpse.entry)
         guard case .signedBand(let profile) = SongProfileResolver.resolve(artist: CannibalCorpse.name, genre: "Death Metal", lyrics: .text(isJapanese: false)) else {

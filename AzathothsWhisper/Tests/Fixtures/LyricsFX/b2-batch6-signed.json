@@ -1,0 +1,81 @@
+{
+ "signed": "2026-11-02",
+ "probe": "CC1",
+ "note": "B2 批 6：使用者看原型探針後簽字的樂團目標值與每槽合格元件（原型 fit>0，不含サビ／關鍵字觸發的效果）。只含樂團名與元件代號，不含曲庫資料。",
+ "bands": [],
+ "linked": [
+  {
+   "name": "Cannibal Corpse",
+   "decision": "new",
+   "signed": "2026-11-02",
+   "reason": "2026-11-02 Cannibal 探針（scratchpad cannibal-probe.html）：使用者逐一確認 drop「沒問題」、stamp「對」、negative「沒問題」；第 2 版只用 app 現有元件、三個進場混抽，整體樣子「對」；方案①（私有標籤 cannibal）使用者 2026-11-02「照①做」",
+   "eligible": {
+    "font": [
+     "Anton",
+     "Catacombs",
+     "Grimoire"
+    ],
+    "backdrop": [
+     "film",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "negative",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "fall"
+    ],
+    "fx": [
+     "none",
+     "shake"
+    ],
+    "palette": [
+     "ashGrey",
+     "boneBlood"
+    ]
+   },
+   "playable": {
+    "backdrop": [
+     "film",
+     "void"
+    ],
+    "enter": [
+     "drop",
+     "negative",
+     "stamp"
+    ],
+    "exit": [
+     "cut",
+     "fall"
+    ],
+    "font": [
+     "Anton",
+     "Catacombs",
+     "Grimoire"
+    ],
+    "fx1": [
+     "none",
+     "shake"
+    ],
+    "fx2": [
+     "none",
+     "shake"
+    ],
+    "paletteByBackdrop": {
+     "film": [
+      "ashGrey",
+      "boneBlood"
+     ],
+     "void": [
+      "ashGrey",
+      "boneBlood"
+     ]
+    }
+   }
+  }
+ ],
+ "unassigned": []
+}

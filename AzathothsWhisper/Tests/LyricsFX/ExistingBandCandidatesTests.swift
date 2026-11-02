@@ -106,8 +106,8 @@ struct ExistingBandCandidatesTests {
         #expect(changed == expected, "簽了要變卻沒變的團：\(expected.subtracting(changed).sorted())")
     }
 
-    /// 基線之後才簽的批次（基線已含批 4 的結果，B2 批 5 計劃 T1①）
-    static let batchesAfterTheBaseline = [5]
+    /// 基線之後才簽的批次（基線已含批 4 的結果，B2 批 5 計劃 T1①）；批 6＝Cannibal Corpse 補進場（docs/plans/2026-11-01-cannibal-corpse-entrance.md）
+    static let batchesAfterTheBaseline = [5, 6]
 
     /// 批 1–4 的新團是使用者在真視窗簽過的，後面的批次不得把它們列為連帶
     @Test func theBandsSignedInEarlierBatchesAreNeverLinked() throws {
