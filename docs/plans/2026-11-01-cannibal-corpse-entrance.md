@@ -136,3 +136,6 @@
 
 ### R3（2026-11-02，審 v0.6）
 - Codex：「無異議。R2 處置已完整納入 v0.6，且與 `LibraryGateReport.swift:100–215` 的現況相符。」
+
+## 附錄 D 實作記錄（2026-11-02，`wip/lyrics-leftovers-2026-11`）
+- **C1**：在 cf1c20a（production 原始碼未改）以 `ProfileCandidatesSnapshotPrinter/printTheSnapshot()` 錄下 137 個 profile（可稽核 134＋J-Pop 3 變體）的逐槽合格集合 → `Tests/Fixtures/LyricsFX/profile-candidates-pre-cannibal.json`。當時 `LyricsFXCatalog.swift` sha256 前綴 `18e9d9fe6d397621`、`SongProfileResolver.swift` `c9b6a20f04b8d123`。Cannibal 進場合格集合為空。
