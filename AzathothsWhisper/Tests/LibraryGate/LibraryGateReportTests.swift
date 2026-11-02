@@ -7,7 +7,6 @@ import Testing
 @Suite("Library gate report")
 struct LibraryGateReportTests {
     static let base = Date(timeIntervalSince1970: 1_790_000_000)
-    /// 樂團表裡組不出六槽的團（⑦ §2.1 已核：缺 palette）
 
     private func track(
         _ id: String, artist: String, album: String = "Paper Boats", genre: String = "Glimmerwave Foo", lyrics: Bool = true, japanese: Bool = false

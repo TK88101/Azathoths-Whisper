@@ -5,10 +5,10 @@ import Testing
 
 // Cannibal Corpse 補進場（docs/plans/2026-11-01-cannibal-corpse-entrance.md v0.6 §4c；使用者 2026-11-02 拍板①、探針兩版簽字）：
 // 只對 Cannibal 開一次性的目標值凍結例外——加私有標籤 `cannibal`，三個既有進場 drop／stamp／negative 同掛它。
-// 標籤以 rawValue 取得，讓「標籤還不存在」是可編譯的行為紅燈（C0）
+// C0 的紅燈曾以 `FXTag(rawValue: "cannibal")` 寫成可編譯的行為紅燈（計劃附錄 D）；標籤已存在後直接引用
 enum CannibalCorpse {
     static let name = "Cannibal Corpse"
-    static let tag = FXTag(rawValue: "cannibal")
+    static let tag = FXTag.cannibal
     static let entrances: Set<String> = ["drop", "negative", "stamp"]
     /// 改前（cf1c20a）三個進場各自的標籤；同掛只能「加 cannibal」，原標籤一個不少
     static let originalEntranceTags: [String: Set<FXTag>] = [
@@ -27,14 +27,14 @@ struct CannibalCorpseEntranceTests {
     // MARK: C0
 
     @Test func thePrivateTagExistsAndNeverFlowsIntoGenreRows() throws {
-        let tag = try #require(CannibalCorpse.tag, "還沒有 cannibal 標籤")
+        let tag = CannibalCorpse.tag
         #expect(SongProfileResolver.genreRowPrivateTags.contains(tag))
     }
 
     // MARK: C2 隔離
 
     @Test func onlyTheThreeSignedEntrancesCarryTheTagAndKeepTheirOriginalTags() throws {
-        let tag = try #require(CannibalCorpse.tag)
+        let tag = CannibalCorpse.tag
         let carriers = LyricsFXCatalog.all.filter { $0.tags.contains(tag) }
         #expect(Set(carriers.map { "\($0.slot.rawValue):\($0.id)" }) == Set(CannibalCorpse.entrances.map { "enter:\($0)" }))
         for component in carriers {
@@ -43,7 +43,7 @@ struct CannibalCorpseEntranceTests {
     }
 
     @Test func noOtherProfileCarriesTheTag() throws {
-        let tag = try #require(CannibalCorpse.tag)
+        let tag = CannibalCorpse.tag
         for band in SongProfileResolver.bandTable where band.name != CannibalCorpse.name {
             #expect(!band.profile.tags.contains(tag), "\(band.name)")
         }
@@ -72,7 +72,7 @@ struct CannibalCorpseEntranceTests {
     }
 
     @Test func jpopAndGenericCatalogsAreUntouched() throws {
-        let tag = try #require(CannibalCorpse.tag)
+        let tag = CannibalCorpse.tag
         for variant in JPopVariant.allCases {
             #expect(JPopPolicy.catalog(variant).allSatisfy { !$0.tags.contains(tag) }, "\(variant)")
         }
@@ -82,7 +82,7 @@ struct CannibalCorpseEntranceTests {
     }
 
     @Test func theTargetKeepsItsAxesAndOriginalTags() throws {
-        let tag = try #require(CannibalCorpse.tag)
+        let tag = CannibalCorpse.tag
         let entry = try #require(CannibalCorpse.entry)
         #expect(entry.profile.axes == CannibalCorpse.axes)
         #expect(entry.profile.tags == [.death, .grind, tag])

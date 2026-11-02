@@ -139,3 +139,10 @@
 
 ## 附錄 D 實作記錄（2026-11-02，`wip/lyrics-leftovers-2026-11`）
 - **C1**：在 cf1c20a（production 原始碼未改）以 `ProfileCandidatesSnapshotPrinter/printTheSnapshot()` 錄下 137 個 profile（可稽核 134＋J-Pop 3 變體）的逐槽合格集合 → `Tests/Fixtures/LyricsFX/profile-candidates-pre-cannibal.json`。當時 `LyricsFXCatalog.swift` sha256 前綴 `18e9d9fe6d397621`、`SongProfileResolver.swift` `c9b6a20f04b8d123`。Cannibal 進場合格集合為空。
+- **C0／C2／C3 紅燈**：`CannibalCorpseEntranceTests` 9 條全紅（標籤不存在、組不出、快照中 Cannibal 進場為空）。**C5**：新 API 不存在→編譯紅；抽出 `composition(of:isComposable:)` 與 `init(rows:consensus:)` 後 `LibraryGateReportTests` 30 條綠（`anUnfinished…` 四斷言改由兩層承接，不再用 Cannibal）。**C4**：標籤、目標值、三進場同掛 → Cannibal＋報表＋曲風列 51 條綠。
+- **C6**：原型三檔（composer.js、預覽頁、本機預覽頁）先備份 `*.before-b2-6.*` 再套 `patch_b2_6.py`；`export_signed.js` 加 `--app-catalog`（批 5 使用即拒絕、匯出自檢）；乾跑：eligible、playable 皆＝app；不加旗標對照會混進 AmazDooM／Butcherman／MetalMania／split。寫入 `b2-batch6-signed.json`；`batchesAfterTheBaseline=[5,6]`；相關 3 suite 21 條綠。C6 的紅燈（批 6 之前「沒簽過卻變了」）未單獨記錄——由 C4 之後的狀態推論必紅，未實跑（推測）。
+- **C7**：摘要測試先紅（新值 `d804f42365571123`）→ 錄下；`onlyCannibalChanged`（只還原 Cannibal＝`d99a…`）、批 5＋Cannibal 一起還原＝`2f80…`，綠。
+- **C8**：G1–G3 單獨跑超過我設的 1 小時上限被截斷（exit 142），改由全量涵蓋；新增「Cannibal 可抽的每組配對都已在 `reachablePairs`」斷言，綠。
+- **C9 全量**（f01d2e4，10:16–11:41）：2,024 條，1,998 綠、0 紅、26 略過；具名差集對前次全量：消失 0（`QueueSnapshot` 字典鍵順序同一案例）、新增 19（Cannibal 11、報表 2、快照 2、摘要 1、`UnreadablePairTests` 自動納入 Cannibal 2，另 1 筆為字典順序對應）。coverage_gate 96.5%（豁免 489／490）、`no_playback_gate.sh` 綠、Scripts 471 綠。
+- **simcodex**（1 輪即提前結束：codex review --base cf1c20a 無問題；simplify 四角度皆無 P1）。採納 3 條便宜 P2：測試標籤改直接引用 `FXTag.cannibal`（C0 鷹架）、刪孤兒註解、`onlyTheBatchFiveBandsChanged` 改名 `…AndCannibalChanged`；受影響 3 suite 45 條綠。遺留 P2：`composition` 的注入參數可改 `catalog:`；「合格集合」算法測試端 3 份、print-fixture 樣板 2 份、批 5 隔離／可播放檢查可抽共用 helper；測試端幾處重複計算（數十毫秒級）。
+- **C10**：ACCEPTANCE I-71（待簽）。

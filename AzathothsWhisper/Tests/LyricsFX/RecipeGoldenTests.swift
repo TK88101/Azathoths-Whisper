@@ -15,7 +15,7 @@ struct RecipeGoldenTests {
     static let recordedDigest: UInt64 = 0xd804_f423_6557_1123
     /// B2 批 5（docs/plans/2026-11-01-lyrics-fx-signed-bands-components.md V4）：5 個署名團由 mono 變組合後、Cannibal 補件前的 `digest()`
     static let preCannibalDigest: UInt64 = 0xd99a_08d7_32a6_f6ff
-    /// e0818da＋fit 軸序修正上錄下的值；批 5 之後由 `onlyTheBatchFiveBandsChanged` 繼續守住其餘 profile
+    /// e0818da＋fit 軸序修正上錄下的值；批 5 之後由 `onlyTheBatchFiveBandsAndCannibalChanged` 繼續守住其餘 profile
     static let preBatchFiveDigest: UInt64 = 0x2f80_4412_4f79_d4dc
 
     /// 只取既有的 profile（樂團表＋B1 的兩條曲風列）；不用 `ReadabilityAudit.profiles`——它之後會加入 J-Pop 變體。
@@ -69,7 +69,7 @@ struct RecipeGoldenTests {
     }
 
     /// 批 5 只改了這 5 團、之後 Cannibal 補件只改了它：把這 6 團的行還原成 mono，摘要必須回到 `preBatchFiveDigest`（其餘 profile 一字不差）
-    @Test func onlyTheBatchFiveBandsChanged() {
+    @Test func onlyTheBatchFiveBandsAndCannibalChanged() {
         #expect(Self.digest(restoringToMono: Set(B2BatchFive.bands).union([CannibalCorpse.name])) == Self.preBatchFiveDigest)
     }
 
