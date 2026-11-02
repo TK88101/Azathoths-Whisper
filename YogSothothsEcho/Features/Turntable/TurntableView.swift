@@ -163,6 +163,9 @@ struct TurntableView: View {
         .accessibilityLabel(Text(model.nowPlaying.clock?.event.state == .playing ? "Pause" : "Play"))
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier(AccessibilityID.turntableRecord)
+        #if DEBUG
+        .accessibilityValue(Text(verbatim: labelPrintProbe(layout)))
+        #endif
         .accessibilityFocused($recordFocused)
         .accessibilityAction { Task { await model.tapRecord() } }
         .id(deck.trackID)
@@ -179,6 +182,17 @@ struct TurntableView: View {
         #endif
         return !model.recordTimelineNeedsTicks
     }
+
+    #if DEBUG
+    /// CR-039 §11.5 B3：給 UI 測試讀標籤印字遮罩的狀態（與 VinylRecordView 同一把鍵；Release 沒有）
+    private func labelPrintProbe(_ layout: TurntableLayout) -> String {
+        let key = LabelPrintKey.make(recordSide: layout.record.width, displayScale: displayScale, digits: VinylAssetsEasterEgg.digits)
+        switch LabelPrintStore.shared.lookup(key) {
+        case .ready: return "labelPrint=ready"
+        case .fallback(let reason): return "labelPrint=\(reason.rawValue)"
+        }
+    }
+    #endif
 
     private func recordFace(_ deck: TurntableDeck, _ layout: TurntableLayout, now: Double) -> VinylRecordView {
         // CR-039：停表時兩盤共讀靜止角（不取 TimelineView 最後一次 callback）

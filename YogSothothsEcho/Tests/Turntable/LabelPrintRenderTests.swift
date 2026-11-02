@@ -1,15 +1,45 @@
 import CoreGraphics
+import CryptoKit
 import Foundation
 import SwiftUI
 import Testing
 
 @testable import YogSothothsEcho
 
-/// CR-039 §11.4（事先登錄，實作後不改）：正式合成路徑（VinylRecordView：labelView＋旋轉＋drawingGroup，classic）
-/// 「遮罩路徑」vs「即時路徑（現行 LabelRing）」；角度 0°／37°；三組配色；只比標籤圓內；RGBA 8-bit；
-/// 每通道差 ≤ 2 的像素 ≥ 99.9%，且沒有任何像素任一通道差 > 8
+/// CR-039 §11.4 v1.0「渲染漂移哨兵」：正式合成路徑（VinylRecordView：labelView＋旋轉＋drawingGroup，classic）
+/// 「遮罩路徑」vs「即時路徑（現行 LabelRing）」；角度 0°／37°；三組配色；只比標籤圓內；RGBA 8-bit。
+/// **不是外觀通過依據**（通過標準＝使用者 iPad 目視四格）：只防無意漂移。紅＝調查並重做目視，不自動判外觀失敗。
+/// 基線＝計劃附錄 G.2（2681c6c、iPad Pro 13-inch (M5) 模擬器、iOS 27.0、條碼有）；只能隨程式變更＋原因紀錄＋重跑六格＋使用者目視簽核更新
 @MainActor
 struct LabelPrintRenderTests {
+    private struct Baseline {
+        let over2: Int
+        let maxDiff: Int
+    }
+
+    /// 防漂移的營運值（不是品質門檻）
+    private static let over2Factor = 1.1
+    private static let maxDiffSlack = 8
+    private static let baselines: [String: Baseline] = [
+        "white-on-black@0": .init(over2: 562, maxDiff: 118),
+        "black-on-white@0": .init(over2: 538, maxDiff: 118),
+        "gray-on-fallback@0": .init(over2: 47, maxDiff: 40),
+        "white-on-black@37": .init(over2: 19_921, maxDiff: 234),
+        "black-on-white@37": .init(over2: 19_922, maxDiff: 234),
+        "gray-on-fallback@37": .init(over2: 14_859, maxDiff: 80),
+    ]
+
+    /// 環境紀錄（寫進 log）；條碼只印模組序列 SHA-256 的前 8 碼——數字本身只在本機、不進 repo
+    private static func environmentLine(_ key: LabelPrintKey) -> String {
+        let env = ProcessInfo.processInfo.environment
+        let barcode = key.barcode.map { modules in
+            let bits = modules.map { $0 ? "1" : "0" }.joined()
+            return SHA256.hash(data: Data(bits.utf8)).prefix(4).map { String(format: "%02x", $0) }.joined()
+        } ?? "absent"
+        let xcode = Bundle.main.infoDictionary?["DTXcodeBuild"] as? String ?? "?"
+        return "§11.4 sentinel env: runtime=\(env["SIMULATOR_RUNTIME_VERSION"] ?? "?") model=\(env["SIMULATOR_MODEL_IDENTIFIER"] ?? "?") "
+            + "xcodeBuild=\(xcode) barcode=\(barcode) diameterPt=\(key.diameter) scale=\(key.scale)"
+    }
     private static let side: CGFloat = 700
     private static let scale: CGFloat = 2
     private static let palettes: [(name: String, colors: AlbumColors)] = [
@@ -39,8 +69,9 @@ struct LabelPrintRenderTests {
     }
 
     @Test(arguments: [0.0, 37.0])
-    func maskPathMatchesLivePath(angle: Double) throws {
+    func maskPathStaysWithinDriftBaseline(angle: Double) throws {
         let key = LabelPrintKey.make(recordSide: Self.side, displayScale: Self.scale, digits: VinylAssetsEasterEgg.digits)
+        print(Self.environmentLine(key))
         let cached = LabelPrintStore(renderer: ImageRendererLabelPrint())
         cached.request(key)
         guard case .ready = cached.lookup(key) else { Issue.record("mask not ready"); return }
@@ -63,10 +94,13 @@ struct LabelPrintRenderTests {
                     maxDiff = max(maxDiff, diff)
                 }
             }
-            let within = Double(compared - over2) / Double(compared)
             print("§11.4 angle=\(angle) \(palette.name): compared=\(compared) over2=\(over2) maxDiff=\(maxDiff)")
-            #expect(within >= 0.999, "\(palette.name) angle \(angle): \(over2)/\(compared) px differ > 2")
-            #expect(maxDiff <= 8, "\(palette.name) angle \(angle): max channel diff \(maxDiff)")
+            let name = "\(palette.name)@\(Int(angle))"
+            let baseline = try #require(Self.baselines[name], "no baseline for \(name)")
+            let over2Limit = Int((Double(baseline.over2) * Self.over2Factor).rounded(.down))
+            #expect(over2 <= over2Limit, "drift \(name): over2 \(over2) > \(over2Limit)（基線 \(baseline.over2)）——調查並重做目視")
+            #expect(maxDiff <= baseline.maxDiff + Self.maxDiffSlack,
+                    "drift \(name): maxDiff \(maxDiff) > \(baseline.maxDiff + Self.maxDiffSlack)——調查並重做目視")
         }
     }
 

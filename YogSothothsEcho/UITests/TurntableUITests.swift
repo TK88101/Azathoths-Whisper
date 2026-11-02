@@ -94,6 +94,11 @@ final class TurntableUITests: XCTestCase {
         XCTAssertTrue(darkInkAgain.isSelected)
     }
 
+    /// CR-039 §11.5 B3：進唱機後 2 s 內標籤印字遮罩就緒（DEBUG 才有的 accessibilityValue；Release 唱片元素沒有 value）
+    func testLabelPrintMaskReadyWithinTwoSeconds() {
+        XCTAssertTrue(waitFor("value == %@", ["labelPrint=ready"], on: record, timeout: 2), "value=\(String(describing: record.value))")
+    }
+
     func testSwipeLeftSkipsToNextAndRightGoesBack() {
         swipe(towardRight: false)
         XCTAssertEqual(closeAndReadTitle(), "Synthetic Song 02")
