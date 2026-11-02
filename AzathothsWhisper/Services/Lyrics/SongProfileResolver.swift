@@ -23,6 +23,9 @@ enum FXTag: String, CaseIterable, Sendable {
     case jpopKira, jpopCity, jpopBallad
     /// ⑦ 通用家族：每族一個私有標籤，只給通用元件與通用列；樂團表的團、既有曲風列一個都不帶（⑦ 計劃 §4.2）
     case genExperimental, genElectronic, genPop, genFolk, genIndustrial, genAmbient, genSacred, genDarkwave, genHipHop
+    /// Cannibal Corpse 專屬（docs/plans/2026-11-01-cannibal-corpse-entrance.md，使用者 2026-11-02 拍板）：death／grind 都不專屬，
+    /// 給它的進場只掛這個標籤，其他團與曲風列一個都不帶。對已簽字團「目標值凍結」的一次性例外，只限 Cannibal
+    case cannibal
 
     /// Nu 系標籤：任何一個都不得與 `industrial` 掛在同一個元件上（P10；B2 批 3 計劃 §2.4 N1）。新立的 Nu 系子標籤要加進來
     static let nuFamily: Set<FXTag> = [.nu, .altmetal, .rapmetal, .cybermetal, .horrormetal, .gothmetal, .latinmetal]
@@ -268,8 +271,9 @@ enum SongProfileResolver {
                   axes: [.raw: 0.5, .theatrical: 0.45, .cold: 0.25, .aggression: 0.55, .speed: 0.6, .elegance: 0.2, .decay: 0.25, .bright: 0.5, .bounce: 0.8, .warm: 0.55]),
     ]
 
-    /// 曲風列不得帶的標籤（⑥b R3-1）：emo 群、J-Pop 與批 3 的 Nu 系子標籤是各批私有，重用要重簽；`.nu`（B1 原型）不在此列
-    static let genreRowPrivateTags: Set<FXTag> = FXTag.emoFamily.union(FXTag.jpopFamily).union(FXTag.nuFamily.subtracting([.nu]))
+    /// 曲風列不得帶的標籤（⑥b R3-1）：emo 群、J-Pop 與批 3 的 Nu 系子標籤是各批私有，重用要重簽；`.nu`（B1 原型）不在此列。
+    /// `cannibal`：death 列以 Cannibal Corpse 為代表團，聯集時要扣掉（Cannibal 計劃 §4c 設計 1）
+    static let genreRowPrivateTags: Set<FXTag> = FXTag.emoFamily.union(FXTag.jpopFamily).union(FXTag.nuFamily.subtracting([.nu])).union([.cannibal])
 
     /// 硬軸取 max：一個「狠」的曲風不得被溫柔的曲風稀釋（P11）；其餘軟軸取平均
     static let hardAxes: Set<FXAxis> = [.raw, .aggression, .speed, .decay, .cold, .theatrical]
@@ -461,7 +465,7 @@ enum SongProfileResolver {
         ("Cradle of Filth", band([.black, .gothic, .symphonic], [.raw: 0.35, .theatrical: 0.95, .cold: 0.3, .aggression: 0.88, .speed: 0.8, .elegance: 0.45, .decay: 0.7, .bright: 0.05, .bounce: 0, .warm: 0.15])),
         ("Dimmu Borgir", band([.black, .symphonic], [.raw: 0.2, .theatrical: 0.95, .cold: 0.6, .aggression: 0.8, .speed: 0.65, .elegance: 0.55, .decay: 0.3, .bright: 0.1, .bounce: 0, .warm: 0.05])),
         ("Arch Enemy", band([.melodeath, .death, .thrash], [.raw: 0.3, .theatrical: 0.35, .cold: 0.2, .aggression: 0.85, .speed: 0.85, .elegance: 0.4, .decay: 0.3, .bright: 0.3])),
-        ("Cannibal Corpse", band([.death, .grind], [.raw: 0.7, .theatrical: 0.1, .cold: 0.1, .aggression: 1, .speed: 0.8, .elegance: 0, .decay: 0.8, .bright: 0])),
+        ("Cannibal Corpse", band([.death, .grind, .cannibal], [.raw: 0.7, .theatrical: 0.1, .cold: 0.1, .aggression: 1, .speed: 0.8, .elegance: 0, .decay: 0.8, .bright: 0])),
         ("Hatebreed", band([.hardcore, .nu], [.raw: 0.6, .theatrical: 0, .cold: 0.1, .aggression: 0.95, .speed: 0.9, .elegance: 0, .decay: 0.3, .bright: 0.2])),
         ("Nightwish", band([.symphonic, .power], [.raw: 0.05, .theatrical: 1, .cold: 0.3, .aggression: 0.3, .speed: 0.5, .elegance: 0.95, .decay: 0.05, .bright: 0.7])),
         ("Type O Negative", band([.gothic, .doom], [.raw: 0.3, .theatrical: 0.6, .cold: 0.4, .aggression: 0.3, .speed: 0.15, .elegance: 0.7, .decay: 0.6, .bright: 0.1])),

@@ -304,9 +304,30 @@ struct MusicAppleEventsClient: MusicControlling {
         return columns.map { column in column.map { $0 as? String ?? "" } }
     }
 
+    #if DEBUG
+    /// I-68 量測：在呼叫端 task 上（`queue.async` 之前）快照請求 ID 與入列時間，block 內記 body 的開始／結束
     private func run<T: Sendable>(
         aeTimeoutTicks: Int? = nil,
         checksLastError: Bool = true,
+        operation: StaticString = #function,
+        _ body: @escaping @Sendable (MusicAppProto) throws -> T
+    ) async throws -> T {
+        let token = AELatencyProbe.beginRun(operation: operation)
+        return try await enqueue(aeTimeoutTicks: aeTimeoutTicks, checksLastError: checksLastError) { app in try token.measure { try body(app) } }
+    }
+    #else
+    private func run<T: Sendable>(
+        aeTimeoutTicks: Int? = nil,
+        checksLastError: Bool = true,
+        _ body: @escaping @Sendable (MusicAppProto) throws -> T
+    ) async throws -> T {
+        try await enqueue(aeTimeoutTicks: aeTimeoutTicks, checksLastError: checksLastError, body)
+    }
+    #endif
+
+    private func enqueue<T: Sendable>(
+        aeTimeoutTicks: Int?,
+        checksLastError: Bool,
         _ body: @escaping @Sendable (MusicAppProto) throws -> T
     ) async throws -> T {
         let identifier = bundleIdentifier

@@ -64,9 +64,9 @@ struct LyricsFXContrastTests {
         RGB(red: Double(p[i]) / 255, green: Double(p[i + 1]) / 255, blue: Double(p[i + 2]) / 255).relativeLuminance
     }
 
-    /// 回傳（核心像素對比的 5 百分位, 核心像素數）
-    /// 主字字形內部：主字單獨畫與什麼都沒有的差異，八鄰都在字形裡才算（內縮 1 像素）
-    static func core(text: [UInt8], empty: [UInt8], width: Int, height: Int) -> [Int] {
+    /// 主字字形內部：主字單獨畫與什麼都沒有的差異，八鄰都在字形裡才算（內縮 1 像素）。
+    /// 判定式的可讀版本，只供等價測試對照；改判定時 `fastCore` 與它要一起改（docs/plans/2026-11-01-g1-contrast-timeout.md §5）
+    static func referenceCore(text: [UInt8], empty: [UInt8], width: Int, height: Int) -> [Int] {
         let inside = stride(from: 0, to: text.count, by: 4).map { i in (0..<3).contains { abs(Int(text[i + $0]) - Int(empty[i + $0])) > inkDifference } }
         return (1..<max(1, height - 1)).flatMap { y in
             (1..<max(1, width - 1)).filter { x in
@@ -75,12 +75,45 @@ struct LyricsFXContrastTests {
         }
     }
 
+    /// 與 `referenceCore` 同一判定、逐位相同的索引迴圈版。測試 target 是 Debug（-Onone），
+    /// 閉包串接的逐像素寫法每次約 210 ms、這版約 10 ms——G1 4 條原本每條約 230 s、超過 120 s 上限（G1 計劃 §2 F4–F5）
+    static func fastCore(text: [UInt8], empty: [UInt8], width: Int, height: Int) -> [Int] {
+        let count = width * height
+        guard width >= 3, height >= 3, text.count >= count * 4, empty.count >= count * 4 else { return [] }
+        var inside = [Bool](repeating: false, count: count)
+        inside.withUnsafeMutableBufferPointer { mask in
+            text.withUnsafeBufferPointer { text in
+                empty.withUnsafeBufferPointer { empty in
+                    for pixel in 0..<count {
+                        let i = pixel * 4
+                        mask[pixel] = abs(Int(text[i]) - Int(empty[i])) > inkDifference
+                            || abs(Int(text[i + 1]) - Int(empty[i + 1])) > inkDifference
+                            || abs(Int(text[i + 2]) - Int(empty[i + 2])) > inkDifference
+                    }
+                }
+            }
+        }
+        var result: [Int] = []
+        inside.withUnsafeBufferPointer { mask in
+            for y in 1..<(height - 1) {
+                for x in 1..<(width - 1) {
+                    let c = y * width + x
+                    if mask[c - width - 1], mask[c - width], mask[c - width + 1], mask[c - 1], mask[c], mask[c + 1],
+                       mask[c + width - 1], mask[c + width], mask[c + width + 1] {
+                        result.append(c * 4)
+                    }
+                }
+            }
+        }
+        return result
+    }
+
     static func contrast(_ recipe: ComposedRecipe, at time: Double = settled, lyrics: LyricsTimeline = timeline) -> (ratio: Double, pixels: Int)? {
         guard let full = render(recipe, layers: .all, at: time, lyrics: lyrics), let background = render(recipe, layers: .backgroundOnly, at: time, lyrics: lyrics),
               let alone = render(recipe, layers: .mainTextAlone, at: time, lyrics: lyrics), let nothing = render(recipe, layers: .nothing, at: time, lyrics: lyrics)
         else { return nil }
         let a = rgba(full), b = rgba(background)
-        var ratios = core(text: rgba(alone), empty: rgba(nothing), width: full.width, height: full.height).map { i in
+        var ratios = fastCore(text: rgba(alone), empty: rgba(nothing), width: full.width, height: full.height).map { i in
             let l1 = luminance(a, i), l2 = luminance(b, i)
             return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
         }
@@ -125,6 +158,77 @@ struct LyricsFXContrastTests {
         let label = "\(palette)＋\(backdrop)" + (fx == "none" ? "" : "＋\(fx)") + (who.isEmpty ? "" : "（\(who.joined(separator: "、"))）") + (time == settled ? "" : "@\(time)")
         guard let result = contrast(recipe(backdrop: backdrop, palette: palette, fx: fx), at: time, lyrics: lyrics) else { return "\(label)：量不到字" }
         return result.ratio < minimum ? "\(label)：\(String(format: "%.2f", result.ratio))" : nil
+    }
+
+    // MARK: 加速的等價證明（G1 計劃 §5）
+
+    /// 分層具名選樣：`reachablePairs` 依背景 tone 分亮／暗／無三層，各層依 id 排序取 4 組，背景與配色先都不重複、
+    /// 該層背景用完才允許重複背景（亮層只有 halftone、sunset）。2026-11-02 選定後寫死，元件增加不改選樣
+    static let equivalencePairs: [(backdrop: String, palette: String)] = [
+        ("halftone", "britRed"), ("sunset", "chalk"), ("halftone", "cream60"), ("halftone", "mancSky"),
+        ("ampGlow", "acid"), ("bluehour", "bruise"), ("bokeh", "dusk"), ("genAmbBluehour", "genAmbDeep"),
+        ("ash", "ampRed"), ("checker", "gigRed"), ("crimsonFog", "ashGrey"), ("embers", "bloodBlack"),
+    ]
+    static let equivalenceEffects = ["none", "glow", "neonstroke", "rgbsplit", "misreg", "reflect"]
+
+    /// 12 組配對 × 英日兩行，效果依序輪流（24 個輸入，6 種效果各 4 次）：新舊兩版核心像素逐位相同
+    @Test func fastCoreMatchesTheReferenceOnRenderedLines() {
+        var index = 0
+        for pair in Self.equivalencePairs {
+            for lyrics in [Self.timeline, Self.japanese] {
+                let fx = Self.equivalenceEffects[index % Self.equivalenceEffects.count]
+                index += 1
+                let recipe = Self.recipe(backdrop: pair.backdrop, palette: pair.palette, fx: fx)
+                guard let alone = Self.render(recipe, layers: .mainTextAlone, lyrics: lyrics),
+                      let nothing = Self.render(recipe, layers: .nothing, lyrics: lyrics)
+                else {
+                    Issue.record("\(pair.palette)＋\(pair.backdrop)＋\(fx)：畫不出來")
+                    continue
+                }
+                let text = Self.rgba(alone), empty = Self.rgba(nothing)
+                let fast = Self.fastCore(text: text, empty: empty, width: alone.width, height: alone.height)
+                let reference = Self.referenceCore(text: text, empty: empty, width: alone.width, height: alone.height)
+                #expect(!reference.isEmpty, "\(pair.palette)＋\(pair.backdrop)＋\(fx)：量不到字")
+                #expect(fast == reference, "\(pair.palette)＋\(pair.backdrop)＋\(fx)")
+            }
+        }
+        #expect(index == 24)
+    }
+
+    /// 合成遮罩（不渲染）：寬高邊界、3×3 內縮、通道差恰為門檻與門檻加一。預期索引寫死，新舊兩版都要等於它
+    @Test func fastAndReferenceCoreAgreeOnSyntheticMasks() {
+        struct Case {
+            let name: String
+            let width: Int
+            let height: Int
+            /// 每個像素（列優先）的通道差；其餘通道相同
+            let difference: (_ x: Int, _ y: Int) -> UInt8
+            let expected: [Int]
+            /// 有差的通道（0 紅、1 綠、2 藍）：三個通道任一超過門檻都算字形
+            var channel = 1
+        }
+        let cases = [
+            Case(name: "全空 5×5", width: 5, height: 5, difference: { _, _ in 0 }, expected: []),
+            Case(name: "全滿 5×5", width: 5, height: 5, difference: { _, _ in 255 },
+                 expected: (1...3).flatMap { y in (1...3).map { x in (y * 5 + x) * 4 } }),
+            Case(name: "1 像素寬直線", width: 5, height: 5, difference: { x, _ in x == 2 ? 255 : 0 }, expected: []),
+            Case(name: "3×3 實心", width: 3, height: 3, difference: { _, _ in 255 }, expected: [16]),
+            Case(name: "寬 2", width: 2, height: 5, difference: { _, _ in 255 }, expected: []),
+            Case(name: "高 2", width: 5, height: 2, difference: { _, _ in 255 }, expected: []),
+            Case(name: "差恰為 48 不算", width: 3, height: 3, difference: { _, _ in UInt8(Self.inkDifference) }, expected: []),
+            Case(name: "差 49 算", width: 3, height: 3, difference: { _, _ in UInt8(Self.inkDifference + 1) }, expected: [16]),
+            Case(name: "只有紅色差 49", width: 3, height: 3, difference: { _, _ in UInt8(Self.inkDifference + 1) }, expected: [16], channel: 0),
+            Case(name: "只有藍色差 49", width: 3, height: 3, difference: { _, _ in UInt8(Self.inkDifference + 1) }, expected: [16], channel: 2),
+        ]
+        for item in cases {
+            let empty = [UInt8](repeating: 0, count: item.width * item.height * 4)
+            var text = empty
+            for y in 0..<item.height {
+                for x in 0..<item.width { text[(y * item.width + x) * 4 + item.channel] = item.difference(x, y) }
+            }
+            #expect(Self.fastCore(text: text, empty: empty, width: item.width, height: item.height) == item.expected, "\(item.name)")
+            #expect(Self.referenceCore(text: text, empty: empty, width: item.width, height: item.height) == item.expected, "\(item.name)")
+        }
     }
 
     @Test func mainTextStaysReadableOnEveryReachableBackdrop() {

@@ -256,11 +256,12 @@ enum LyricsFXCatalog {
     ]
 
     // composer.js:55,57-61,64。淡入型（condense、smoke、rise）的時長依 P12 縮短 40%（使用者 2026-10-06：「漸入漸出稍長，字發虛」）
+    /// negative／stamp／drop 同掛 `cannibal`：Cannibal Corpse 的進場（使用者 2026-11-02 看探針簽字；原標籤不動，其他團不帶此標籤）
     static let enters: [FXComponent] = [
         // slam（彈片堆）2026-10-19 依使用者指示拿掉：詞互相疊住、讀不出歌詞。引擎的 pile／expires 畫法保留未刪
         make(.enter, "condense", [.cold: 0.85, .speed: 0.1, .elegance: 0.4], [.black, .gothic, .doom],
              .enter(EnterSpec(weights: [(.condense, 4), (.fadeUp, 1)], duration: 0.54...1.02))),
-        make(.enter, "negative", [.raw: 0.8, .aggression: 0.6, .speed: 0.6], [.black],
+        make(.enter, "negative", [.raw: 0.8, .aggression: 0.6, .speed: 0.6], [.black, .cannibal],
              .enter(EnterSpec(weights: [(.negative, 3), (.fadeUp, 1)], duration: 0.2...0.35))),
         make(.enter, "smoke", [.theatrical: 0.6, .elegance: 0.55, .speed: 0.2, .cold: 0.3], [.gothic, .doom, .symphonic, .gothmetal],
              .enter(EnterSpec(weights: [(.smoke, 4), (.fadeUp, 1)], duration: 0.36...0.78))),
@@ -282,7 +283,7 @@ enum LyricsFXCatalog {
              .enter(EnterSpec(weights: [(.stamp, 3), (.pop, 2), (.slide, 1)], duration: 0.12...0.28))),
         make(.enter, "slide", [.aggression: 0.6, .speed: 0.7, .bounce: 0.2], [.hardrock, .heavy, .thrash, .nu, .hardcore, .punk, .skatepunk, .rock, .bigbeat, .melodichc, .ska, .rapmetal, .altmetal, .posthardcore, .emopop],
              .enter(EnterSpec(weights: [(.slide, 4), (.stamp, 1)], duration: 0.15...0.35))),
-        make(.enter, "stamp", [.aggression: 0.7, .speed: 0.8, .raw: 0.3], [.hardrock, .hardcore, .nu, .heavy, .thrash, .rapmetal, .altmetal, .latinmetal, .posthardcore],
+        make(.enter, "stamp", [.aggression: 0.7, .speed: 0.8, .raw: 0.3], [.hardrock, .hardcore, .nu, .heavy, .thrash, .rapmetal, .altmetal, .latinmetal, .posthardcore, .cannibal],
              .enter(EnterSpec(weights: [(.stamp, 4), (.pop, 1)], duration: 0.1...0.25))),
         make(.enter, "strut", [.theatrical: 0.8, .bright: 0.6, .speed: 0.5, .elegance: 0.5], [.glam, .arena],
              .enter(EnterSpec(weights: [(.slant, 3), (.swoop, 2), (.stamp, 1)], duration: 0.2...0.4))),
@@ -300,7 +301,7 @@ enum LyricsFXCatalog {
         make(.enter, "tumble", [.bounce: 0.6, .aggression: 0.6, .speed: 0.8, .raw: 0.5], [.ska, .punk, .punk77, .skatepunk, .hardcore],
              .enter(EnterSpec(weights: [(.tumble, 3), (.stamp, 2), (.fling, 1)], duration: 0.12...0.3))),
         // B2 批 3（Nu-metal；原型 composer.js 的 B2 批 3 段）。標籤只收本批專屬的（新團的私有子標籤＋連帶的 Korn／Hatebreed 的 nu、hardcore）
-        make(.enter, "drop", [.aggression: 0.8, .speed: 0.7, .raw: 0.4], [.horrormetal, .altmetal, .hardcore, .nu],
+        make(.enter, "drop", [.aggression: 0.8, .speed: 0.7, .raw: 0.4], [.horrormetal, .altmetal, .hardcore, .nu, .cannibal],
              .enter(EnterSpec(weights: [(.drop, 4), (.stamp, 1)], duration: 0.18...0.4))),
         make(.enter, "flip", [.speed: 0.9, .aggression: 0.5, .cold: 0.4, .bounce: 0.3], [.cybermetal, .techno, .electro, .idm],
              .enter(EnterSpec(weights: [(.flip, 4), (.type, 1)], duration: 0.08...0.2))),

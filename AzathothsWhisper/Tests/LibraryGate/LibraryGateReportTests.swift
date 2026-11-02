@@ -7,9 +7,6 @@ import Testing
 @Suite("Library gate report")
 struct LibraryGateReportTests {
     static let base = Date(timeIntervalSince1970: 1_790_000_000)
-    /// 樂團表裡組不出六槽的團（⑦ §2.1 已核：缺 palette）
-    /// 樂團表裡仍組不出的署名團。B2 批 5 補完 Aphex Twin 等 5 團後，只剩 Cannibal Corpse（批 5 計劃 F6，另案）
-    static let unfinishedBand = "Cannibal Corpse"
 
     private func track(
         _ id: String, artist: String, album: String = "Paper Boats", genre: String = "Glimmerwave Foo", lyrics: Bool = true, japanese: Bool = false
@@ -58,12 +55,46 @@ struct LibraryGateReportTests {
         #expect(after.passed)
     }
 
+    /// 署名團組不出：Cannibal Corpse 補件後樂團表已無真實範例（docs/plans/2026-11-01-cannibal-corpse-entrance.md §4c 設計 5），
+    /// 四個斷言改由兩層承接——判定純函式（注入「組不出」）＋由列彙整計數（拿真實署名團的一列改成組不出）
     @Test func anUnfinishedSignedBandIsCountedAsMonoAndBlocksTheGate() throws {
-        let r = report([track("1", artist: Self.unfinishedBand)])
+        let verdict = LibraryGateReport.composition(of: .signedBand(SongProfile(axes: [:], tags: [.death])), isComposable: { _ in false })
+        #expect(!verdict.isComposed)
+        #expect(verdict.noStyleReason == .signedBandMissingParts)
+
+        let real = try #require(report([track("1", artist: "Mayhem")]).rows.first)
+        #expect(real.isComposed, "前提：真實署名團組得出")
+        let unfinished = LibraryGateReport.Row(
+            track: real.track, familyKey: real.familyKey, explanation: real.explanation, mbStatus: real.mbStatus, decision: real.decision,
+            noStyleReason: verdict.noStyleReason, issues: real.issues.union([.composed]), japaneseEstimate: nil
+        )
+        let r = LibraryGateReport(rows: [unfinished], consensus: [:])
         #expect(r.composed == .init(songs: 1, artists: 1))
         #expect(r.signedPending == .init(songs: 1, artists: 1))
         #expect(r.rows[0].noStyleReason == .signedBandMissingParts)
         #expect(!r.passed, "署名待補元件照樣擋住閘門（§10-1）")
+    }
+
+    /// 判定純函式的每個分支（抽出前後語義相同）
+    @Test func compositionCoversEveryResolution() {
+        let profile = SongProfile(axes: [:], tags: [.black])
+        let composable = LibraryGateReport.composition(of: .signedBand(profile), isComposable: { _ in true })
+        #expect(composable.isComposed && composable.noStyleReason == nil)
+        let pending = LibraryGateReport.composition(of: .pending)
+        #expect(!pending.isComposed && pending.noStyleReason == nil)
+        let noMatch = LibraryGateReport.composition(of: .noMatch)
+        #expect(!noMatch.isComposed && noMatch.noStyleReason == .noRowMatched)
+        for resolution: ProfileResolution in [.jpop, .userStyle(profile), .artistGenreRow(profile), .genreRow(profile), .genericRow(profile)] {
+            let other = LibraryGateReport.composition(of: resolution, isComposable: { _ in false })
+            #expect(other.isComposed && other.noStyleReason == nil, "\(resolution)：曲風列各層在 explain 裡已確認組得出")
+        }
+    }
+
+    /// 正式流程（tracks → 列 → 計數）與 `init(rows:)` 算出的計數相同
+    @Test func countingFromRowsMatchesTheFullReport() {
+        let full = report([track("1", artist: "Mayhem"), track("2", artist: "Paper Harbour", genre: "Rock"), track("3", artist: "Paper Harbour", japanese: true)])
+        let fromRows = LibraryGateReport(rows: full.rows, consensus: full.consensus)
+        #expect(fromRows == full)
     }
 
     @Test func aComposedStyleOutsideTheAuditedSetFailsReadability() {

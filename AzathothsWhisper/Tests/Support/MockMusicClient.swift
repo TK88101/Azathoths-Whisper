@@ -16,6 +16,10 @@ actor MockMusicClient: MusicControlling {
     private(set) var currentTrackCalls = 0
     /// `nowPlaying()` 的呼叫次數（`currentTrackCalls` 也會加一：兩者都是「查一次當前曲」）
     private(set) var nowPlayingCalls = 0
+    #if DEBUG
+    /// I-68 量測：每次 `nowPlaying` 時呼叫端 task 上的請求 ID（monitor 端有沒有設好 TaskLocal）
+    private(set) var nowPlayingRequestIDs: [Int?] = []
+    #endif
     private var trackDetailsResult: [TrackDetails] = []
     private var trackDetailsOutcome: Result<[TrackDetails], MusicError>?
     /// 每次 `trackDetails` 請求的 ID（依請求順序）
@@ -190,6 +194,9 @@ actor MockMusicClient: MusicControlling {
     func nowPlaying() async throws -> NowPlayingRead? {
         let call = nowPlayingCalls
         nowPlayingCalls += 1
+        #if DEBUG
+        nowPlayingRequestIDs.append(AELatencyProbe.requestID)
+        #endif
         currentTrackCalls += 1
         let response = next()
         if call < nowPlayingGateQueue.count {
