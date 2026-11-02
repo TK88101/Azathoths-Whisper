@@ -186,7 +186,7 @@ struct TurntableView: View {
     #if DEBUG
     /// CR-039 §11.5 B3：給 UI 測試讀標籤印字遮罩的狀態（與 VinylRecordView 同一把鍵；Release 沒有）
     private func labelPrintProbe(_ layout: TurntableLayout) -> String {
-        let key = LabelPrintKey.make(recordSide: layout.record.width, displayScale: displayScale, digits: VinylAssetsEasterEgg.digits)
+        let key = LabelPrintKey.make(recordSide: layout.record.width, displayScale: displayScale, modules: VinylAssetsEasterEgg.modules)
         switch LabelPrintStore.shared.lookup(key) {
         case .ready: return "labelPrint=ready"
         case .fallback(let reason): return "labelPrint=\(reason.rawValue)"

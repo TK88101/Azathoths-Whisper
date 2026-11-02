@@ -2,7 +2,7 @@
   "purpose": "CR-039 §11.5 B6：凍結的 D.8 LabelRing 分流規則；fixture＝rc2 Time Profiler trace（tp-rc2b.trace，2026-11-02 19:49:07 起 40 s）縮小匯出",
   "extract_command": "YSE_UUID=93976A01-93D8-30DD-96B8-ECF2C8F6C9C5 python3 -I labelring_rule.py extract tp-rc2b.trace time-profile.xml '<rc2 dSYM>/Contents/Resources/DWARF/Yog-Sothoth's Echo' fixtures/labelring/rc2-d9.json",
   "profile_export": "xcrun xctrace export --input tp-rc2b.trace --xpath '/trace-toc/run[@number=\"1\"]/data/table[@schema=\"time-profile\"]'",
-  "script_sha256": "afe5c677c850ed676decaff6aab231c219487344d7b342eb820b079c503cd615",
+  "script_sha256": "74d43ad387c4bfd6e5e800bea041de0a757aae78380a31225a717a6c4a454b87",
   "fixture_sha256": "3ef139ef44432683e292131550984b9d1f8763ae488469d32450ffa5884ed8f1",
   "expected": {
     "per_transition": [

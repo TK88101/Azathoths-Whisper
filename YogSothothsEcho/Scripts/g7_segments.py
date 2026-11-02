@@ -327,7 +327,7 @@ def _samples_by_metric(tables, process):
 
 def analyze_tables(traces, mode, process=PROCESS, labels=None, require_label_misses=False):
     """多個 trace（每組一個；時間各自相對錄製起點）：各自歸屬後合併成 {段: {指標: [ns]}}；problems 帶 trace 標籤"""
-    per_group, problems, every_interval, renders = [], [], [], []
+    per_group, problems, miss_results, render_results = [], [], [], []
     by_segment = {name: {metric: [] for metric in METRICS} for name in SEGMENTS}
     # traces 可以是只能迭代一次的 generator（CLI 逐個匯出、用完即釋放）
     for index, tables in enumerate(traces):
@@ -336,29 +336,43 @@ def analyze_tables(traces, mode, process=PROCESS, labels=None, require_label_mis
         per_group.append({"group": label, "intervals": len(found)})
         problems.extend(f"{label}: {problem}" for problem in found_problems)
         if require_label_misses:
-            misses = label_misses(found)
-            problems.extend(f"{label}: {problem}" for problem in misses["problems"])
-            every_interval.extend(found)
-            rendered = label_renders(tables["os-signpost"])
-            problems.extend(f"{label}: {problem}" for problem in rendered["problems"])
-            renders.append(rendered)
+            # 每個 trace 各算一次（render 連號只在同一 trace 內有意義），最後合併
+            miss_results.append(label_misses(found))
+            render_results.append(label_renders(tables["os-signpost"]))
+            for result in (miss_results[-1], render_results[-1]):
+                problems.extend(f"{label}: {problem}" for problem in result["problems"])
         for metric, samples in _samples_by_metric(tables, process).items():
             for name, values in attribute(found, samples).items():
                 by_segment[name][metric].extend(values)
     count = sum(group["intervals"] for group in per_group)
-    misses = label_misses(every_interval) if require_label_misses else None
+    misses = _merge_misses(miss_results) if require_label_misses else None
     report = {"intervals": count, "per_group": per_group, "problems": problems,
               "segments": {name: {metric: stats(values) for metric, values in metrics.items()}
                            for name, metrics in by_segment.items()},
               "verdict": judge(count, problems, by_segment, mode, groups=len(per_group), label_misses=misses)}
     if misses is not None:
-        report["label_misses"] = {key: misses[key] for key in ("total", "reasons", "per_interval")}
-        durations = [ms for rendered in renders for ms in rendered["durations_ms"]]
-        over = [ms for rendered in renders for ms in rendered["over_limit_ms"]]
+        report["label_misses"] = misses
         # B8 的 S2 進唱機成本 gate：與 §6 的 verdict 分開報（任一次 > 16.67 ms＝S2 不通過）
-        report["label_render"] = {"count": len(durations), "durations_ms": durations, "max_ms": max(durations, default=None),
-                                  "over_limit_ms": over, "passes": all(rendered["passes"] for rendered in renders)}
+        report["label_render"] = _merge_renders(render_results)
     return report
+
+
+def _merge_misses(results):
+    """各 trace 的 label_misses 合併（不重新解析 note）"""
+    reasons = dict.fromkeys(LABEL_MISS_REASONS, 0)
+    per_interval = [count for result in results for count in result["per_interval"]]
+    for result in results:
+        for name, value in result["reasons"].items():
+            reasons[name] += value
+    return {"total": sum(per_interval), "reasons": reasons, "per_interval": per_interval}
+
+
+def _merge_renders(results):
+    """各 trace 的 label_renders 合併"""
+    durations = [ms for result in results for ms in result["durations_ms"]]
+    return {"count": len(durations), "durations_ms": durations, "max_ms": max(durations, default=None),
+            "over_limit_ms": [ms for result in results for ms in result["over_limit_ms"]],
+            "passes": all(result["passes"] for result in results)}
 
 
 def steady(frame_rows, hitches, warmup_s=STEADY_WARMUP_S, seconds=STEADY_SECONDS):

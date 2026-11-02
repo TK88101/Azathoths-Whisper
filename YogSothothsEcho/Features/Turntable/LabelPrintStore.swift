@@ -33,10 +33,15 @@ struct LabelPrintKey: Hashable, Sendable {
     var canvasSide: CGFloat { CGFloat(canvasPixels) / scale }
 
     /// 唯一的計算處：標籤直徑＝`214 × recordSide / 474`（VinylRecordView.labelView 同一公式）
-    static func make(recordSide: CGFloat, displayScale: CGFloat, digits: String?) -> LabelPrintKey {
-        let diameter = VinylRecordView.labelDiameter * recordSide / TurntableMetrics.recordSize
+    static func make(recordSide: CGFloat, displayScale: CGFloat, modules: [Bool]?) -> LabelPrintKey {
+        let diameter = VinylRecordView.labelDiameter(forSide: recordSide)
         return LabelPrintKey(schema: currentSchema, diameterCenti: Int((diameter * 100).rounded()),
-                             scaleCenti: Int((displayScale * 100).rounded()), barcode: digits.flatMap(UPCABarcode.modules))
+                             scaleCenti: Int((displayScale * 100).rounded()), barcode: modules)
+    }
+
+    /// 測試用：從數字字串解析（正式路徑用 `VinylAssetsEasterEgg.modules`，只解析一次）
+    static func make(recordSide: CGFloat, displayScale: CGFloat, digits: String?) -> LabelPrintKey {
+        make(recordSide: recordSide, displayScale: displayScale, modules: digits.flatMap(UPCABarcode.modules))
     }
 }
 
@@ -138,7 +143,8 @@ final class LabelPrintStore: G7TransitionObserver {
         render(key)
     }
 
-    /// 視圖的作用域：顯示期間登記使用中（不被淘汰）；任務取消（視圖消失、鍵改變）時註銷
+    /// 視圖的作用域：顯示期間登記使用中（不被淘汰）；任務取消（視圖消失、鍵改變）時註銷。
+    /// 使用中／最近使用的記帳與 `SwirlArtworkStore.use` 同一套（要抽共用元件時兩邊一起改）
     func use(_ key: LabelPrintKey) async {
         inUse[key, default: 0] += 1
         request(key)

@@ -54,7 +54,7 @@ struct VinylRecordView: View {
         let finish = transparentFinish
         let usesMaterial = finish?.usesMaterial == true && !isLiquid
         let swirlKey = makeSwirlKey()
-        let labelKey = LabelPrintKey.make(recordSide: side, displayScale: displayScale, digits: VinylAssetsEasterEgg.digits)
+        let labelKey = LabelPrintKey.make(recordSide: side, displayScale: displayScale, modules: VinylAssetsEasterEgg.modules)
         let translucent = swirlKey.map { $0.colors.opacity < 1 } ?? usesMaterial
         ZStack {
             // 磨砂層必須在 drawingGroup 之外：合成圖層內的 Material 拿不到後面的封套與背景
@@ -226,7 +226,7 @@ struct VinylRecordView: View {
 
     /// 標籤（§4.2b v1.4）：歌名＋歌手在中心孔上方；印字（環狀字、品牌字、條碼）由 LabelRing 依 LabelLayout 畫
     private func labelView(_ key: LabelPrintKey) -> some View {
-        let diameter = Self.labelDiameter * s
+        let diameter = Self.labelDiameter(forSide: side)
         return ZStack(alignment: .top) {
             Circle().fill(colors.primary.color)
             labelPrint(key, diameter: diameter)
@@ -260,6 +260,9 @@ struct VinylRecordView: View {
     }
 
     static let labelDiameter: CGFloat = 214
+
+    /// 標籤直徑（pt）的唯一公式：labelView 與標籤印字快取鍵（LabelPrintKey.make）共用，兩邊尺寸不會走岔
+    static func labelDiameter(forSide side: CGFloat) -> CGFloat { labelDiameter * side / TurntableMetrics.recordSize }
 
     @ViewBuilder private var centerHole: some View {
         if let center = VinylAssets.image(.center) {

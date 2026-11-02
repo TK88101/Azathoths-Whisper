@@ -31,7 +31,6 @@ import g7_segments as g7  # noqa: E402
 YSE_UUID = os.environ.get("YSE_UUID", "93976A01-93D8-30DD-96B8-ECF2C8F6C9C5")
 SUBSYSTEM = "com.ibridgezhao.yogsothothsecho"
 MAIN_THREAD_PREFIX = "Main Thread"
-PROCESS = "Yog-Sothoth's Echo"
 OVER_BUDGET_MS = 8.33
 REGISTERED_TRANSITIONS = 3
 SHARE_MIN = 0.25
@@ -60,7 +59,7 @@ def parse_profile(path):
         cells = {c.tag: (ids[c.get("ref")] if c.get("ref") else c) for c in el}
         thread = cells.get("thread")
         fmt = thread.get("fmt", "") if thread is not None else ""
-        if not fmt.startswith(MAIN_THREAD_PREFIX) or PROCESS not in fmt:
+        if not fmt.startswith(MAIN_THREAD_PREFIX) or g7.PROCESS not in fmt:
             continue
         backtrace = cells.get("tagged-backtrace") if "tagged-backtrace" in cells else cells.get("backtrace")
         if backtrace is None:

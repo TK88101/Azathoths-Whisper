@@ -143,4 +143,6 @@ enum VinylAssetsEasterEgg {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return UPCABarcode.checkDigit(trimmed) == nil ? nil : trimmed
     }()
+    /// 模組序列只算一次：唱片在 TimelineView 內每幀重建，每次建標籤快取鍵都重解析會白做（simcodex r1）
+    static let modules: [Bool]? = digits.flatMap(UPCABarcode.modules)
 }

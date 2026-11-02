@@ -51,14 +51,9 @@ struct LabelPrintRenderTests {
     private static func pixels(_ view: some View) throws -> (data: [UInt8], width: Int) {
         let renderer = ImageRenderer(content: view.frame(width: side, height: side))
         renderer.scale = scale
-        let image = try #require(renderer.cgImage)
-        let width = image.width, height = image.height
-        var data = [UInt8](repeating: 0, count: width * height * 4)
-        let context = try #require(CGContext(data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                                             space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        return (data, width)
+        // 同 SpineBakeTests 的讀回（sRGB、premultipliedLast）；換讀回方式會動到 G.2 基線
+        let pixels = SpineBakeTests.pixels(try #require(renderer.cgImage))
+        return (pixels.data, pixels.width)
     }
 
     private static func record(_ colors: AlbumColors, angle: Double, store: LabelPrintStore) -> VinylRecordView {
