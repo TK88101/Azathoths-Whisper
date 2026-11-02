@@ -134,7 +134,6 @@ struct LibraryGateReport: Equatable, Sendable {
             guard case .rows(_, let ids) = verdict.explanation.key, let tier = AppleGenreConsensus.evidenceTier(of: verdict.explanation.key) else { return [] }
             return Array(repeating: .init(familyKey: verdict.familyKey, tier: tier, rowIDs: ids), count: songs)
         })
-        self.consensus = consensus
         let verdicts = plain.reduce(into: plain) { verdicts, entry in
             if let family = consensus[entry.value.familyKey] { verdicts[entry.key] = judge(entry.key, family) }
         }
@@ -145,7 +144,14 @@ struct LibraryGateReport: Equatable, Sendable {
                 decision: verdict.decision, noStyleReason: verdict.noStyleReason, issues: verdict.issues, japaneseEstimate: item.estimate
             )
         }
+        self.init(rows: rows, consensus: consensus)
+    }
+
+    /// 由逐首列彙整計數（Cannibal Corpse 計劃 §4c 設計 5）：正式流程建好列後交給它；
+    /// 測試可直接給人造的列（樂團表已無「組不出的署名團」時，用來守住署名待補元件擋閘門的計數）
+    init(rows: [Row], consensus: [String: AppleGenreConsensus]) {
         self.rows = rows
+        self.consensus = consensus
         artists = Self.artistIssues(rows)
         let withLyrics = rows.filter(\.track.hasLyrics)
         identity = Self.count(rows, .identity)
@@ -167,6 +173,19 @@ struct LibraryGateReport: Equatable, Sendable {
                 estimates[key] = JapaneseEstimate(lyricsSongs: current.lyricsSongs + 1, japaneseSongs: current.japaneseSongs + (track.isJapanese ? 1 : 0))
             }
             .filter { $0.value.isMostlyJapanese }
+    }
+
+    /// 解析結果是否組得出、組不出的原因。曲風列各層在 explain 裡已確認組得出；只剩署名團要另外判。
+    /// `isComposable` 只給測試注入（Cannibal Corpse 計劃 §4c 設計 5）
+    static func composition(
+        of resolution: ProfileResolution, isComposable: (SongProfile) -> Bool = { Composer.isComposable($0) }
+    ) -> (isComposed: Bool, noStyleReason: NoStyleReason?) {
+        switch resolution {
+        case .pending: (false, nil)
+        case .noMatch: (false, .noRowMatched)
+        case .signedBand(let profile): isComposable(profile) ? (true, nil) : (false, .signedBandMissingParts)
+        default: (true, nil)
+        }
     }
 
     private struct KeyedTrack {
@@ -200,13 +219,7 @@ struct LibraryGateReport: Equatable, Sendable {
             artist: key.artist, genre: key.genre, lyrics: .text(isJapanese: key.isJapanese), artistGenres: genres, decision: decision?.choice,
             consensus: consensus
         )
-        // 曲風列各層在 explain 裡已確認組得出；只剩署名團要另外判
-        let (isComposed, noStyleReason): (Bool, NoStyleReason?) = switch explanation.resolution {
-        case .pending: (false, nil)
-        case .noMatch: (false, .noRowMatched)
-        case .signedBand(let profile): Composer.isComposable(profile) ? (true, nil) : (false, .signedBandMissingParts)
-        default: (true, nil)
-        }
+        let (isComposed, noStyleReason) = Self.composition(of: explanation.resolution)
         let usesMB = SongProfileResolver.needsArtistGenres(key.artist) && explanation.key != .jpop
         let mbStatus: MBStatus = usesMB ? status(genres, record: artistStyles.record(forArtist: key.artist)) : .notApplicable
         var issues: Set<Issue> = []
