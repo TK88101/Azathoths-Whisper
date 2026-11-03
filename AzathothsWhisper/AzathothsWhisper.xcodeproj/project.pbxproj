@@ -27,6 +27,7 @@
 		0A8DAD9C375EFE076842E89B /* CoverFlowStripStackingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CAA8E2815FD13EE91B7306C /* CoverFlowStripStackingTests.swift */; };
 		0C184008ADCCB6EB8711BF52 /* HTMLText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7B16B314B3DA14C6C421D5 /* HTMLText.swift */; };
 		0D929F53346E047ADD3EBD3D /* Anton-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5F0AB26E9B4AEA128961EE2A /* Anton-Regular.ttf */; };
+		0DC9340B3389B83464F7A3ED /* CloudSyncEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 904B1F9F65FB81923C405AE1 /* CloudSyncEnvironmentTests.swift */; };
 		0DDCE6BFE7270E854A88DD37 /* PythonCompatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDB995C37DF88749A2D09BFE /* PythonCompatTests.swift */; };
 		0DF0FBF9428A87F1F29D7EA1 /* UnifrakturMaguntia-Book.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 157EE002A8ACABD63C76F84E /* UnifrakturMaguntia-Book.ttf */; };
 		0E869D3A90B16E21B3BEC1F3 /* OFL-Rubik.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2BAEAAE57B00C54E932B3E51 /* OFL-Rubik.txt */; };
@@ -851,6 +852,7 @@
 		8EC370A6376F0236EA5EAB4D /* TimingRecordSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimingRecordSyncTests.swift; sourceTree = "<group>"; };
 		8ECDE70E69B691F835254409 /* LyricsStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsStatus.swift; sourceTree = "<group>"; };
 		8F1C5B13ED17F9135FA23613 /* CoverFlowSlideSpikeS9Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowSlideSpikeS9Tests.swift; sourceTree = "<group>"; };
+		904B1F9F65FB81923C405AE1 /* CloudSyncEnvironmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncEnvironmentTests.swift; sourceTree = "<group>"; };
 		90FEE9372D4A50255C763391 /* PythonCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PythonCompat.swift; sourceTree = "<group>"; };
 		914D6BE08AD5EBE7090F7048 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		91AF07276702EF16AEC0AEAF /* LICENSE-Syncopate.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "LICENSE-Syncopate.txt"; sourceTree = "<group>"; };
@@ -1428,6 +1430,7 @@
 				459CB3CE278E392BCD08DA32 /* ArtistDecisionSyncTests.swift */,
 				47E5AB6DB4191E5402361E73 /* ArtistStyleMergeTests.swift */,
 				D71A96EB25DD813828A0A198 /* CloudSyncCoordinatorTests.swift */,
+				904B1F9F65FB81923C405AE1 /* CloudSyncEnvironmentTests.swift */,
 				A481C981C6CAF1FDA0E6FE76 /* CloudSyncSettingsTests.swift */,
 				64A802CC240113B80F5DA617 /* NoLyricsMarkSyncTests.swift */,
 				41C01AE284CCBD6E707844C8 /* RemoteTimingIndexTests.swift */,
@@ -2233,6 +2236,7 @@
 				539C5B564600B60548F7258D /* CannibalCorpseEntranceTests.swift in Sources */,
 				41E4C401554F86C1C2568605 /* CardDetailsReaderTests.swift in Sources */,
 				E7A628185481324231D69013 /* CloudSyncCoordinatorTests.swift in Sources */,
+				0DC9340B3389B83464F7A3ED /* CloudSyncEnvironmentTests.swift in Sources */,
 				C1210FA760B864C4AF44E9EA /* CloudSyncSettingsTests.swift in Sources */,
 				B98366A5E631F3558B92111A /* ComposedStyleFrameTests.swift in Sources */,
 				6D219A0162D2E35F1342E799 /* ComposerTests.swift in Sources */,

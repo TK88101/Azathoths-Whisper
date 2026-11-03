@@ -126,7 +126,7 @@ iCloud Drive/Azathoth's Whisper/Sync/<writerID>/
 - 匯入只寫本機正本、從不寫他機檔；匯入造成的本機變更照樣 `markDirty`（聯集轉出；重複匯入結果不變＝冪等）。
 - **單一採用入口**（R1-3，採納）：所有匯入經 `AppModel.adoptRemote(_:)`，同一次主執行緒更新：store、`decisionBook`、`LibraryCheckViewModel` 的決定（新增 `decisionsReplaced(_:)`）；MB 經 `ArtistStyleSync` 的 `publish` 換 `artistBook`；時間軸由 resolver 每次讀 store、標記由 `reloadMarks` 每次重讀，不需額外通知。效果：**不重啟**，下次播放（時間軸：下次查找）生效。
 - 各類合併規則（純函式，寫在各自型別，真值表測試）：
-  - **MB 歌手**（R1-2、R1-4、R2-B2、R2-B3，採納）：唯一擁有者是 `ArtistStyleSync` actor。**actor 改在 `AppModel` 組裝時建立**；book 的載入是 actor 內一次性的 `ensureLoaded()`（背景、不在主執行緒、不在組裝時同步讀檔；R3-3），`adopt` 與 `run` 都先 await 它，`run()` 不再自己 `store.load()`；3.5 s 延遲只延後 `run()`。**查詢結果寫回也走同一個合併函式**（R3-1）：actor 在 `await` 期間可重入，正在查的那位若已被匯入，查回來的結果只當一個候選與 book 現值合併，不直接覆寫。新增 `adopt(remote:)`：合併進 book、把已有記錄的歌手從佇列移除、`persist`、`publish`；每位歌手查詢前再看一次 book。不需要啟動屏障，最多白查「匯入當下正在查」的那一位。合併：先取兩邊寫法聯集，**照現有撞鍵規則重判**（聯集內不是同一寫法家族＝collision，`ArtistStyleBook.swift:84-86` 的語義），collision 一旦成立就保留；不撞鍵時 verified 勝 unresolved、同狀態取 `origin` 字典序較小者的 mbid／曲風。兩台因此收斂成同一份，且遠端 verified 不會蓋掉本機的撞鍵防線。
+  - **MB 歌手**（R1-2、R1-4、R2-B2、R2-B3，採納）：唯一擁有者是 `ArtistStyleSync` actor。**actor 改在 `AppModel` 組裝時建立**；book 的載入是 actor 內一次性的 `ensureLoaded()`（背景、不在主執行緒、不在組裝時同步讀檔；R3-3），`adopt` 與 `run` 都先 await 它，`run()` 不再自己 `store.load()`；3.5 s 延遲只延後 `run()`。**查詢途中被匯入＝丟棄查回的結果**（R3-1；實作時改採 Codex R3-1 原建議「只容許白查、不容許白查後寫回」，比「當候選合併」少一條未蓋章記錄的決勝分支；附錄 C-1）：actor 在 `await` 期間可重入，寫回前若該鍵已有記錄就不寫。新增 `adopt(remote:)`：合併進 book、把已有記錄的歌手從佇列移除、`persist`、`publish`；每位歌手查詢前再看一次 book。不需要啟動屏障，最多白查「匯入當下正在查」的那一位。合併：先取兩邊寫法聯集，**照現有撞鍵規則重判**（聯集內不是同一寫法家族＝collision，`ArtistStyleBook.swift:84-86` 的語義），collision 一旦成立就保留；不撞鍵時 verified 勝 unresolved、同狀態取 `origin` 字典序較小者的 mbid／曲風。兩台因此收斂成同一份，且遠端 verified 不會蓋掉本機的撞鍵防線。
   - **共用 LWW 暫存器**（R2-B4 後抽出，決定與標記共用一個定義）：`SyncRegister<Value>`＝{value 或 cleared、revision、origin}；本機改動＝該鍵已見過的最大 revision＋1；合併＝revision 大者勝、同 revision 取 origin 字典序較小者。
   - **使用者決定**（R1-1、R1-9、R1-10，採納）：資料模型改為 `active(choice)`／`cleared` 兩態，每筆帶 `revision`（每鍵 Lamport 計數：本機改動＝該鍵已見過的最大 revision＋1）、`decidedAt`（只供顯示）、`origin`、`spellings`（下決定時畫面上的歌手寫法）。決勝：revision 大者勝，同 revision 取 origin 字典序較小者——可交換、可結合、冪等，三台以上轉手也收斂。`decision(forArtist:)` 對 `cleared` 回 nil；`clearing` 改為寫墓碑。驗證依 choice 分開：`.style` 要列 id 在本版目錄內、且 `spellings` 至少一個 `needsArtistGenres` 為真；`.keepFallback`、`cleared` 不驗樂團表。本版不認得的列 id（他機較新版本）＝這一筆本輪不採用、保留本機，升級後下次匯入自然採用。存檔 schemaVersion 1→2（v1 照讀並補 revision 0、origin 本機；v2 被舊版讀到＝看不懂、不覆寫，既有防線）。
   - **沒有歌詞標記**（R2-B4，採納；原「聯集不做墓碑」撤回）：每個 pid 一個 `SyncRegister<Bool>`；清除（AC5 寫入非空歌詞時）寫成 cleared＋新 revision。本機正本改為 UserDefaults 新鍵 `NoLyricsMarkLedger`（含 revision、origin），首次啟動自舊鍵 `NoLyricsMarkedTrackIDs` 單向遷移（revision 0、origin 本機）；之後 `noLyricsMarks` 只從 ledger 推出，舊鍵凍結不再讀寫。**不支援降版後的標記改動回流**（R3-2；常規判斷：只有使用者本人使用、降版罕見；退回舊版會看到遷移當下的標記，ACCEPTANCE 註明）。理由：Music 裡直接把詞改空、或他機舊標記晚到，無墓碑會讓已清除的標記復活。`lyricsChanged` 不更新標記狀態是既有行為（`LyricsFlowModel.swift:110-112`），不在本計劃。
@@ -291,3 +291,24 @@ Codex 最擔心：錯誤一旦被跨機採用就會被再匯出擴散；`sourceR
 | 3 | T2 驗證器依賴 T3 的模型，順序反了 | **採納**：T3 拆 T3a（模型、遷移）先於 T2 |
 | 最易失敗 | T0 探針（File Provider、TCC 不易重現） | **採納**：T0 DoD 加「做不出就記未驗證、直接採退路」 |
 | §4、§5、§8、§11 一致性 | — | Codex：無 |
+
+## 附錄 C：實作紀錄（2026-11-03，分支 wip/lyrics-icloud-sync）
+
+| commit | 內容 | 測試 |
+|---|---|---|
+| 163fae9 | T3a-1：`SyncRegister`、決定兩態 v2、標記 ledger | 9 suite 76 條綠（測試與實作同批，未單獨跑紅） |
+| 04eeb6b | T3a-2：MB origin＋逐筆驗證＋撞鍵重判合併；時間軸 origin／sourceRef／match、`importMerged`、`adopt`、`stampAll` | **紅**：112 個編譯錯誤（欄位與方法未定義）→ 綠：12 suite 154 條 |
+| 7c77382 | T1＋T2：writerID、外殼與正規形式雜湊、資料夾版面與下載狀態 | 5 suite 56 條綠（同批寫） |
+| 9d6fd2d | T5：`CloudSyncCoordinator`、`CloudSyncChannel`、`SyncLock` | 11 條綠；連跑 10 次 10/10 |
+| 777c10b | T7＋T8：`ArtistStyleSync` 一次性載入／stamp／adopt／查詢途中丟棄；`RemoteTimingIndex` 接進查找 | 時間軸 101 條、MB 44 條綠 |
+| 381e1a2 | AppModel 接線、單一採用入口、各寫入路徑 markDirty、重設 | `AppModelCloudSyncTests` 7 條（連跑 5 次）、app-model 61 條綠 |
+| 6cbaf9c | T9：Settings 群組＋選單＋三語 15 鍵；退出前限時匯出；UI 測試 | 52 條綠；UITest 未跑（需在場） |
+
+與定稿的差異（皆不動驗收標準）：
+1. **C-1** MB 查詢途中被匯入：丟棄查回結果（見 §6.5），不當候選合併。
+2. **C-2** T0 探針併入使用者在場 #1：讀取路徑已同時實作「先查下載狀態＋要求下載」與「背景讀＋30 s 逾時＋晚到丟棄」兩條，T0 結果不改程式形狀；在場時觀察授權框與下載狀態即可。
+3. **C-3** 新增防線：iCloud Drive 本身（根目錄的上層）不存在時不自建資料夾（`SyncFolder.Failure.iCloudDriveUnavailable`），避免在未登入 iCloud 的機器上造出假的 `Mobile Documents`。
+4. **C-4** 讀不到硬體身分時，開關不存成「開」，設定頁顯示無法開啟。
+5. **C-5** 舊測試的假 mbid（`"mb-1"`）改為 UUID 格式：新驗證器要求 verified 必須是 UUID（真 client 本來就只收 UUID），斷言未動。`NoLyricsMarksTests.markingTwiceKeepsASingleEntry` 原本讀舊鍵，改讀 ledger（舊鍵依定稿凍結）。
+6. **C-6** UI 測試組裝（DEBUG）可經 `AZW_UITEST_SYNC_ROOT` 指定臨時同步根目錄與假硬體身分；未設＝不同步。
+7. **C-7** 已知取捨（定稿 §6.5「聯集轉出」的推論）：同 persistentID 的匯入會把他機的每一筆時間軸都存成本機檔；若 U1 證實兩台 persistentID 不同，這些檔在本機永遠用不到（只佔空間，數 MB 級），並隨匯出回到 iCloud。待 U1 有結論再評估是否只收本機曲庫有的 pid。
