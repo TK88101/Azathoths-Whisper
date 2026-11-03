@@ -30,6 +30,8 @@ struct SyncFolder: Sendable {
     enum Failure: Error, Equatable {
         /// 根目錄或資料夾是符號連結／不是目錄
         case unsafeLayout
+        /// iCloud Drive 本身不在（未登入或關閉）：不得自己建出一個假的
+        case iCloudDriveUnavailable
     }
 
     struct Scan<Payload: Codable & Sendable>: Sendable {
@@ -55,6 +57,7 @@ struct SyncFolder: Sendable {
     // MARK: 寫自己的
 
     func write<Payload: Codable & Sendable>(_ payload: Payload, kind: SyncKind, at date: Date) throws {
+        guard isSafeDirectory(root.deletingLastPathComponent()) else { throw Failure.iCloudDriveUnavailable }
         try ensureDirectory(root)
         try ensureDirectory(syncDirectory)
         try ensureDirectory(ownDirectory)

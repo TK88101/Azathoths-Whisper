@@ -107,6 +107,13 @@ struct SyncFolderTests {
         #expect(folder(link).readOthers(.nolyrics, as: SyncPayload.NoLyrics.self).envelopes.isEmpty)
     }
 
+    @Test func aMissingICloudDriveIsNotCreated() {
+        let parent = root()
+        let folder = folder(parent.appendingPathComponent("Azathoth's Whisper"))
+        #expect(throws: SyncFolder.Failure.iCloudDriveUnavailable) { try folder.write(marks, kind: .nolyrics, at: Self.at) }
+        #expect(FileManager.default.fileExists(atPath: parent.path) == false)
+    }
+
     @Test func otherWritersAreListedWithTheirLastWriteTime() throws {
         let root = root()
         defer { try? FileManager.default.removeItem(at: root) }

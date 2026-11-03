@@ -35,7 +35,8 @@ final class AppModel {
     /// Editor 與 Batch 任一存檔成功都要放紙花（py:545／701／737）
     var confettiTrigger: Int { editor.confettiTrigger + batch.confettiTrigger }
 
-    private let configStore: ConfigStore
+    /// ⑨：iCloud 同步（`AppModel+CloudSync.swift`）也讀寫它，故不設 private
+    let configStore: ConfigStore
     private let httpClient: any HTTPClient
     private let monitor: NowPlayingMonitor
     /// 啟動後先等一下才開始背景查 MB：暫時節流，讓第一輪播放讀取先用 AE 佇列（⑥b simcodex R1）。不保證第一輪讀取已完成
@@ -59,20 +60,33 @@ final class AppModel {
     /// ⑥b：背景查 MB 的組裝（nil＝不查——單元測試與 UI 測試組裝的預設，絕不連網）
     typealias ArtistStylesFactory = (@escaping @Sendable (ArtistStyleBook) async -> Void) -> ArtistStyleSync
     private let makeArtistStyles: ArtistStylesFactory?
-    private var artistStyles: ArtistStyleSync?
+    /// 需要時才建（`artistStyleSync()`）：背景查詢等 3.5 s 後才開始；⑨ 同步開啟時會更早建立以便匯入
+    @ObservationIgnored var artistStyles: ArtistStyleSync?
     private var artistStylesTask: Task<Void, Never>?
     /// ⑥b：最新的查詢結果 snapshot（R1-6）；歌詞特效同步讀它
     /// ⑧：nil＝背景同步還沒發布過（曲庫檢查不能判定達標）。可觀察：檢查視窗的「需重新掃描」要隨它重繪
     private(set) var artistBook: ArtistStyleBook?
     /// ⑧：使用者決定的存檔（nil＝只在記憶體——單元測試與 UI 測試組裝的預設，絕不碰使用者的檔案）
-    private let artistDecisions: ArtistDecisionStore?
+    let artistDecisions: ArtistDecisionStore?
     private let artistConsensus: ArtistConsensusStore?
     /// 播放端的同歌手共識（家族鍵 → 共識）：啟動時載入存檔、完整掃描後換新
     @ObservationIgnored private var consensusTable: [String: AppleGenreConsensus]
     /// 最後一次成功寫進檔的表：寫檔失敗後，同一張表下次還要再試（codex review R1）
     @ObservationIgnored private var savedConsensusTable: [String: AppleGenreConsensus]?
     /// ⑧：使用者決定的 snapshot；歌詞特效同步讀它
-    @ObservationIgnored private(set) var decisionBook: ArtistDecisionBook
+    @ObservationIgnored var decisionBook: ArtistDecisionBook
+    /// ⑨ iCloud 同步的組裝（nil＝這個組裝不同步：單元與 UI 測試的預設，絕不碰使用者的 iCloud）
+    @ObservationIgnored let cloudSyncEnvironment: CloudSyncEnvironment?
+    /// 時間軸存檔：與查找共用同一個 actor（兩個 actor 指同一資料夾會互相蓋掉，A1 §3.6）
+    @ObservationIgnored let timingStore: TimingStore?
+    @ObservationIgnored let remoteTimingIndex: RemoteTimingIndex?
+    @ObservationIgnored var cloudSync: CloudSyncCoordinator?
+    @ObservationIgnored var cloudSyncTask: Task<Void, Never>?
+    /// 設定頁顯示用
+    var cloudSyncEnabled: Bool
+    var cloudSyncStatus: CloudSyncCoordinator.Status?
+    /// 讀不到硬體身分＝不能同步（§6.2）
+    var cloudSyncUnavailable = false
     /// ⑧ 曲庫檢查（獨立視窗）
     let libraryCheck: LibraryCheckViewModel
 
@@ -112,8 +126,16 @@ final class AppModel {
         /// ⑧ 使用者決定的存檔。nil＝只在記憶體
         artistDecisions: ArtistDecisionStore? = nil,
         /// 增補計劃 §4.2：同歌手共識的存檔。nil＝只在記憶體
-        artistConsensus: ArtistConsensusStore? = nil
+        artistConsensus: ArtistConsensusStore? = nil,
+        /// ⑨ iCloud 同步。nil＝不同步
+        cloudSync: CloudSyncEnvironment? = nil,
+        timingStore: TimingStore? = nil,
+        remoteTimingIndex: RemoteTimingIndex? = nil
     ) {
+        self.cloudSyncEnvironment = cloudSync
+        self.timingStore = timingStore
+        self.remoteTimingIndex = remoteTimingIndex
+        self.cloudSyncEnabled = configStore.cloudSyncEnabled
         self.relayHost = relayHost
         self.relayLifecycle = relayLifecycle
         self.configStore = configStore
@@ -232,6 +254,7 @@ final class AppModel {
             self?.updateRaisedLayerVisibility()
             self?.lyricsFX.refreshStatus()   // 標記「這首沒有詞」只會經由升降變更被看見
         }
+        lyricsFlow.onMarksChanged = { [weak self] in self?.markCloudSyncDirty(.nolyrics) }
         lyricsFlow.onWriteNotConfirmed = { [weak self] _ in
             self?.editor.setExternalStatus(StatusText.writeNotConfirmed)
         }
@@ -349,11 +372,14 @@ final class AppModel {
         #else
         let music = MusicAppleEventsClient()
         #endif
+        // ⑨：時間軸存檔與他機索引由查找與 iCloud 同步共用
+        let timingStore = TimingStore(directory: TimingStore.defaultDirectory)
+        let remoteTimingIndex = RemoteTimingIndex()
         #if DEBUG
         // 單元測試 host 不連外網查時間軸
-        let timing: (any TimingResolving)? = isTestHost ? nil : TimingResolver.live(music: music)
+        let timing: (any TimingResolving)? = isTestHost ? nil : TimingResolver.live(music: music, store: timingStore, remoteIndex: remoteTimingIndex)
         #else
-        let timing: (any TimingResolving)? = TimingResolver.live(music: music)
+        let timing: (any TimingResolving)? = TimingResolver.live(music: music, store: timingStore, remoteIndex: remoteTimingIndex)
         #endif
         #if DEBUG
         // D11：單元測試 host 不讀使用者的曲庫
@@ -366,10 +392,13 @@ final class AppModel {
         let artistStyles: ArtistStylesFactory? = isAutomatedTest ? nil : liveArtistStyles(music: music)
         let artistDecisions: ArtistDecisionStore? = isAutomatedTest ? nil : ArtistDecisionStore(directory: ArtistDecisionStore.defaultDirectory)
         let artistConsensus: ArtistConsensusStore? = isAutomatedTest ? nil : ArtistConsensusStore(directory: ArtistConsensusStore.defaultDirectory)
+        // ⑨：自動化測試一律不碰使用者的 iCloud
+        let cloudSync: CloudSyncEnvironment? = isAutomatedTest ? nil : .live()
         #else
         let artistStyles: ArtistStylesFactory? = liveArtistStyles(music: music)
         let artistDecisions: ArtistDecisionStore? = ArtistDecisionStore(directory: ArtistDecisionStore.defaultDirectory)
         let artistConsensus: ArtistConsensusStore? = ArtistConsensusStore(directory: ArtistConsensusStore.defaultDirectory)
+        let cloudSync: CloudSyncEnvironment? = .live()
         #endif
         return AppModel(
             configStore: store,
@@ -388,7 +417,10 @@ final class AppModel {
             timing: timing,
             artistStyles: artistStyles,
             artistDecisions: artistDecisions,
-            artistConsensus: artistConsensus
+            artistConsensus: artistConsensus,
+            cloudSync: cloudSync,
+            timingStore: timingStore,
+            remoteTimingIndex: remoteTimingIndex
         )
     }
 
@@ -443,6 +475,8 @@ final class AppModel {
         }
         lyricsFlow.startPolling()
         startRelay()
+        // ⑨：MB 匯入要能在背景查詢之前（或期間）採用，所以先於 3.5 s 的等待
+        startCloudSyncIfEnabled()
 
         try? await artistStylesClock.sleep(for: artistStylesStartDelay)
         startArtistStyles()
@@ -450,10 +484,18 @@ final class AppModel {
 
     /// ⑥b：背景查一輪（只啟動一次）；每查完一位就換 snapshot
     func startArtistStyles() {
-        guard artistStyles == nil, let makeArtistStyles else { return }
+        guard artistStylesTask == nil, let sync = artistStyleSync() else { return }
+        artistStylesTask = Task(priority: .utility) { await sync.run() }
+    }
+
+    /// 建一次、之後同一個（MB 存檔的唯一擁有者；⑨ 匯入也經它）
+    func artistStyleSync() -> ArtistStyleSync? {
+        if let artistStyles { return artistStyles }
+        guard let makeArtistStyles else { return nil }
         let sync = makeArtistStyles { [weak self] book in await self?.receiveArtistBook(book) }
         artistStyles = sync
-        artistStylesTask = Task(priority: .utility) { await sync.run() }
+        Task { await sync.setOnPersisted { [weak self] in Task { @MainActor in self?.markCloudSyncDirty(.artists) } } }
+        return sync
     }
 
     /// 測試用：等背景這一輪跑完
@@ -482,6 +524,7 @@ final class AppModel {
     private func saveDecisions(_ book: ArtistDecisionBook) throws {
         try artistDecisions?.save(book)
         decisionBook = book
+        markCloudSyncDirty(.decisions)
     }
 
     /// iPad 中繼：與視窗無關。登入時系統叫起 App 但不開視窗，`RootView.task` 不會跑——
@@ -519,6 +562,7 @@ final class AppModel {
         eventTask?.cancel()
         eventTask = nil
         artistStylesTask?.cancel()
+        stopCloudSync()
         libraryCheck.cancelScan()
         lyricsFlow.stopPolling()
         lyricsFX.setVisible(false)

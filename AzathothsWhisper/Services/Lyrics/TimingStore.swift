@@ -167,9 +167,15 @@ actor TimingStore {
         .appendingPathComponent("Library/Application Support/com.ibridgezhao.azathothswhisper/Timings")
 
     private let directory: URL
+    /// ⑨：查找寫入成功後通知（iCloud 匯出的 dirty）；匯入（adopt）與蓋章不通知，由同步自己處理
+    private var onSaved: (@Sendable () -> Void)?
 
     init(directory: URL) {
         self.directory = directory
+    }
+
+    func setOnSaved(_ hook: (@Sendable () -> Void)?) {
+        onSaved = hook
     }
 
     /// 磁碟上這首的檔是什麼狀況。只讀一次檔，讀與寫的判斷都從這裡出（simplify R2 altitude）
@@ -194,6 +200,7 @@ actor TimingStore {
         let canonical = record.with(persistentID: id, origin: record.origin, sourceRef: record.sourceRef)
         let merged = TimingRecord.merged(existing: try existingRecord(id), incoming: canonical)
         try write(merged, id: id)
+        onSaved?()
         return merged
     }
 
@@ -215,6 +222,7 @@ actor TimingStore {
         guard let id = Self.canonicalID(record.persistentID) else { throw StoreError.invalidPersistentID }
         if case .unrecognized = inspect(id) { throw StoreError.unrecognizedFileOnDisk }
         try write(record.with(persistentID: id, origin: record.origin, sourceRef: record.sourceRef), id: id)
+        onSaved?()
     }
 
     /// 匯出用：所有讀得懂的記錄，依 persistentID 排序

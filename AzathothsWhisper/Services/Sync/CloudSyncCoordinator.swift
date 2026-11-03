@@ -201,8 +201,8 @@ actor CloudSyncCoordinator {
     }
 }
 
-/// 只讓第一個結果（讀完或逾時）回去
-private final class SyncRace<Value: Sendable>: @unchecked Sendable {
+/// 只讓第一個結果（讀完或逾時）回去；結束 app 時的限時匯出也用它
+final class SyncRace<Value: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Value?, Never>?
 

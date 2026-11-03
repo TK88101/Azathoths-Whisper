@@ -11,6 +11,7 @@ struct ConfigStore: @unchecked Sendable {
         static let migrationVersion = "LegacyConfigMigratedVersion"
         static let notificationsEnabled = "LyricsNotificationsEnabled"
         static let raisedLayerStyle = "RaisedLayerStyle"
+        static let cloudSyncEnabled = "ICloudSyncEnabled"
     }
 
     /// 遷移格式版本；日後若 legacy 讀取語義再變，遞增此值即可重跑遷移。
@@ -77,6 +78,15 @@ struct ConfigStore: @unchecked Sendable {
 
     func setRaisedLayerStyle(_ value: RaisedLayerStyle) {
         defaults.set(value.rawValue, forKey: Key.raisedLayerStyle)
+    }
+
+    /// ⑨ iCloud 同步開關，**預設關**、每台各自（計劃 §6.6）
+    var cloudSyncEnabled: Bool {
+        defaults.bool(forKey: Key.cloudSyncEnabled)
+    }
+
+    func setCloudSyncEnabled(_ value: Bool) {
+        defaults.set(value, forKey: Key.cloudSyncEnabled)
     }
 }
 

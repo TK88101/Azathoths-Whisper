@@ -259,6 +259,7 @@
 		7E55EDB8B0FBE691E63A1CE4 /* LatinLayoutBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03E2BE0D8F3CD09621750BC /* LatinLayoutBaselineTests.swift */; };
 		8018A18F74E3C10F4907064E /* BatchImportCoverFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D344A222229810F246989A /* BatchImportCoverFlowUITests.swift */; };
 		8026945D833BDE07431A2157 /* ArtistIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 692D74E57AA6735BCFC41B3A /* ArtistIdentityTests.swift */; };
+		80BEB2E62C11A6514768500B /* AppModel+CloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C08C30617E913D7EBF5A2D6 /* AppModel+CloudSync.swift */; };
 		813496D67E5182DE002243EA /* PlaybackPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72A7CBA940A9CCA551D8B40A /* PlaybackPosition.swift */; };
 		81BBB0ADBD22B3EB72F814AE /* CoverFlowStripReaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = E232BBA841CFF454F0ACBD50 /* CoverFlowStripReaction.swift */; };
 		82518F451EC99E7002E2804D /* LICENSE-Syncopate.txt in Resources */ = {isa = PBXBuildFile; fileRef = 91AF07276702EF16AEC0AEAF /* LICENSE-Syncopate.txt */; };
@@ -369,6 +370,7 @@
 		B3C3C189240EA8549F64EF48 /* TimingMarksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8443348F9A45452D22DB6395 /* TimingMarksTests.swift */; };
 		B3F2AFD30B0A181B9A9A8FEF /* OFL-Righteous.txt in Resources */ = {isa = PBXBuildFile; fileRef = A400966E1FD5ED5AA759BB67 /* OFL-Righteous.txt */; };
 		B41A98A578327ECA58E8B39E /* CoverFlowViewModelDeckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436CC389AA48CA8CEA132DF6 /* CoverFlowViewModelDeckTests.swift */; };
+		B554EF294CECE4FA144046A8 /* AppModelCloudSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D06973E4A1774E3A36843A8 /* AppModelCloudSyncTests.swift */; };
 		B5915764153A2DC3D534343F /* OFL-Oswald.txt in Resources */ = {isa = PBXBuildFile; fileRef = 973705F8A954EFB27D6DAFA4 /* OFL-Oswald.txt */; };
 		B59F7F54ECC2D44691FF54E8 /* RelayQueueReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42761BAF60A7DF3F15B8FA46 /* RelayQueueReader.swift */; };
 		B5FC73FBCAAEA235449378F1 /* AppModel+LyricsFlowUITest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71D5D3EB1307A6301785FE06 /* AppModel+LyricsFlowUITest.swift */; };
@@ -447,6 +449,7 @@
 		DB464ADE3A4414380D8C7A8B /* AboutModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6C9DC917927EE65DB90D069 /* AboutModalView.swift */; };
 		DBCD3DCBD8D011B4282BD6B9 /* AbrilFatface-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2F18801FBBEE2D04E786427A /* AbrilFatface-Regular.ttf */; };
 		DD08B4A5E8125E6C90E20ADD /* ArtistStyleStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA59D8F2A396C4700DDE1A19 /* ArtistStyleStoreTests.swift */; };
+		DD0F727C4121FF0A6C0C9A67 /* CloudSyncEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A81BDC8665C907AF96BE726F /* CloudSyncEnvironment.swift */; };
 		DD11B5CB03F3F487BE829629 /* MusicBrainzClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C7CE6A73FAF4B85762A1E56 /* MusicBrainzClientTests.swift */; };
 		DD3361E9C46A55A061643ABC /* LyricsLines.swift in Sources */ = {isa = PBXBuildFile; fileRef = C207B43C1ACA4C7F46C87E81 /* LyricsLines.swift */; };
 		DD4806856FEECDF283FACF06 /* B2BatchFiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D88DC83D6FEB5BE070E73A25 /* B2BatchFiveTests.swift */; };
@@ -638,6 +641,7 @@
 		2BAEAAE57B00C54E932B3E51 /* OFL-Rubik.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-Rubik.txt"; sourceTree = "<group>"; };
 		2BC6960B8584082481AA7721 /* AlfaSlabOne-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "AlfaSlabOne-Regular.ttf"; sourceTree = "<group>"; };
 		2BCD8E08AC78EAA7681264B2 /* JPopPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JPopPolicyTests.swift; sourceTree = "<group>"; };
+		2C08C30617E913D7EBF5A2D6 /* AppModel+CloudSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+CloudSync.swift"; sourceTree = "<group>"; };
 		2CC45A7CC7F36A7384041FCF /* CoverFlowUITestMusic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowUITestMusic.swift; sourceTree = "<group>"; };
 		2D73EEC1E7143A8AD5C82C3D /* SpaceGrotesk-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Variable.ttf"; sourceTree = "<group>"; };
 		2D9AFF9C090846310D4AFBF0 /* QueueSnapshotShortcutShuffleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueSnapshotShortcutShuffleTests.swift; sourceTree = "<group>"; };
@@ -759,6 +763,7 @@
 		6C395D1502A7F55510207748 /* PlayerChangeSignalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerChangeSignalTests.swift; sourceTree = "<group>"; };
 		6C61FC001523CA630A644E18 /* LyricsFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsFlowUITests.swift; sourceTree = "<group>"; };
 		6CEAE1416634122A9C99B5D1 /* GlyphTemplatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlyphTemplatesTests.swift; sourceTree = "<group>"; };
+		6D06973E4A1774E3A36843A8 /* AppModelCloudSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelCloudSyncTests.swift; sourceTree = "<group>"; };
 		6D924592E89F113D8C382EFB /* RelayPlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayPlayback.swift; sourceTree = "<group>"; };
 		6FA504860EF4A6A183692791 /* EditDistance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditDistance.swift; sourceTree = "<group>"; };
 		6FB871802D079A88D159A2DA /* CandidateRanking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateRanking.swift; sourceTree = "<group>"; };
@@ -893,6 +898,7 @@
 		A78E54FADEE375EBB62C98FC /* HTTPClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPClientTests.swift; sourceTree = "<group>"; };
 		A79000C2DDFEB159646F60EB /* FXComponent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXComponent.swift; sourceTree = "<group>"; };
 		A7C626DFA525BA999F7F022F /* NetEaseProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetEaseProviderTests.swift; sourceTree = "<group>"; };
+		A81BDC8665C907AF96BE726F /* CloudSyncEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncEnvironment.swift; sourceTree = "<group>"; };
 		A82103CA26657A17F960DBF1 /* ArtistDecisionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtistDecisionStore.swift; sourceTree = "<group>"; };
 		A8D48AED89F6F8695A6CF9E3 /* SettingsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModelTests.swift; sourceTree = "<group>"; };
 		A90AD5DFDAC963B31AB158BD /* AppModelRelayLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelRelayLaunchTests.swift; sourceTree = "<group>"; };
@@ -1096,6 +1102,7 @@
 			children = (
 				CAA072662EDB72B457ABE716 /* AppDelegate.swift */,
 				1C71D407A1B67001681052F0 /* AppModel.swift */,
+				2C08C30617E913D7EBF5A2D6 /* AppModel+CloudSync.swift */,
 				EE1BF2F922C9386770DBD80C /* AzathothsWhisperApp.swift */,
 				0791CAC2D67F248D7BEA25DA /* Info.plist */,
 				B86F3B1F9891A8DEE5EB90C6 /* WindowConfigurator.swift */,
@@ -1409,6 +1416,7 @@
 		7720E273A00DEBC60309B3C8 /* Sync */ = {
 			isa = PBXGroup;
 			children = (
+				6D06973E4A1774E3A36843A8 /* AppModelCloudSyncTests.swift */,
 				459CB3CE278E392BCD08DA32 /* ArtistDecisionSyncTests.swift */,
 				47E5AB6DB4191E5402361E73 /* ArtistStyleMergeTests.swift */,
 				D71A96EB25DD813828A0A198 /* CloudSyncCoordinatorTests.swift */,
@@ -1499,6 +1507,7 @@
 			children = (
 				84528A472372BEF67F9BEC25 /* CloudSyncChannel.swift */,
 				AC4A24174475B0BFE46B314F /* CloudSyncCoordinator.swift */,
+				A81BDC8665C907AF96BE726F /* CloudSyncEnvironment.swift */,
 				13079BF1536DB8FDB6408A61 /* RemoteTimingIndex.swift */,
 				E04A3B62820E5EAF19F3C03F /* SyncEnvelope.swift */,
 				89BDAB9AFE4C9A38BFD4BAC3 /* SyncFolder.swift */,
@@ -2166,6 +2175,7 @@
 				2869167F58B61DF3FBB6445C /* AEBudgetTests.swift in Sources */,
 				40D70B80B0E1C468C8E3455D /* AELatencyProbeTests.swift in Sources */,
 				759A0D9BB5FE39EE628D3DC2 /* AppInfoTests.swift in Sources */,
+				B554EF294CECE4FA144046A8 /* AppModelCloudSyncTests.swift in Sources */,
 				8BA88108C81FE1A0DABA96BC /* AppModelLibraryCheckTests.swift in Sources */,
 				00009B452E0FDF11C949F180 /* AppModelLyricsFXTests.swift in Sources */,
 				5E086739BF21B54E5B233692 /* AppModelNotificationTests.swift in Sources */,
@@ -2398,6 +2408,7 @@
 				65EA4BD9C610459A4E76C3B8 /* AccessibilityProbe.swift in Sources */,
 				788F4A3EF2FAB67E6D909296 /* ActionButton.swift in Sources */,
 				1AC85A608575F1243D830389 /* AppDelegate.swift in Sources */,
+				80BEB2E62C11A6514768500B /* AppModel+CloudSync.swift in Sources */,
 				794698CD4B4607F3DD2A1528 /* AppModel+CoverFlowUITest.swift in Sources */,
 				B5FC73FBCAAEA235449378F1 /* AppModel+LyricsFlowUITest.swift in Sources */,
 				A1D1C41121EB5695E39AF605 /* AppModel.swift in Sources */,
@@ -2428,6 +2439,7 @@
 				5852A9AC08154BDAE4AB8F91 /* CardDetailsReader.swift in Sources */,
 				226397C1BF79B0B0BD36B40E /* CloudSyncChannel.swift in Sources */,
 				982800B7E83253DB25CDBC0F /* CloudSyncCoordinator.swift in Sources */,
+				DD0F727C4121FF0A6C0C9A67 /* CloudSyncEnvironment.swift in Sources */,
 				437F6CA90159C3C0891D63A6 /* ComposedBackdrop.swift in Sources */,
 				70E51A71CA3A1B20EDF3AA72 /* ComposedStyle.swift in Sources */,
 				12F7CBBAF026544DEC350D77 /* Composer.swift in Sources */,
