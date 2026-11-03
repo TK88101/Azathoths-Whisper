@@ -13,8 +13,18 @@ struct ArtistDecision: Codable, Equatable, Sendable {
     let decidedAt: Date
 }
 
+/// 存檔與跨機同步的一筆決定（⑨ 計劃 §6.5）：`spellings`＝下決定時畫面上的歌手寫法，匯入時用來驗樂團表（R1-10）
+struct ArtistDecisionPayload: Codable, Equatable, Sendable {
+    let choice: ArtistDecision.Choice
+    let decidedAt: Date
+    let spellings: [String]
+
+    var decision: ArtistDecision { ArtistDecision(choice: choice, decidedAt: decidedAt) }
+}
+
 /// 使用者決定的不可變集合。鍵＝寫法家族（`ArtistStyleBook.spellingFamily`）：只折疊大小寫、全半形、變音與空白，保留標點。
-/// 不同寫法家族永遠是不同鍵，所以這裡不會撞鍵；同 `normalizedArtist` 的其他家族要一併套用時由使用者明示（R4 A-1）
+/// 不同寫法家族永遠是不同鍵，所以這裡不會撞鍵；同 `normalizedArtist` 的其他家族要一併套用時由使用者明示（R4 A-1）。
+/// ⑨：每鍵一個 `SyncRegister`，清除＝墓碑（不刪鍵），另一台較舊的決定不會復活
 struct ArtistDecisionBook: Equatable, Sendable {
     enum DecisionError: Error, Equatable {
         /// 署名樂團的樣式不在這裡改（計劃 §10-1）
@@ -22,37 +32,78 @@ struct ArtistDecisionBook: Equatable, Sendable {
         case unknownRow
     }
 
+    typealias Entry = SyncRegister<ArtistDecisionPayload>
+
     /// 可指定的列：曲風列、通用列兩段（使用者拿掉的列本來就不在表內）；畫面選單也讀這一份
     static let selectableRows = (genre: SongProfileResolver.keywordRows.map(\.id), generic: SongProfileResolver.genericRows.map(\.id))
     static let selectableRowIDs: [String] = selectableRows.genre + selectableRows.generic
 
-    private(set) var decisions: [String: ArtistDecision]
+    private(set) var entries: [String: Entry]
 
-    init(decisions: [String: ArtistDecision] = [:]) {
-        self.decisions = decisions
+    init(entries: [String: Entry] = [:]) {
+        self.entries = entries
     }
 
     static func key(_ artist: String) -> String {
         ArtistStyleBook.spellingFamily(artist)
     }
 
+    /// 生效中的決定（墓碑不算）
+    var decisions: [String: ArtistDecision] {
+        entries.compactMapValues { $0.value?.decision }
+    }
+
     func decision(forArtist artist: String) -> ArtistDecision? {
-        decisions[Self.key(artist)]
+        entries[Self.key(artist)]?.value?.decision
     }
 
     /// 同一個決定寫進每個寫法家族；樣式只給非樂團表歌手，且必須是現有的列
     func deciding(_ choice: ArtistDecision.Choice, forArtists artists: [String], at date: Date) throws(DecisionError) -> ArtistDecisionBook {
-        if case .style(let rowID) = choice {
-            guard Self.selectableRowIDs.contains(rowID) else { throw .unknownRow }
-            guard artists.allSatisfy(SongProfileResolver.needsArtistGenres) else { throw .signedBand }
+        try Self.validate(choice, spellings: artists)
+        let byKey = Dictionary(grouping: artists.filter { !Self.key($0).isEmpty }, by: Self.key)
+        return byKey.reduce(self) { book, group in
+            book.setting(ArtistDecisionPayload(choice: choice, decidedAt: date, spellings: Array(Set(group.value)).sorted()), forKey: group.key)
         }
-        let keys = artists.map(Self.key).filter { !$0.isEmpty }
-        let decision = ArtistDecision(choice: choice, decidedAt: date)
-        return ArtistDecisionBook(decisions: decisions.merging(keys.map { ($0, decision) }) { _, new in new })
     }
 
     func clearing(forArtists artists: [String]) -> ArtistDecisionBook {
-        let keys = Set(artists.map(Self.key))
-        return ArtistDecisionBook(decisions: decisions.filter { !keys.contains($0.key) })
+        Set(artists.map(Self.key)).reduce(self) { book, key in
+            guard book.entries[key]?.value != nil else { return book }
+            return book.setting(nil, forKey: key)
+        }
     }
+
+    /// 匯出、匯入前替本機改動蓋上這台的 writerID（⑨ §6.3）
+    func stamped(by writer: String) -> ArtistDecisionBook {
+        ArtistDecisionBook(entries: entries.mapValues { $0.stamped(by: writer) })
+    }
+
+    /// 匯入：逐鍵取勝者；不合格的遠端筆（鍵與寫法不符、未知列、樂團表給樣式）不採用、保留本機（§6.5）
+    func merging(remote: [String: Entry]) -> (book: ArtistDecisionBook, rejected: Int) {
+        let valid = remote.filter { Self.isAcceptable($0.value, underKey: $0.key) }
+        return (ArtistDecisionBook(entries: SyncRegister.merged(entries, valid)), remote.count - valid.count)
+    }
+
+    private func setting(_ payload: ArtistDecisionPayload?, forKey key: String) -> ArtistDecisionBook {
+        let next = entries[key].map { $0.updated(to: payload) } ?? Entry.fresh(payload)
+        return ArtistDecisionBook(entries: entries.merging([key: next]) { _, new in new })
+    }
+
+    private static func validate(_ choice: ArtistDecision.Choice, spellings: [String]) throws(DecisionError) {
+        guard case .style(let rowID) = choice else { return }
+        guard selectableRowIDs.contains(rowID) else { throw .unknownRow }
+        guard spellings.allSatisfy(SongProfileResolver.needsArtistGenres) else { throw .signedBand }
+    }
+
+    private static func isAcceptable(_ entry: Entry, underKey key: String) -> Bool {
+        guard entry.version.isStamped, entry.version.revision >= 0 else { return false }
+        guard let payload = entry.value else { return true }
+        guard !payload.spellings.isEmpty, payload.spellings.count <= maxSpellings,
+              payload.spellings.allSatisfy({ Self.key($0) == key })
+        else { return false }
+        return (try? validate(payload.choice, spellings: payload.spellings)) != nil
+    }
+
+    /// 一位歌手在曲庫裡的寫法不會多到這樣；超過＝竄改或壞檔
+    static let maxSpellings = 50
 }

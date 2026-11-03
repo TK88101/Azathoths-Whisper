@@ -56,6 +56,8 @@ struct NoLyricsMarksTests {
 
         store.markNoLyrics("PID1")
         store.markNoLyrics("PID1")
-        #expect(defaults.stringArray(forKey: ConfigStore.NoLyricsMarksKey.markedTrackIDs) == ["PID1"])
+        // ⑨ 計劃 §6.5：正本改為 ledger（舊鍵凍結）；同一首只有一筆、revision 不因重複標記而增加
+        #expect(store.noLyricsMarkLedger.count == 1)
+        #expect(store.noLyricsMarkLedger["PID1"]?.version.revision == 1)
     }
 }
