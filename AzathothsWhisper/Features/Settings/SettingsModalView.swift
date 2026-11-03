@@ -13,6 +13,7 @@ struct SettingsModalView: View {
                 case .token: tokenGroup
                 case .language: languageGroup
                 case .notifications: notificationsGroup
+                case .cloudSync: cloudSyncGroup
                 }
             }
             .padding(.top, 24)
@@ -31,6 +32,10 @@ struct SettingsModalView: View {
         }
         .alert(model.languageAlert ?? "", isPresented: languageAlertBinding) {
             Button("OK") { model.dismissLanguageAlert() }
+        }
+        .alert(Text("settings_sync_reset_confirm"), isPresented: resetConfirmBinding) {
+            Button(role: .destructive) { Task { await model.confirmCloudSyncReset() } } label: { Text("settings_sync_reset_ok") }
+            Button(role: .cancel) { model.cancelCloudSyncReset() } label: { Text("settings_sync_reset_cancel") }
         }
         .onAppear { isFieldFocused = true }            // py:789/794 focus
     }
@@ -149,6 +154,86 @@ struct SettingsModalView: View {
             get: { model.notificationsEnabled },
             set: { model.setNotificationsEnabled($0) }
         )
+    }
+
+    // MARK: iCloud 同步（⑨ 計劃 §6.6）
+
+    private var cloudSyncGroup: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            fieldLabel("settings_sync_label")
+            Toggle(isOn: cloudSyncBinding) {
+                Text("settings_sync_toggle")
+                    .font(Theme.Fonts.display(14))
+                    .foregroundStyle(.white)
+            }
+            .toggleStyle(.switch)
+            .tint(Theme.success)
+            .disabled(model.cloudSync.unavailable)
+            .accessibilityIdentifier(AccessibilityID.cloudSyncToggle)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.black)
+            .overlay(Rectangle().strokeBorder(Theme.Gray.g800, lineWidth: 1))
+
+            Text("settings_sync_what")
+                .font(Theme.Fonts.display(12))
+                .foregroundStyle(Theme.Gray.g400)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
+            Text("settings_sync_new_mac")
+                .font(Theme.Fonts.display(12))
+                .foregroundStyle(Theme.Gray.g400)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 6)
+
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(model.cloudSync.statusLines) { line in
+                    statusText(line)
+                        .font(Theme.Fonts.display(12))
+                        .foregroundStyle(statusLineColor(line))
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier(AccessibilityID.cloudSyncStatus)
+            .padding(.top, 12)
+
+            Button(action: model.requestCloudSyncReset) {
+                Text("settings_sync_reset")
+                    .font(Theme.Fonts.display(12))
+                    .foregroundStyle(Theme.danger)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(AccessibilityID.cloudSyncReset)
+            .padding(.top, 16)
+        }
+    }
+
+    private func statusText(_ line: CloudSyncDisplay.Line) -> Text {
+        let when = line.date?.formatted(date: .abbreviated, time: .shortened) ?? ""
+        switch line.kind {
+        case .lastExport: return Text("settings_sync_last_export \(when)")
+        case .lastImport: return Text("settings_sync_last_import \(when)")
+        case .otherMacs(let count): return Text("settings_sync_other_macs \(count)")
+        case .skipped(let count): return Text("settings_sync_skipped \(count)")
+        case .pendingDownloads(let count): return Text("settings_sync_pending \(count)")
+        case .error(let kind): return Text("settings_sync_error \(kind)")
+        case .unavailable: return Text("settings_sync_unavailable")
+        }
+    }
+
+    private func statusLineColor(_ line: CloudSyncDisplay.Line) -> Color {
+        switch line.kind {
+        case .error, .unavailable: return Theme.danger
+        default: return Theme.Gray.g400
+        }
+    }
+
+    private var cloudSyncBinding: Binding<Bool> {
+        Binding(get: { model.cloudSync.enabled }, set: { model.setCloudSyncEnabled($0) })
+    }
+
+    private var resetConfirmBinding: Binding<Bool> {
+        Binding(get: { model.isConfirmingCloudSyncReset }, set: { if !$0 { model.cancelCloudSyncReset() } })
     }
 
     // MARK: 零件

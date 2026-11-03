@@ -29,6 +29,8 @@ enum LyricsFlowUITestScenario: String, CaseIterable, Sendable {
     static let resetDefaultsVariable = "AZW_UITEST_RESET_DEFAULTS"
     /// 逗號分隔的 persistentID：預植「沒有歌詞」標記
     static let seedMarksVariable = "AZW_UITEST_SEED_MARKS"
+    /// ⑨ iCloud 同步 UI 測試：同步根目錄（臨時資料夾）；沒設＝這個組裝不同步
+    static let cloudSyncRootVariable = "AZW_UITEST_SYNC_ROOT"
     /// `RaisedLayerStyle.rawValue`：啟動前預植升起層畫面（未設＝沿用 suite 裡存的值）
     static let raisedStyleVariable = "AZW_UITEST_RAISED_STYLE"
     /// 測試專屬的設定 suite：**從不碰使用者的 `.standard`**（D4）

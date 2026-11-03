@@ -568,6 +568,43 @@ struct LyricsFlowModelTests {
         #expect(h.coverFlow.status(for: card) == .markedNone)
     }
 
+    /// ⑨ T6：標記寫入設定成功才通知同步（標記、寫入非空清除）；空文字寫入不清、不通知
+    @Test func markWritesNotifyCloudSyncOnlyWhenTheyHappen() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        var changes = 0
+        h.model.onMarksChanged = { changes += 1 }
+        h.store.markNoLyrics(QueueFixtures.pid(2))
+        _ = try await playingOneWithMissingTwo(h)
+        h.model.batchSaved(persistentID: QueueFixtures.pid(2), text: "   ")
+        #expect(changes == 0)
+        h.model.batchSaved(persistentID: QueueFixtures.pid(2), text: "found them after all")
+        #expect(changes == 1)
+    }
+
+    @Test func markingTheCurrentTrackNotifiesCloudSync() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        var changes = 0
+        h.model.onMarksChanged = { changes += 1 }
+        await play(h, 1, lyrics: "")
+        h.model.markNoLyrics(persistentID: QueueFixtures.pid(1))
+        #expect(changes == 1)
+        h.model.markNoLyrics(persistentID: QueueFixtures.pid(2))
+        #expect(changes == 1, "不是當前曲：拒絕、不通知")
+    }
+
+    /// ⑨：iCloud 匯入換了 ledger → Cover Flow 立刻看得到（不等換歌）
+    @Test func externallyChangedMarksReachCoverFlowImmediately() async throws {
+        let h = try makeHarness()
+        defer { h.tearDown() }
+        let card = try await playingOneWithMissingTwo(h)
+        h.store.markNoLyrics(QueueFixtures.pid(2))
+        #expect(h.coverFlow.status(for: card) == .missing)
+        h.model.marksChangedExternally()
+        #expect(h.coverFlow.status(for: card) == .markedNone)
+    }
+
     /// 計劃 T3b（回歸防線）：詳情讀取在飛時 Batch 寫入 → 放行後該卡不得顯示寫入前的舊歌詞。
     /// 不用 `play`（它的 settle 會等被閘門擋住的批次）
     @Test func detailsInFlightDuringABatchWriteNeverShowTheOldLyrics() async throws {

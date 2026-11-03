@@ -207,6 +207,8 @@ final class AppModel {
             onTokenSaved: { [weak self] token in self?.saveToken(token) },
             onLanguageSaved: { [weak self] language in self?.saveLanguage(language) },
             onNotificationsToggled: { [weak self] enabled in self?.saveNotificationsEnabled(enabled) },
+            onCloudSyncToggled: { [weak self] enabled in self?.setCloudSyncEnabled(enabled) },
+            onCloudSyncReset: { [weak self] in await self?.resetCloudSyncCopy() },
             onClose: { [weak self] in self?.closeModal() }
         )
 
@@ -633,7 +635,7 @@ final class AppModel {
     }
 
     func openSettings(_ group: SettingsViewModel.Group) {
-        settings.open(group, token: token, language: language, notificationsEnabled: configStore.notificationsEnabled)
+        settings.open(group, token: token, language: language, notificationsEnabled: configStore.notificationsEnabled, cloudSync: cloudSyncDisplay)
         activeModal = .settings
     }
 

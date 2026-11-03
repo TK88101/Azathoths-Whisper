@@ -46,7 +46,9 @@ extension AppModel {
             // 假檔寫不出來就退回「觀察到的歷史」模式（右側標明讀不到），不讓測試組裝本身崩潰
             queueDirectory: try? LyricsFlowUITestQueueFiles.write(),
             isMusicRunning: { true },
-            timing: UITestTimingResolver(environment: environment[LyricsFXPreviewFixture.fakeTimingVariable])
+            timing: UITestTimingResolver(environment: environment[LyricsFXPreviewFixture.fakeTimingVariable]),
+            // ⑨：只在測試指定的臨時資料夾同步，假硬體身分；不碰使用者的 iCloud
+            cloudSync: CloudSyncEnvironment.uiTest(environment: environment)
         )
         model.lyricsFX.forcesReducedMotion = environment[LyricsFXPreviewFixture.reduceMotionVariable] == "1"
         if let nonce = LyricsFXPreviewRecipe.nonce(in: environment) {

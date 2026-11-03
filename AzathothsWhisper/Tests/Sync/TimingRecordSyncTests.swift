@@ -144,4 +144,24 @@ struct TimingRecordSyncTests {
         #expect(try await store.stampAll(by: Self.macB) == 0)
         #expect(await store.load(persistentID: Self.pid)?.origin == Self.macA)
     }
+
+    /// ⑨ T6：查找的寫入（save／replace）成功才通知；匯入（adopt）與蓋章不通知；寫失敗不通知
+    @Test func onlyLookupWritesNotifyCloudSync() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("azw-timing-hook-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TimingStore(directory: directory)
+        let saves = Counter()
+        await store.setOnSaved { saves.increment() }
+        try await store.save(notFound(origin: nil))
+        #expect(saves.value == 1)
+        try await store.replace(found())
+        #expect(saves.value == 2)
+        _ = try await store.adopt(found(revision: LRCAligner.revision + 1))
+        _ = try await store.stampAll(by: Self.macA)
+        #expect(saves.value == 2)
+        await #expect(throws: TimingStore.StoreError.invalidPersistentID) {
+            try await store.save(TimingRecord(persistentID: "not-a-pid", lyricsHash: Self.lyrics, outcome: .notFound, fetchedAt: Self.base))
+        }
+        #expect(saves.value == 2)
+    }
 }

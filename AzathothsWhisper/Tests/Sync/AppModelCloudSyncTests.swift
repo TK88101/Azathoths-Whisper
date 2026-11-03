@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -201,5 +202,29 @@ struct AppModelCloudSyncTests {
         fixture.model.setCloudSyncEnabled(true)
         #expect(fixture.model.cloudSyncUnavailable)
         #expect(fixture.model.cloudSync == nil)
+        #expect(fixture.model.cloudSyncEnabled == false)
+        #expect(fixture.defaults.bool(forKey: ConfigStore.Key.cloudSyncEnabled) == false)
+        #expect(fixture.model.settings.cloudSync.unavailable, "設定頁顯示無法開啟")
+    }
+
+    /// §6.4：結束 app 時匯出 dirty 的類別（不等安靜期）
+    @Test func quittingFlushesDirtyKinds() async throws {
+        let fixture = try await fixture(enabled: true)
+        defer { fixture.cleanUp() }
+        fixture.model.startCloudSyncIfEnabled()
+        await fixture.waitUntilStarted()
+        let file = fixture.ownFolder.appendingPathComponent("decisions.json")
+        let before = try Data(contentsOf: file)
+        fixture.model.libraryCheck.decide(.keepFallback, forArtists: ["Velvet Lanterns"])
+        try await Task.sleep(for: .milliseconds(50))
+        await fixture.model.flushCloudSync()
+        #expect(try Data(contentsOf: file) != before)
+    }
+
+    @Test func withSyncOffQuittingIsImmediate() async throws {
+        let fixture = try await fixture()
+        defer { fixture.cleanUp() }
+        let delegate = AppDelegate(model: fixture.model)
+        #expect(delegate.applicationShouldTerminate(NSApplication.shared) == .terminateNow)
     }
 }

@@ -9,6 +9,8 @@ final class SettingsViewModel {
         case token
         case language
         case notifications
+        /// ⑨ iCloud 同步（計劃 2026-11-03-lyrics-icloud-sync §6.6）
+        case cloudSync
     }
 
     enum FieldStatus: Equatable {
@@ -34,6 +36,9 @@ final class SettingsViewModel {
     private(set) var isValidating = false
     /// 歌詞寫入通知開關（D-14）：切換即存，不經 Save 鈕
     private(set) var notificationsEnabled = true
+    /// ⑨：開關與狀態；開關切換即存
+    private(set) var cloudSync = CloudSyncDisplay(enabled: false)
+    private(set) var isConfirmingCloudSyncReset = false
 
     /// modal 標題：繞過 i18n 的英文覆寫（py:788/793，ACCEPTANCE D-03）
     var title: String {
@@ -41,6 +46,7 @@ final class SettingsViewModel {
         case .token: return StatusText.tokenSettingsTitle
         case .language: return StatusText.languageSettingsTitle
         case .notifications: return StatusText.notificationSettingsTitle
+        case .cloudSync: return StatusText.cloudSyncSettingsTitle
         }
     }
 
@@ -49,6 +55,8 @@ final class SettingsViewModel {
     private let onTokenSaved: (String) -> Void
     private let onLanguageSaved: (AppLanguage) -> Void
     private let onNotificationsToggled: (Bool) -> Void
+    private let onCloudSyncToggled: (Bool) -> Void
+    private let onCloudSyncReset: () async -> Void
     private let onClose: () -> Void
 
     init(
@@ -57,8 +65,12 @@ final class SettingsViewModel {
         onTokenSaved: @escaping (String) -> Void,
         onLanguageSaved: @escaping (AppLanguage) -> Void,
         onNotificationsToggled: @escaping (Bool) -> Void = { _ in },
+        onCloudSyncToggled: @escaping (Bool) -> Void = { _ in },
+        onCloudSyncReset: @escaping () async -> Void = {},
         onClose: @escaping () -> Void
     ) {
+        self.onCloudSyncToggled = onCloudSyncToggled
+        self.onCloudSyncReset = onCloudSyncReset
         self.validator = validator
         self.clock = clock
         self.onTokenSaved = onTokenSaved
@@ -68,8 +80,13 @@ final class SettingsViewModel {
     }
 
     /// py:776-796：開啟時清空狀態列，再顯示對應組
-    func open(_ group: Group, token: String, language: AppLanguage, notificationsEnabled: Bool = true) {
+    func open(
+        _ group: Group, token: String, language: AppLanguage, notificationsEnabled: Bool = true,
+        cloudSync: CloudSyncDisplay = CloudSyncDisplay(enabled: false)
+    ) {
         self.group = group
+        self.cloudSync = cloudSync
+        isConfirmingCloudSyncReset = false
         tokenInput = token
         self.language = language
         self.notificationsEnabled = notificationsEnabled
@@ -113,6 +130,32 @@ final class SettingsViewModel {
     func setNotificationsEnabled(_ enabled: Bool) {
         notificationsEnabled = enabled
         onNotificationsToggled(enabled)
+    }
+
+    // MARK: ⑨ iCloud 同步
+
+    func setCloudSyncEnabled(_ enabled: Bool) {
+        cloudSync.enabled = enabled
+        onCloudSyncToggled(enabled)
+    }
+
+    /// AppModel 收到新狀態時更新（modal 開著也即時重繪）
+    func updateCloudSync(_ display: CloudSyncDisplay) {
+        cloudSync = display
+    }
+
+    /// 重設要先確認（刪除 iCloud 上這台的資料夾）
+    func requestCloudSyncReset() {
+        isConfirmingCloudSyncReset = true
+    }
+
+    func cancelCloudSyncReset() {
+        isConfirmingCloudSyncReset = false
+    }
+
+    func confirmCloudSyncReset() async {
+        isConfirmingCloudSyncReset = false
+        await onCloudSyncReset()
     }
 
     func close() {

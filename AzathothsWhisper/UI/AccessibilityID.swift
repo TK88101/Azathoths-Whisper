@@ -7,6 +7,11 @@ enum AccessibilityID {
     static let navBatch = "nav-batch"
 
     static let lyricsFlowHandle = "lyricsflow-handle"
+
+    /// ⑨ Settings 的 iCloud 同步群組
+    static let cloudSyncToggle = "settings-cloudsync-toggle"
+    static let cloudSyncStatus = "settings-cloudsync-status"
+    static let cloudSyncReset = "settings-cloudsync-reset"
     /// 把手右端的兩格風格按鈕（A2 計劃 §3.2）。本檔也編進 UITests，故用字串常數、不引用 `RaisedLayerStyle`
     static let styleCoverFlow = "lyricsflow-style-coverFlow"
     static let styleLyricsFX = "lyricsflow-style-lyricsFX"

@@ -9,6 +9,11 @@ extension AppModel {
     /// 結束 app 時最多等這麼久（不擋退出，§6.4）
     static let cloudSyncQuitBudget: Duration = .seconds(2)
 
+    /// 設定頁要顯示的狀態
+    var cloudSyncDisplay: CloudSyncDisplay {
+        CloudSyncDisplay(enabled: cloudSyncEnabled, unavailable: cloudSyncUnavailable, status: cloudSyncStatus)
+    }
+
     func startCloudSyncIfEnabled() {
         guard cloudSyncEnabled else { return }
         startCloudSync()
@@ -17,6 +22,11 @@ extension AppModel {
     /// 設定頁開關：每台各自，預設關
     func setCloudSyncEnabled(_ enabled: Bool) {
         guard cloudSyncEnvironment != nil, enabled != cloudSyncEnabled else { return }
+        // 讀不到硬體身分：開不起來，開關也不存成「開」
+        guard !enabled || makeSyncFolder() != nil else {
+            settings.updateCloudSync(cloudSyncDisplay)
+            return
+        }
         configStore.setCloudSyncEnabled(enabled)
         cloudSyncEnabled = enabled
         if enabled {
@@ -24,6 +34,7 @@ extension AppModel {
         } else {
             stopCloudSync()
         }
+        settings.updateCloudSync(cloudSyncDisplay)
     }
 
     /// 「重設這台 Mac 的雲端副本」＝刪除自己的資料夾並關閉同步（R1-18）。本機正本不動
@@ -36,6 +47,7 @@ extension AppModel {
             cloudSyncLog.error("cloud sync reset failed")
             cloudSyncStatus = (cloudSyncStatus ?? .init()).failing("resetFailed")
         }
+        settings.updateCloudSync(cloudSyncDisplay)
     }
 
     func markCloudSyncDirty(_ kind: SyncKind) {
@@ -101,6 +113,7 @@ extension AppModel {
 
     private func receiveCloudSyncStatus(_ status: CloudSyncCoordinator.Status) {
         cloudSyncStatus = status
+        settings.updateCloudSync(cloudSyncDisplay)
     }
 
     private func cloudSyncChannels() -> [CloudSyncChannel] {
