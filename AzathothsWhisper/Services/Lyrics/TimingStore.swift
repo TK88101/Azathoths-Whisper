@@ -210,6 +210,13 @@ actor TimingStore {
         return true
     }
 
+    /// 跨 ID 採用（⑨ §6.5）：呼叫端已確定本機那份不可用，直接取代（不合併）
+    func replace(_ record: TimingRecord) throws {
+        guard let id = Self.canonicalID(record.persistentID) else { throw StoreError.invalidPersistentID }
+        if case .unrecognized = inspect(id) { throw StoreError.unrecognizedFileOnDisk }
+        try write(record.with(persistentID: id, origin: record.origin, sourceRef: record.sourceRef), id: id)
+    }
+
     /// 匯出用：所有讀得懂的記錄，依 persistentID 排序
     func allRecords() -> [TimingRecord] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []

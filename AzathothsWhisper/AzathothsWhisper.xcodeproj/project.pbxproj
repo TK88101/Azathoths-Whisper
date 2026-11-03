@@ -155,6 +155,7 @@
 		437F6CA90159C3C0891D63A6 /* ComposedBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6D70C54D210955CEBEDDAB /* ComposedBackdrop.swift */; };
 		444762249ED8963E8D7AC94A /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 93C6CDE5541F85D742FEF8AB /* InfoPlist.xcstrings */; };
 		454EBDBF2240BD8545B6ADCD /* RelayRequestRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA5B2E5B2872F72A40D8136 /* RelayRequestRouter.swift */; };
+		457BFB6FFC297422EDCE45A8 /* RemoteTimingIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13079BF1536DB8FDB6408A61 /* RemoteTimingIndex.swift */; };
 		45AF21509288913FACFDA154 /* OFL-Anton.txt in Resources */ = {isa = PBXBuildFile; fileRef = C33D842FDEE62669EAD82948 /* OFL-Anton.txt */; };
 		461B0A6CFB0B2AD7F42C7470 /* ArtistConsensusStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CB06B5C7B77F3629D62D3D /* ArtistConsensusStoreTests.swift */; };
 		4627E2CDE8169872C6078E90 /* LoginItemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602A9E448A71388AAB895233 /* LoginItemTests.swift */; };
@@ -164,6 +165,7 @@
 		49AEB62C67EDFDFD0F7C35BB /* SairaStencilOne-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 51E3FC34DE7D89D58EF493C9 /* SairaStencilOne-Regular.ttf */; };
 		4A7E6CCEFCCCC6322A403E9C /* LICENSE-RockSalt.txt in Resources */ = {isa = PBXBuildFile; fileRef = 556F03AC76861477694B8000 /* LICENSE-RockSalt.txt */; };
 		4B684BE9A905256F9403AAB3 /* GrimoireOfDeath-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BC3845E8AC633F1D37B0BE14 /* GrimoireOfDeath-Regular.ttf */; };
+		4CE5A9F13B6A73FA6AB6C97E /* RemoteTimingIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41C01AE284CCBD6E707844C8 /* RemoteTimingIndexTests.swift */; };
 		4D785BC70A4F48D4DFE0DD21 /* GatedPollClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = E88ADD80362DCB3452B7468D /* GatedPollClock.swift */; };
 		4F166BB18962C229B19C309A /* ArtistIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB9EDEFA35D4602826B21F9F /* ArtistIdentity.swift */; };
 		4F2E05767EB27782F052F80B /* AlfaSlabOne-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2BC6960B8584082481AA7721 /* AlfaSlabOne-Regular.ttf */; };
@@ -576,6 +578,7 @@
 		1207833B927999FE4629D7C4 /* ShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellUITests.swift; sourceTree = "<group>"; };
 		120F3323C4973B80132A3602 /* ModalScrim.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModalScrim.swift; sourceTree = "<group>"; };
 		12CB06B5C7B77F3629D62D3D /* ArtistConsensusStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtistConsensusStoreTests.swift; sourceTree = "<group>"; };
+		13079BF1536DB8FDB6408A61 /* RemoteTimingIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteTimingIndex.swift; sourceTree = "<group>"; };
 		1341DACAA0F815709A88BAAD /* TimingHardeningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimingHardeningTests.swift; sourceTree = "<group>"; };
 		1441548FDE4C7116FD6CC03F /* TimingResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimingResolverTests.swift; sourceTree = "<group>"; };
 		1504F9B817ED9FEB53D16230 /* RecipeGoldenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeGoldenTests.swift; sourceTree = "<group>"; };
@@ -664,6 +667,7 @@
 		3FDC4E5904685D4136EF1FB7 /* BatchImportFinishedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchImportFinishedTests.swift; sourceTree = "<group>"; };
 		3FEFF34E54799F631399943B /* GenericLayerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenericLayerTests.swift; sourceTree = "<group>"; };
 		4184956D33F7336BE25EBE66 /* CoverFlowSlideGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverFlowSlideGeometryTests.swift; sourceTree = "<group>"; };
+		41C01AE284CCBD6E707844C8 /* RemoteTimingIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteTimingIndexTests.swift; sourceTree = "<group>"; };
 		41FC53AE3AD065E73AA496E4 /* LyricsSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsSource.swift; sourceTree = "<group>"; };
 		42761BAF60A7DF3F15B8FA46 /* RelayQueueReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayQueueReader.swift; sourceTree = "<group>"; };
 		42B851112292FB3B4786D734 /* Barrio-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Barrio-Regular.ttf"; sourceTree = "<group>"; };
@@ -1409,6 +1413,7 @@
 				47E5AB6DB4191E5402361E73 /* ArtistStyleMergeTests.swift */,
 				D71A96EB25DD813828A0A198 /* CloudSyncCoordinatorTests.swift */,
 				64A802CC240113B80F5DA617 /* NoLyricsMarkSyncTests.swift */,
+				41C01AE284CCBD6E707844C8 /* RemoteTimingIndexTests.swift */,
 				6BA3CFF5AFC8C08189BE986F /* SyncEnvelopeTests.swift */,
 				75DFE7AD785ED64C53850EE0 /* SyncFolderTests.swift */,
 				F0EE902D637CA62389C2DBC9 /* SyncRegisterTests.swift */,
@@ -1494,6 +1499,7 @@
 			children = (
 				84528A472372BEF67F9BEC25 /* CloudSyncChannel.swift */,
 				AC4A24174475B0BFE46B314F /* CloudSyncCoordinator.swift */,
+				13079BF1536DB8FDB6408A61 /* RemoteTimingIndex.swift */,
 				E04A3B62820E5EAF19F3C03F /* SyncEnvelope.swift */,
 				89BDAB9AFE4C9A38BFD4BAC3 /* SyncFolder.swift */,
 				8D82B2D9D9731718330C8E4C /* SyncRegister.swift */,
@@ -2346,6 +2352,7 @@
 				BE2D8CE3B9B0EE8A1DA00958 /* RelayQueueReaderTests.swift in Sources */,
 				F699993DB44235DCD8398163 /* RelayRequestRouterTests.swift in Sources */,
 				F396B51487A9AB503CD9F1A6 /* RelayServerLog.swift in Sources */,
+				4CE5A9F13B6A73FA6AB6C97E /* RemoteTimingIndexTests.swift in Sources */,
 				A5F34C43C13F0D023D1F00DD /* SelectorAllowList.swift in Sources */,
 				5FE1DF33D780A35ADAD78130 /* SerialAEQueueMusicClient.swift in Sources */,
 				070BFA6FE12F38EC022F62ED /* SettingsViewModelTests.swift in Sources */,
@@ -2548,6 +2555,7 @@
 				B59F7F54ECC2D44691FF54E8 /* RelayQueueReader.swift in Sources */,
 				454EBDBF2240BD8545B6ADCD /* RelayRequestRouter.swift in Sources */,
 				8F4CDD5891EAD560FD14C5F0 /* RelaySettingsView.swift in Sources */,
+				457BFB6FFC297422EDCE45A8 /* RemoteTimingIndex.swift in Sources */,
 				969B8BEA463BD4DC6BBEE9BB /* RootView.swift in Sources */,
 				71FD6CF89E6E5E3DD71F8023 /* SecretStore.swift in Sources */,
 				E55A146723B04977FF250683 /* SessionRecipe.swift in Sources */,

@@ -15,6 +15,12 @@ actor ArtistStyleSync {
     private let publish: @Sendable (ArtistStyleBook) async -> Void
 
     private var book = ArtistStyleBook()
+    /// ⑨ R3-3：book 只在 actor 內載入一次（不在組裝時於主執行緒讀檔）；`adopt`、`stamp`、`run` 都先等它
+    private var isLoaded = false
+    /// false＝磁碟上有看不懂的檔：不查、不寫、不採用
+    private var isWritable = true
+    /// ⑨ 每次寫檔成功後通知（iCloud 匯出的 dirty）
+    private var onPersisted: (@Sendable () -> Void)?
     /// 排隊中（鍵＋曲庫裡這個鍵的所有寫法，第一個是查詢用的），只有它們能插隊
     private var queued: [(key: String, spellings: [String])] = []
     private var inFlight: String?
@@ -38,11 +44,14 @@ actor ArtistStyleSync {
         queued.insert(entry, at: 0)
     }
 
+    func setOnPersisted(_ hook: @escaping @Sendable () -> Void) {
+        onPersisted = hook
+    }
+
     func run() async {
-        let loaded = store.load()
-        book = loaded.book
+        ensureLoaded()
         await publish(book)
-        guard loaded.isWritable else {
+        guard isWritable else {
             syncLog.error("artist style file unreadable; not querying")
             return
         }
@@ -62,6 +71,44 @@ actor ArtistStyleSync {
         }
         let summary = book.summary
         syncLog.info("artist styles verified=\(summary.verified, privacy: .public) unresolved=\(summary.unresolved, privacy: .public) remaining=\(self.queued.count, privacy: .public)")
+    }
+
+    // MARK: ⑨ iCloud 同步（計劃 §6.5）：MB 存檔的唯一擁有者是這個 actor
+
+    /// 匯出用：目前的記錄
+    func records() -> [String: ArtistStyleBook.Record] {
+        ensureLoaded()
+        return book.records
+    }
+
+    /// 替缺 origin 的記錄蓋章並寫檔（沒有要補的就不寫）
+    func stamp(by writer: String) throws {
+        ensureLoaded()
+        guard isWritable, book.unstampedCount > 0 else { return }
+        book = book.stamped(by: writer)
+        try store.save(book)
+        onPersisted?()
+    }
+
+    /// 匯入他機記錄：合併、把已有結果的歌手移出佇列、寫檔、發布（下次播放生效）
+    func adopt(remote: [String: ArtistStyleBook.Record]) async -> CloudSyncAdoption {
+        ensureLoaded()
+        guard isWritable else { return CloudSyncAdoption(rejected: 0, changed: false) }
+        let merged = book.merging(remote: remote)
+        guard merged.book != book else { return CloudSyncAdoption(rejected: merged.rejected, changed: false) }
+        book = merged.book
+        queued.removeAll { book.records[$0.key] != nil }
+        persist()
+        await publish(book)
+        return CloudSyncAdoption(rejected: merged.rejected, changed: true)
+    }
+
+    private func ensureLoaded() {
+        guard !isLoaded else { return }
+        let loaded = store.load()
+        book = loaded.book
+        isWritable = loaded.isWritable
+        isLoaded = true
     }
 
     /// 樂團表的團不查；寫法與撞鍵交給 book（`reconcilingLibrary`）；其餘還沒記錄的鍵排隊，曲多的先。true＝book 有變
@@ -92,6 +139,8 @@ actor ArtistStyleSync {
         guard let artist = spellings.first, let albums = ArtistIdentity.albumsToCompare(tracks) else { return true }
         do {
             let lookup = try await identify(artist, albums)
+            // R3-1：查詢途中這位已被匯入（actor 在 await 期間可重入）——白查可以，白查後不寫回
+            guard book.records[ArtistStyleBook.key(artist)] == nil else { return true }
             book = book.recording(lookup, forSpelling: artist, at: now()).noting(spellings: Array(spellings.dropFirst()))
             persist()
             await publish(book)
@@ -108,6 +157,7 @@ actor ArtistStyleSync {
     private func persist() {
         do {
             try store.save(book)
+            onPersisted?()
         } catch {
             syncLog.error("artist style file not written")
         }
