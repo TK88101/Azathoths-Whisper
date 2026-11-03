@@ -237,7 +237,7 @@ actor TimingStore {
 
     private func write(_ record: TimingRecord, id: String) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try Self.encoder.encode(StoredFile(record)).write(to: fileURL(for: id), options: .atomic)
+        try Self.encoder.encode(TimingRecordFile(record)).write(to: fileURL(for: id), options: .atomic)
     }
 
     /// Music 的 persistentID 是 16 位 hex；大寫正規化後才驗證與命名（大小寫不同不得變成兩個檔、防路徑穿越）
@@ -260,7 +260,7 @@ actor TimingStore {
         guard let version = try? Self.decoder.decode(SchemaProbe.self, from: data).schemaVersion,
               version <= Self.schemaVersion
         else { return .unrecognized }
-        guard let stored = try? Self.decoder.decode(StoredFile.self, from: data), let record = stored.record(expecting: id) else {
+        guard let stored = try? Self.decoder.decode(TimingRecordFile.self, from: data), let record = stored.record(expecting: id) else {
             timingLog.error("unreadable timing file ignored")
             return .corrupt
         }
@@ -295,8 +295,8 @@ private struct SchemaProbe: Decodable {
     let schemaVersion: Int
 }
 
-/// 磁碟上的形狀（母計劃 C.1 的欄位）。`source == nil`＝查過沒有
-private struct StoredFile: Codable {
+/// 磁碟上的形狀（母計劃 C.1 的欄位）。`source == nil`＝查過沒有。⑨：iCloud 檔的時間軸 payload 也是這個形狀
+struct TimingRecordFile: Codable, Equatable, Sendable {
     let schemaVersion: Int
     let persistentID: String
     let lyricsHash: LyricsFingerprint
@@ -327,6 +327,11 @@ private struct StoredFile: Codable {
             self.source = nil
             self.lines = []
         }
+    }
+
+    /// 以自己的 persistentID 驗證（iCloud payload 用）
+    var record: TimingRecord? {
+        TimingStore.canonicalID(persistentID).flatMap(record(expecting:))
     }
 
     func record(expecting id: String) -> TimingRecord? {
