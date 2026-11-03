@@ -16,6 +16,13 @@ enum StoredTimingSource: String, Sendable, Codable, Hashable {
     }
 }
 
+/// 跨 persistentID 比對用的曲目身分（⑨ 計劃 §6.5）：寫入當下的查詢欄位。只存在本機正本與自己的 iCloud 檔，不進日誌
+struct TimingMatch: Codable, Equatable, Sendable {
+    let artist: String
+    let title: String
+    let duration: Double
+}
+
 /// 一首歌一份的時間軸存檔（母計劃 C.1）。「查過、沒有」也要存：7 天重試靠它（C.4）
 struct TimingRecord: Equatable, Sendable {
     /// `index`＝`LyricsLines.lyricTexts` 的零起序號（只借時間、不借文字：文字永遠取自 Music 欄位）
@@ -36,13 +43,60 @@ struct TimingRecord: Equatable, Sendable {
     let fetchedAt: Date
     /// 對出這份錨點的 `LRCAligner.revision`；欄位出現前寫下的檔＝1
     let alignerRevision: Int
+    /// ⑨ §6.3：第一次產生這份結果的機器；nil＝本機、還沒蓋章
+    let origin: String?
+    /// ⑨ §6.5：不可變的來源（`<origin>:<原始 persistentID>`）。只有本機由外部來源新查到的 found 會產生新的；
+    /// 跨 ID 採用、匯入、同 ID 合併一律原樣保留（整體確認 2）
+    let sourceRef: String?
+    let match: TimingMatch?
 
-    init(persistentID: String, lyricsHash: LyricsFingerprint, outcome: Outcome, fetchedAt: Date, alignerRevision: Int = LRCAligner.revision) {
+    init(persistentID: String, lyricsHash: LyricsFingerprint, outcome: Outcome, fetchedAt: Date, alignerRevision: Int = LRCAligner.revision,
+         origin: String? = nil, sourceRef: String? = nil, match: TimingMatch? = nil) {
         self.persistentID = persistentID
         self.lyricsHash = lyricsHash
         self.outcome = outcome
         self.fetchedAt = fetchedAt
         self.alignerRevision = alignerRevision
+        self.origin = origin
+        self.sourceRef = sourceRef
+        self.match = match
+    }
+
+    var isFound: Bool {
+        if case .found = outcome { return true }
+        return false
+    }
+
+    func stamped(by writer: String) -> TimingRecord {
+        guard (origin ?? "").isEmpty else { return self }
+        return with(origin: writer, sourceRef: sourceRef ?? (isFound ? "\(writer):\(persistentID)" : nil))
+    }
+
+    /// 換掉身分欄位（跨 ID 採用時換成本機 pid）
+    func with(persistentID: String? = nil, origin: String?, sourceRef: String?) -> TimingRecord {
+        TimingRecord(persistentID: persistentID ?? self.persistentID, lyricsHash: lyricsHash, outcome: outcome, fetchedAt: fetchedAt,
+                     alignerRevision: alignerRevision, origin: origin, sourceRef: sourceRef, match: match)
+    }
+
+    /// 他機時鐘超前這麼多的記錄不收（R1-5）
+    static let remoteFutureTolerance: TimeInterval = 86_400
+
+    /// 遠端記錄的逐筆驗證（§6.3）：檔案層已驗 pid 與錨點；這裡驗蓋章與時鐘
+    func isAcceptableRemote(now: Date) -> Bool {
+        !(origin ?? "").isEmpty && fetchedAt.timeIntervalSince(now) <= Self.remoteFutureTolerance
+            && (!isFound || !(sourceRef ?? "").isEmpty)
+    }
+
+    /// 匯入他機記錄（§6.5）：不用時鐘決勝。本機沒有→採用；同詞 found 勝 notFound、兩邊 found 取 alignerRevision 大者；
+    /// 其餘（含異詞）保留本機——時間軸是對本機目前歌詞有效的快取，不要求兩台逐位相同（R1-1）
+    static func importMerged(local: TimingRecord?, remote: TimingRecord) -> TimingRecord {
+        guard let local else { return remote }
+        guard local.lyricsHash == remote.lyricsHash else { return local }
+        switch (local.isFound, remote.isFound) {
+        case (false, true): return remote
+        case (true, true): return remote.alignerRevision > local.alignerRevision ? remote : local
+        default: return local
+        }
     }
 
     /// 兩份記錄的合併（多台 Mac 經同步資料夾、或同程序先後寫入）：
@@ -54,7 +108,8 @@ struct TimingRecord: Equatable, Sendable {
             // 錨點留著，但記下這個對齊版本已重查過：否則舊版本 found 每次都會再查（Codex review P2）
             return TimingRecord(
                 persistentID: existing.persistentID, lyricsHash: existing.lyricsHash, outcome: existing.outcome, fetchedAt: existing.fetchedAt,
-                alignerRevision: max(existing.alignerRevision, incoming.alignerRevision)
+                alignerRevision: max(existing.alignerRevision, incoming.alignerRevision),
+                origin: existing.origin, sourceRef: existing.sourceRef, match: existing.match
             )
         case (.notFound, .found): return incoming
         // 同時刻＝新寫入者勝（它是剛查到的；舊的可能是錨點已套不上的壞檔）
@@ -136,20 +191,53 @@ actor TimingStore {
     @discardableResult
     func save(_ record: TimingRecord) throws -> TimingRecord {
         guard let id = Self.canonicalID(record.persistentID) else { throw StoreError.invalidPersistentID }
-        let canonical = TimingRecord(
-            persistentID: id, lyricsHash: record.lyricsHash, outcome: record.outcome, fetchedAt: record.fetchedAt,
-            alignerRevision: record.alignerRevision
-        )
-        let existing: TimingRecord?
+        let canonical = record.with(persistentID: id, origin: record.origin, sourceRef: record.sourceRef)
+        let merged = TimingRecord.merged(existing: try existingRecord(id), incoming: canonical)
+        try write(merged, id: id)
+        return merged
+    }
+
+    // MARK: ⑨ 跨機同步（計劃 §6.5）
+
+    /// 匯入一筆他機記錄（不走 `merged` 的「新來的勝」）。true＝本機有變
+    @discardableResult
+    func adopt(_ record: TimingRecord) throws -> Bool {
+        guard let id = Self.canonicalID(record.persistentID) else { throw StoreError.invalidPersistentID }
+        let existing = try existingRecord(id)
+        let merged = TimingRecord.importMerged(local: existing, remote: record.with(persistentID: id, origin: record.origin, sourceRef: record.sourceRef))
+        guard merged != existing else { return false }
+        try write(merged, id: id)
+        return true
+    }
+
+    /// 匯出用：所有讀得懂的記錄，依 persistentID 排序
+    func allRecords() -> [TimingRecord] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return names.sorted().compactMap { name in
+            guard name.hasSuffix(".json"), let id = Self.canonicalID(String(name.dropLast(5))), case .current(let record) = inspect(id) else { return nil }
+            return record
+        }
+    }
+
+    /// 替缺 origin 的記錄蓋上本機 writerID 並寫回（§6.3；冪等，中斷後下次只補仍缺的）。回傳補了幾筆
+    func stampAll(by writer: String) throws -> Int {
+        try allRecords().filter { ($0.origin ?? "").isEmpty }.reduce(0) { count, record in
+            try write(record.stamped(by: writer), id: record.persistentID)
+            return count + 1
+        }
+    }
+
+    private func existingRecord(_ id: String) throws -> TimingRecord? {
         switch inspect(id) {
         case .unrecognized: throw StoreError.unrecognizedFileOnDisk
-        case .current(let record): existing = record
-        case .absent, .corrupt: existing = nil
+        case .current(let record): return record
+        case .absent, .corrupt: return nil
         }
-        let merged = TimingRecord.merged(existing: existing, incoming: canonical)
+    }
+
+    private func write(_ record: TimingRecord, id: String) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try Self.encoder.encode(StoredFile(merged)).write(to: fileURL(for: id), options: .atomic)
-        return merged
+        try Self.encoder.encode(StoredFile(record)).write(to: fileURL(for: id), options: .atomic)
     }
 
     /// Music 的 persistentID 是 16 位 hex；大寫正規化後才驗證與命名（大小寫不同不得變成兩個檔、防路徑穿越）
@@ -217,6 +305,10 @@ private struct StoredFile: Codable {
     let fetchedAt: Date
     /// 可選欄位：舊版讀到會忽略，所以不必升 schemaVersion
     let alignerRevision: Int?
+    /// ⑨ 同上，可選欄位
+    let origin: String?
+    let sourceRef: String?
+    let match: TimingMatch?
 
     init(_ record: TimingRecord) {
         schemaVersion = TimingStore.schemaVersion
@@ -224,6 +316,9 @@ private struct StoredFile: Codable {
         lyricsHash = record.lyricsHash
         fetchedAt = record.fetchedAt
         alignerRevision = record.alignerRevision
+        origin = record.origin
+        sourceRef = record.sourceRef
+        match = record.match
         switch record.outcome {
         case .found(let source, let lines):
             self.source = source
@@ -244,12 +339,23 @@ private struct StoredFile: Codable {
         case (let source?, false):
             return TimingRecord(
                 persistentID: id, lyricsHash: lyricsHash, outcome: .found(source: source, lines: lines), fetchedAt: fetchedAt,
-                alignerRevision: alignerRevision ?? 1
+                alignerRevision: alignerRevision ?? 1, origin: origin, sourceRef: sourceRef, match: match.flatMap(\.validated)
             )
         case (nil, true):
-            return TimingRecord(persistentID: id, lyricsHash: lyricsHash, outcome: .notFound, fetchedAt: fetchedAt, alignerRevision: alignerRevision ?? 1)
+            return TimingRecord(persistentID: id, lyricsHash: lyricsHash, outcome: .notFound, fetchedAt: fetchedAt, alignerRevision: alignerRevision ?? 1,
+                                origin: origin, sourceRef: sourceRef, match: match.flatMap(\.validated))
         default:
             return nil
         }
+    }
+}
+
+private extension TimingMatch {
+    /// 壞的比對欄位只讓這筆不參與跨 ID，不讓整筆記錄失效
+    var validated: TimingMatch? {
+        guard !artist.isEmpty, !title.isEmpty, artist.count <= TrackMatcher.maxNameLength, title.count <= TrackMatcher.maxNameLength,
+              duration.isFinite, duration > 0
+        else { return nil }
+        return self
     }
 }

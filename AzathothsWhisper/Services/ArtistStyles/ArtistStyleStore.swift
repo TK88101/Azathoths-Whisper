@@ -82,7 +82,11 @@ struct ArtistStyleStore: Sendable {
             artistStyleLog.error("unreadable artist style file ignored")
             return .corrupt
         }
-        return .current(ArtistStyleBook(records: stored.artists, lastNetworkError: stored.summary.lastNetworkError, lastNetworkErrorAt: stored.summary.lastNetworkErrorAt))
+        // ⑨ R1-13：本機檔也逐筆驗證，不合格的單筆丟掉（之後會被重查補回）
+        let (book, rejected) = ArtistStyleBook(records: stored.artists, lastNetworkError: stored.summary.lastNetworkError,
+                                               lastNetworkErrorAt: stored.summary.lastNetworkErrorAt).sanitized(requireStamped: false)
+        if rejected > 0 { artistStyleLog.error("artist style records dropped count=\(rejected, privacy: .public)") }
+        return .current(book)
     }
 
     private static var encoder: JSONEncoder {

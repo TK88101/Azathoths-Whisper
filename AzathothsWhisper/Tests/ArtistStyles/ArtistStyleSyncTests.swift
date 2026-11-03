@@ -20,11 +20,16 @@ struct ArtistStyleSyncTests {
         func setOnAsk(_ hook: @escaping @Sendable (String) async -> Void) { onAsk = hook }
         func publish(_ book: ArtistStyleBook) { published.append(book) }
 
+        /// 每位歌手一個固定的 UUID 格式 mbid（真 client 只收 UUID；⑨ 起存檔也逐筆驗證）
+        static func mbid(for artist: String) -> String {
+            String(format: "00000000-0000-4000-8000-%012llx", FXHash.fnv1a64(artist) & 0xffff_ffff_ffff)
+        }
+
         func identify(_ artist: String, _ albums: [String]) async throws(ProviderFailure) -> ArtistStyleBook.Lookup {
             asked.append((artist, albums))
             await onAsk?(artist)
             if let failure = failures[artist] { throw failure }
-            return .verified(id: "mb-\(artist)", matchedReleaseGroups: [], genres: [.init(name: "black metal", count: 1)])
+            return .verified(id: Self.mbid(for: artist), matchedReleaseGroups: [], genres: [.init(name: "black metal", count: 1)])
         }
     }
 
@@ -193,7 +198,7 @@ struct ArtistStyleSyncTests {
     @Test func aCollisionFoundDuringTheScanIsPublishedRightAway() async throws {
         let store = tempStore()
         try store.save(ArtistStyleBook().recording(
-            .verified(id: "mb-1", matchedReleaseGroups: [], genres: [.init(name: "black metal", count: 1)]), forSpelling: "AC/DX", at: Self.now
+            .verified(id: "11111111-1111-4111-8111-111111111111", matchedReleaseGroups: [], genres: [.init(name: "black metal", count: 1)]), forSpelling: "AC/DX", at: Self.now
         ))
         let music = MockMusicClient()
         await music.setLibrary(library([("AC/DX", "A"), ("ACDX", "B")]))

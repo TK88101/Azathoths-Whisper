@@ -13,7 +13,7 @@ struct ArtistStyleStoreTests {
     }
 
     private func verified(_ genres: [(String, Int)] = [("black metal", 3)]) -> ArtistStyleBook.Lookup {
-        .verified(id: "mb-1", matchedReleaseGroups: ["rg-1"], genres: genres.map { ArtistStyleBook.Genre(name: $0.0, count: $0.1) })
+        .verified(id: "11111111-1111-4111-8111-111111111111", matchedReleaseGroups: ["rg-1"], genres: genres.map { ArtistStyleBook.Genre(name: $0.0, count: $0.1) })
     }
 
     @Test func aRecordSurvivesARoundTrip() throws {
@@ -119,7 +119,7 @@ struct ArtistStyleStoreTests {
         let book = ArtistStyleBook().recording(verified(), forSpelling: "AC/DX", at: Self.base).noting(spellings: ["ACDX"])
         #expect(book.genres(forArtist: "ACDX") == .unresolved)
         #expect(book.genres(forArtist: "AC/DX") == .unresolved)
-        #expect(book.record(forArtist: "AC/DX")?.mbid == "mb-1", "撞鍵不覆寫 mbid")
+        #expect(book.record(forArtist: "AC/DX")?.mbid == "11111111-1111-4111-8111-111111111111", "撞鍵不覆寫 mbid")
         #expect(book.record(forArtist: "AC/DX")?.reason == .collision)
     }
 
