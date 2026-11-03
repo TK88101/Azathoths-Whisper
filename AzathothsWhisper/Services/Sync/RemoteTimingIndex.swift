@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// 他機時間軸的記憶體索引（⑨ 計劃 §6.5「時間軸，跨 persistentID」）：每台他機一份、整份換；鍵＝歌詞雜湊。
@@ -8,6 +7,10 @@ actor RemoteTimingIndex {
 
     func replace(writer: String, records: [TimingRecord]) {
         byWriter[writer] = Dictionary(grouping: records.filter(\.isFound), by: \.lyricsHash)
+    }
+
+    func clear() {
+        byWriter = [:]
     }
 
     func candidates(for hash: LyricsFingerprint) -> [TimingRecord] {
@@ -51,6 +54,6 @@ actor RemoteTimingIndex {
     }
 
     private static func anchorDigest(_ record: TimingRecord) -> String {
-        SHA256.hash(data: (try? SyncCodec.canonicalData(anchors(of: record))) ?? Data()).map { String(format: "%02x", $0) }.joined()
+        SyncCodec.payloadHash(anchors(of: record))
     }
 }

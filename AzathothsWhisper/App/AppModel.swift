@@ -82,6 +82,7 @@ final class AppModel {
     @ObservationIgnored let remoteTimingIndex: RemoteTimingIndex?
     @ObservationIgnored var cloudSync: CloudSyncCoordinator?
     @ObservationIgnored var cloudSyncTask: Task<Void, Never>?
+    @ObservationIgnored var cloudSyncIndexClear: Task<Void, Never>?
     /// 設定頁顯示用
     var cloudSyncEnabled: Bool
     var cloudSyncStatus: CloudSyncCoordinator.Status?
@@ -257,6 +258,8 @@ final class AppModel {
             self?.lyricsFX.refreshStatus()   // 標記「這首沒有詞」只會經由升降變更被看見
         }
         lyricsFlow.onMarksChanged = { [weak self] in self?.markCloudSyncDirty(.nolyrics) }
+        // ⑨ 時間軸寫入的通知裝一次、不卸（同步關著時 markCloudSyncDirty 本身不做事；simplify 評審 #3）
+        if let timingStore { Task { await timingStore.setOnSaved { [weak self] in Task { @MainActor in self?.markCloudSyncDirty(.timings) } } } }
         lyricsFlow.onWriteNotConfirmed = { [weak self] _ in
             self?.editor.setExternalStatus(StatusText.writeNotConfirmed)
         }

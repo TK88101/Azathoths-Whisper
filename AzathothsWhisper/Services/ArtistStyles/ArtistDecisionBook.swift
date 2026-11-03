@@ -95,15 +95,17 @@ struct ArtistDecisionBook: Equatable, Sendable {
         guard spellings.allSatisfy(SongProfileResolver.needsArtistGenres) else { throw .signedBand }
     }
 
-    private static func isAcceptable(_ entry: Entry, underKey key: String) -> Bool {
-        guard entry.version.isStamped, entry.version.revision >= 0 else { return false }
+    /// 遠端與本機載入共用（安全評審 HIGH-1、LOW-6）：版本合法、鍵是寫法家族格式且長度有限；有值時寫法都落在這個鍵、選擇合法
+    static func isAcceptable(_ entry: Entry, underKey key: String, allowUnstamped: Bool = false) -> Bool {
+        guard entry.version.isAcceptable(allowUnstamped: allowUnstamped), !key.isEmpty, key.count <= TrackMatcher.maxNameLength,
+              Self.key(key) == key
+        else { return false }
         guard let payload = entry.value else { return true }
-        guard !payload.spellings.isEmpty, payload.spellings.count <= maxSpellings,
+        guard !payload.spellings.isEmpty, payload.spellings.count <= ArtistStyleBook.maxSpellings,
               payload.spellings.allSatisfy({ Self.key($0) == key })
         else { return false }
-        return (try? validate(payload.choice, spellings: payload.spellings)) != nil
+        // 本機載入不驗選擇本身（安全複查 N9）：日後某列被拿掉或歌手進了樂團表，使用者的舊決定不得在載入時被默默丟掉
+        return allowUnstamped || (try? validate(payload.choice, spellings: payload.spellings)) != nil
     }
 
-    /// 一位歌手在曲庫裡的寫法不會多到這樣；超過＝竄改或壞檔
-    static let maxSpellings = 50
 }

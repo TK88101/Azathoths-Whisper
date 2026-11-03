@@ -21,7 +21,8 @@ extension ConfigStore {
     var noLyricsMarkLedger: NoLyricsMarkLedger {
         if let data = defaults.data(forKey: NoLyricsMarksKey.ledger),
            let ledger = try? JSONDecoder().decode(NoLyricsMarkLedger.self, from: data) {
-            return ledger
+            // ⑨ 安全評審 HIGH-1：壞版本號的單筆不收（否則下一次清除就溢位崩潰）
+            return ledger.filter { $0.value.version.isAcceptable(allowUnstamped: true) }
         }
         let legacy = (defaults.array(forKey: NoLyricsMarksKey.markedTrackIDs) ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty }
         return Dictionary(legacy.map { ($0, SyncRegister(value: true, version: SyncVersion(revision: 0, origin: ""))) }) { first, _ in first }

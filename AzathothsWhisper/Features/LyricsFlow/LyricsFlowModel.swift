@@ -454,12 +454,12 @@ final class LyricsFlowModel {
 
     // MARK: - 內部
 
-    /// 鏡像以設定為準：每次換歌、寫入前重讀（設定是唯一來源，鏡像只供畫面觀察）
     /// ⑨：iCloud 匯入換了標記 ledger 之後，立刻讓 Cover Flow 看到（不等下次換歌）
     func marksChangedExternally() {
         reloadMarks()
     }
 
+    /// 鏡像以設定為準：每次換歌、寫入前重讀（設定是唯一來源，鏡像只供畫面觀察）
     private func reloadMarks() {
         let stored = configStore.noLyricsMarks
         guard stored != marks else { return }

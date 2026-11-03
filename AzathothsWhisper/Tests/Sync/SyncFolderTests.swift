@@ -131,4 +131,112 @@ struct SyncFolderTests {
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("Sync/\(Self.me)").path) == false)
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("Sync/\(Self.other)/nolyrics.json").path))
     }
+
+    // MARK: 安全評審 HIGH-2、MEDIUM-4、LOW-7
+
+    @Test func aPlantedSymbolicLinkTempFileIsNotFollowed() throws {
+        let root = root()
+        let outside = root.deletingLastPathComponent().appendingPathComponent("azw-victim-\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: root); try? FileManager.default.removeItem(at: outside) }
+        try Data("keep me".utf8).write(to: outside)
+        let mine = root.appendingPathComponent("Sync/\(Self.me)")
+        try FileManager.default.createDirectory(at: mine, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: mine.appendingPathComponent(".nolyrics.json.tmp"), withDestinationURL: outside)
+        try folder(root).write(marks, kind: .nolyrics, at: Self.at)
+        #expect(try String(contentsOf: outside, encoding: .utf8) == "keep me", "不寫到 iCloud 外")
+        let written = mine.appendingPathComponent("nolyrics.json")
+        #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: written.path)) == nil, "正式檔是一般檔")
+        #expect(folder(root).ownPayloadHash(.nolyrics) == SyncCodec.payloadHash(marks))
+    }
+
+    @Test func aDirectoryInPlaceOfTheTargetFileIsRefused() throws {
+        let root = root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("Sync/\(Self.me)/nolyrics.json"), withIntermediateDirectories: true)
+        #expect(throws: SyncFolder.Failure.unsafeLayout) { try folder(root).write(marks, kind: .nolyrics, at: Self.at) }
+    }
+
+    @Test func anExportOverTheSizeLimitIsNotWritten() throws {
+        let root = root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let huge: SyncPayload.NoLyrics = Dictionary(uniqueKeysWithValues: (0..<20_000).map {
+            (String(format: "AAAA%012d", $0), SyncRegister(value: true, version: SyncVersion(revision: 1, origin: Self.me)))
+        })
+        #expect(throws: SyncFolder.Failure.tooLarge) { try folder(root).write(huge, kind: .nolyrics, at: Self.at) }
+        #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("Sync/\(Self.me)/nolyrics.json").path) == false)
+    }
+
+    @Test func atMostSixteenOtherMacsAreRead() throws {
+        let root = root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        for index in 0..<20 { try writeOther(root, writer: String(format: "00000000000001%02x", index)) }
+        let scan = folder(root).readOthers(.nolyrics, as: SyncPayload.NoLyrics.self)
+        #expect(scan.envelopes.count == SyncFolder.maxWriters)
+        #expect(scan.skipped == 20 - SyncFolder.maxWriters)
+    }
+
+    /// 安全複查 N4：空資料夾不佔名額
+    @Test func emptyFoldersCannotCrowdOutRealMacs() throws {
+        let root = root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        for index in 0..<20 {
+            try FileManager.default.createDirectory(at: root.appendingPathComponent(String(format: "Sync/00000000000000%02x", index)), withIntermediateDirectories: true)
+        }
+        try writeOther(root, writer: "ffffffffffffff01")
+        let scan = folder(root).readOthers(.nolyrics, as: SyncPayload.NoLyrics.self)
+        #expect(scan.envelopes.map(\.writerID) == ["ffffffffffffff01"])
+    }
+
+    /// 安全複查 N5：他機檔被換成 FIFO 不會卡住
+    @Test func aFIFOInPlaceOfAFileIsSkippedWithoutBlocking() throws {
+        let root = root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let dir = root.appendingPathComponent("Sync/\(Self.other)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        #expect(mkfifo(dir.appendingPathComponent("nolyrics.json").path, 0o600) == 0)
+        let scan = folder(root).readOthers(.nolyrics, as: SyncPayload.NoLyrics.self)
+        #expect(scan.envelopes.isEmpty)
+    }
+
+    /// 安全複查 N6：暫存名被預放成資料夾 → 講清楚是版面問題
+    @Test func aDirectoryInPlaceOfTheTempFileIsReportedAsUnsafeLayout() throws {
+        let root = root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("Sync/\(Self.me)/.nolyrics.json.tmp"), withIntermediateDirectories: true)
+        #expect(throws: SyncFolder.Failure.unsafeLayout) { try folder(root).write(marks, kind: .nolyrics, at: Self.at) }
+    }
+
+    /// 安全複查 N8：壞檔每輪照樣計入略過
+    @Test func aBrokenFileIsCountedEveryRound() throws {
+        let root = root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let dir = root.appendingPathComponent("Sync/\(Self.other)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data("garbage".utf8).write(to: dir.appendingPathComponent("nolyrics.json"))
+        let first = folder(root).readOthers(.nolyrics, as: SyncPayload.NoLyrics.self)
+        let second = folder(root).readOthers(.nolyrics, as: SyncPayload.NoLyrics.self, unchangedSince: first.stamps)
+        #expect(first.skipped == 1)
+        #expect(second.skipped == 1)
+    }
+
+    @Test func resettingRefusesWhenAParentIsASymbolicLink() throws {
+        let root = root()
+        let elsewhere = root.deletingLastPathComponent().appendingPathComponent("azw-elsewhere-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root); try? FileManager.default.removeItem(at: elsewhere) }
+        try FileManager.default.createDirectory(at: elsewhere.appendingPathComponent(Self.me), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("Sync"), withDestinationURL: elsewhere)
+        #expect(throws: SyncFolder.Failure.unsafeLayout) { try folder(root).removeOwnFolder() }
+        #expect(FileManager.default.fileExists(atPath: elsewhere.appendingPathComponent(Self.me).path), "連結目標底下的資料夾不被刪")
+    }
+
+    @Test func anUnchangedFileIsNotReadAgain() throws {
+        let root = root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeOther(root)
+        let first = folder(root).readOthers(.nolyrics, as: SyncPayload.NoLyrics.self)
+        let second = folder(root).readOthers(.nolyrics, as: SyncPayload.NoLyrics.self, unchangedSince: first.stamps)
+        #expect(second.envelopes.isEmpty)
+        #expect(second.stamps == first.stamps, "沒變的他機仍回報其檔案戳記")
+    }
 }

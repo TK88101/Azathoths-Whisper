@@ -135,6 +135,7 @@ struct CloudSyncCoordinatorTests {
         let base = await sync.exportCount
         var elapsed: TimeInterval = 0
         while elapsed < 1_800 {
+            await memory.set(mark(String(format: "AAAA%012d", Int(elapsed))))
             await sync.markDirty(.timings)
             clock.advance(by: 120)
             elapsed += 120
@@ -212,10 +213,10 @@ struct CloudSyncCoordinatorTests {
         let gate = AsyncGate()
         let applied = Applied()
         let slow = CloudSyncChannel(
-            kind: .nolyrics, stamp: { _ in }, localHash: { "" }, export: { _, _ in },
+            kind: .nolyrics, stamp: { _ in }, export: { _, _ in false },
             read: { _, _ in
                 await gate.wait()
-                return CloudSyncRead(writers: [:], hashes: [:], skipped: 0, pendingDownloads: 0, apply: { await applied.hit(); return CloudSyncAdoption(rejected: 0, changed: true) })
+                return CloudSyncRead(writers: [:], stamps: [:], skipped: 0, pendingDownloads: 0, apply: { await applied.hit(); return CloudSyncAdoption(rejected: 0, changed: true) })
             }
         )
         let published = Published()
@@ -253,6 +254,90 @@ struct CloudSyncCoordinatorTests {
         #expect(status.otherWriters == [Self.other: Self.wall])
         #expect(status.skipped == 1)
         #expect(status.lastImport == Self.wall)
+    }
+
+    /// codex review P2：本機寫入失敗的遠端檔下輪重試，不記成已採用
+    @Test func aFailedAdoptionIsRetriedNextRound() async throws {
+        let root = root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeOther(root, mark("AAAA000000000002", origin: Self.other))
+        let attempts = Applied()
+        let failing = CloudSyncChannel.make(
+            kind: .nolyrics, as: SyncPayload.NoLyrics.self, stamp: { _ in }, payload: { [:] },
+            adopt: { _ in
+                await attempts.hit()
+                return CloudSyncAdoption(rejected: 0, changed: false, failed: true)
+            }
+        )
+        let clock = FakeTimingClock()
+        let published = Published()
+        let sync = coordinator(root, channels: [failing], clock: clock, published: published)
+        await sync.start()
+        clock.advance(by: CloudSyncCoordinator.importInterval)
+        await sync.tick()
+        #expect(await attempts.count == 2)
+        #expect(await published.last?.lastError == "adoptFailed")
+    }
+
+    /// 安全評審 LOW-9：上一輪逾時的讀取還卡著，不再開新的
+    @Test func aStuckReadIsNotStartedAgain() async throws {
+        let root = root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let gate = AsyncGate()
+        let reads = Applied()
+        let stuck = CloudSyncChannel(
+            kind: .nolyrics, stamp: { _ in }, export: { _, _ in false },
+            read: { _, _ in
+                await reads.hit()
+                await gate.wait()
+                return CloudSyncRead(writers: [:], stamps: [:], skipped: 0, pendingDownloads: 0, apply: { .none })
+            }
+        )
+        let clock = FakeTimingClock()
+        let published = Published()
+        let sync = coordinator(root, channels: [stuck], clock: clock, deadline: FakeTimingClock(), published: published)
+        await sync.start()
+        clock.advance(by: CloudSyncCoordinator.importInterval)
+        await sync.tick()
+        #expect(await reads.count == 1)
+        #expect(await published.last?.lastError == "readBusy")
+        await gate.open()
+        try await Task.sleep(for: .milliseconds(50))
+        clock.advance(by: CloudSyncCoordinator.importInterval)
+        await sync.tick()
+        #expect(await reads.count == 2, "讀取結束後恢復")
+    }
+
+    /// R3 效率評審旁注：工作先做完時，被取消的計時器不得搶先回報逾時
+    @Test func aFinishedWorkIsNeverReportedAsATimeout() async {
+        for _ in 0..<200 {
+            let value = await SyncDeadline.run(.seconds(30), clock: SystemPollClock()) { 42 }
+            #expect(value == 42)
+        }
+    }
+
+    @Test func anExportFailureReportsItsKind() async throws {
+        let parent = root()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let missingDrive = parent.appendingPathComponent("no-drive/Azathoth's Whisper")
+        let memory = MemoryLedger()
+        await memory.set(mark("AAAA000000000001"))
+        let published = Published()
+        await coordinator(missingDrive, channels: [channel(memory)], clock: FakeTimingClock(), published: published).start()
+        #expect(await published.last?.lastError == "iCloudDriveUnavailable")
+    }
+
+    @Test func anUnchangedLocalPayloadIsNotRewritten() async throws {
+        let root = root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let memory = MemoryLedger()
+        await memory.set(mark("AAAA000000000001"))
+        let sync = coordinator(root, channels: [channel(memory)], clock: FakeTimingClock())
+        await sync.start()
+        let before = await sync.exportCount
+        await sync.markDirty(.nolyrics)
+        await sync.flushDirty()
+        #expect(await sync.exportCount == before, "雜湊相同不改寫（他機不必重新下載）")
     }
 }
 

@@ -137,11 +137,11 @@ struct ArtistStyleBook: Equatable, Sendable {
     // MARK: ⑨ 跨機同步（計劃 §6.3、§6.5）
 
     var unstampedCount: Int {
-        records.values.filter { ($0.origin ?? "").isEmpty }.count
+        records.values.filter { !$0.isStamped }.count
     }
 
     func stamped(by writer: String) -> ArtistStyleBook {
-        ArtistStyleBook(records: records.mapValues { ($0.origin ?? "").isEmpty ? $0.originated(by: writer) : $0 },
+        ArtistStyleBook(records: records.mapValues { $0.isStamped ? $0 : $0.originated(by: writer) },
                         lastNetworkError: lastNetworkError, lastNetworkErrorAt: lastNetworkErrorAt)
     }
 
@@ -154,11 +154,18 @@ struct ArtistStyleBook: Equatable, Sendable {
     /// 匯入他機記錄：寫法聯集後照撞鍵規則重判（collision 一旦成立就保留）；不撞鍵時 verified 勝 unresolved、
     /// 同狀態取 origin 小者（R2-B2）。全序、不用時鐘：任意順序合併結果相同
     func merging(remote: [String: Record]) -> (book: ArtistStyleBook, rejected: Int) {
-        let valid = remote.filter { Self.isValid($0.value, underKey: $0.key, requireStamped: true) }
-        let merged = valid.reduce(records) { result, item in
-            result.merging([item.key: Self.combined(result[item.key], item.value)]) { _, new in new }
+        var rejected = 0
+        var merged = records
+        for (key, incoming) in remote {
+            // 合併結果也要合格（安全評審 LOW-5：寫法聯集可能超過上限）；不合格就保留本機那筆
+            let combined = Self.combined(merged[key], incoming)
+            guard Self.isValid(incoming, underKey: key, requireStamped: true), Self.isValid(combined, underKey: key, requireStamped: false) else {
+                rejected += 1
+                continue
+            }
+            merged[key] = combined
         }
-        return (ArtistStyleBook(records: merged, lastNetworkError: lastNetworkError, lastNetworkErrorAt: lastNetworkErrorAt), remote.count - valid.count)
+        return (ArtistStyleBook(records: merged, lastNetworkError: lastNetworkError, lastNetworkErrorAt: lastNetworkErrorAt), rejected)
     }
 
     private static func combined(_ local: Record?, _ remote: Record) -> Record {
@@ -169,10 +176,18 @@ struct ArtistStyleBook: Equatable, Sendable {
                       reason: collides ? .collision : base.reason, fetchedAt: base.fetchedAt, origin: base.origin)
     }
 
+    /// 合併規則：verified 勝 unresolved；同狀態取 origin 小者
     private static func winner(_ lhs: Record, _ rhs: Record) -> Record {
         let (lhsVerified, rhsVerified) = (lhs.reason == nil, rhs.reason == nil)
         if lhsVerified != rhsVerified { return lhsVerified ? lhs : rhs }
         return (rhs.origin ?? "") < (lhs.origin ?? "") ? rhs : lhs
+    }
+
+    /// 背景查詢回來時這位已被匯入（與 `winner`／`combined` 同一套規則）：只有「查到 verified、匯入的是一般 unresolved」才寫回；
+    /// 撞鍵一旦成立就保留，同狀態以匯入的為準
+    static func lookup(_ lookup: Lookup, supersedes existing: Record) -> Bool {
+        guard case .verified = lookup else { return false }
+        return existing.reason != nil && existing.reason != .collision
     }
 
     static let maxSpellings = 50
@@ -181,7 +196,8 @@ struct ArtistStyleBook: Equatable, Sendable {
 
     /// 依狀態分開（R2-B5）：verified 要有 UUID；一般 unresolved 不得帶 mbid／曲風；collision 照 `adding` 語義可保留 mbid
     static func isValid(_ record: Record, underKey key: String, requireStamped: Bool) -> Bool {
-        if requireStamped, (record.origin ?? "").isEmpty { return false }
+        // origin：遠端必須是 writerID 格式；本機可以還沒蓋章，但有值就必須合格（安全評審 LOW-6）
+        guard SyncWriterID.isAcceptableOrigin(record.origin, allowUnstamped: !requireStamped) else { return false }
         guard (1...maxSpellings).contains(record.spellings.count), record.spellings.allSatisfy({ Self.key($0) == key }),
               record.matchedReleaseGroups.count <= maxReleaseGroups,
               record.genres.allSatisfy({ !$0.name.isEmpty && $0.name.count <= maxGenreNameLength && $0.count >= 0 }),
@@ -211,6 +227,8 @@ private extension ArtistStyleBook.Record {
         Self(spellings: Set(spellings + [spelling]).sorted(), mbid: mbid, matchedReleaseGroups: matchedReleaseGroups, genres: genres, reason: reason,
              fetchedAt: fetchedAt, origin: origin)
     }
+
+    var isStamped: Bool { SyncWriterID.isStamped(origin) }
 
     func originated(by writer: String) -> Self {
         Self(spellings: spellings, mbid: mbid, matchedReleaseGroups: matchedReleaseGroups, genres: genres, reason: reason, fetchedAt: fetchedAt, origin: writer)

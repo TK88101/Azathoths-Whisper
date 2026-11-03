@@ -37,6 +37,16 @@ enum SyncWriterID {
         return SHA256.hash(data: Data((uuid + salt).utf8)).prefix(length / 2).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// 「已蓋章」的唯一定義（各記錄型別的 origin 都經這裡）
+    static func isStamped(_ origin: String?) -> Bool {
+        !(origin ?? "").isEmpty
+    }
+
+    /// origin 合格的唯一定義：writerID 格式；本機載入可接受還沒蓋章（nil／空字串）
+    static func isAcceptableOrigin(_ origin: String?, allowUnstamped: Bool) -> Bool {
+        isStamped(origin) ? isValid(origin ?? "") : allowUnstamped
+    }
+
     /// 資料夾名與 origin 的唯一格式定義：16 位小寫 hex（防路徑穿越）
     static func isValid(_ id: String) -> Bool {
         id.utf8.count == length && id.utf8.allSatisfy { (0x30...0x39).contains($0) || (0x61...0x66).contains($0) }

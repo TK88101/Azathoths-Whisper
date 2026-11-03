@@ -67,24 +67,44 @@ struct TimingRecord: Equatable, Sendable {
         return false
     }
 
+    var isStamped: Bool { SyncWriterID.isStamped(origin) }
+
     func stamped(by writer: String) -> TimingRecord {
-        guard (origin ?? "").isEmpty else { return self }
-        return with(origin: writer, sourceRef: sourceRef ?? (isFound ? "\(writer):\(persistentID)" : nil))
+        guard !isStamped else { return self }
+        // 先算成 String?：直接傳給 String?? 參數時，`??` 會被提升成雙層 Optional，左邊的 nil 變成「有值」而右邊永遠用不到
+        let ref: String? = sourceRef ?? (isFound ? "\(writer):\(persistentID)" : nil)
+        return copy(origin: .some(writer), sourceRef: .some(ref))
     }
 
-    /// 換掉身分欄位（跨 ID 採用時換成本機 pid）
-    func with(persistentID: String? = nil, origin: String?, sourceRef: String?) -> TimingRecord {
+    /// 換成另一個 persistentID（正規化、跨 ID 採用）；出身欄位原樣保留
+    func withPersistentID(_ id: String) -> TimingRecord {
+        copy(persistentID: id)
+    }
+
+    /// 欄位複製的唯一一處（R3 重用評審：新增欄位時只改這裡）
+    private func copy(persistentID: String? = nil, origin: String?? = nil, sourceRef: String?? = nil) -> TimingRecord {
         TimingRecord(persistentID: persistentID ?? self.persistentID, lyricsHash: lyricsHash, outcome: outcome, fetchedAt: fetchedAt,
-                     alignerRevision: alignerRevision, origin: origin, sourceRef: sourceRef, match: match)
+                     alignerRevision: alignerRevision, origin: origin ?? self.origin, sourceRef: sourceRef ?? self.sourceRef, match: match)
     }
 
     /// 他機時鐘超前這麼多的記錄不收（R1-5）
     static let remoteFutureTolerance: TimeInterval = 86_400
 
-    /// 遠端記錄的逐筆驗證（§6.3）：檔案層已驗 pid 與錨點；這裡驗蓋章與時鐘
+    /// 遠端記錄的逐筆驗證（§6.3）：檔案層已驗 pid 與錨點；這裡驗 origin 格式、時鐘、對齊器版本、sourceRef 格式。
+    /// 對齊器版本高於本版的不收（安全評審 MEDIUM-3：否則可永久蓋掉本機正確的結果、且本機永不重查；新版的結果由本機自己重查）
     func isAcceptableRemote(now: Date) -> Bool {
-        !(origin ?? "").isEmpty && fetchedAt.timeIntervalSince(now) <= Self.remoteFutureTolerance
-            && (!isFound || !(sourceRef ?? "").isEmpty)
+        guard SyncWriterID.isAcceptableOrigin(origin, allowUnstamped: false), fetchedAt.timeIntervalSince(now) <= Self.remoteFutureTolerance,
+              (1...LRCAligner.revision).contains(alignerRevision)
+        else { return false }
+        guard isFound else { return true }
+        return sourceRef.map(Self.isValidSourceRef) ?? false
+    }
+
+    /// `<writerID>:<16 位大寫 hex persistentID>`（安全評審 LOW-6）
+    static func isValidSourceRef(_ value: String) -> Bool {
+        let parts = value.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2 else { return false }
+        return SyncWriterID.isValid(String(parts[0])) && TimingStore.isCanonicalID(String(parts[1]))
     }
 
     /// 匯入他機記錄（§6.5）：不用時鐘決勝。本機沒有→採用；同詞 found 勝 notFound、兩邊 found 取 alignerRevision 大者；
@@ -169,12 +189,14 @@ actor TimingStore {
     private let directory: URL
     /// ⑨：查找寫入成功後通知（iCloud 匯出的 dirty）；匯入（adopt）與蓋章不通知，由同步自己處理
     private var onSaved: (@Sendable () -> Void)?
+    /// ⑨：全掃補章做過之後的 writerID——之後新寫入當場蓋章，不再全掃（效率評審 #1）。全掃中途失敗不設，下次再掃
+    private var stampedBy: String?
 
     init(directory: URL) {
         self.directory = directory
     }
 
-    func setOnSaved(_ hook: (@Sendable () -> Void)?) {
+    func setOnSaved(_ hook: @escaping @Sendable () -> Void) {
         onSaved = hook
     }
 
@@ -197,11 +219,12 @@ actor TimingStore {
     @discardableResult
     func save(_ record: TimingRecord) throws -> TimingRecord {
         guard let id = Self.canonicalID(record.persistentID) else { throw StoreError.invalidPersistentID }
-        let canonical = record.with(persistentID: id, origin: record.origin, sourceRef: record.sourceRef)
+        let canonical = record.withPersistentID(id)
         let merged = TimingRecord.merged(existing: try existingRecord(id), incoming: canonical)
-        try write(merged, id: id)
+        let stored = stampedBy.map { merged.stamped(by: $0) } ?? merged
+        try write(stored, id: id)
         onSaved?()
-        return merged
+        return stored
     }
 
     // MARK: ⑨ 跨機同步（計劃 §6.5）
@@ -211,7 +234,7 @@ actor TimingStore {
     func adopt(_ record: TimingRecord) throws -> Bool {
         guard let id = Self.canonicalID(record.persistentID) else { throw StoreError.invalidPersistentID }
         let existing = try existingRecord(id)
-        let merged = TimingRecord.importMerged(local: existing, remote: record.with(persistentID: id, origin: record.origin, sourceRef: record.sourceRef))
+        let merged = TimingRecord.importMerged(local: existing, remote: record.withPersistentID(id))
         guard merged != existing else { return false }
         try write(merged, id: id)
         return true
@@ -221,7 +244,7 @@ actor TimingStore {
     func replace(_ record: TimingRecord) throws {
         guard let id = Self.canonicalID(record.persistentID) else { throw StoreError.invalidPersistentID }
         if case .unrecognized = inspect(id) { throw StoreError.unrecognizedFileOnDisk }
-        try write(record.with(persistentID: id, origin: record.origin, sourceRef: record.sourceRef), id: id)
+        try write(record.withPersistentID(id), id: id)
         onSaved?()
     }
 
@@ -234,12 +257,17 @@ actor TimingStore {
         }
     }
 
-    /// 替缺 origin 的記錄蓋上本機 writerID 並寫回（§6.3；冪等，中斷後下次只補仍缺的）。回傳補了幾筆
+    /// 替缺 origin 的記錄蓋上本機 writerID 並寫回（§6.3；冪等，中斷後下次只補仍缺的）。回傳補了幾筆。
+    /// 補完之後的新寫入當場蓋章，所以之後的呼叫不再全掃
+    @discardableResult
     func stampAll(by writer: String) throws -> Int {
-        try allRecords().filter { ($0.origin ?? "").isEmpty }.reduce(0) { count, record in
+        guard stampedBy == nil else { return 0 }
+        let stamped = try allRecords().filter { !$0.isStamped }.reduce(0) { count, record in
             try write(record.stamped(by: writer), id: record.persistentID)
             return count + 1
         }
+        stampedBy = writer
+        return stamped
     }
 
     private func existingRecord(_ id: String) throws -> TimingRecord? {
@@ -253,6 +281,11 @@ actor TimingStore {
     private func write(_ record: TimingRecord, id: String) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Self.encoder.encode(TimingRecordFile(record)).write(to: fileURL(for: id), options: .atomic)
+    }
+
+    /// 已是正規形式（16 位大寫 hex）：遠端資料的 pid 必須原樣合格
+    static func isCanonicalID(_ value: String) -> Bool {
+        canonicalID(value) == value
     }
 
     /// Music 的 persistentID 是 16 位 hex；大寫正規化後才驗證與命名（大小寫不同不得變成兩個檔、防路徑穿越）

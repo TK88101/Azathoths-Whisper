@@ -62,12 +62,13 @@ enum SyncCodec {
         return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// `hash` 已算好就傳入，省一次整份編碼（效率評審 R2-1）
     static func encode<Payload: Codable & Sendable>(
-        _ payload: Payload, kind: SyncKind, writerID: String, appVersion: String, writtenAt: Date
+        _ payload: Payload, kind: SyncKind, writerID: String, appVersion: String, writtenAt: Date, hash: String? = nil
     ) throws -> Data {
         try encoder.encode(SyncEnvelope(
             schemaVersion: SyncEnvelope<Payload>.schemaVersion, kind: kind.rawValue, writerID: writerID, appVersion: appVersion,
-            writtenAt: writtenAt, payloadSHA256: payloadHash(payload), payload: payload
+            writtenAt: writtenAt, payloadSHA256: hash ?? payloadHash(payload), payload: payload
         ))
     }
 

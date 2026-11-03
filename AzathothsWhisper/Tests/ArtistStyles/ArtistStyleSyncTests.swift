@@ -260,6 +260,21 @@ struct ArtistStyleSyncTests {
         #expect(store.load().book.genres(forArtist: "Velvet Lanterns") == .verified(["doom metal"]), "白查後不寫回")
     }
 
+    /// 與合併規則一致（altitude 評審）：查詢途中匯入的是一般 unresolved、本機查到 verified → 寫回 verified
+    @Test func aVerifiedResultStillReplacesAnUnresolvedAdoptedMidQuery() async {
+        let music = MockMusicClient()
+        await music.setLibrary(library([("Velvet Lanterns", "A")]))
+        await music.setArtistTracks([ArtistTrack(album: "A", lyrics: Self.english)], for: "Velvet Lanterns")
+        let store = tempStore()
+        let recorder = Recorder()
+        let sync = sync(music, recorder, store: store)
+        let unresolved = ArtistStyleBook.Record(spellings: ["Velvet Lanterns"], mbid: nil, matchedReleaseGroups: [], genres: [],
+                                                reason: .notFound, fetchedAt: Self.now, origin: "000000000000000b")
+        await recorder.setOnAsk { _ in _ = await sync.adopt(remote: [ArtistStyleBook.key("Velvet Lanterns"): unresolved]) }
+        await sync.run()
+        #expect(store.load().book.genres(forArtist: "Velvet Lanterns") == .verified(["black metal"]))
+    }
+
     @Test func stampingFillsOriginsAndPersistsOnce() async throws {
         let store = tempStore()
         try store.save(ArtistStyleBook(records: [ArtistStyleBook.key("Velvet Lanterns"): remoteRecord("Velvet Lanterns", origin: "")]))

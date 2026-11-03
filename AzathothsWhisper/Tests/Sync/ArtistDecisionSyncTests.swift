@@ -130,4 +130,53 @@ struct ArtistDecisionSyncTests {
         #expect(entry.version == SyncVersion(revision: 0, origin: ""))
         #expect(entry.value?.spellings == [key])
     }
+
+    // MARK: 安全評審 HIGH-1、LOW-6
+
+    @Test func aRemoteDecisionWithAHugeRevisionIsRejected() {
+        let huge = SyncRegister(value: ArtistDecisionPayload(choice: .keepFallback, decidedAt: Self.base, spellings: ["Paper Harbour"]),
+                                version: SyncVersion(revision: Int.max, origin: Self.macB))
+        let merged = ArtistDecisionBook().merging(remote: [ArtistDecisionBook.key("Paper Harbour"): huge])
+        #expect(merged.book == ArtistDecisionBook())
+        #expect(merged.rejected == 1)
+    }
+
+    @Test func aRemoteTombstoneUnderAnOversizedKeyIsRejected() {
+        let tombstone = SyncRegister<ArtistDecisionPayload>(value: nil, version: SyncVersion(revision: 1, origin: Self.macB))
+        let key = String(repeating: "a", count: TrackMatcher.maxNameLength + 1)
+        #expect(ArtistDecisionBook().merging(remote: [key: tombstone]).rejected == 1)
+    }
+
+    @Test func aRemoteDecisionWithAMalformedOriginIsRejected() {
+        let entry = SyncRegister(value: ArtistDecisionPayload(choice: .keepFallback, decidedAt: Self.base, spellings: ["Paper Harbour"]),
+                                 version: SyncVersion(revision: 1, origin: "!"))
+        #expect(ArtistDecisionBook().merging(remote: [ArtistDecisionBook.key("Paper Harbour"): entry]).rejected == 1)
+    }
+
+    /// 安全複查 N9：本機載入不驗選擇——日後拿掉的列，使用者的舊決定不在載入時被丟掉
+    @Test func aLocalDecisionForARowThatNoLongerExistsSurvivesLoading() throws {
+        let directory = tempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let key = ArtistDecisionBook.key("Paper Harbour")
+        let v2 = """
+        {"schemaVersion":2,"entries":{"\(key)":{"value":{"choice":{"style":{"rowID":"row-removed-later"}},"decidedAt":"2026-09-21T10:00:00Z","spellings":["Paper Harbour"]},"version":{"revision":3,"origin":"000000000000000a"}}}}
+        """
+        try Data(v2.utf8).write(to: directory.appendingPathComponent(ArtistDecisionStore.fileName))
+        #expect(ArtistDecisionStore(directory: directory).load().book.decision(forArtist: "Paper Harbour")?.choice == .style(rowID: "row-removed-later"))
+    }
+
+    @Test func aStoredHugeRevisionIsDroppedOnLoadSoChangingItCannotCrash() throws {
+        let directory = tempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let key = ArtistDecisionBook.key("Paper Harbour")
+        let v2 = """
+        {"schemaVersion":2,"entries":{"\(key)":{"value":{"choice":{"keepFallback":{}},"decidedAt":"2026-09-21T10:00:00Z","spellings":["Paper Harbour"]},"version":{"revision":9223372036854775807,"origin":"000000000000000b"}}}}
+        """
+        try Data(v2.utf8).write(to: directory.appendingPathComponent(ArtistDecisionStore.fileName))
+        let book = ArtistDecisionStore(directory: directory).load().book
+        #expect(book.entries.isEmpty)
+        _ = try book.deciding(.keepFallback, forArtists: ["Paper Harbour"], at: Self.base)
+    }
 }

@@ -55,30 +55,31 @@ extension AppModel {
         Task { await cloudSync.markDirty(kind) }
     }
 
-    /// 結束 app：dirty 的類別盡力匯出，最多 `cloudSyncQuitBudget`
+    /// 結束 app：dirty 的小類別盡力匯出，最多 `cloudSyncQuitBudget`。時間軸不在這裡匯出（整庫掃描加編碼常超過 2 s，
+    /// 效率評審 #5）：下次啟動比雜湊補上
     func flushCloudSync(budget: Duration = AppModel.cloudSyncQuitBudget) async {
         guard let cloudSync else { return }
-        let race = SyncRace<Bool>()
-        let clock = cloudSyncEnvironment?.readDeadline ?? SystemPollClock()
-        _ = await withCheckedContinuation { continuation in
-            race.begin(continuation)
-            let timer = Task.detached {
-                try? await clock.sleep(for: budget)
-                race.finish(false)
-            }
-            Task.detached {
-                await cloudSync.flushDirty()
-                timer.cancel()
-                race.finish(true)
-            }
+        _ = await SyncDeadline.run(budget, clock: cloudSyncEnvironment?.readDeadline ?? SystemPollClock()) {
+            await cloudSync.flushDirty(skipping: [.timings])
         }
     }
 
+    /// 關閉＝停止讀寫；他機的時間軸候選一併清掉（關閉後查找不得再用，效率評審 #6）
     func stopCloudSync() {
-        cloudSyncTask?.cancel()
+        let running = cloudSyncTask
+        running?.cancel()
         cloudSyncTask = nil
         cloudSync = nil
-        if let timingStore { Task { await timingStore.setOnSaved(nil) } }
+        // 先等舊排程器真的結束（取消擋不住進行中的匯入寫索引）再清；下一次開啟再等這次清完
+        // （codex review R2／R3、層級評審 R3：清除不得早於舊匯入、也不得晚於新匯入）
+        let previous = cloudSyncIndexClear
+        if let remoteTimingIndex {
+            cloudSyncIndexClear = Task {
+                await previous?.value
+                await running?.value
+                await remoteTimingIndex.clear()
+            }
+        }
     }
 
     // MARK: 內部
@@ -104,9 +105,12 @@ extension AppModel {
             publish: { [weak self] status in await self?.receiveCloudSyncStatus(status) }
         )
         cloudSync = coordinator
-        let timingStore = timingStore
+        let pendingClear = cloudSyncIndexClear
+        cloudSyncIndexClear = nil
         cloudSyncTask = Task(priority: .utility) {
-            await timingStore?.setOnSaved { [weak self] in Task { @MainActor in self?.markCloudSyncDirty(.timings) } }
+            await pendingClear?.value
+            // 等待期間又被關掉：不啟動（否則關了仍會讀寫 iCloud）
+            guard !Task.isCancelled else { return }
             await coordinator.run()
         }
     }
@@ -133,18 +137,24 @@ extension AppModel {
             stamp: { writer in _ = try await store.stampAll(by: writer) },
             payload: { SyncPayload.canonicalTimings(await store.allRecords()) },
             adopt: { envelopes in
-                var rejected = 0
-                var changed = false
+                var result = CloudSyncAdoption.none
                 for envelope in envelopes {
                     let records = envelope.payload.compactMap(\.record).filter { $0.isAcceptableRemote(now: now()) }
-                    rejected += envelope.payload.count - records.count
+                    result = result + CloudSyncAdoption(rejected: envelope.payload.count - records.count, changed: false)
                     // 跨 persistentID 的候選：整台換（§6.5）
                     await index.replace(writer: envelope.writerID, records: records)
-                    for record in records where (try? await store.adopt(record)) == true {
-                        changed = true
+                    for record in records {
+                        do {
+                            if try await store.adopt(record) { result = result + CloudSyncAdoption(rejected: 0, changed: true) }
+                        } catch TimingStore.StoreError.unrecognizedFileOnDisk {
+                            // 本機那份看不懂（較新版本、符號連結）：永久性的，算拒收，不觸發每輪全量重試（效率評審 R2-2）
+                            result = result + CloudSyncAdoption(rejected: 1, changed: false)
+                        } catch {
+                            result = result + CloudSyncAdoption(rejected: 0, changed: false, failed: true)
+                        }
                     }
                 }
-                return CloudSyncAdoption(rejected: rejected, changed: changed)
+                return result
             }
         )
     }
@@ -157,14 +167,9 @@ extension AppModel {
             stamp: { writer in try await sync.stamp(by: writer) },
             payload: { SyncPayload.canonicalArtists(await sync.records()) },
             adopt: { envelopes in
-                var rejected = 0
-                var changed = false
-                for envelope in envelopes {
-                    let adoption = await sync.adopt(remote: envelope.payload)
-                    rejected += adoption.rejected
-                    changed = changed || adoption.changed
-                }
-                return CloudSyncAdoption(rejected: rejected, changed: changed)
+                var result = CloudSyncAdoption.none
+                for envelope in envelopes { result = result + (await sync.adopt(remote: envelope.payload)) }
+                return result
             }
         )
     }
@@ -176,7 +181,7 @@ extension AppModel {
             kind: .decisions, as: SyncPayload.Decisions.self,
             stamp: { [weak self] writer in try await self?.stampDecisions(by: writer) },
             payload: { [weak self] in await self?.decisionEntries() ?? [:] },
-            adopt: { [weak self] envelopes in await self?.adoptRemoteDecisions(envelopes) ?? CloudSyncAdoption(rejected: 0, changed: false) }
+            adopt: { [weak self] envelopes in await self?.adoptRemoteDecisions(envelopes) ?? .none }
         )
     }
 
@@ -200,7 +205,7 @@ extension AppModel {
             try replaceDecisions(merged.book)
         } catch {
             cloudSyncLog.error("remote decisions not written")
-            return CloudSyncAdoption(rejected: merged.rejected, changed: false)
+            return CloudSyncAdoption(rejected: merged.rejected, changed: false, failed: true)
         }
         return CloudSyncAdoption(rejected: merged.rejected, changed: true)
     }
@@ -219,7 +224,7 @@ extension AppModel {
             kind: .nolyrics, as: SyncPayload.NoLyrics.self,
             stamp: { [weak self] writer in await self?.stampMarks(by: writer) },
             payload: { [weak self] in await self?.markLedger() ?? [:] },
-            adopt: { [weak self] envelopes in await self?.adoptRemoteMarks(envelopes) ?? CloudSyncAdoption(rejected: 0, changed: false) }
+            adopt: { [weak self] envelopes in await self?.adoptRemoteMarks(envelopes) ?? .none }
         )
     }
 
@@ -250,8 +255,7 @@ extension AppModel {
 
     /// 標記的逐筆驗證（§6.3）：pid 16 位 hex、已蓋章、revision 非負、值只能是 true 或墓碑
     nonisolated static func isAcceptableMark(_ persistentID: String, _ register: SyncRegister<Bool>) -> Bool {
-        TimingStore.canonicalID(persistentID) != nil && register.version.isStamped && register.version.revision >= 0
-            && SyncWriterID.isValid(register.version.origin) && register.value != false
+        TimingStore.isCanonicalID(persistentID) && register.version.isAcceptable(allowUnstamped: false) && register.value != false
     }
 }
 

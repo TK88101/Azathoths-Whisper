@@ -183,6 +183,37 @@ struct AppModelCloudSyncTests {
         #expect(FileManager.default.fileExists(atPath: fixture.ownFolder.path), "關閉不刪任何檔")
     }
 
+    /// 關閉同步後，查找不得再用他機的時間軸候選
+    @Test func turningSyncOffForgetsOtherMacsTimelines() async throws {
+        let fixture = try await fixture()
+        defer { fixture.cleanUp() }
+        try writeOtherMac(fixture.root)
+        fixture.model.setCloudSyncEnabled(true)
+        await fixture.waitUntilStarted()
+        let hash = LyricsFingerprint.of("an invented line")
+        #expect(await fixture.model.remoteTimingIndex?.candidates(for: hash).count == 1)
+        fixture.model.setCloudSyncEnabled(false)
+        await fixture.model.cloudSyncIndexClear?.value
+        #expect(await fixture.model.remoteTimingIndex?.candidates(for: hash).isEmpty == true)
+    }
+
+    /// codex review R2：關了又立刻開，新匯入的候選不被上一次的清除清掉
+    @Test func reEnablingRightAwayKeepsFreshTimelines() async throws {
+        let fixture = try await fixture()
+        defer { fixture.cleanUp() }
+        try writeOtherMac(fixture.root)
+        fixture.model.setCloudSyncEnabled(true)
+        await fixture.waitUntilStarted()
+        fixture.model.setCloudSyncEnabled(false)
+        fixture.model.cloudSyncStatus = nil
+        fixture.model.setCloudSyncEnabled(true)
+        for _ in 0..<500 where fixture.model.cloudSyncStatus == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(await fixture.model.remoteTimingIndex?.candidates(for: LyricsFingerprint.of("an invented line")).count == 1)
+    }
+
     @Test func resettingDeletesOnlyThisMacsCopyAndTurnsSyncOff() async throws {
         let fixture = try await fixture(enabled: true)
         defer { fixture.cleanUp() }

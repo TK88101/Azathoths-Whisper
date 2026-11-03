@@ -73,4 +73,32 @@ struct SyncRegisterTests {
         let data = try JSONEncoder().encode(original)
         #expect(try JSONDecoder().decode(SyncRegister<String>.self, from: data) == original)
     }
+
+    // MARK: 安全評審 HIGH-1：惡意的超大版本號
+
+    @Test func anUpdateAtTheMaximumRevisionSaturatesInsteadOfCrashing() {
+        let top = reg("a", Int.max, "0000000000000001")
+        #expect(top.updated(to: "b").version.revision == SyncVersion.maxRevision)
+        #expect(reg("a", SyncVersion.maxRevision, "0000000000000001").updated(to: "b").version.revision == SyncVersion.maxRevision)
+    }
+
+    @Test(arguments: [(Int.max, "0000000000000001"), (-1, "0000000000000001"), (1, "!"), (1, "000000000000000A"), (1, String(repeating: "a", count: 17))])
+    func anUnacceptableVersionIsRefused(_ revision: Int, _ origin: String) {
+        #expect(SyncVersion(revision: revision, origin: origin).isAcceptable(allowUnstamped: false) == false)
+    }
+
+    /// 安全複查 N1、codex R3：遠端與本機收同一個範圍——本機在上限前的改動同伴收得下、重讀也還在
+    @Test func anEditJustBelowTheCapIsStrictlyNewerAndAcceptedEverywhere() {
+        let accepted = reg("remote", SyncVersion.maxRevision - 1, "0000000000000001")
+        let edited = accepted.updated(to: "local").stamped(by: "ffffffffffffffff")
+        #expect(edited.version.revision == SyncVersion.maxRevision)
+        #expect(edited.version.isAcceptable(allowUnstamped: false), "同伴收得下")
+        #expect(SyncRegister.merged(accepted, edited) == edited, "origin 較大也贏：revision 嚴格較大")
+    }
+
+    @Test func anUnstampedVersionIsAcceptableOnlyLocally() {
+        let local = SyncVersion(revision: 3, origin: "")
+        #expect(local.isAcceptable(allowUnstamped: true))
+        #expect(local.isAcceptable(allowUnstamped: false) == false)
+    }
 }

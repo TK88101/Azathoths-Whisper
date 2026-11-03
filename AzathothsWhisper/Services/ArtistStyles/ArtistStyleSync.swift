@@ -139,8 +139,9 @@ actor ArtistStyleSync {
         guard let artist = spellings.first, let albums = ArtistIdentity.albumsToCompare(tracks) else { return true }
         do {
             let lookup = try await identify(artist, albums)
-            // R3-1：查詢途中這位已被匯入（actor 在 await 期間可重入）——白查可以，白查後不寫回
-            guard book.records[ArtistStyleBook.key(artist)] == nil else { return true }
+            // R3-1：查詢途中這位已被匯入（actor 在 await 期間可重入）。與合併規則一致（altitude 評審）：
+            // 只有「本機查到 verified、匯入的是一般 unresolved」才寫回；其餘（同狀態、撞鍵）以匯入的為準，白查不寫回
+            if let adopted = book.records[ArtistStyleBook.key(artist)], !ArtistStyleBook.lookup(lookup, supersedes: adopted) { return true }
             book = book.recording(lookup, forSpelling: artist, at: now()).noting(spellings: Array(spellings.dropFirst()))
             persist()
             await publish(book)

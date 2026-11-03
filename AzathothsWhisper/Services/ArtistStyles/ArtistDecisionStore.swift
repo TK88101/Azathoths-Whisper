@@ -98,7 +98,10 @@ struct ArtistDecisionStore: Sendable {
         guard version <= Self.schemaVersion else { return .unrecognized }
         let book: ArtistDecisionBook? = version < 2
             ? (try? Self.decoder.decode(StoredFileV1.self, from: data))?.book
-            : (try? Self.decoder.decode(StoredFile.self, from: data)).map { ArtistDecisionBook(entries: $0.entries) }
+            : (try? Self.decoder.decode(StoredFile.self, from: data)).map { stored in
+                // ⑨ 安全評審 HIGH-1：落盤的壞版本號（例如他機塞的 Int.max）在載入時清掉，單筆丟、其餘照收
+                ArtistDecisionBook(entries: stored.entries.filter { ArtistDecisionBook.isAcceptable($0.value, underKey: $0.key, allowUnstamped: true) })
+            }
         guard let book else {
             decisionLog.error("unreadable artist decision file ignored")
             return .corrupt

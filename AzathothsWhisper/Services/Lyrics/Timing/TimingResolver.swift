@@ -209,7 +209,7 @@ actor TimingResolver: TimingResolving {
         guard !candidates.isEmpty, !Task.isCancelled, latestHash[request.persistentID] == hash,
               let picked = RemoteTimingIndex.pick(candidates, for: query, lyricsHash: hash, lineCount: LyricsLines.lyricTexts(request.lyrics).count)
         else { return nil }
-        let adopted = picked.with(persistentID: request.persistentID, origin: picked.origin, sourceRef: picked.sourceRef)
+        let adopted = picked.withPersistentID(request.persistentID)
         do {
             try await store.replace(adopted)
         } catch {

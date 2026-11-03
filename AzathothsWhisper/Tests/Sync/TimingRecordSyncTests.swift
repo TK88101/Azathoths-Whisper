@@ -140,9 +140,22 @@ struct TimingRecordSyncTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = TimingStore(directory: directory)
         try await store.save(TimingRecord(persistentID: Self.pid, lyricsHash: Self.lyrics, outcome: .notFound, fetchedAt: Self.base))
-        #expect(try await store.stampAll(by: Self.macA) == 1)
-        #expect(try await store.stampAll(by: Self.macB) == 0)
+        try await store.save(found(origin: Self.macB).withPersistentID("AAAA000000000009"))
+        #expect(try await store.stampAll(by: Self.macA) == 1, "已蓋章的那筆不動")
         #expect(await store.load(persistentID: Self.pid)?.origin == Self.macA)
+        #expect(await store.load(persistentID: "AAAA000000000009")?.origin == Self.macB)
+    }
+
+    @Test func afterStampingNewLookupsAreStampedOnWrite() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("azw-timing-stamp-write-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TimingStore(directory: directory)
+        try await store.stampAll(by: Self.macA)
+        try await store.save(TimingRecord(persistentID: Self.pid, lyricsHash: Self.lyrics, outcome: .found(source: .lrclib, lines: Self.anchors), fetchedAt: Self.base))
+        let stored = await store.load(persistentID: Self.pid)
+        #expect(stored?.origin == Self.macA)
+        #expect(stored?.sourceRef == "\(Self.macA):\(Self.pid)")
+        #expect(try await store.stampAll(by: Self.macB) == 0, "之後不再全掃")
     }
 
     /// ⑨ T6：查找的寫入（save／replace）成功才通知；匯入（adopt）與蓋章不通知；寫失敗不通知
@@ -163,5 +176,22 @@ struct TimingRecordSyncTests {
             try await store.save(TimingRecord(persistentID: "not-a-pid", lyricsHash: Self.lyrics, outcome: .notFound, fetchedAt: Self.base))
         }
         #expect(saves.value == 2)
+    }
+
+    // MARK: 安全評審 MEDIUM-3、LOW-6
+
+    @Test func aRemoteRecordFromANewerAlignerIsRejected() {
+        #expect(found(revision: LRCAligner.revision + 1).isAcceptableRemote(now: Self.base) == false)
+        #expect(found(revision: Int.max).isAcceptableRemote(now: Self.base) == false)
+        #expect(found(revision: 0).isAcceptableRemote(now: Self.base) == false)
+    }
+
+    @Test(arguments: ["", "x", "000000000000000b", "000000000000000b:aaaa000000000001", "000000000000000b:AAAA000000000001:x", "!:AAAA000000000001"])
+    func aMalformedSourceRefIsRejected(_ sourceRef: String) {
+        #expect(found(sourceRef: sourceRef).isAcceptableRemote(now: Self.base) == false)
+    }
+
+    @Test func aMalformedOriginIsRejected() {
+        #expect(found(origin: "!", sourceRef: "\(Self.macB):\(Self.pid)").isAcceptableRemote(now: Self.base) == false)
     }
 }

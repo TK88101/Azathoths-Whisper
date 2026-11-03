@@ -122,4 +122,33 @@ struct ArtistStyleMergeTests {
         try store.save(ArtistStyleBook(records: [key("Paper Harbour"): good, key("Velvet Lanterns"): bad]))
         #expect(store.load().book.records.keys.sorted() == [key("Paper Harbour")], "R1-13：本機載入也走同一個驗證器")
     }
+
+    /// 安全評審 LOW-5：聯集後超過寫法上限＝保留本機那筆（否則下次載入整筆被丟掉）
+    @Test func aUnionOverTheSpellingLimitKeepsTheLocalRecord() {
+        // 同一寫法家族的大小寫變體：第 i 個把「第 j 個字母」依 i 的第 j 位轉大寫
+        let letters = Array("paperharbour")
+        func variant(_ index: Int) -> String {
+            let word = letters.enumerated().map { offset, char in (index >> offset) & 1 == 1 ? Character(char.uppercased()) : char }
+            return String(word[0..<5]) + " " + String(word[5...])
+        }
+        let localSpellings = (0..<ArtistStyleBook.maxSpellings).map(variant)
+        #expect(Set(localSpellings).count == ArtistStyleBook.maxSpellings)
+        let local = ArtistStyleBook(records: [key("Paper Harbour"): verified(localSpellings, origin: Self.macA)])
+        let remote = [key("Paper Harbour"): verified([variant(ArtistStyleBook.maxSpellings)], mbid: Self.mbid2, origin: Self.macB)]
+        let merged = local.merging(remote: remote)
+        #expect(merged.book == local)
+        #expect(merged.rejected == 1)
+    }
+
+    @Test func aBackgroundLookupOnlySupersedesAPlainUnresolvedRecord() {
+        let found = ArtistStyleBook.Lookup.verified(id: Self.mbid1, matchedReleaseGroups: [], genres: [.init(name: "doom", count: 1)])
+        #expect(ArtistStyleBook.lookup(found, supersedes: unresolved(["Paper Harbour"])))
+        #expect(ArtistStyleBook.lookup(found, supersedes: unresolved(["AC/DX", "ACDX"], .collision)) == false, "撞鍵保留")
+        #expect(ArtistStyleBook.lookup(found, supersedes: verified(["Paper Harbour"])) == false, "同狀態以匯入的為準")
+        #expect(ArtistStyleBook.lookup(.unresolved(.notFound), supersedes: unresolved(["Paper Harbour"])) == false)
+    }
+
+    @Test func aRemoteRecordWithAMalformedOriginIsDropped() {
+        #expect(ArtistStyleBook().merging(remote: [key("Paper Harbour"): verified(["Paper Harbour"], origin: "!")]).rejected == 1)
+    }
 }

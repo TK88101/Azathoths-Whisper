@@ -48,4 +48,26 @@ struct NoLyricsMarkSyncTests {
         store.writeNoLyricsMarkLedger(SyncRegister.merged(local, remote))
         #expect(store.noLyricsMarks.isEmpty)
     }
+
+    /// 安全複查 N1：收下接近上限的遠端記錄後，本機的改動在重讀後仍在
+    @Test func aLocalChangeAfterAHighRemoteRevisionSurvivesAReread() {
+        let (store, defaults, name) = makeStore()
+        defer { defaults.removePersistentDomain(forName: name) }
+        store.writeNoLyricsMarkLedger(["AAAA000000000001": SyncRegister(value: nil, version: SyncVersion(revision: SyncVersion.maxRevision - 1, origin: "000000000000000b"))])
+        store.markNoLyrics("AAAA000000000001")
+        let reopened = ConfigStore(secrets: EphemeralSecretStore(), defaults: defaults)
+        #expect(reopened.noLyricsMarks == ["AAAA000000000001"])
+    }
+
+    /// 安全評審 HIGH-1：落進設定的超大版本號被濾掉，之後清除不會溢位崩潰
+    @Test func aStoredHugeRevisionIsIgnoredAndClearingStillWorks() throws {
+        let (store, defaults, name) = makeStore()
+        defer { defaults.removePersistentDomain(forName: name) }
+        let poisoned: ConfigStore.NoLyricsMarkLedger = ["AAAA000000000001": SyncRegister(value: true, version: SyncVersion(revision: Int.max, origin: "000000000000000b"))]
+        defaults.set(try JSONEncoder().encode(poisoned), forKey: ConfigStore.NoLyricsMarksKey.ledger)
+        #expect(store.noLyricsMarks.isEmpty)
+        store.markNoLyrics("AAAA000000000001")
+        store.clearNoLyricsMark("AAAA000000000001")
+        #expect(store.noLyricsMarks.isEmpty)
+    }
 }

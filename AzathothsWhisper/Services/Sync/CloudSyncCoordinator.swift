@@ -13,7 +13,6 @@ actor CloudSyncCoordinator {
         var otherWriters: [String: Date] = [:]
         var skipped = 0
         var pendingDownloads = 0
-        var rejected = 0
         /// 最近一次錯誤的類型（不含路徑與內容）
         var lastError: String?
     }
@@ -46,7 +45,12 @@ actor CloudSyncCoordinator {
     private let publish: @Sendable (Status) async -> Void
 
     private var dirty: [SyncKind: (first: TimeInterval, last: TimeInterval)] = [:]
-    private var knownHashes: [SyncKind: [String: String]] = [:]
+    /// 各類、各他機上次採用成功時的檔案大小與時間（沒變就不重讀）
+    private var knownStamps: [SyncKind: [String: SyncFolder.FileStamp]] = [:]
+    /// 讀取還沒結束的類別（逾時後阻塞讀取仍佔著執行緒；上一輪沒結束就不再開新的，安全評審 LOW-9）
+    private var readsInFlight: Set<SyncKind> = []
+    /// 各他機最後一次讀到的 writtenAt（沒變而略過時沿用）
+    private var writerTimes: [String: Date] = [:]
     private var lastImportAt: TimeInterval?
     private var status = Status()
     private var published: Status?
@@ -66,7 +70,7 @@ actor CloudSyncCoordinator {
         self.publish = publish
     }
 
-    /// 開啟同步、或同步為開時的啟動：補 origin → 匯入 → 本機與自己那份不同才匯出
+    /// 開啟同步、或同步為開時的啟動：補 origin → 匯入 → 匯出（與自己那份相同的不寫）
     func start() async {
         for channel in channels {
             do {
@@ -76,13 +80,14 @@ actor CloudSyncCoordinator {
             }
         }
         await importAll()
-        for channel in channels where await channel.localHash() != folder.ownPayloadHash(channel.kind) {
+        for channel in channels {
             await export(channel)
         }
         await publishIfChanged()
     }
 
     func run() async {
+        guard !Task.isCancelled else { return }
         await start()
         while !Task.isCancelled {
             do {
@@ -114,9 +119,9 @@ actor CloudSyncCoordinator {
         await publishIfChanged()
     }
 
-    /// 結束 app 時：只匯出 dirty 的類別（呼叫端限時，§6.4）
-    func flushDirty() async {
-        for channel in channels where dirty[channel.kind] != nil {
+    /// 結束 app 時：只匯出 dirty 的類別（呼叫端限時，§6.4）。`skipping` 的類別留給下次啟動的雜湊比對補上
+    func flushDirty(skipping skipped: Set<SyncKind> = []) async {
+        for channel in channels where dirty[channel.kind] != nil && !skipped.contains(channel.kind) {
             await export(channel)
         }
         await publishIfChanged()
@@ -133,10 +138,13 @@ actor CloudSyncCoordinator {
         defer { held?.release() }
         do {
             try await channel.stamp(folder.writerID)
-            try await channel.export(folder, wallClock())
+            if try await channel.export(folder, wallClock()) {
+                status.lastExport = wallClock()
+                exportCount += 1
+            }
             dirty[channel.kind] = nil
-            exportCount += 1
-            status.lastExport = wallClock()
+        } catch let failure as SyncFolder.Failure {
+            fail(String(describing: failure), kind: channel.kind)
         } catch {
             fail("exportFailed", kind: channel.kind)
         }
@@ -145,48 +153,57 @@ actor CloudSyncCoordinator {
     private func importAll() async {
         lastImportAt = clock.now
         var writers: [String: Date] = [:]
+        var seen: Set<String> = []
         var skipped = 0
         var pending = 0
         for channel in channels {
+            guard !readsInFlight.contains(channel.kind) else {
+                fail("readBusy", kind: channel.kind)
+                continue
+            }
             guard let read = await readWithDeadline(channel) else {
                 fail("readTimeout", kind: channel.kind)
                 continue
             }
             writers.merge(read.writers, uniquingKeysWith: max)
+            seen.formUnion(read.stamps.keys)
             skipped += read.skipped
             pending += read.pendingDownloads
             let adoption = await read.apply()
-            knownHashes[channel.kind, default: [:]].merge(read.hashes) { _, new in new }
-            status.rejected += adoption.rejected
+            // 寫入失敗的不記成已採用：下輪重讀重試（codex review P2）
+            if !adoption.failed {
+                knownStamps[channel.kind, default: [:]].merge(read.stamps) { _, new in new }
+            } else {
+                fail("adoptFailed", kind: channel.kind)
+            }
             if adoption.rejected > 0 {
                 syncLog.error("sync records rejected kind=\(channel.kind.rawValue, privacy: .public) count=\(adoption.rejected, privacy: .public)")
             }
             if adoption.changed { markDirty(channel.kind) }
         }
-        status.otherWriters = writers
+        // 沒變而略過的他機沿用上次讀到的時間；這輪完全看不到的（資料夾被刪）就不列
+        writerTimes.merge(writers, uniquingKeysWith: max)
+        status.otherWriters = writerTimes.filter { seen.contains($0.key) }
         status.skipped = skipped
         status.pendingDownloads = pending
         status.lastImport = wallClock()
     }
 
-    /// 讀取放到 actor 外、限時；逾時就丟掉這次的結果（晚到也不採用）
+    /// 讀取放到 actor 外、限時；逾時就丟掉這次的結果（晚到也不採用）。讀取真正結束時才清掉「進行中」
     private func readWithDeadline(_ channel: CloudSyncChannel) async -> CloudSyncRead? {
         let folder = folder
-        let known = knownHashes[channel.kind] ?? [:]
-        let deadline = readDeadline
-        let race = SyncRace<CloudSyncRead>()
-        return await withCheckedContinuation { continuation in
-            race.begin(continuation)
-            let timer = Task.detached {
-                try? await deadline.sleep(for: Self.readTimeout)
-                race.finish(nil)
-            }
-            Task.detached {
-                let read = await channel.read(folder, known)
-                timer.cancel()
-                race.finish(read)
-            }
+        let known = knownStamps[channel.kind] ?? [:]
+        let kind = channel.kind
+        readsInFlight.insert(kind)
+        return await SyncDeadline.run(Self.readTimeout, clock: readDeadline) { [weak self] in
+            let read = await channel.read(folder, known)
+            await self?.readFinished(kind)
+            return read
         }
+    }
+
+    private func readFinished(_ kind: SyncKind) {
+        readsInFlight.remove(kind)
     }
 
     private func fail(_ kind: String, kind syncKind: SyncKind) {
@@ -198,23 +215,5 @@ actor CloudSyncCoordinator {
         guard status != published else { return }
         published = status
         await publish(status)
-    }
-}
-
-/// 只讓第一個結果（讀完或逾時）回去；結束 app 時的限時匯出也用它
-final class SyncRace<Value: Sendable>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var continuation: CheckedContinuation<Value?, Never>?
-
-    func begin(_ continuation: CheckedContinuation<Value?, Never>) {
-        lock.withLock { self.continuation = continuation }
-    }
-
-    func finish(_ value: Value?) {
-        let pending: CheckedContinuation<Value?, Never>? = lock.withLock {
-            defer { continuation = nil }
-            return continuation
-        }
-        pending?.resume(returning: value)
     }
 }
