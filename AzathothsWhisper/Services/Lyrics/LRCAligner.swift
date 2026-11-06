@@ -21,13 +21,11 @@ enum LRCAligner {
     static let maxMergedMusicLines = 3
     /// 對齊演算法版本：1＝一對一、2＝加串接、3＝單調最優＋反向群組。新寫入的記錄記下它；notFound 低於它就重查一次
     static let revision = 3
-    /// found 錨點仍可信的最低版本：found 低於它才重查，跨機比較 found 新舊一律用 `effectiveRevision`（⑩ 計劃 §4.3）。
+    /// found 錨點仍可信的最低版本：比較一律透過 `TimingRecord.hasCompatibleAnchors`／`comparableRevision`（⑩ 計劃 §4.3）。
     /// **升級它之前必須先把 `alignerRevision` 拆成「錨點產生版本」與「已重查版本」兩欄**（⑩ 計劃 §8 R5）：
     /// 現行 `TimingRecord.merged` 保留舊錨點時會把版本升到已查版本，兩義共用一欄
     static let foundCompatibleRevision = 2
 
-    /// 比較 found 新舊用的版本：達到 `foundCompatibleRevision` 的一律同級
-    static func effectiveRevision(_ revision: Int) -> Int { min(revision, foundCompatibleRevision) }
     /// 外部 cue 與存檔時間可以比曲長晚這麼多（曲長取整、尾奏淡出）
     static let durationSlack: Double = 5
 
@@ -39,13 +37,6 @@ enum LRCAligner {
         /// 直接 cue 群組數（反向群組只算 1）：`minimumAnchors` 與 `lrcCoverage` 都以它計
         let groups: Int
 
-        /// `groups` 省略＝每個非 nil 錨點各自一群組（沒有反向群組時的值）
-        init(anchors: [Double?], musicRate: Double, lrcCoverage: Double, groups: Int? = nil) {
-            self.anchors = anchors
-            self.musicRate = musicRate
-            self.lrcCoverage = lrcCoverage
-            self.groups = groups ?? anchors.compactMap { $0 }.count
-        }
 
         var isAccepted: Bool {
             groups >= LRCAligner.minimumAnchors
@@ -64,14 +55,18 @@ enum LRCAligner {
         return timeline(lyrics: lyrics, anchors: alignment.anchors, duration: duration, source: source)
     }
 
-    /// Music 沒有歌詞行＝nil
-    /// Music 沒有歌詞行、或被取消＝nil。`duration` 只用於最後一個 cue 上的反向群組（上界＝`lastLineEnd`）
-    static func alignment(lyrics: String, lrc: [LRCLine], duration: Double = 0) -> Alignment? {
+    /// Music 沒有歌詞行、或被取消＝nil。`duration` 是反向群組切分點的上界（`duration + durationSlack`，與存檔讀回的上限同一個）
+    static func alignment(lyrics: String, lrc: [LRCLine], duration: Double) -> Alignment? {
         let texts = LyricsLines.lyricTexts(lyrics)
         guard !texts.isEmpty else { return nil }
         // 兩邊各正規化一次（不在 M×L 的配對迴圈裡重算）
         let music = texts.map { Array(normalized($0)) }
         let cues = lrc.map { Array(normalized($0.text)) }
+        let comparable = cues.count(where: { !$0.isEmpty })
+        // 每個 cue 最多吃 `maxMergedMusicLines` 行：連理論上限都到不了門檻就不跑 DP——也就不配置 M×L 的表（本機歌詞行數沒有上限，安全評審 F2）
+        guard Double(min(texts.count, maxMergedMusicLines * comparable)) / Double(texts.count) >= alignmentRateThreshold else {
+            return Alignment(anchors: Array(repeating: nil, count: texts.count), musicRate: 0, lrcCoverage: 0, groups: 0)
+        }
         guard let path = LRCAlignmentPath.find(music: music, cues: cues) else { return nil }
         var anchors = [Double?](repeating: nil, count: texts.count)
         for step in path.steps {
@@ -80,14 +75,14 @@ enum LRCAligner {
                 anchors[line] = lrc[cue].start
             case .reverse(let line, let cue, let span):
                 let start = lrc[cue].start
-                let end = nextCueStart(after: cue, in: lrc, cues: cues)
-                    ?? LyricsTimelineBuilder.lastLineEnd(start: start, duration: duration)
+                let next = nextCueStart(after: cue, in: lrc, cues: cues) ?? LyricsTimelineBuilder.lastLineEnd(start: start, duration: duration)
+                // 夾在存檔讀回的上限內：否則最後一個 cue 落在曲長＋slack 內時，切分點會超限、存了顯示不了（安全評審 F1）
+                let end = max(start, min(next, duration + durationSlack))
                 let starts = groupStarts(weights: music[line..<(line + span)].map(\.count), start: start, end: end)
                 for (offset, value) in starts.enumerated() { anchors[line + offset] = value }
             }
         }
         // LRC 側覆蓋率以群組數計：沒有反向群組時＝對上的 Music 行數（與 revision 2 逐值相同，串接不放寬，Codex M1-Q2）
-        let comparable = cues.filter { !$0.isEmpty }.count
         return Alignment(
             anchors: anchors,
             musicRate: Double(path.matchedMusicLines) / Double(texts.count),
@@ -100,10 +95,9 @@ enum LRCAligner {
     static func groupStarts(weights: [Int], start: Double, end: Double) -> [Double] {
         let total = weights.reduce(0, +)
         let span = end - start
-        var cumulative = 0
         return weights.indices.map { index in
-            defer { cumulative += weights[index] }
-            let fraction = total == 0 ? Double(index) / Double(weights.count) : Double(cumulative) / Double(total)
+            let before = weights[..<index].reduce(0, +)
+            let fraction = total == 0 ? Double(index) / Double(weights.count) : Double(before) / Double(total)
             return start + span * fraction
         }
     }
@@ -164,9 +158,9 @@ enum LRCAligner {
         similarity(Array(normalized(a)), Array(normalized(b)))
     }
 
-    /// 較長的一邊已長到不可能達門檻（差距超過允許的編輯距離）：串接時用來提早停，再接只會更不相似
-    static func isTooLong(_ longer: Int, comparedWith shorter: Int) -> Bool {
-        longer > shorter && longer - shorter > allowedDistance(longest: longer)
+    /// `candidate` 已比 `reference` 長到不可能達門檻（差距超過允許的編輯距離）：串接時用來提早停，再接只會更不相似
+    static func isTooLong(_ candidate: Int, comparedWith reference: Int) -> Bool {
+        candidate - reference > allowedDistance(longest: candidate)
     }
 
     static func isSimilar(_ left: [Character], _ right: [Character]) -> Bool {
@@ -174,7 +168,7 @@ enum LRCAligner {
     }
 
     /// 門檻內允許的最大編輯距離；向上取整只會少提早結束，不會誤判
-    static func allowedDistance(longest: Int) -> Int {
+    private static func allowedDistance(longest: Int) -> Int {
         Int((Double(longest) * (1 - lineSimilarityThreshold)).rounded(.up))
     }
 

@@ -92,7 +92,7 @@ struct CandidateRankingTests {
     // MARK: pickAccepted
 
     static func alignment(music: Double, lrc: Double) -> LRCAligner.Alignment {
-        LRCAligner.Alignment(anchors: [1, 2, 3], musicRate: music, lrcCoverage: lrc)
+        LRCAligner.Alignment(anchors: [1, 2, 3], musicRate: music, lrcCoverage: lrc, groups: 3)
     }
 
     @Test func theHigherMusicRateWins() {

@@ -45,7 +45,7 @@ struct RankedAlignment: Equatable, Sendable {
     /// Music 側與 LRC 側都全部對上：後面的候選最多打平、再以名次輸，不必再取
     var isPerfect: Bool { alignment.musicRate == 1 && alignment.lrcCoverage == 1 }
 
-    /// musicRate 高者 → lrcCoverage 高者 → 名次前者（直接錨點數＝musicRate×行數，與第一鍵等價，不另比）
+    /// musicRate 高者 → lrcCoverage 高者 → 名次前者（對上的 Music 行數＝musicRate×行數，與第一鍵等價，不另比）
     static func best(of accepted: [RankedAlignment]) -> RankedAlignment? {
         accepted.min { lhs, rhs in
             (-lhs.alignment.musicRate, -lhs.alignment.lrcCoverage, lhs.rank) < (-rhs.alignment.musicRate, -rhs.alignment.lrcCoverage, rhs.rank)

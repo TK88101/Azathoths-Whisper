@@ -19,7 +19,7 @@ struct TimingAlignmentTests {
             (40, "Lanterns over the river"), (44, "Ash in the wind"), (48, "Smoke along the shore"),
             (52, "Count the silent bells"), (56, "Paper boats at dawn"), (60, "Hold the lantern high"),
         ])
-        let alignment = LRCAligner.alignment(lyrics: chorusOnly, lrc: full)
+        let alignment = LRCAligner.alignment(lyrics: chorusOnly, lrc: full, duration: 100)
         #expect(alignment?.musicRate == 1)
         #expect((alignment?.lrcCoverage ?? 1) < LRCAligner.lrcCoverageThreshold)
         #expect(LRCAligner.align(lyrics: chorusOnly, lrc: full, duration: 100, source: .netease) == nil)
@@ -28,13 +28,13 @@ struct TimingAlignmentTests {
     @Test func fewerThanThreeAnchorsIsRejectedEvenAtFullRate() {
         let two = "Lanterns over the river\nAsh in the wind"
         let timed = lrc([(10, "Lanterns over the river"), (14, "Ash in the wind")])
-        #expect(LRCAligner.alignment(lyrics: two, lrc: timed)?.musicRate == 1)
+        #expect(LRCAligner.alignment(lyrics: two, lrc: timed, duration: 100)?.musicRate == 1)
         #expect(LRCAligner.align(lyrics: two, lrc: timed, duration: 100, source: .lrclib) == nil)
     }
 
     @Test func coverageCountsOnlyDirectOneToOneAnchors() throws {
         let timed = lrc([(10, "Lanterns over the river"), (12, ""), (14, "Ash in the wind"), (20, "Count the silent bells"), (24, "Paper boats at dawn"), (30, "Spare line")])
-        let alignment = try #require(LRCAligner.alignment(lyrics: music, lrc: timed))
+        let alignment = try #require(LRCAligner.alignment(lyrics: music, lrc: timed, duration: 100))
         #expect(alignment.anchors == [10, 14, 20, 24])
         #expect(alignment.musicRate == 1)
         #expect(alignment.lrcCoverage == 0.8)   // 空行不進分母：4／5
@@ -49,7 +49,7 @@ struct TimingAlignmentTests {
     @Test func storedAnchorsRebuildTheSameTimelineAsTheLiveAlignment() throws {
         let timed = lrc([(10, "Lanterns over the river"), (14, "Something else entirely here"), (20, "Count the silent bells"), (24, "Paper boats at dawn")])
         let live = try #require(LRCAligner.align(lyrics: music, lrc: timed, duration: 100, source: .youtubeMusic))
-        let alignment = try #require(LRCAligner.alignment(lyrics: music, lrc: timed))
+        let alignment = try #require(LRCAligner.alignment(lyrics: music, lrc: timed, duration: 100))
         let stored = alignment.lineStarts
         #expect(stored == [.init(index: 0, start: 10), .init(index: 2, start: 20), .init(index: 3, start: 24)])
         let rebuilt = try #require(LRCAligner.timeline(lyrics: music, stored: stored, duration: 100, source: .youtubeMusic))

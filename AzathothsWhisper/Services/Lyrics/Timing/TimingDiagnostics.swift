@@ -40,7 +40,7 @@ final class OSLogTimingDiagnostics: TimingDiagnostics, @unchecked Sendable {
         case .answer(let source, let rank, let alignment, let elapsed):
             let accepted = alignment?.isAccepted == true
             let scores = alignment.map {
-                " music=\(format($0.musicRate)) lrc=\(format($0.lrcCoverage)) anchors=\($0.anchors.compactMap { $0 }.count)"
+                " music=\(format($0.musicRate)) lrc=\(format($0.lrcCoverage)) groups=\($0.groups)"
             } ?? ""
             return "source=\(source.rawValue) result=\(accepted ? "answer" : "alignFail") rank=\(rank)\(scores) ms=\(milliseconds(elapsed))"
         case .picked(let source, let rank, let tried):

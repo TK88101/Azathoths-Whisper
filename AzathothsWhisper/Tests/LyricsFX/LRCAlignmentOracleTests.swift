@@ -59,10 +59,18 @@ struct LRCAlignmentOracleTests {
         var sawReverse = 0, sawImprovement = 0, sawIdentical = 0
         for seed in 0..<UInt64(Self.caseCount) {
             let sample = Self.makeCase(seed: seed)
-            let lineCount = LyricsLines.lyricTexts(sample.lyrics).count
             let old = try #require(LRCAlignerV2Oracle.alignment(lyrics: sample.lyrics, lrc: sample.lrc))
-            let new = try #require(LRCAligner.alignment(lyrics: sample.lyrics, lrc: sample.lrc))
-            let matched = Int((new.musicRate * Double(lineCount)).rounded())
+            let new = try #require(LRCAligner.alignment(lyrics: sample.lyrics, lrc: sample.lrc, duration: 100))
+            let matched = new.anchors.compactMap { $0 }.count   // 反向群組內每行都有起點：非 nil 數＝對上行數
+            let lineCount = new.anchors.count
+            let comparable = sample.lrc.count(where: { !LRCAligner.normalized($0.text).isEmpty })
+            guard Double(min(lineCount, LRCAligner.maxMergedMusicLines * comparable)) / Double(lineCount) >= LRCAligner.alignmentRateThreshold else {
+                // 預檢（理論上限到不了門檻）不跑 DP：兩版都不採用
+                #expect(!new.isAccepted && new.groups == 0, "預檢 seed \(seed)")
+                #expect(!(old.matched >= LRCAligner.minimumAnchors && old.musicRate >= LRCAligner.alignmentRateThreshold
+                    && old.lrcCoverage >= LRCAligner.lrcCoverageThreshold), "預檢 seed \(seed)：v2 也不得採用")
+                continue
+            }
             #expect(matched >= old.matched, "ⓐ seed \(seed)")
             let usedReverse = new.groups != matched
             if usedReverse { sawReverse += 1 }

@@ -219,14 +219,8 @@ struct TimingResolverTests {
     /// ⑩ 計劃附錄 E（Codex 快審 #3）：真實 resolver 的 20 s 時限到點時，正在跑最壞輸入（2000×2000、每行 500 字）的對齊
     /// 要在 ≤ 1 s 內被取消並返回 unavailable、不存檔
     @Test func theDeadlineCancelsAWorstCaseAlignmentWithinOneSecond() async {
-        func line(_ seed: Int, _ salt: Int) -> String {
-            var random = SplitMix64(seed: UInt64(seed * 7919 + salt))
-            let letters = Array("abcdefghijklmnopqrstuvwxyz")
-            return String((0..<ProviderOutcome.maximumLineLength).map { _ in letters[Int(random.next() % 26)] })
-        }
-        let count = ProviderOutcome.maximumTimedLines
-        let lyrics = (0..<count).map { line($0, 1) }.joined(separator: "\n")
-        let cues = (0..<count).map { LRCLine(start: Double($0) * 0.1, text: line($0, 2)) }
+        let lyrics = AlignmentFixtures.worstCaseLines(salt: 1).joined(separator: "\n")
+        let cues = AlignmentFixtures.worstCaseLines(salt: 2).enumerated().map { LRCLine(start: Double($0.offset) * 0.1, text: $0.element) }
         let deadline = GatedPollClock()
         let provider = FakeTimingProvider(.lrclib, [.outcome(.timed(cues, matched: Self.matched))])
         let (resolver, store) = resolver([provider], deadline: deadline)

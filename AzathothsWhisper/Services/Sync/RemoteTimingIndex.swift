@@ -27,7 +27,7 @@ actor RemoteTimingIndex {
         let eligible = candidates.filter { record in
             guard case .found(_, let lines) = record.outcome, record.lyricsHash == lyricsHash,
                   let match = record.match, let sourceRef = record.sourceRef, !sourceRef.isEmpty,
-                  record.alignerRevision >= LRCAligner.foundCompatibleRevision,
+                  record.hasCompatibleAnchors,
                   TrackMatcher.exactKey(match.artist) == TrackMatcher.exactKey(query.artist),
                   TrackMatcher.exactKey(match.title) == TrackMatcher.exactKey(query.title),
                   abs(match.duration - query.duration) <= durationTolerance,
@@ -42,10 +42,9 @@ actor RemoteTimingIndex {
         return representatives.allSatisfy({ anchors(of: $0) == anchors(of: first) }) ? first : nil
     }
 
-    /// 同一 sourceRef 的版本全序：有效版本（`LRCAligner.effectiveRevision`）大者優先 → 錨點正規化 JSON 的 SHA-256 小者
+    /// 同一 sourceRef 的版本全序：`comparableRevision` 大者優先 → 錨點正規化 JSON 的 SHA-256 小者
     private static func precedes(_ lhs: TimingRecord, _ rhs: TimingRecord) -> Bool {
-        let (left, right) = (LRCAligner.effectiveRevision(lhs.alignerRevision), LRCAligner.effectiveRevision(rhs.alignerRevision))
-        if left != right { return left > right }
+        if lhs.comparableRevision != rhs.comparableRevision { return lhs.comparableRevision > rhs.comparableRevision }
         return anchorDigest(lhs) < anchorDigest(rhs)
     }
 

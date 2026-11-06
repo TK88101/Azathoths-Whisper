@@ -120,7 +120,12 @@
 - 回退：還原 `LRCAligner.swift` 與 policy；rev 3 存檔被舊版讀到時 found 照讀（舊版看 rev 3 ≥ 2 不重查），notFound 照 7 天——無破壞。
 
 ## 9. 實施紀錄
-（待填）
+- **T1 紅燈（2026-11-06）**：先編譯紅（`groups`／`groupStarts`／`duration` 參數不存在）；補最小空殼後斷言紅——新測試 9 條紅（拆行、群組切分 4 條、貪婪陷阱、反向群組錨點數、存檔重建、oracle 三種情況覆蓋），既有 `LRCAlignmentTests`／`TimingAlignmentTests` 20 條綠。同分規則與防錯錨的 7 條在貪婪下本來就綠（回歸守衛）。
+- **T2 綠（2026-11-06）**：對齊器 4 suite 37 條綠（含 600 組 oracle）。效能：見附錄 E（Debug 合成門檻改為 Release 探針＋resolver 時限測試）。
+- **T3 紅→綠（2026-11-06）**：紅 8 條（found rev 2 不重查、notFound 舊版重查、`importMerged` 有效版本、雙機收斂、`RemoteTimingIndex` rev 2 同級、`merged` 不升到 3、resolver 舊 found 記到 2）；實作後相關 14 suite 198 條綠。checkpoint `aed25e3`（wip，未 push）。
+- **T4（2026-11-06，`tools/nf/t45`，branch 原檔 -O）**：notFound 33 首、有通過 TrackMatcher 且帶時間候選者 28 首：舊 0、新 **19** 採用（門檻 18 達標）；19 首全為 TrackMatcher exact、時長差 0.04–2.2 s。〈Here Comes the Sun〉musicRate 0.90、lrcCoverage 0.93、群組 25。對照組：①交叉 896 對 0 採用；②同團近鄰（不同曲名、不同歌詞）574 對 0；③合成（自身歌詞 40 % 換成他曲）172 對 0。只作把關，不是「不增加錯配」的證明。
+- **T5 shadow（不寫入）**：lrclib-found 82 首；舊對齊器能逐值重現存檔者 80 首（rev 1、rev 2 各 1 首重現不了，列「來源已變」排除）。80 首中 **55 首不變、25 首顯示會變**：以「新版多出直接錨點」為主（原本內插的行，新版直接對上），逐行最大差 0.4–62 s。哪邊正確需音訊或人耳判定，**本案不改 found**，交使用者另案決定。其他來源 80 首：TBD。
+
 
 ## 附錄 A Codex R1（2026-11-06，評 v0.1）與處置
 | # | 嚴重度 | 要點 | 處置 |

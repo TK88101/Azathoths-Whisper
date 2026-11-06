@@ -13,110 +13,117 @@ struct LRCAlignmentPath: Equatable, Sendable {
         /// Music 第 `music`…`music + span − 1` 行對 cue `cue`
         case reverse(music: Int, cue: Int, span: Int)
 
-        var musicLines: Int {
-            if case .reverse(_, _, let span) = self { return span }
-            return 1
+        var music: Int {
+            switch self { case .forward(let music, _, _), .reverse(let music, _, _): music }
+        }
+
+        var cue: Int {
+            switch self { case .forward(_, let cue, _), .reverse(_, let cue, _): cue }
+        }
+
+        /// 這一步吃掉的 Music 行數與 cue 數
+        var advance: (music: Int, cue: Int) {
+            switch self {
+            case .forward(_, _, let span): (1, span)
+            case .reverse(_, _, let span): (span, 1)
+            }
         }
     }
 
     let steps: [Step]
 
-    var matchedMusicLines: Int { steps.reduce(0) { $0 + $1.musicLines } }
+    var matchedMusicLines: Int { steps.reduce(0) { $0 + $1.advance.music } }
 
-    /// 取消＝nil（每次相似度比較前、配置分數表前都檢查：20 s 時限與 shutdown 才管得到它）
+    /// 取消＝nil（配置表之前、每次相似度比較前、重建每一行前都檢查：20 s 時限與 shutdown 才管得到它）
     static func find(music: [[Character]], cues: [[Character]]) -> LRCAlignmentPath? {
         guard !Task.isCancelled else { return nil }
-        var table = ScoreTable(rows: music.count + 1, columns: cues.count + 1)
+        var table = Grid(rows: music.count + 1, columns: cues.count + 1, filledWith: Score.zero)
         // 每格可行的配對轉移只算一次（相似度是主要成本），重建時直接讀
-        var masks = [TransitionMask](repeating: [], count: music.count * (cues.count + 1))
+        var masks = Grid(rows: music.count, columns: cues.count + 1, filledWith: TransitionMask())
         for i in stride(from: music.count - 1, through: 0, by: -1) {
             for j in stride(from: cues.count, through: 0, by: -1) {
                 guard let mask = matches(music, cues, i, j) else { return nil }
-                masks[i * (cues.count + 1) + j] = mask
+                masks[i, j] = mask
                 var best = table[i + 1, j]
                 if j < cues.count { best = max(best, table[i, j + 1]) }
                 for step in steps(mask, i, j) { best = max(best, value(of: step, in: table)) }
                 table[i, j] = best
             }
         }
-        return reconstruct(rows: music.count, columns: cues.count + 1, table, masks)
+        return reconstruct(rows: music.count, cueCount: cues.count, table, masks)
     }
 
-    private static func reconstruct(rows: Int, columns: Int, _ table: ScoreTable, _ masks: [TransitionMask]) -> LRCAlignmentPath {
+    private static func reconstruct(rows: Int, cueCount: Int, _ table: Grid<Score>, _ masks: Grid<TransitionMask>) -> LRCAlignmentPath? {
         var steps: [Step] = []
         var (i, j) = (0, 0)
         while i < rows {
-            let target = table[i, j]
-            var chosen: Step?
-            search: for k in j..<(columns - 1) where target.matched > 0 {
-                for step in Self.steps(masks[i * columns + k], i, k) where value(of: step, in: table) == target {
-                    chosen = step
-                    break search
-                }
-            }
-            guard let chosen else {
+            guard !Task.isCancelled else { return nil }
+            guard let step = earliestOptimalStep(i, from: j, cueCount: cueCount, table, masks) else {
                 i += 1
                 continue
             }
-            steps.append(chosen)
-            switch chosen {
-            case .forward(_, let cue, let span): (i, j) = (i + 1, cue + span)
-            case .reverse(_, let cue, let span): (i, j) = (i + span, cue + 1)
-            }
+            steps.append(step)
+            (i, j) = (i + step.advance.music, step.cue + step.advance.cue)
         }
         return LRCAlignmentPath(steps: steps)
+    }
+
+    /// Music 行 i 從 cue j 起、最早一個達到最佳分數的轉移；沒有＝跳過這一行
+    private static func earliestOptimalStep(_ i: Int, from j: Int, cueCount: Int, _ table: Grid<Score>, _ masks: Grid<TransitionMask>) -> Step? {
+        let target = table[i, j]
+        guard target.matched > 0 else { return nil }
+        for k in j..<cueCount {
+            if let step = steps(masks[i, k], i, k).first(where: { value(of: $0, in: table) == target }) { return step }
+        }
+        return nil
     }
 
     /// 遮罩 → 轉移，依重建偏好順序：單行 → 串接 s=2 → s=3 → 反向 t=2 → t=3
     private static func steps(_ mask: TransitionMask, _ i: Int, _ j: Int) -> [Step] {
         guard !mask.isEmpty else { return [] }
-        var steps: [Step] = []
-        for span in 1...LRCAligner.maxMergedCues where mask.contains(.forward(span)) { steps.append(.forward(music: i, cue: j, span: span)) }
-        for span in 2...LRCAligner.maxMergedMusicLines where mask.contains(.reverse(span)) { steps.append(.reverse(music: i, cue: j, span: span)) }
-        return steps
+        let forward = (1...LRCAligner.maxMergedCues).filter { mask.contains(.forward($0)) }.map { Step.forward(music: i, cue: j, span: $0) }
+        let reverse = (2...LRCAligner.maxMergedMusicLines).filter { mask.contains(.reverse($0)) }.map { Step.reverse(music: i, cue: j, span: $0) }
+        return forward + reverse
     }
 
-    /// 在 (i, j) 哪些配對轉移可行；取消＝nil。串接一旦長到不可能相似就停（再接只會更長）
+    /// 在 (i, j) 哪些配對轉移可行；取消＝nil
     private static func matches(_ music: [[Character]], _ cues: [[Character]], _ i: Int, _ j: Int) -> TransitionMask? {
         guard j < cues.count, !cues[j].isEmpty else { return [] }
-        var mask: TransitionMask = []
-        var joined: [Character] = []
-        for span in 1...LRCAligner.maxMergedCues {
-            let next = j + span - 1
-            guard next < cues.count, !cues[next].isEmpty else { break }
-            guard !Task.isCancelled else { return nil }
-            joined += cues[next]
-            if LRCAligner.isTooLong(joined.count, comparedWith: music[i].count) { break }
-            if LRCAligner.isSimilar(music[i], joined) { mask.insert(.forward(span)) }
-        }
-        var lines = music[i]
-        for span in 2...LRCAligner.maxMergedMusicLines {
-            let next = i + span - 1
-            guard next < music.count else { break }
-            guard !Task.isCancelled else { return nil }
-            lines += music[next]
-            if LRCAligner.isTooLong(lines.count, comparedWith: cues[j].count) { break }
-            if LRCAligner.isSimilar(lines, cues[j]) { mask.insert(.reverse(span)) }
-        }
-        return mask
+        let cueRun = cues[j..<min(j + LRCAligner.maxMergedCues, cues.count)].prefix { !$0.isEmpty }   // 串接不跨空 cue
+        let musicRun = music[i..<min(i + LRCAligner.maxMergedMusicLines, music.count)]
+        guard let forward = similarSpans(music[i], cueRun, spans: 1...LRCAligner.maxMergedCues),
+              let reverse = similarSpans(cues[j], musicRun, spans: 2...LRCAligner.maxMergedMusicLines)
+        else { return nil }
+        return TransitionMask(forward.map(TransitionMask.forward) + reverse.map(TransitionMask.reverse))
     }
 
-    private static func value(of step: Step, in table: ScoreTable) -> Score {
-        switch step {
-        case .forward(let music, let cue, let span):
-            return Score(matched: 1, groups: 1) + table[music + 1, cue + span]
-        case .reverse(let music, let cue, let span):
-            return Score(matched: Int32(span), groups: 1) + table[music + span, cue + 1]
+    /// `single` 與 `run` 前 1、2、… 段的串接比相似度，回傳 `spans` 內相似的段數；取消＝nil。
+    /// 先比累加長度：一旦長到不可能相似就停（再接只會更長），通過才真的串接（單行極長時不白複製，安全評審 F4）
+    private static func similarSpans(_ single: [Character], _ run: ArraySlice<[Character]>, spans: ClosedRange<Int>) -> [Int]? {
+        var length = 0
+        var hits: [Int] = []
+        for (offset, piece) in run.prefix(spans.upperBound).enumerated() {
+            guard !Task.isCancelled else { return nil }
+            length += piece.count
+            if LRCAligner.isTooLong(length, comparedWith: single.count) { break }
+            let span = offset + 1
+            if spans.contains(span), LRCAligner.isSimilar(single, Array(run.prefix(span).joined())) { hits.append(span) }
         }
+        return hits
+    }
+
+    private static func value(of step: Step, in table: Grid<Score>) -> Score {
+        let advance = step.advance
+        return Score(matched: Int32(advance.music), groups: 1) + table[step.music + advance.music, step.cue + advance.cue]
     }
 }
 
-/// 一格的可行配對：bit 0–2＝正向 s＝1–3，bit 3–4＝反向 t＝2–3
+/// 一格的可行配對：低位起依序為正向 s＝1…`maxMergedCues`、反向 t＝2…`maxMergedMusicLines`（目前共 5 位）
 private struct TransitionMask: OptionSet {
     let rawValue: UInt8
 
     static func forward(_ span: Int) -> TransitionMask { TransitionMask(rawValue: 1 << (span - 1)) }
-    static func reverse(_ span: Int) -> TransitionMask { TransitionMask(rawValue: 1 << (span + 1)) }
+    static func reverse(_ span: Int) -> TransitionMask { TransitionMask(rawValue: 1 << (LRCAligner.maxMergedCues + span - 2)) }
 }
 
 /// (對上的 Music 行數, 群組數)：字典序比較
@@ -135,17 +142,17 @@ private struct Score: Comparable {
     }
 }
 
-/// 扁平的 (rows × columns) 分數表；每格 8 bytes（行數上限 2000 時約 32 MB）
-private struct ScoreTable {
-    private var cells: [Score]
+/// 扁平的 (rows × columns) 表。分數每格 8 bytes、遮罩 1 byte
+private struct Grid<Element> {
+    private var cells: [Element]
     private let columns: Int
 
-    init(rows: Int, columns: Int) {
+    init(rows: Int, columns: Int, filledWith value: Element) {
         self.columns = columns
-        cells = [Score](repeating: .zero, count: rows * columns)
+        cells = [Element](repeating: value, count: rows * columns)
     }
 
-    subscript(row: Int, column: Int) -> Score {
+    subscript(row: Int, column: Int) -> Element {
         get { cells[row * columns + column] }
         set { cells[row * columns + column] = newValue }
     }

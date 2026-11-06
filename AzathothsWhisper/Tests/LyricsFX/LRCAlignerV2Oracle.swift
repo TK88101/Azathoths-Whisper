@@ -41,7 +41,7 @@ enum LRCAlignerV2Oracle {
                     let next = index + span - 1
                     guard next < cues.count, !cues[next].isEmpty else { break }
                     joined += cues[next]
-                    if LRCAligner.similarity(String(line), String(joined)) >= LRCAligner.lineSimilarityThreshold {
+                    if LRCAligner.isSimilar(line, joined) {
                         hit = Hit(index: index, span: span)
                         break search
                     }

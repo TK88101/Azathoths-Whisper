@@ -108,7 +108,7 @@ struct TimingRecord: Equatable, Sendable {
     }
 
     /// 匯入他機記錄（§6.5）：不用時鐘決勝。本機沒有→採用；同詞 found 勝 notFound、兩邊 found 取**有效**版本大者
-    /// （`LRCAligner.effectiveRevision`：可信的版本同級→保留本機，⑩ 計劃 §4.3）；
+    /// （`comparableRevision`：可信的版本同級→保留本機，⑩ 計劃 §4.3）；
     /// 其餘（含異詞）保留本機——時間軸是對本機目前歌詞有效的快取，不要求兩台逐位相同（R1-1）
     static func importMerged(local: TimingRecord?, remote: TimingRecord) -> TimingRecord {
         guard let local else { return remote }
@@ -116,7 +116,7 @@ struct TimingRecord: Equatable, Sendable {
         switch (local.isFound, remote.isFound) {
         case (false, true): return remote
         case (true, true):
-            return LRCAligner.effectiveRevision(remote.alignerRevision) > LRCAligner.effectiveRevision(local.alignerRevision) ? remote : local
+            return remote.comparableRevision > local.comparableRevision ? remote : local
         default: return local
         }
     }
@@ -131,7 +131,7 @@ struct TimingRecord: Equatable, Sendable {
             // 最多記到 `foundCompatibleRevision`：不把舊錨點標成新演算法對出來的（⑩ 計劃 §4.3、§8 R5）
             return TimingRecord(
                 persistentID: existing.persistentID, lyricsHash: existing.lyricsHash, outcome: existing.outcome, fetchedAt: existing.fetchedAt,
-                alignerRevision: max(existing.alignerRevision, LRCAligner.effectiveRevision(incoming.alignerRevision)),
+                alignerRevision: max(existing.alignerRevision, incoming.comparableRevision),
                 origin: existing.origin, sourceRef: existing.sourceRef, match: existing.match
             )
         case (.notFound, .found): return incoming
@@ -150,6 +150,16 @@ extension Array where Element == TimingRecord.LineStart {
 }
 
 /// 要不要再去外部找時間軸（母計劃 C.4）
+/// found 版本語意的唯一定義（⑩ 計劃 §4.3）：重查、本機合併、iCloud 匯入、跨 ID 採用都只透過這兩個屬性比較版本。
+/// 拆 `alignerRevision` 兩義（§8 R5）時只改這裡
+extension TimingRecord {
+    /// 錨點仍可信（達到 `LRCAligner.foundCompatibleRevision`）
+    var hasCompatibleAnchors: Bool { alignerRevision >= LRCAligner.foundCompatibleRevision }
+
+    /// 比較 found 新舊用的版本：可信的版本一律同級
+    var comparableRevision: Int { min(alignerRevision, LRCAligner.foundCompatibleRevision) }
+}
+
 enum TimingLookupPolicy {
     static let retryInterval: TimeInterval = 7 * 86_400
     /// 他機時鐘錯亂寫下的未來時間：超過這麼多就當作該重找，免得永遠不到期
@@ -159,7 +169,7 @@ enum TimingLookupPolicy {
         guard let record else { return true }
         if record.lyricsHash != currentHash { return true }
         // found：錨點不可信才重查（⑩ 計劃 G3：revision 3 不重查既有 found）；notFound：舊演算法判的可能是漏判，重查一次
-        if case .found = record.outcome { return record.alignerRevision < LRCAligner.foundCompatibleRevision }
+        if case .found = record.outcome { return !record.hasCompatibleAnchors }
         if record.alignerRevision < LRCAligner.revision { return true }
         let age = now.timeIntervalSince(record.fetchedAt)
         return age >= retryInterval || age < -futureTolerance
