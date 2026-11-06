@@ -23,7 +23,7 @@
 | 資料 | 位置 | 現況 | 鍵（身分） | 來源 | 重建成本 |
 |---|---|---|---|---|---|
 | 時間軸存檔 | `Timings/<persistentID>.json`（`TimingStore`） | 169 檔／680 KB | persistentID＋lyricsHash | 5 個外部來源查得，或「查過沒有」 | 每首重查 1–5 個來源；notFound 7 天內不重查 |
-| MB 歌手存檔 | `ArtistStyles/artists.json`（`ArtistStyleStore`） | 418 位／205 KB | `normalizedArtist`（歌手名） | MusicBrainz | 首次約 22 分鐘背景查詢（⑥b 在場 #2） |
+| MB 歌手存檔 | `ArtistStyles/artists.json`（`ArtistStyleStore`） | 420 位（在場 #1 實測；原盤點寫 418，附錄 F-b）／約 205 KB | `normalizedArtist`（歌手名） | MusicBrainz | 首次約 22 分鐘背景查詢（⑥b 在場 #2） |
 | 使用者決定 | `ArtistDecisions/decisions.json`（`ArtistDecisionStore`） | 尚無檔（0 筆；⑧ 處理歌手時才會產生） | 寫法家族 `spellingFamily` | 使用者在曲庫檢查親手指定 | **無法重建** |
 | 同歌手共識 | `ArtistConsensus/consensus.json`（`ArtistConsensusStore`） | 99 位／16 KB，`builtAt` 2026-11-01 | 寫法家族 | 最近一次完整曲庫檢查掃描 | 打開曲庫檢查重掃一次（約 51–70 s，I-68） |
 | 「這首沒有歌詞」標記 | UserDefaults `NoLyricsMarkedTrackIDs` | 0 筆 | persistentID | 使用者親手標記 | 無法重建（但目前 0 筆） |
@@ -173,7 +173,7 @@ iCloud Drive/Azathoth's Whisper/Sync/<writerID>/
 3. 他機檔壞掉、版本較新、writerID／kind／雜湊不符、超大、未下載、讀取逾時、iCloud 衝突副本：各自跳過，本機正本逐位不變（測試比對前後雜湊）。
 4. 清除一個決定後，另一台 revision 較小的同鍵決定不會復活；revision 較大者覆蓋本機。「沒有歌詞」標記同理（含 Music 裡直接把詞改空後的舊標記）；遠端 verified 不會蓋掉本機的撞鍵記錄。
 5. 三個 writer 在同一根目錄以任意順序交錯匯出匯入：MB 與決定三方收斂成同一份（逐位相同）；時間軸三方都不出現「套到不同詞」的記錄。
-6. 升版：既有 169 份時間軸、418 位 MB 記錄開啟同步後全部帶 origin、筆數不變；中斷後再啟動只補缺的。
+6. 升版：既有 169 份時間軸、420 位 MB 記錄（原寫 418，在場 #1 實測 420，附錄 F-b）開啟同步後全部帶 origin、筆數不變；中斷後再啟動只補缺的。
 7. 錯時鐘：遠端 `fetchedAt` 超前 2 天的時間軸記錄被丟棄；決定與 MB 決勝不受時鐘影響。
 8. 時間軸持續寫入時，匯出不晚於最長延遲 30 分；強制結束後下次啟動補匯出。
 9. 關閉同步：之後不再讀寫 iCloud 資料夾（替身檔案系統計數 0 次）；本機功能照常。
@@ -343,3 +343,29 @@ Codex 最擔心：錯誤一旦被跨機採用就會被再匯出擴散；`sourceR
 - **在場 #1（真 iCloud Drive 開啟同步，Debug 版）**：22:59 打開開關，**沒有跳任何授權框**（U2：此機、此版本無 TCC 提示；ad-hoc 重建後是否重問未驗）。設定頁顯示最後上傳、最後讀取 22:59、其他 Mac 0 台。磁碟核對：`iCloud Drive/Azathoth's Whisper/Sync/1559630029485179/` 四檔，writerID＝資料夾名；`timings.json` 169 筆（本機 169 檔、0 筆未蓋章）、`artists.json` 420 筆（本機 420 筆、0 筆未蓋章）、`decisions.json` 0、`nolyrics.json` 0（本機皆無）。
 - 全量單元（評審修正後）：2,183 條，2,157 綠、0 紅、26 略過（既有環境限定 suite）；coverage_gate rc 0，Services+Infra 96.4 %，`Services/Sync/` 各檔 92.1–100 %；no_playback_gate rc 0；Scripts Python 471 條 OK。
 - 未做：U3（dataless 檔讀取）需他機檔才觀察得到；UI 測試 `CloudSyncSettingsUITests` 需 Automation Mode；第二台 Mac 未有。
+- **2026-11-06**：v2（iCloud 唯一存放）經使用者「改回 v1」作廢，本稿仍為現行計劃。UI 測試 `CloudSyncSettingsUITests.testTurningSyncOnWritesThisMacsFolder` 綠（1 條 0 失敗，14.7 s；Debug 版 test-without-building，使用者在場授權 Automation Mode）。第二台 Mac 依 §8-11 以 fixture 代替（`AppModelCloudSyncTests.otherMacDataTakesEffectWithoutARestart`），I-72 已註明未經真雙機驗證。U3 仍未觀察（同因）。
+
+## 附錄 F：簽字前 Codex 評審（2026-11-06，2 輪收斂）
+
+背景：v2 作廢、改回 v1 後，問 Codex「能否簽 I-72 並發布」。R1 結論「修完再簽」；R2 對我方裁決逐條回應後結論「採納＋修改完成後可簽」。
+
+| # | Codex R1 | 處置 | R2 |
+|---|---|---|---|
+| a | zh-Hant「最後上傳」暗示已上傳雲端，程式只知道本機寫完 | **採納**：改「最後送出」，對齊 en「Last sent」、ja「最終送信」 | 接受 |
+| b | §8-6 寫 418，實測 420 | **採納** | 接受 |
+| c | §8-2 queued 減少、§8-3 拒收矩陣比對本機正本前後雜湊、§8-5 時間軸三 writer 任意順序、§8-9 關閉後 iCloud 路徑 0 次讀寫（計數替身）未逐字滿足 | **採納**：計劃自己的驗收標準，補測試 | 接受 |
+| d | `UbiquitousDownloadProbe` 取不到狀態當已下載（fail-open） | **修改**：丟錯＝不讀、要求下載；鍵值 nil（非 iCloud 一般資料夾）＝可讀 | 接受方向；要 `do/catch` 分流＋測試 |
+| e | 上層目錄 TOCTOU 列 HIGH 必修 | **駁回**：需本機同使用者權限＋微秒級競態，不提升權限邊界；他機經 iCloud 以秒計搶不到；維持 P2 | 接受駁回 |
+| f | pendingDownloads 短退避重試 | **駁回（P2）**：只影響到達速度，單機無他機檔 | 接受駁回 |
+| g | 真 iCloud evict 他機四檔在場檢查 | **駁回**：v2 S0 已在真 iCloud 量同 API 的 dataless 行為；跳過分支有替身測試 | 接受，前提是先完成 d |
+| h | 四檔任意順序跨輪出現的 fixture | **駁回**：四 channel 獨立、無 manifest | 接受駁回 |
+
+仍開著（簽 I-72 前必做）：a、b、c、d。
+
+**R3（修正後）**：a、d、c②、c③ 完成；b 盤點列仍寫 418；c① 不接受以既有單元測試（`ArtistStyleSyncTests` 兩條）代替 §8-2 的 fixture 整合驗收；c④ 偏離不接受——探針計數漏掉列舉目錄等讀取，內容快照抓不到同內容重寫、暫存檔建刪。**處置**：全採納（證據方勝）。
+- b：盤點列改 420。
+- c①：`AppModelCloudSyncTests.anArtistAdoptedFromAnotherMacIsNotQueriedAgain`（他機 fixture → channel → adopt → 背景 MB 查詢只問本機沒有的歌手）。
+- c④：`SyncFolder.Access`＋`onAccess`，五個非 private 入口第一行計數；`CloudSyncEnvironment.folderAccess`（預設 no-op）經唯一組裝點 `AppModel.makeSyncFolder` 傳入；測試改為開著時計到讀寫（對照）、關閉後計數為空＋快照不變。變異：拿掉 `stopCloudSync()` → 兩斷言紅，還原綠。
+- d 變異：catch 改回 `return true` → `SyncFolderTests` 與拒收矩陣 `statusUnavailable` 紅，還原綠。
+
+**R4**：b、c①、c④ 完成；未發現繞過 `SyncFolder` 存取 iCloud root 的正式路徑（`SyncLock` 在本機 Application Support，Settings 只讀狀態）。**結論：可簽。** 待全量單元＋閘門綠。

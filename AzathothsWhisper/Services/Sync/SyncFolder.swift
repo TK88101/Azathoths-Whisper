@@ -10,11 +10,25 @@ protocol SyncDownloadProbing: Sendable {
     func requestDownload(_ url: URL)
 }
 
-/// 真實作：一般資料夾（非 iCloud）的資源值是 nil，當作已在本機
+/// 真實作：一般資料夾（非 iCloud）的資源值是 nil，當作已在本機；取不到狀態（丟錯）不當成已下載，
+/// 本輪不讀、要求下載（計劃附錄 F-d：fail-open 會讓暫時性錯誤退化成直接讀 dataless 檔）
 struct UbiquitousDownloadProbe: SyncDownloadProbing {
+    typealias StatusReader = @Sendable (URL) throws -> URLUbiquitousItemDownloadingStatus?
+
+    let readStatus: StatusReader
+
+    init(readStatus: @escaping StatusReader = { try $0.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]).ubiquitousItemDownloadingStatus }) {
+        self.readStatus = readStatus
+    }
+
     func isDownloaded(_ url: URL) -> Bool {
-        guard let status = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]).ubiquitousItemDownloadingStatus else { return true }
-        return status == .current
+        do {
+            guard let status = try readStatus(url) else { return true }
+            return status == .current
+        } catch {
+            folderLog.error("download status unavailable")
+            return false
+        }
     }
 
     func requestDownload(_ url: URL) {
@@ -60,10 +74,16 @@ struct SyncFolder: Sendable {
     static let defaultRoot: URL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/Azathoth's Whisper")
 
+    /// 對 iCloud 資料夾的每一次存取（測試計數用：關閉同步後必須是 0 次，§8-9）
+    enum Access: Equatable, Sendable {
+        case write(SyncKind), ownHash(SyncKind), removeOwn, otherWriters, readOthers(SyncKind)
+    }
+
     let root: URL
     let writerID: String
     let appVersion: String
     let downloads: any SyncDownloadProbing
+    var onAccess: @Sendable (Access) -> Void = { _ in }
 
     private var syncDirectory: URL { root.appendingPathComponent("Sync") }
     private var ownDirectory: URL { syncDirectory.appendingPathComponent(writerID) }
@@ -71,6 +91,7 @@ struct SyncFolder: Sendable {
     // MARK: 寫自己的
 
     func write<Payload: Codable & Sendable>(_ payload: Payload, kind: SyncKind, at date: Date, hash: String? = nil) throws {
+        onAccess(.write(kind))
         guard isSafeDirectory(root.deletingLastPathComponent()) else { throw Failure.iCloudDriveUnavailable }
         try ensureDirectory(root)
         try ensureDirectory(syncDirectory)
@@ -113,6 +134,7 @@ struct SyncFolder: Sendable {
 
     /// 自己資料夾那份的 payload 雜湊（啟動時與本機正本比，§6.4）；沒有或讀不懂＝nil
     func ownPayloadHash(_ kind: SyncKind) -> String? {
+        onAccess(.ownHash(kind))
         let url = ownDirectory.appendingPathComponent(kind.fileName)
         guard isSafeDirectory(ownDirectory), let (data, _) = readRegularFile(url, limit: kind.maxBytes),
               let probe = try? JSONDecoder().decode(HashProbe.self, from: data), probe.writerID == writerID
@@ -121,6 +143,7 @@ struct SyncFolder: Sendable {
     }
 
     func removeOwnFolder() throws {
+        onAccess(.removeOwn)
         guard FileManager.default.fileExists(atPath: ownDirectory.path) || isSymbolicLink(ownDirectory) else { return }
         // 逐層都要是真目錄（安全評審 LOW-7：上層被換成連結時會刪到別處）
         guard [root.deletingLastPathComponent(), root, syncDirectory, ownDirectory].allSatisfy(isSafeDirectory) else { throw Failure.unsafeLayout }
@@ -130,12 +153,14 @@ struct SyncFolder: Sendable {
     // MARK: 讀別人的
 
     func otherWriters() -> [String] {
-        candidateWriters().valid
+        onAccess(.otherWriters)
+        return candidateWriters().valid
     }
 
     func readOthers<Payload: Codable & Sendable>(
         _ kind: SyncKind, as type: Payload.Type, unchangedSince known: [String: FileStamp] = [:]
     ) -> Scan<Payload> {
+        onAccess(.readOthers(kind))
         var scan = Scan<Payload>()
         let writers = candidateWriters(holding: kind)
         scan.skipped = writers.invalid

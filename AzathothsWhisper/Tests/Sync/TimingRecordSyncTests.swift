@@ -55,6 +55,29 @@ struct TimingRecordSyncTests {
         #expect(TimingRecord.importMerged(local: local, remote: newerRemote) == local, "R1-5：不信任 wall clock")
     }
 
+    /// §8-5（計劃附錄 F-c）：三個 writer 以任意順序、重複多輪互相匯入，任何一台原有的記錄都不會被換成別首詞的時間軸
+    @Test func threeWritersInAnyOrderNeverSwapInAnotherLyricsTimeline() {
+        let macC = "000000000000000c"
+        let scenarios: [[String: TimingRecord?]] = [
+            [Self.macA: found(revision: 1, origin: Self.macA), Self.macB: found(Self.otherLyrics, revision: 2), macC: notFound(origin: macC)],
+            [Self.macA: notFound(origin: Self.macA), Self.macB: found(Self.otherLyrics, Self.otherAnchors), macC: found(revision: 2, origin: macC)],
+            [Self.macA: nil, Self.macB: found(Self.otherLyrics), macC: found(Self.lyrics, Self.otherAnchors, origin: macC)],
+        ]
+        for (number, records) in scenarios.enumerated() {
+            for (mac, initial) in records {
+                let remotes = records.filter { $0.key != mac }.compactMap(\.value)
+                for order in [remotes, Array(remotes.reversed()), remotes + remotes, remotes.reversed() + remotes] {
+                    let result = order.reduce(initial) { local, remote in TimingRecord.importMerged(local: local, remote: remote) }
+                    guard let initial else {
+                        #expect(result.map { remote in remotes.contains(remote) } ?? true, "情境 \(number)：本機沒有時只會採用某台的原樣記錄")
+                        continue
+                    }
+                    #expect(result?.lyricsHash == initial.lyricsHash, "情境 \(number)、\(mac)：不得套到不同詞")
+                }
+            }
+        }
+    }
+
     @Test func importingTheSameRecordTwiceChangesNothing() {
         let once = TimingRecord.importMerged(local: notFound(origin: Self.macA), remote: found())
         #expect(TimingRecord.importMerged(local: once, remote: found()) == once)

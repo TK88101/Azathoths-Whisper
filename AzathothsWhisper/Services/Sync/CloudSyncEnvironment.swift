@@ -19,6 +19,8 @@ struct CloudSyncEnvironment: Sendable {
     let readDeadline: any PollClock
     let wallClock: @Sendable () -> Date
     let appVersion: String
+    /// 測試用：計數 `SyncFolder` 的每次存取（正式版不設）
+    var folderAccess: @Sendable (SyncFolder.Access) -> Void = { _ in }
 
     static func live() -> CloudSyncEnvironment {
         CloudSyncEnvironment(

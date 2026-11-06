@@ -89,7 +89,8 @@ extension AppModel {
         do {
             let writer = try SyncWriterID.current(from: environment.hardware)
             cloudSyncUnavailable = false
-            return SyncFolder(root: environment.root, writerID: writer, appVersion: environment.appVersion, downloads: environment.downloads)
+            return SyncFolder(root: environment.root, writerID: writer, appVersion: environment.appVersion, downloads: environment.downloads,
+                              onAccess: environment.folderAccess)
         } catch {
             cloudSyncUnavailable = true
             cloudSyncLog.error("cloud sync unavailable: no hardware identity")

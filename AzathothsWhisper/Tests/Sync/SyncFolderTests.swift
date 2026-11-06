@@ -239,4 +239,26 @@ struct SyncFolderTests {
         #expect(second.envelopes.isEmpty)
         #expect(second.stamps == first.stamps, "沒變的他機仍回報其檔案戳記")
     }
+
+    // MARK: 真下載探針的判斷（計劃附錄 F-d）：取不到狀態（丟錯）不得當成已下載；鍵值 nil＝非 iCloud 一般資料夾，本機檔可讀
+
+    struct StatusUnavailable: Error {}
+    private let anyFile = URL(fileURLWithPath: "/sync/000000000000000b/nolyrics.json")
+
+    @Test func aDownloadStatusThatCannotBeReadIsNotTreatedAsDownloaded() {
+        let probe = UbiquitousDownloadProbe(readStatus: { _ in throw StatusUnavailable() })
+        #expect(probe.isDownloaded(anyFile) == false)
+    }
+
+    @Test func aPlainFolderWithoutDownloadStatusIsReadable() {
+        let probe = UbiquitousDownloadProbe(readStatus: { _ in nil })
+        #expect(probe.isDownloaded(anyFile) == true)
+    }
+
+    @Test func onlyTheCurrentVersionCountsAsDownloaded() {
+        let statuses: [(URLUbiquitousItemDownloadingStatus, Bool)] = [(.current, true), (.downloaded, false), (.notDownloaded, false)]
+        for (status, readable) in statuses {
+            #expect(UbiquitousDownloadProbe(readStatus: { _ in status }).isDownloaded(anyFile) == readable, "\(status.rawValue)")
+        }
+    }
 }
