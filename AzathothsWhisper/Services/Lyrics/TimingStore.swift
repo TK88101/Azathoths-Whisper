@@ -131,7 +131,7 @@ struct TimingRecord: Equatable, Sendable {
             // 最多記到 `foundCompatibleRevision`：不把舊錨點標成新演算法對出來的（⑩ 計劃 §4.3、§8 R5）
             return TimingRecord(
                 persistentID: existing.persistentID, lyricsHash: existing.lyricsHash, outcome: existing.outcome, fetchedAt: existing.fetchedAt,
-                alignerRevision: max(existing.alignerRevision, incoming.comparableRevision),
+                alignerRevision: existing.revisionAfterRequery(by: incoming),
                 origin: existing.origin, sourceRef: existing.sourceRef, match: existing.match
             )
         case (.notFound, .found): return incoming
@@ -149,17 +149,23 @@ extension Array where Element == TimingRecord.LineStart {
     }
 }
 
-/// 要不要再去外部找時間軸（母計劃 C.4）
-/// found 版本語意的唯一定義（⑩ 計劃 §4.3）：重查、本機合併、iCloud 匯入、跨 ID 採用都只透過這兩個屬性比較版本。
+/// 對齊器版本語意的唯一定義（⑩ 計劃 §4.3）：重查、本機合併、iCloud 匯入、跨 ID 採用都只透過這裡比較版本。
 /// 拆 `alignerRevision` 兩義（§8 R5）時只改這裡
 extension TimingRecord {
-    /// 錨點仍可信（達到 `LRCAligner.foundCompatibleRevision`）
+    /// found 的錨點仍可信（達到 `LRCAligner.foundCompatibleRevision`）
     var hasCompatibleAnchors: Bool { alignerRevision >= LRCAligner.foundCompatibleRevision }
 
     /// 比較 found 新舊用的版本：可信的版本一律同級
     var comparableRevision: Int { min(alignerRevision, LRCAligner.foundCompatibleRevision) }
+
+    /// 由比現行舊的對齊器寫下（notFound 可能是舊演算法漏判，重查一次）
+    var predatesCurrentAligner: Bool { alignerRevision < LRCAligner.revision }
+
+    /// 保留這份 found 的錨點、記下 `incoming` 那次重查過之後的版本：最多記到 `foundCompatibleRevision`，不把舊錨點標成新演算法對出來的
+    func revisionAfterRequery(by incoming: TimingRecord) -> Int { max(alignerRevision, incoming.comparableRevision) }
 }
 
+/// 要不要再去外部找時間軸（母計劃 C.4）
 enum TimingLookupPolicy {
     static let retryInterval: TimeInterval = 7 * 86_400
     /// 他機時鐘錯亂寫下的未來時間：超過這麼多就當作該重找，免得永遠不到期
@@ -170,7 +176,7 @@ enum TimingLookupPolicy {
         if record.lyricsHash != currentHash { return true }
         // found：錨點不可信才重查（⑩ 計劃 G3：revision 3 不重查既有 found）；notFound：舊演算法判的可能是漏判，重查一次
         if case .found = record.outcome { return !record.hasCompatibleAnchors }
-        if record.alignerRevision < LRCAligner.revision { return true }
+        if record.predatesCurrentAligner { return true }
         let age = now.timeIntervalSince(record.fetchedAt)
         return age >= retryInterval || age < -futureTolerance
     }

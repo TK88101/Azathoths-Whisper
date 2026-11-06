@@ -7,12 +7,11 @@ import Testing
 struct LRCAlignmentTests {
     private let music = "[Verse]\nLanterns over the river\nAsh in the wind\n[Chorus]\nCount the silent bells\nPaper boats at dawn"
 
-    private func lrc(_ pairs: [(Double, String)]) -> [LRCLine] { pairs.map { LRCLine(start: $0.0, text: $0.1) } }
 
     @Test func identicalTextAlignsEveryLine() throws {
         let timeline = try #require(LRCAligner.align(
             lyrics: music,
-            lrc: lrc([(10, "Lanterns over the river"), (14, "Ash in the wind"), (20, "Count the silent bells"), (24, "Paper boats at dawn")]),
+            lrc: AlignmentFixtures.lrc([(10, "Lanterns over the river"), (14, "Ash in the wind"), (20, "Count the silent bells"), (24, "Paper boats at dawn")]),
             duration: 100, source: .lrclib
         ))
         #expect(timeline.source == .lrclib)
@@ -24,7 +23,7 @@ struct LRCAlignmentTests {
     @Test func displayTextComesFromMusicNotTheLRC() throws {
         let timeline = try #require(LRCAligner.align(
             lyrics: music,
-            lrc: lrc([(10, "LANTERNS, over the river!"), (14, "ash in the wind"), (20, "Count the silent bells..."), (24, "paper boats at dawn")]),
+            lrc: AlignmentFixtures.lrc([(10, "LANTERNS, over the river!"), (14, "ash in the wind"), (20, "Count the silent bells..."), (24, "paper boats at dawn")]),
             duration: 100, source: .lrclib
         ))
         #expect(timeline.lines.map(\.text) == ["Lanterns over the river", "Ash in the wind", "Count the silent bells", "Paper boats at dawn"])
@@ -33,14 +32,14 @@ struct LRCAlignmentTests {
     @Test func noiseHeaderLineDoesNotDisturbTheAlignment() throws {
         let timeline = try #require(LRCAligner.align(
             lyrics: music,
-            lrc: lrc([(0, "Some Band - Some Song"), (10, "Lanterns over the river"), (14, "Ash in the wind"), (20, "Count the silent bells"), (24, "Paper boats at dawn")]),
+            lrc: AlignmentFixtures.lrc([(0, "Some Band - Some Song"), (10, "Lanterns over the river"), (14, "Ash in the wind"), (20, "Count the silent bells"), (24, "Paper boats at dawn")]),
             duration: 100, source: .lrclib
         ))
         #expect(timeline.lines.first?.start == 10)
     }
 
     @Test func aDifferentSongIsRejected() {
-        let other = lrc([(10, "Engines in the night"), (14, "Neon on the road"), (20, "Running out of time"), (24, "Static on the radio")])
+        let other = AlignmentFixtures.lrc([(10, "Engines in the night"), (14, "Neon on the road"), (20, "Running out of time"), (24, "Static on the radio")])
         #expect(LRCAligner.align(lyrics: music, lrc: other, duration: 100, source: .lrclib) == nil)
     }
 
@@ -48,14 +47,14 @@ struct LRCAlignmentTests {
     @Test func unmatchedLinesAreInterpolatedMonotonically() throws {
         let timeline = try #require(LRCAligner.align(
             lyrics: music,
-            lrc: lrc([(10, "Lanterns over the river"), (14, "Something else entirely here"), (20, "Count the silent bells"), (24, "Paper boats at dawn")]),
+            lrc: AlignmentFixtures.lrc([(10, "Lanterns over the river"), (14, "Something else entirely here"), (20, "Count the silent bells"), (24, "Paper boats at dawn")]),
             duration: 100, source: .lrclib
         ))
         #expect(timeline.lines.map(\.start) == [10, 15, 20, 24])
     }
 
     @Test func belowTheAlignmentRateIsRejected() {
-        let half = lrc([(10, "Lanterns over the river"), (20, "Count the silent bells")])
+        let half = AlignmentFixtures.lrc([(10, "Lanterns over the river"), (20, "Count the silent bells")])
         #expect(LRCAligner.align(lyrics: music, lrc: half, duration: 100, source: .lrclib) == nil)
     }
 
@@ -68,7 +67,7 @@ struct LRCAlignmentTests {
     // Genius 常把 LRC 的兩、三行合成一行（docs/plans/2026-10-19-lyrics-fx-merged-line-align.md）
     /// 同一段文字前面以兩行出現、後面以一行出現：取前面（單調前向、取最早，與一對一時相同）
     @Test func earliestMatchWinsBetweenAConcatenationAndALaterSingleCue() throws {
-        let alignment = try #require(LRCAligner.alignment(lyrics: merged, lrc: lrc([
+        let alignment = try #require(LRCAligner.alignment(lyrics: merged, lrc: AlignmentFixtures.lrc([
             (10, "Lanterns over the river"), (12, "Ash in the wind"), (20, "Count the silent bells"),
             (24, "Paper boats at dawn"), (28, "Stones under the old bridge"), (40, "Lanterns over the river ash in the wind"),
         ]), duration: 100))
@@ -78,7 +77,7 @@ struct LRCAlignmentTests {
     /// LRC 有兩段相同副歌、Music 只寫一次且合成一行：錨到第一段，後面的行不被吃掉
     @Test func repeatedChorusAnchorsToTheFirstOccurrence() throws {
         let song = "Count the silent bells paper boats at dawn\nStones under the old bridge\nSmoke above the hills"
-        let alignment = try #require(LRCAligner.alignment(lyrics: song, lrc: lrc([
+        let alignment = try #require(LRCAligner.alignment(lyrics: song, lrc: AlignmentFixtures.lrc([
             (10, "Count the silent bells"), (12, "Paper boats at dawn"), (20, "Stones under the old bridge"),
             (30, "Count the silent bells"), (32, "Paper boats at dawn"), (40, "Smoke above the hills"),
         ]), duration: 100))
@@ -88,7 +87,7 @@ struct LRCAlignmentTests {
     private let merged = "Lanterns over the river ash in the wind\nCount the silent bells\nPaper boats at dawn\nStones under the old bridge"
 
     @Test func mergedLineAnchorsToTheFirstOfTwoCues() throws {
-        let alignment = try #require(LRCAligner.alignment(lyrics: merged, lrc: lrc([
+        let alignment = try #require(LRCAligner.alignment(lyrics: merged, lrc: AlignmentFixtures.lrc([
             (10, "Lanterns over the river"), (12, "Ash in the wind"), (20, "Count the silent bells"), (24, "Paper boats at dawn"), (28, "Stones under the old bridge"),
         ]), duration: 100))
         #expect(alignment.anchors == [10, 20, 24, 28])
@@ -99,7 +98,7 @@ struct LRCAlignmentTests {
 
     @Test func mergedLineAnchorsToTheFirstOfThreeCues() throws {
         let three = "Lanterns over the river ash in the wind count the bells\nPaper boats at dawn\nStones under the old bridge\nSmoke above the hills"
-        let alignment = try #require(LRCAligner.alignment(lyrics: three, lrc: lrc([
+        let alignment = try #require(LRCAligner.alignment(lyrics: three, lrc: AlignmentFixtures.lrc([
             (10, "Lanterns over the river"), (12, "Ash in the wind"), (14, "Count the bells"), (20, "Paper boats at dawn"), (24, "Stones under the old bridge"), (28, "Smoke above the hills"),
         ]), duration: 100))
         #expect(alignment.anchors == [10, 20, 24, 28])
@@ -108,7 +107,7 @@ struct LRCAlignmentTests {
 
     /// 單行可中時不取串接：Music「Ash in the wind」只對自己那一行
     @Test func singleCueMatchWinsOverConcatenation() throws {
-        let alignment = try #require(LRCAligner.alignment(lyrics: music, lrc: lrc([
+        let alignment = try #require(LRCAligner.alignment(lyrics: music, lrc: AlignmentFixtures.lrc([
             (10, "Lanterns over the river"), (14, "Ash in the wind"), (16, "Ash in the wind again"), (20, "Count the silent bells"), (24, "Paper boats at dawn"),
         ]), duration: 100))
         #expect(alignment.anchors == [10, 14, 20, 24])
@@ -116,7 +115,7 @@ struct LRCAlignmentTests {
 
     /// 空行是段落分隔：串接不跨過它
     @Test func concatenationDoesNotCrossABlankCue() throws {
-        let alignment = try #require(LRCAligner.alignment(lyrics: merged, lrc: lrc([
+        let alignment = try #require(LRCAligner.alignment(lyrics: merged, lrc: AlignmentFixtures.lrc([
             (10, "Lanterns over the river"), (11, ""), (12, "Ash in the wind"), (20, "Count the silent bells"), (24, "Paper boats at dawn"), (28, "Stones under the old bridge"),
         ]), duration: 100))
         #expect(alignment.anchors == [nil, 20, 24, 28])
@@ -125,7 +124,7 @@ struct LRCAlignmentTests {
     /// 四行以上不串（k 上限 3）
     @Test func fourCuesAreNotConcatenated() throws {
         let four = "Lanterns over the river ash in the wind count the bells by the cold and silent water tonight\nPaper boats at dawn\nStones under the old bridge\nSmoke above the hills"
-        let alignment = try #require(LRCAligner.alignment(lyrics: four, lrc: lrc([
+        let alignment = try #require(LRCAligner.alignment(lyrics: four, lrc: AlignmentFixtures.lrc([
             (10, "Lanterns over the river"), (12, "Ash in the wind"), (14, "Count the bells"), (16, "By the cold and silent water tonight"), (20, "Paper boats at dawn"), (24, "Stones under the old bridge"), (28, "Smoke above the hills"),
         ]), duration: 100))
         #expect(alignment.anchors.first == .some(nil))

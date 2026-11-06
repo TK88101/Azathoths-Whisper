@@ -64,7 +64,7 @@ struct LRCAlignmentOracleTests {
             let matched = new.anchors.compactMap { $0 }.count   // 反向群組內每行都有起點：非 nil 數＝對上行數
             let lineCount = new.anchors.count
             let comparable = sample.lrc.count(where: { !LRCAligner.normalized($0.text).isEmpty })
-            guard Double(min(lineCount, LRCAligner.maxMergedMusicLines * comparable)) / Double(lineCount) >= LRCAligner.alignmentRateThreshold else {
+            guard LRCAlignmentPath.canReachRate(musicLines: lineCount, comparableCues: comparable) else {
                 // 預檢（理論上限到不了門檻）不跑 DP：兩版都不採用
                 #expect(!new.isAccepted && new.groups == 0, "預檢 seed \(seed)")
                 #expect(!(old.matched >= LRCAligner.minimumAnchors && old.musicRate >= LRCAligner.alignmentRateThreshold

@@ -34,9 +34,21 @@ struct LRCAlignmentPath: Equatable, Sendable {
 
     var matchedMusicLines: Int { steps.reduce(0) { $0 + $1.advance.music } }
 
-    /// 取消＝nil（配置表之前、每次相似度比較前、重建每一行前都檢查：20 s 時限與 shutdown 才管得到它）
+    /// Music 行數上限：比照外部 LRC 的 `ProviderOutcome.maximumTimedLines`（超過不是一首歌），表最壞 2000×2000（約 36 MB）
+    static let maximumMusicLines = ProviderOutcome.maximumTimedLines
+
+    /// 每個 cue 最多吃 `maxMergedMusicLines` 行：連這個理論上限都到不了 `alignmentRateThreshold` 就不可能採用
+    static func canReachRate(musicLines: Int, comparableCues: Int) -> Bool {
+        Double(LRCAligner.maxMergedMusicLines * comparableCues) >= LRCAligner.alignmentRateThreshold * Double(musicLines)
+    }
+
+    /// 取消＝nil（配置表之前、每次相似度比較前、重建每一行前都檢查：20 s 時限與 shutdown 才管得到它）。
+    /// Music 超過上限、或理論上限到不了門檻：不配置 M×L 表、回空路徑（＝不採用；本機歌詞行數沒有上限，安全評審 F2、codex R2）
     static func find(music: [[Character]], cues: [[Character]]) -> LRCAlignmentPath? {
         guard !Task.isCancelled else { return nil }
+        guard music.count <= maximumMusicLines, canReachRate(musicLines: music.count, comparableCues: cues.count(where: { !$0.isEmpty })) else {
+            return LRCAlignmentPath(steps: [])
+        }
         var table = Grid(rows: music.count + 1, columns: cues.count + 1, filledWith: Score.zero)
         // 每格可行的配對轉移只算一次（相似度是主要成本），重建時直接讀
         var masks = Grid(rows: music.count, columns: cues.count + 1, filledWith: TransitionMask())
@@ -81,8 +93,8 @@ struct LRCAlignmentPath: Equatable, Sendable {
     /// 遮罩 → 轉移，依重建偏好順序：單行 → 串接 s=2 → s=3 → 反向 t=2 → t=3
     private static func steps(_ mask: TransitionMask, _ i: Int, _ j: Int) -> [Step] {
         guard !mask.isEmpty else { return [] }
-        let forward = (1...LRCAligner.maxMergedCues).filter { mask.contains(.forward($0)) }.map { Step.forward(music: i, cue: j, span: $0) }
-        let reverse = (2...LRCAligner.maxMergedMusicLines).filter { mask.contains(.reverse($0)) }.map { Step.reverse(music: i, cue: j, span: $0) }
+        let forward = (1...LRCAligner.maxMergedCues).compactMap { mask.contains(.forward($0)) ? Step.forward(music: i, cue: j, span: $0) : nil }
+        let reverse = (2...LRCAligner.maxMergedMusicLines).compactMap { mask.contains(.reverse($0)) ? Step.reverse(music: i, cue: j, span: $0) : nil }
         return forward + reverse
     }
 
@@ -91,25 +103,27 @@ struct LRCAlignmentPath: Equatable, Sendable {
         guard j < cues.count, !cues[j].isEmpty else { return [] }
         let cueRun = cues[j..<min(j + LRCAligner.maxMergedCues, cues.count)].prefix { !$0.isEmpty }   // 串接不跨空 cue
         let musicRun = music[i..<min(i + LRCAligner.maxMergedMusicLines, music.count)]
-        guard let forward = similarSpans(music[i], cueRun, spans: 1...LRCAligner.maxMergedCues),
-              let reverse = similarSpans(cues[j], musicRun, spans: 2...LRCAligner.maxMergedMusicLines)
+        guard let forward = similarSpans(music[i], cueRun, from: 1, as: TransitionMask.forward),
+              let reverse = similarSpans(cues[j], musicRun, from: 2, as: TransitionMask.reverse)
         else { return nil }
-        return TransitionMask(forward.map(TransitionMask.forward) + reverse.map(TransitionMask.reverse))
+        return forward.union(reverse)
     }
 
-    /// `single` 與 `run` 前 1、2、… 段的串接比相似度，回傳 `spans` 內相似的段數；取消＝nil。
+    /// `single` 與 `run` 前 1、2、… 段（段數上限＝`run` 的長度，由呼叫端切）的串接比相似度，段數 ≥ `minSpan` 且相似者記進遮罩；取消＝nil。
     /// 先比累加長度：一旦長到不可能相似就停（再接只會更長），通過才真的串接（單行極長時不白複製，安全評審 F4）
-    private static func similarSpans(_ single: [Character], _ run: ArraySlice<[Character]>, spans: ClosedRange<Int>) -> [Int]? {
+    private static func similarSpans(
+        _ single: [Character], _ run: ArraySlice<[Character]>, from minSpan: Int, as bit: (Int) -> TransitionMask
+    ) -> TransitionMask? {
         var length = 0
-        var hits: [Int] = []
-        for (offset, piece) in run.prefix(spans.upperBound).enumerated() {
+        var mask: TransitionMask = []
+        for (offset, piece) in run.enumerated() {
             guard !Task.isCancelled else { return nil }
             length += piece.count
             if LRCAligner.isTooLong(length, comparedWith: single.count) { break }
             let span = offset + 1
-            if spans.contains(span), LRCAligner.isSimilar(single, Array(run.prefix(span).joined())) { hits.append(span) }
+            if span >= minSpan, LRCAligner.isSimilar(single, Array(run.prefix(span).joined())) { mask.insert(bit(span)) }
         }
-        return hits
+        return mask
     }
 
     private static func value(of step: Step, in table: Grid<Score>) -> Score {

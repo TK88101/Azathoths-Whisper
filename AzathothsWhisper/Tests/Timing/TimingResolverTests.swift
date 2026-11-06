@@ -220,7 +220,7 @@ struct TimingResolverTests {
     /// 要在 ≤ 1 s 內被取消並返回 unavailable、不存檔
     @Test func theDeadlineCancelsAWorstCaseAlignmentWithinOneSecond() async {
         let lyrics = AlignmentFixtures.worstCaseLines(salt: 1).joined(separator: "\n")
-        let cues = AlignmentFixtures.worstCaseLines(salt: 2).enumerated().map { LRCLine(start: Double($0.offset) * 0.1, text: $0.element) }
+        let cues = AlignmentFixtures.worstCaseCues(step: 0.1)
         let deadline = GatedPollClock()
         let provider = FakeTimingProvider(.lrclib, [.outcome(.timed(cues, matched: Self.matched))])
         let (resolver, store) = resolver([provider], deadline: deadline)

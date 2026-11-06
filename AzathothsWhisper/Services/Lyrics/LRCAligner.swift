@@ -29,6 +29,9 @@ enum LRCAligner {
     /// 外部 cue 與存檔時間可以比曲長晚這麼多（曲長取整、尾奏淡出）
     static let durationSlack: Double = 5
 
+    /// 外部 cue、反向群組切分點、存檔讀回共用的起點上限（唯一定義）
+    static func startLimit(duration: Double) -> Double { duration + durationSlack }
+
     /// 一次對齊的結果：`anchors[i]`＝Music 第 i 行對上的 LRC 開始秒數（nil＝未對上）
     struct Alignment: Equatable, Sendable {
         let anchors: [Double?]
@@ -36,7 +39,6 @@ enum LRCAligner {
         let lrcCoverage: Double
         /// 直接 cue 群組數（反向群組只算 1）：`minimumAnchors` 與 `lrcCoverage` 都以它計
         let groups: Int
-
 
         var isAccepted: Bool {
             groups >= LRCAligner.minimumAnchors
@@ -55,18 +57,13 @@ enum LRCAligner {
         return timeline(lyrics: lyrics, anchors: alignment.anchors, duration: duration, source: source)
     }
 
-    /// Music 沒有歌詞行、或被取消＝nil。`duration` 是反向群組切分點的上界（`duration + durationSlack`，與存檔讀回的上限同一個）
+    /// Music 沒有歌詞行、或被取消＝nil。`duration` 決定反向群組切分點的上界（`startLimit`，與 cue 驗證、存檔讀回同一個）
     static func alignment(lyrics: String, lrc: [LRCLine], duration: Double) -> Alignment? {
         let texts = LyricsLines.lyricTexts(lyrics)
         guard !texts.isEmpty else { return nil }
         // 兩邊各正規化一次（不在 M×L 的配對迴圈裡重算）
         let music = texts.map { Array(normalized($0)) }
         let cues = lrc.map { Array(normalized($0.text)) }
-        let comparable = cues.count(where: { !$0.isEmpty })
-        // 每個 cue 最多吃 `maxMergedMusicLines` 行：連理論上限都到不了門檻就不跑 DP——也就不配置 M×L 的表（本機歌詞行數沒有上限，安全評審 F2）
-        guard Double(min(texts.count, maxMergedMusicLines * comparable)) / Double(texts.count) >= alignmentRateThreshold else {
-            return Alignment(anchors: Array(repeating: nil, count: texts.count), musicRate: 0, lrcCoverage: 0, groups: 0)
-        }
         guard let path = LRCAlignmentPath.find(music: music, cues: cues) else { return nil }
         var anchors = [Double?](repeating: nil, count: texts.count)
         for step in path.steps {
@@ -77,12 +74,13 @@ enum LRCAligner {
                 let start = lrc[cue].start
                 let next = nextCueStart(after: cue, in: lrc, cues: cues) ?? LyricsTimelineBuilder.lastLineEnd(start: start, duration: duration)
                 // 夾在存檔讀回的上限內：否則最後一個 cue 落在曲長＋slack 內時，切分點會超限、存了顯示不了（安全評審 F1）
-                let end = max(start, min(next, duration + durationSlack))
+                let end = max(start, min(next, startLimit(duration: duration)))
                 let starts = groupStarts(weights: music[line..<(line + span)].map(\.count), start: start, end: end)
                 for (offset, value) in starts.enumerated() { anchors[line + offset] = value }
             }
         }
         // LRC 側覆蓋率以群組數計：沒有反向群組時＝對上的 Music 行數（與 revision 2 逐值相同，串接不放寬，Codex M1-Q2）
+        let comparable = cues.count(where: { !$0.isEmpty })
         return Alignment(
             anchors: anchors,
             musicRate: Double(path.matchedMusicLines) / Double(texts.count),
@@ -108,7 +106,7 @@ enum LRCAligner {
 
     /// 外部 cue 的邊界驗證（Codex R1 #8）：丟掉非有限、負值、超過曲長＋slack 的；依時間穩定排序；同一時間只留第一行
     static func sanitizedCues(_ lrc: [LRCLine], duration: Double) -> [LRCLine] {
-        let limit = duration + durationSlack
+        let limit = startLimit(duration: duration)
         let valid = lrc.enumerated()
             .filter { $0.element.start.isFinite && $0.element.start >= 0 && $0.element.start <= limit }
             .sorted { ($0.element.start, $0.offset) < ($1.element.start, $1.offset) }
@@ -119,7 +117,7 @@ enum LRCAligner {
     /// 由存檔錨點重建（Codex R1 #7）：index 在目前歌詞行數內且遞增、時間有限、單調不減、不超過曲長＋slack；不合＝nil
     static func timeline(lyrics: String, stored: [TimingRecord.LineStart], duration: Double, source: TimingSource) -> LyricsTimeline? {
         let count = LyricsLines.lyricTexts(lyrics).count
-        guard storedLinesFit(stored, lineCount: count, durationLimit: duration + durationSlack) else { return nil }
+        guard storedLinesFit(stored, lineCount: count, durationLimit: startLimit(duration: duration)) else { return nil }
         var anchors = [Double?](repeating: nil, count: count)
         for line in stored { anchors[line.index] = line.start }
         return timeline(lyrics: lyrics, anchors: anchors, duration: duration, source: source)
