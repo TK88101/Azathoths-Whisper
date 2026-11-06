@@ -181,6 +181,13 @@ Requirements: **macOS 14.0+**, **Xcode 16+** (Swift 6), [XcodeGen](https://githu
     *   **Auto Mode**: The app will detect the song and try to find lyrics automatically.
     *   **Manual**: Click "Fetch Lyrics" to force a search.
 5.  **Language**: Change interface language via `Settings` -> `Language Settings`.
+6.  **iCloud Sync (more than one Mac)**: Turn it on in `Settings` -> `iCloud Sync Settings...` on **each** Mac.
+    *   Synced through a folder in your iCloud Drive (`Azathoth's Whisper/Sync/`): lyric timings, MusicBrainz artist
+        results, your Library Check decisions, and “no lyrics” marks. Each Mac writes only its own subfolder.
+    *   Not synced: your Genius token (paste it again on a new Mac) and other settings. Same-artist styles come back
+        after you run Library Check once on the new Mac.
+    *   Off by default. Turning it off stops reading and writing; **Reset this Mac's iCloud copy…** deletes only this
+        Mac's subfolder.
 
 ## iPad Remote: Yog-Sothoth's Echo
 

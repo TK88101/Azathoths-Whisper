@@ -24,6 +24,19 @@ struct ArtistStyleBook: Equatable, Sendable {
         /// nil＝verified
         let reason: ArtistIdentity.UnresolvedReason?
         let fetchedAt: Date
+        /// ⑨ §6.3：產生這筆結果的機器（writerID）；nil＝本機、還沒蓋章。舊檔沒有這欄
+        let origin: String?
+
+        init(spellings: [String], mbid: String?, matchedReleaseGroups: [String], genres: [Genre],
+             reason: ArtistIdentity.UnresolvedReason?, fetchedAt: Date, origin: String? = nil) {
+            self.spellings = spellings
+            self.mbid = mbid
+            self.matchedReleaseGroups = matchedReleaseGroups
+            self.genres = genres
+            self.reason = reason
+            self.fetchedAt = fetchedAt
+            self.origin = origin
+        }
     }
 
     enum Lookup: Equatable, Sendable {
@@ -121,6 +134,83 @@ struct ArtistStyleBook: Equatable, Sendable {
         ArtistStyleBook(records: records, lastNetworkError: kind, lastNetworkErrorAt: date)
     }
 
+    // MARK: ⑨ 跨機同步（計劃 §6.3、§6.5）
+
+    var unstampedCount: Int {
+        records.values.filter { !$0.isStamped }.count
+    }
+
+    func stamped(by writer: String) -> ArtistStyleBook {
+        ArtistStyleBook(records: records.mapValues { $0.isStamped ? $0 : $0.originated(by: writer) },
+                        lastNetworkError: lastNetworkError, lastNetworkErrorAt: lastNetworkErrorAt)
+    }
+
+    /// 只留合格的記錄（本機載入與遠端匯入共用，R1-13）
+    func sanitized(requireStamped: Bool) -> (book: ArtistStyleBook, rejected: Int) {
+        let valid = records.filter { Self.isValid($0.value, underKey: $0.key, requireStamped: requireStamped) }
+        return (ArtistStyleBook(records: valid, lastNetworkError: lastNetworkError, lastNetworkErrorAt: lastNetworkErrorAt), records.count - valid.count)
+    }
+
+    /// 匯入他機記錄：寫法聯集後照撞鍵規則重判（collision 一旦成立就保留）；不撞鍵時 verified 勝 unresolved、
+    /// 同狀態取 origin 小者（R2-B2）。全序、不用時鐘：任意順序合併結果相同
+    func merging(remote: [String: Record]) -> (book: ArtistStyleBook, rejected: Int) {
+        var rejected = 0
+        var merged = records
+        for (key, incoming) in remote {
+            // 合併結果也要合格（安全評審 LOW-5：寫法聯集可能超過上限）；不合格就保留本機那筆
+            let combined = Self.combined(merged[key], incoming)
+            guard Self.isValid(incoming, underKey: key, requireStamped: true), Self.isValid(combined, underKey: key, requireStamped: false) else {
+                rejected += 1
+                continue
+            }
+            merged[key] = combined
+        }
+        return (ArtistStyleBook(records: merged, lastNetworkError: lastNetworkError, lastNetworkErrorAt: lastNetworkErrorAt), rejected)
+    }
+
+    private static func combined(_ local: Record?, _ remote: Record) -> Record {
+        let base = local.map { winner($0, remote) } ?? remote
+        let spellings = Set((local?.spellings ?? []) + remote.spellings).sorted()
+        let collides = local?.reason == .collision || remote.reason == .collision || Set(spellings.map(spellingFamily)).count > 1
+        return Record(spellings: spellings, mbid: base.mbid, matchedReleaseGroups: base.matchedReleaseGroups, genres: base.genres,
+                      reason: collides ? .collision : base.reason, fetchedAt: base.fetchedAt, origin: base.origin)
+    }
+
+    /// 合併規則：verified 勝 unresolved；同狀態取 origin 小者
+    private static func winner(_ lhs: Record, _ rhs: Record) -> Record {
+        let (lhsVerified, rhsVerified) = (lhs.reason == nil, rhs.reason == nil)
+        if lhsVerified != rhsVerified { return lhsVerified ? lhs : rhs }
+        return (rhs.origin ?? "") < (lhs.origin ?? "") ? rhs : lhs
+    }
+
+    /// 背景查詢回來時這位已被匯入（與 `winner`／`combined` 同一套規則）：只有「查到 verified、匯入的是一般 unresolved」才寫回；
+    /// 撞鍵一旦成立就保留，同狀態以匯入的為準
+    static func lookup(_ lookup: Lookup, supersedes existing: Record) -> Bool {
+        guard case .verified = lookup else { return false }
+        return existing.reason != nil && existing.reason != .collision
+    }
+
+    static let maxSpellings = 50
+    static let maxReleaseGroups = 200
+    static let maxGenreNameLength = 100
+
+    /// 依狀態分開（R2-B5）：verified 要有 UUID；一般 unresolved 不得帶 mbid／曲風；collision 照 `adding` 語義可保留 mbid
+    static func isValid(_ record: Record, underKey key: String, requireStamped: Bool) -> Bool {
+        // origin：遠端必須是 writerID 格式；本機可以還沒蓋章，但有值就必須合格（安全評審 LOW-6）
+        guard SyncWriterID.isAcceptableOrigin(record.origin, allowUnstamped: !requireStamped) else { return false }
+        guard (1...maxSpellings).contains(record.spellings.count), record.spellings.allSatisfy({ Self.key($0) == key }),
+              record.matchedReleaseGroups.count <= maxReleaseGroups,
+              record.genres.allSatisfy({ !$0.name.isEmpty && $0.name.count <= maxGenreNameLength && $0.count >= 0 }),
+              Set(record.genres.map(\.name)).count == record.genres.count
+        else { return false }
+        let hasUUID = record.mbid.map { UUID(uuidString: $0) != nil }
+        switch record.reason {
+        case nil: return hasUUID == true
+        case .collision: return hasUUID != false
+        default: return record.mbid == nil && record.genres.isEmpty && record.matchedReleaseGroups.isEmpty
+        }
+    }
+
     private func replacing(_ key: String, with record: Record) -> ArtistStyleBook {
         ArtistStyleBook(records: records.merging([key: record]) { _, new in new }, lastNetworkError: lastNetworkError, lastNetworkErrorAt: lastNetworkErrorAt)
     }
@@ -134,6 +224,13 @@ struct ArtistStyleBook: Equatable, Sendable {
 private extension ArtistStyleBook.Record {
     /// 併入一個寫法；撞鍵時只改原因，不覆寫 mbid
     func adding(_ spelling: String, reason: ArtistIdentity.UnresolvedReason?) -> Self {
-        Self(spellings: Set(spellings + [spelling]).sorted(), mbid: mbid, matchedReleaseGroups: matchedReleaseGroups, genres: genres, reason: reason, fetchedAt: fetchedAt)
+        Self(spellings: Set(spellings + [spelling]).sorted(), mbid: mbid, matchedReleaseGroups: matchedReleaseGroups, genres: genres, reason: reason,
+             fetchedAt: fetchedAt, origin: origin)
+    }
+
+    var isStamped: Bool { SyncWriterID.isStamped(origin) }
+
+    func originated(by writer: String) -> Self {
+        Self(spellings: spellings, mbid: mbid, matchedReleaseGroups: matchedReleaseGroups, genres: genres, reason: reason, fetchedAt: fetchedAt, origin: writer)
     }
 }

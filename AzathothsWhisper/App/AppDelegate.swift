@@ -35,6 +35,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// ⑨ 計劃 §6.4：同步開著時，退出前把 dirty 的類別盡力匯出一次（最多 2 s，不擋退出）。同步關著＝照舊立即退出
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard model.cloudSync != nil else { return .terminateNow }
+        Task { [model] in
+            await model.flushCloudSync()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }

@@ -120,6 +120,13 @@ final class LibraryCheckViewModel {
         decide(.keepFallback, forArtists: spellings)
     }
 
+    /// ⑨：iCloud 匯入換了決定（AppModel 已落盤）。報表即時重算，下次播放生效
+    func decisionsReplaced(_ book: ArtistDecisionBook) {
+        guard book != decisions else { return }
+        decisions = book
+        recompute()
+    }
+
     private func apply(_ updated: ArtistDecisionBook) {
         do {
             try onDecisionsChanged(updated)

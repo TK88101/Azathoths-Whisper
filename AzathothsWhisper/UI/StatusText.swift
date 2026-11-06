@@ -28,6 +28,7 @@ enum StatusText {
     static let tokenSettingsTitle = "Token Settings"
     static let languageSettingsTitle = "Language Settings"
     static let notificationSettingsTitle = "Notification Settings"     // D-03 慣例（2.1 新增，D-14）
+    static let cloudSyncSettingsTitle = "iCloud Sync Settings"         // D-03 慣例（⑨ 新增）
     static let tokenCannotBeEmpty = "Token cannot be empty."
     static let validating = "Validating..."
     static let tokenValidAndSaved = "Success! Token is valid and saved."

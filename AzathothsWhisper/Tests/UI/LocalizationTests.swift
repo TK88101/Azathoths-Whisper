@@ -55,6 +55,11 @@ struct LocalizationTests {
             "notify_subtitle", "notify_list_separator", "notify_single_ok", "notify_batch_full",
             "notify_batch_some", "notify_batch_partial", "notify_batch_all_failed", "notify_more",
             "settings_notify_label", "settings_notify_toggle",
+            // ⑨ iCloud 同步（計劃 2026-11-03-lyrics-icloud-sync §6.6）
+            "settings_sync_label", "settings_sync_toggle", "settings_sync_what", "settings_sync_new_mac",
+            "settings_sync_last_export %@", "settings_sync_last_import %@", "settings_sync_other_macs %lld",
+            "settings_sync_skipped %lld", "settings_sync_pending %lld", "settings_sync_error %@", "settings_sync_unavailable",
+            "settings_sync_reset", "settings_sync_reset_confirm", "settings_sync_reset_ok", "settings_sync_reset_cancel",
         ]
         for language in ["en", "zh-Hant", "ja"] {
             for key in keys {

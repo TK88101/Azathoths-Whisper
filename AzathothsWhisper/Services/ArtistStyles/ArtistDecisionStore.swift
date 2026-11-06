@@ -16,7 +16,8 @@ struct ArtistDecisionStore: Sendable {
         let isWritable: Bool
     }
 
-    static let schemaVersion = 1
+    /// v2（⑨ 計劃 §6.5）：每鍵一個 `SyncRegister`（含墓碑）。v1 照讀（revision 0、未蓋章）；舊版讀到 v2＝看不懂、不覆寫
+    static let schemaVersion = 2
     /// 數百位歌手約數十 KB；超過不讀
     static let maxFileBytes = 1 << 20
     static let fileName = "decisions.json"
@@ -33,7 +34,19 @@ struct ArtistDecisionStore: Sendable {
 
     private struct StoredFile: Codable {
         let schemaVersion: Int
+        let entries: [String: ArtistDecisionBook.Entry]
+    }
+
+    private struct StoredFileV1: Decodable {
         let decisions: [String: ArtistDecision]
+
+        /// v1 沒有寫法：以鍵本身（寫法家族）當寫法，驗證樂團表時與原寫法同一個 `normalizedArtist`
+        var book: ArtistDecisionBook {
+            ArtistDecisionBook(entries: Dictionary(uniqueKeysWithValues: decisions.map { key, decision in
+                (key, SyncRegister(value: ArtistDecisionPayload(choice: decision.choice, decidedAt: decision.decidedAt, spellings: [key]),
+                                   version: SyncVersion(revision: 0, origin: "")))
+            }))
+        }
     }
 
     private struct SchemaProbe: Decodable {
@@ -64,7 +77,7 @@ struct ArtistDecisionStore: Sendable {
         case .absent, .current: break
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try Self.encoder.encode(StoredFile(schemaVersion: Self.schemaVersion, decisions: book.decisions)).write(to: fileURL, options: .atomic)
+        try Self.encoder.encode(StoredFile(schemaVersion: Self.schemaVersion, entries: book.entries)).write(to: fileURL, options: .atomic)
     }
 
     private var fileURL: URL {
@@ -83,11 +96,17 @@ struct ArtistDecisionStore: Sendable {
         guard (try? JSONSerialization.jsonObject(with: data)) != nil else { return .corrupt }
         guard let version = try? Self.decoder.decode(SchemaProbe.self, from: data).schemaVersion else { return .corrupt }
         guard version <= Self.schemaVersion else { return .unrecognized }
-        guard let stored = try? Self.decoder.decode(StoredFile.self, from: data) else {
+        let book: ArtistDecisionBook? = version < 2
+            ? (try? Self.decoder.decode(StoredFileV1.self, from: data))?.book
+            : (try? Self.decoder.decode(StoredFile.self, from: data)).map { stored in
+                // ⑨ 安全評審 HIGH-1：落盤的壞版本號（例如他機塞的 Int.max）在載入時清掉，單筆丟、其餘照收
+                ArtistDecisionBook(entries: stored.entries.filter { ArtistDecisionBook.isAcceptable($0.value, underKey: $0.key, allowUnstamped: true) })
+            }
+        guard let book else {
             decisionLog.error("unreadable artist decision file ignored")
             return .corrupt
         }
-        return .current(ArtistDecisionBook(decisions: stored.decisions))
+        return .current(book)
     }
 
     private static var encoder: JSONEncoder {

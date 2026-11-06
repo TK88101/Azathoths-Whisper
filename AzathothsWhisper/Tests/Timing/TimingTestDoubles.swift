@@ -130,6 +130,7 @@ actor FakeTimingProvider: TimedLyricsProvider {
     /// 依序被取時間軸的候選 id
     private(set) var fetched: [String] = []
     private var waiting: [CheckedContinuation<Void, Never>] = []
+    private var pendingReleases = 0
 
     init(_ source: StoredTimingSource, _ steps: [Step]) {
         self.source = source
@@ -150,7 +151,13 @@ actor FakeTimingProvider: TimedLyricsProvider {
     /// 搜尋次數（舊名：一次搜尋＝一次查找）
     var callCount: Int { queries.count }
 
+    /// 放行。沒人在等時記下這次（漏放行修正：測試在「已記數、還沒登記等待」的空窗呼叫 release，
+    /// 舊版會丟掉這次放行、測試永遠等下去；全量並行負載下才撞得到）
     func release() {
+        guard !waiting.isEmpty else {
+            pendingReleases += 1
+            return
+        }
         let resumed = waiting
         waiting = []
         resumed.forEach { $0.resume() }
@@ -232,6 +239,10 @@ actor FakeTimingProvider: TimedLyricsProvider {
     }
 
     private func park() async {
+        if pendingReleases > 0 {
+            pendingReleases -= 1
+            return
+        }
         await withCheckedContinuation { waiting.append($0) }
     }
 }

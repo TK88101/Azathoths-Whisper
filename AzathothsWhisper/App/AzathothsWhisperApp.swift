@@ -35,6 +35,10 @@ struct AzathothsWhisperApp: App {
                 Button { model.openSettings(.notifications) } label: {
                     Text(verbatim: "Notification Settings...")
                 }
+                // ⑨ iCloud 同步（A-07：選單寫死英文）
+                Button { model.openSettings(.cloudSync) } label: {
+                    Text(verbatim: "iCloud Sync Settings...")
+                }
                 // Yog-Sothoth's Echo 中繼（S2 詳設 v1.1；A-07：選單寫死英文）
                 Button { model.openRemoteSettings() } label: {
                     Text(verbatim: "Remote Settings...")

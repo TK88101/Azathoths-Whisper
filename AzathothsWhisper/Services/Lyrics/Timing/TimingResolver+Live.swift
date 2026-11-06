@@ -19,17 +19,21 @@ extension TimingResolver {
     static let defaultInterval: TimeInterval = 1
 
     /// 正式組裝：時間軸專用、不收不送 cookie 的連線；寫入觸發時向 Music 唯讀補讀 artist／title／duration
-    static func live(music: any MusicControlling, defaults: UserDefaults = .standard) -> TimingResolver {
+    static func live(
+        music: any MusicControlling, defaults: UserDefaults = .standard,
+        store: TimingStore = TimingStore(directory: TimingStore.defaultDirectory), remoteIndex: RemoteTimingIndex? = nil
+    ) -> TimingResolver {
         let client = URLSessionHTTPClient(session: URLSession(configuration: URLSessionHTTPClient.cookielessConfiguration()))
         return TimingResolver(
             providers: liveProviders(client: client),
-            store: TimingStore(directory: TimingStore.defaultDirectory),
+            store: store,
             metadata: { persistentID in
                 guard let details = try? await music.trackDetails(persistentIDs: [persistentID]).first else { return nil }
                 return TimingQuery(artist: details.artist, title: details.title, duration: details.duration ?? 0)
             },
             switches: .read(from: defaults),
-            diagnostics: OSLogTimingDiagnostics()
+            diagnostics: OSLogTimingDiagnostics(),
+            remoteCandidates: { hash in await remoteIndex?.candidates(for: hash) ?? [] }
         )
     }
 }

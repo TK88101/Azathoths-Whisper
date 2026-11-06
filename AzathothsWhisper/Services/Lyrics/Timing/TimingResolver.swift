@@ -107,11 +107,15 @@ actor TimingResolver: TimingResolving {
     private let now: @Sendable () -> Date
     private let queueLimit: Int
     private let diagnostics: any TimingDiagnostics
+    /// ⑨ 他機的時間軸候選（鍵＝歌詞雜湊）；預設沒有
+    private let remoteCandidates: @Sendable (LyricsFingerprint) async -> [TimingRecord]
 
     private var jobs: [String: Job] = [:]
     private var pending: [Job] = []
     private var running: Job?
     private var latestHash: [String: LyricsFingerprint] = [:]
+    /// 查找中這首的查詢欄位：存檔時寫成 `match`（⑨ §6.5）
+    private var queries: [String: TimingQuery] = [:]
     private var backoff = ArtworkFailureBackoff()
     private var isShutDown = false
     /// 每次執行查找配一個新號（被搶占後重跑也換號）
@@ -130,8 +134,10 @@ actor TimingResolver: TimingResolving {
         providers: [any TimedLyricsProvider], store: TimingStore, metadata: @escaping @Sendable (String) async -> TimingQuery?,
         switches: TimingSwitches, deadlineSleeper: any PollClock = SystemPollClock(), clock: any MonotonicClock = SystemMonotonicClock(),
         now: @escaping @Sendable () -> Date = { Date() }, queueLimit: Int = TimingResolver.defaultQueueLimit,
-        diagnostics: any TimingDiagnostics = NoopTimingDiagnostics()
+        diagnostics: any TimingDiagnostics = NoopTimingDiagnostics(),
+        remoteCandidates: @escaping @Sendable (LyricsFingerprint) async -> [TimingRecord] = { _ in [] }
     ) {
+        self.remoteCandidates = remoteCandidates
         self.providers = providers
         self.store = store
         self.metadata = metadata
@@ -196,12 +202,30 @@ actor TimingResolver: TimingResolving {
         return TimingResolution.Outcome(record.outcome)
     }
 
+    /// ⑨：他機有同一首（歌詞、歌手、曲名完全相同）的時間軸就直接用，以本機 pid 存下、保留原來源（§6.5、§12-1）。
+    /// 走到這裡＝本機沒有可用記錄（`storedOutcome` 已判），所以直接取代本機那份
+    private func remoteTimeline(for request: TimingRequest, query: TimingQuery, hash: LyricsFingerprint) async -> TimingResolution.Outcome? {
+        let candidates = await remoteCandidates(hash)
+        guard !candidates.isEmpty, !Task.isCancelled, latestHash[request.persistentID] == hash,
+              let picked = RemoteTimingIndex.pick(candidates, for: query, lyricsHash: hash, lineCount: LyricsLines.lyricTexts(request.lyrics).count)
+        else { return nil }
+        let adopted = picked.withPersistentID(request.persistentID)
+        do {
+            try await store.replace(adopted)
+        } catch {
+            diagnostics.record(.storeFailed)
+        }
+        backoff.recordSuccess(request.persistentID)
+        return TimingResolution.Outcome(adopted.outcome)
+    }
+
     private func save(_ outcome: TimingRecord.Outcome, for request: TimingRequest, hash: LyricsFingerprint) async -> TimingResolution.Outcome {
         guard !Task.isCancelled, latestHash[request.persistentID] == hash else { return .cancelled }
         var kept = outcome
+        let match = queries.removeValue(forKey: request.persistentID).map { TimingMatch(artist: $0.artist, title: $0.title, duration: $0.duration) }
         do {
             // 合併後的結果才是答案：同詞已有 found 時，這次的 notFound 不會蓋掉它
-            kept = try await store.save(TimingRecord(persistentID: request.persistentID, lyricsHash: hash, outcome: outcome, fetchedAt: now())).outcome
+            kept = try await store.save(TimingRecord(persistentID: request.persistentID, lyricsHash: hash, outcome: outcome, fetchedAt: now(), match: match)).outcome
         } catch {
             diagnostics.record(.storeFailed)
         }
@@ -291,7 +315,10 @@ actor TimingResolver: TimingResolving {
     }
 
     private func finish(_ job: Job, _ outcome: TimingResolution.Outcome) {
-        if jobs[job.request.persistentID] === job { jobs[job.request.persistentID] = nil }
+        if jobs[job.request.persistentID] === job {
+            jobs[job.request.persistentID] = nil
+            queries[job.request.persistentID] = nil
+        }
         pending.removeAll { $0 === job }
         job.task?.cancel()
         let resolution = TimingResolution(persistentID: job.request.persistentID, lyricsHash: job.hash, outcome: outcome)
@@ -372,6 +399,8 @@ actor TimingResolver: TimingResolving {
             diagnostics.record(.skipped(.missingMetadata))
             return .skipped(.missingMetadata)
         }
+        queries[request.persistentID] = query
+        if let remote = await remoteTimeline(for: request, query: query, hash: hash) { return remote }
         let lookupStarted = clock.now
         var hadFailure = false
         for provider in providers where !switches.disabledSources.contains(provider.source) {

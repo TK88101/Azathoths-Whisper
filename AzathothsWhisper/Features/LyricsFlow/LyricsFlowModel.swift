@@ -40,6 +40,8 @@ final class LyricsFlowModel {
     @ObservationIgnored var onSurfaceChanged: ((LyricsSurface) -> Void)?
     /// 寫入回報成功、讀回卻仍缺詞（使用者拍板①：提示寫入沒生效）
     @ObservationIgnored var onWriteNotConfirmed: ((String) -> Void)?
+    /// ⑨：標記寫入設定之後（iCloud 匯出的 dirty）
+    @ObservationIgnored var onMarksChanged: () -> Void = {}
 
     private let configStore: ConfigStore
     private let detailsReader: CardDetailsReader
@@ -206,6 +208,7 @@ final class LyricsFlowModel {
     func markNoLyrics(persistentID: String) {
         guard state.isCurrent(persistentID), state.status == .missing, configStore.markNoLyrics(persistentID)
         else { return }
+        onMarksChanged()
         reloadMarks()
         dispatch(.markedNone(persistentID: persistentID))
     }
@@ -451,6 +454,11 @@ final class LyricsFlowModel {
 
     // MARK: - 內部
 
+    /// ⑨：iCloud 匯入換了標記 ledger 之後，立刻讓 Cover Flow 看到（不等下次換歌）
+    func marksChangedExternally() {
+        reloadMarks()
+    }
+
     /// 鏡像以設定為準：每次換歌、寫入前重讀（設定是唯一來源，鏡像只供畫面觀察）
     private func reloadMarks() {
         let stored = configStore.noLyricsMarks
@@ -466,6 +474,7 @@ final class LyricsFlowModel {
         // AC5：日後寫入成功（非空）清除標記
         if status == .present, marks.contains(persistentID) {
             configStore.clearNoLyricsMark(persistentID)
+            onMarksChanged()
             reloadMarks()
         }
         updateCardLyrics(text, for: persistentID)

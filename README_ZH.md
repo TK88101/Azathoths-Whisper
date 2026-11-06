@@ -177,6 +177,11 @@ iPad App 只會經由家中區網，連到你自己 Mac 上的 Azathoth's Whispe
     *   **自動模式 (Auto Mode)**：應用程序會檢測歌曲變化並嘗試自動查找歌詞。
     *   **手動模式**：點擊 "Fetch Lyrics" 強制搜索。
 5.  **語言設置**：通過 `Settings` -> `Language Settings` 切換界面語言。
+6.  **iCloud 同步（不只一台 Mac）**：在**每一台** Mac 的 `Settings` -> `iCloud Sync Settings...` 打開。
+    *   經 iCloud Drive 裡的資料夾（`Azathoth's Whisper/Sync/`）同步：歌詞時間軸、MusicBrainz 歌手結果、你在曲庫檢查下的決定、
+        「這首沒有歌詞」標記。每台 Mac 只寫自己的子資料夾。
+    *   不同步：Genius token（新 Mac 上重新貼一次）與其他設定。同歌手樣式要在新 Mac 上開曲庫檢查重掃一次才會恢復。
+    *   預設關閉。關閉＝停止讀寫；**重設這台 Mac 的雲端副本…** 只刪除這台的子資料夾。
 
 ## iPad 遙控器：Yog-Sothoth's Echo
 

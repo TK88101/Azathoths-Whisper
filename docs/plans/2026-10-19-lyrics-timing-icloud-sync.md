@@ -1,5 +1,7 @@
 # 時間軸跨 Mac 搬移（iCloud Drive，Codex 4 輪收斂）
 
+> 2026-11-03：已由 `docs/plans/2026-11-03-lyrics-icloud-sync.md` 取代（範圍擴到四類存檔），本檔只留作紀錄。
+
 ## 0. 複述
 使用者 2026-10-19：希望存 iCloud，換 Mac 時找到的時間軸不白費。
 

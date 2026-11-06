@@ -20,11 +20,16 @@ struct ArtistStyleSyncTests {
         func setOnAsk(_ hook: @escaping @Sendable (String) async -> Void) { onAsk = hook }
         func publish(_ book: ArtistStyleBook) { published.append(book) }
 
+        /// 每位歌手一個固定的 UUID 格式 mbid（真 client 只收 UUID；⑨ 起存檔也逐筆驗證）
+        static func mbid(for artist: String) -> String {
+            String(format: "00000000-0000-4000-8000-%012llx", FXHash.fnv1a64(artist) & 0xffff_ffff_ffff)
+        }
+
         func identify(_ artist: String, _ albums: [String]) async throws(ProviderFailure) -> ArtistStyleBook.Lookup {
             asked.append((artist, albums))
             await onAsk?(artist)
             if let failure = failures[artist] { throw failure }
-            return .verified(id: "mb-\(artist)", matchedReleaseGroups: [], genres: [.init(name: "black metal", count: 1)])
+            return .verified(id: Self.mbid(for: artist), matchedReleaseGroups: [], genres: [.init(name: "black metal", count: 1)])
         }
     }
 
@@ -193,7 +198,7 @@ struct ArtistStyleSyncTests {
     @Test func aCollisionFoundDuringTheScanIsPublishedRightAway() async throws {
         let store = tempStore()
         try store.save(ArtistStyleBook().recording(
-            .verified(id: "mb-1", matchedReleaseGroups: [], genres: [.init(name: "black metal", count: 1)]), forSpelling: "AC/DX", at: Self.now
+            .verified(id: "11111111-1111-4111-8111-111111111111", matchedReleaseGroups: [], genres: [.init(name: "black metal", count: 1)]), forSpelling: "AC/DX", at: Self.now
         ))
         let music = MockMusicClient()
         await music.setLibrary(library([("AC/DX", "A"), ("ACDX", "B")]))
@@ -205,4 +210,100 @@ struct ArtistStyleSyncTests {
         #expect(published.last?.genres(forArtist: "ACDX") == .unresolved)
         #expect(await recorder.asked.isEmpty)
     }
+    // MARK: ⑨ iCloud 同步（計劃 §6.5、T7）
+
+    private func remoteRecord(_ artist: String, origin: String = "000000000000000b") -> ArtistStyleBook.Record {
+        ArtistStyleBook.Record(spellings: [artist], mbid: "33333333-3333-4333-8333-333333333333", matchedReleaseGroups: [],
+                               genres: [.init(name: "doom metal", count: 2)], reason: nil, fetchedAt: Self.now, origin: origin)
+    }
+
+    @Test func anArtistAdoptedBeforeTheRunIsNeverQueried() async {
+        let music = MockMusicClient()
+        await music.setLibrary(library([("Velvet Lanterns", "A"), ("Paper Harbour", "B")]))
+        for artist in ["Velvet Lanterns", "Paper Harbour"] { await music.setArtistTracks([ArtistTrack(album: "A", lyrics: Self.english)], for: artist) }
+        let store = tempStore()
+        let recorder = Recorder()
+        let sync = sync(music, recorder, store: store)
+        let adoption = await sync.adopt(remote: [ArtistStyleBook.key("Velvet Lanterns"): remoteRecord("Velvet Lanterns")])
+        #expect(adoption == CloudSyncAdoption(rejected: 0, changed: true))
+        await sync.run()
+        #expect(await recorder.asked.map(\.artist) == ["Paper Harbour"])
+        #expect(store.load().book.genres(forArtist: "Velvet Lanterns") == .verified(["doom metal"]), "run() 不覆寫已採用的記錄")
+    }
+
+    @Test func anArtistAdoptedWhileQueuedIsDroppedFromTheQueue() async {
+        let music = MockMusicClient()
+        await music.setLibrary(library([("Alpha Lanterns", "A"), ("Alpha Lanterns", "A2"), ("Beta Harbour", "B")]))
+        for artist in ["Alpha Lanterns", "Beta Harbour"] { await music.setArtistTracks([ArtistTrack(album: "A", lyrics: Self.english)], for: artist) }
+        let recorder = Recorder()
+        let sync = sync(music, recorder, store: tempStore())
+        let remote = remoteRecord("Beta Harbour")
+        await recorder.setOnAsk { artist in
+            if artist == "Alpha Lanterns" { _ = await sync.adopt(remote: [ArtistStyleBook.key("Beta Harbour"): remote]) }
+        }
+        await sync.run()
+        #expect(await recorder.asked.map(\.artist) == ["Alpha Lanterns"])
+    }
+
+    /// R3-1：actor 在 await 期間可重入；正在查的那位被匯入了，查回來的結果不得倒退蓋掉它
+    @Test func aResultForAnArtistAdoptedMidQueryIsDiscarded() async {
+        let music = MockMusicClient()
+        await music.setLibrary(library([("Velvet Lanterns", "A")]))
+        await music.setArtistTracks([ArtistTrack(album: "A", lyrics: Self.english)], for: "Velvet Lanterns")
+        let store = tempStore()
+        let recorder = Recorder()
+        let sync = sync(music, recorder, store: store)
+        let remote = remoteRecord("Velvet Lanterns")
+        await recorder.setOnAsk { _ in _ = await sync.adopt(remote: [ArtistStyleBook.key("Velvet Lanterns"): remote]) }
+        await sync.run()
+        #expect(await recorder.asked.count == 1, "白查一次可以")
+        #expect(store.load().book.genres(forArtist: "Velvet Lanterns") == .verified(["doom metal"]), "白查後不寫回")
+    }
+
+    /// 與合併規則一致（altitude 評審）：查詢途中匯入的是一般 unresolved、本機查到 verified → 寫回 verified
+    @Test func aVerifiedResultStillReplacesAnUnresolvedAdoptedMidQuery() async {
+        let music = MockMusicClient()
+        await music.setLibrary(library([("Velvet Lanterns", "A")]))
+        await music.setArtistTracks([ArtistTrack(album: "A", lyrics: Self.english)], for: "Velvet Lanterns")
+        let store = tempStore()
+        let recorder = Recorder()
+        let sync = sync(music, recorder, store: store)
+        let unresolved = ArtistStyleBook.Record(spellings: ["Velvet Lanterns"], mbid: nil, matchedReleaseGroups: [], genres: [],
+                                                reason: .notFound, fetchedAt: Self.now, origin: "000000000000000b")
+        await recorder.setOnAsk { _ in _ = await sync.adopt(remote: [ArtistStyleBook.key("Velvet Lanterns"): unresolved]) }
+        await sync.run()
+        #expect(store.load().book.genres(forArtist: "Velvet Lanterns") == .verified(["black metal"]))
+    }
+
+    @Test func stampingFillsOriginsAndPersistsOnce() async throws {
+        let store = tempStore()
+        try store.save(ArtistStyleBook(records: [ArtistStyleBook.key("Velvet Lanterns"): remoteRecord("Velvet Lanterns", origin: "")]))
+        let persisted = Counter()
+        let sync = sync(MockMusicClient(), Recorder(), store: store)
+        await sync.setOnPersisted { persisted.increment() }
+        try await sync.stamp(by: "000000000000000a")
+        try await sync.stamp(by: "000000000000000a")
+        #expect(store.load().book.records[ArtistStyleBook.key("Velvet Lanterns")]?.origin == "000000000000000a")
+        #expect(persisted.value == 1, "第二次沒有要補的，不寫檔")
+        #expect(await sync.records().count == 1)
+    }
+
+    @Test func anUnreadableFileIsNeverOverwrittenByAdoption() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("azw-sync-unreadable-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let newer = Data(#"{"schemaVersion": 99}"#.utf8)
+        try newer.write(to: directory.appendingPathComponent(ArtistStyleStore.fileName))
+        let sync = sync(MockMusicClient(), Recorder(), store: ArtistStyleStore(directory: directory))
+        let adoption = await sync.adopt(remote: [ArtistStyleBook.key("Velvet Lanterns"): remoteRecord("Velvet Lanterns")])
+        #expect(adoption.changed == false)
+        #expect(try Data(contentsOf: directory.appendingPathComponent(ArtistStyleStore.fileName)) == newer)
+    }
+}
+
+final class Counter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    var value: Int { lock.withLock { count } }
+    func increment() { lock.withLock { count += 1 } }
 }
