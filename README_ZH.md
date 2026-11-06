@@ -2,7 +2,7 @@
 
 [**English**](README.md) | [**繁體中文**](README_ZH.md) | [**日本語**](README_JA.md)
 
-**Azathoth's Whisper** 是一個 macOS 應用程序，可以自動獲取目前在 **iTunes** 中播放歌曲的歌詞，並將其直接嵌入到音頻文件的自定義歌詞元數據中。
+**Azathoth's Whisper** 是一個 macOS 應用程序，可以自動獲取目前在 **Music**（macOS 的「音樂」app）中播放歌曲的歌詞，並將其直接嵌入到音頻文件的自定義歌詞元數據中。
 
 它支持多種歌詞來源，並具有深色主題和多語言用戶界面。
 
@@ -18,8 +18,8 @@ iPad App 只會經由家中區網，連到你自己 Mac 上的 Azathoth's Whispe
 
 ## 功能
 
-*   🎵 **自動同步：** 監控 iTunes 並在切換歌曲時自動獲取歌詞。
-*   📝 **歌詞寫入：** 將歌詞直接寫入音樂文件（可在 iTunes、iPhone 等設備上查看）。
+*   🎵 **自動同步：** 監控 Music 並在切換歌曲時自動獲取歌詞。
+*   📝 **歌詞寫入：** 將歌詞直接寫入音樂文件（可在 Music、iPhone 等設備上查看）。
 *   🌍 **多來源支援：**
     *   **Genius**（需 API Token）
     *   **DarkLyrics**（**僅批量處理模式**的後備來源——見下方說明）
@@ -151,7 +151,7 @@ flowchart LR
    ✅ 應用將運行。macOS 會記住您的選擇，之後啟動不再提示。
 
 5. **授予自動化權限**
-   - 首次啟動時，系統會要求授權控制 iTunes
+   - 首次啟動時，系統會要求授權控制 Music
    - 點擊 **「好 (OK)」** 允許
 
 **為什麼會這樣？**
@@ -232,7 +232,7 @@ flowchart LR
     *   首次運行時，前往 `Settings` -> `Genius Token Settings`。
     *   粘貼您的 **Genius Client Access Token** (可在 [genius.com/api-clients](https://genius.com/api-clients) 獲取)。
     *   點擊保存 (Save)。
-3.  **播放音樂**：在 iTunes 中開始播放歌曲。
+3.  **播放音樂**：在 Music 中開始播放歌曲。
 4.  **獲取歌詞**：
     *   **自動模式 (Auto Mode)**：應用程序會檢測歌曲變化並嘗試自動查找歌詞。
     *   **手動模式**：點擊 "Fetch Lyrics" 強制搜索。

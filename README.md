@@ -2,7 +2,7 @@
 
 [**English**](README.md) | [**繁體中文**](README_ZH.md) | [**日本語**](README_JA.md)
 
-**Azathoth's Whisper** is a macOS application that automatically fetches lyrics for the currently playing song in **iTunes** and embeds them directly into the audio file's custom lyrics metadata.
+**Azathoth's Whisper** is a macOS application that automatically fetches lyrics for the currently playing song in **Music** (the macOS Music app) and embeds them directly into the audio file's custom lyrics metadata.
 
 It supports multiple lyrics sources and features a dark-themed, localized user interface.
 
@@ -18,8 +18,8 @@ The iPad app talks only to Azathoth's Whisper on your own Mac, over your home ne
 
 ## Features
 
-*   🎵 **Auto-Sync:** Monitor iTunes and automatically fetch lyrics when the song changes.
-*   📝 **Lyrics Embedding:** Writes lyrics directly to the music file (viewable in iTunes, iPhone, etc.).
+*   🎵 **Auto-Sync:** Monitor Music and automatically fetch lyrics when the song changes.
+*   📝 **Lyrics Embedding:** Writes lyrics directly to the music file (viewable in Music, iPhone, etc.).
 *   🌍 **Multi-Source Support:**
     *   **Genius** (Requires API Token)
     *   **DarkLyrics** (fallback in **Batch mode only** — see below)
@@ -152,7 +152,7 @@ Since this app is not signed with an Apple Developer ID, macOS Gatekeeper will b
    ✅ The app will run. macOS will remember your choice for future launches.
 
 5. **Grant Automation Permissions**
-   - On first launch, you'll be asked to grant permission to control iTunes
+   - On first launch, you'll be asked to grant permission to control Music
    - Click **"OK"** to allow
 
 **Why does this happen?**
@@ -236,7 +236,7 @@ Requirements: **macOS 14.0+**, **Xcode 16+** (Swift 6), [XcodeGen](https://githu
     *   On first run, go to `Settings` -> `Genius Token Settings`.
     *   Paste your **Genius Client Access Token** (Get one at [genius.com/api-clients](https://genius.com/api-clients)).
     *   Click Save.
-3.  **Play Music**: Start playing a song in iTunes.
+3.  **Play Music**: Start playing a song in Music.
 4.  **Fetch**:
     *   **Auto Mode**: The app will detect the song and try to find lyrics automatically.
     *   **Manual**: Click "Fetch Lyrics" to force a search.
