@@ -41,7 +41,7 @@ struct RemoteTimingIndexTests {
         ("one letter off in the title", remote(title: "Lantern Songs")),
         ("a remaster marker", remote(title: "Lantern Song (Remastered)")),
         ("duration 0.6 s apart", remote(duration: 200.6)),
-        ("an older aligner", remote(revision: LRCAligner.revision - 1)),
+        ("an incompatible older aligner", remote(revision: LRCAligner.foundCompatibleRevision - 1)),
         ("no match fields", remote(match: false)),
         ("anchors past the last line", remote(lines: [.init(index: 0, start: 1), .init(index: 9, start: 5)])),
         ("different lyrics", remote(hash: LyricsFingerprint.of("some other invented words"))),
@@ -76,10 +76,20 @@ struct RemoteTimingIndexTests {
     }
 
     @Test func versionsOfOneSourceResolveToTheSameRepresentativeInAnyOrder() {
-        let older = Self.remote(lines: Self.anchors, revision: LRCAligner.revision)
-        let newer = Self.remote(lines: Self.shifted, revision: LRCAligner.revision + 1)
+        let older = Self.remote(lines: Self.anchors, revision: LRCAligner.foundCompatibleRevision - 1)
+        let newer = Self.remote(lines: Self.shifted, revision: LRCAligner.foundCompatibleRevision)
         #expect(pick([older, newer]) == newer)
         #expect(pick([newer, older]) == newer, "R3-4：同一 sourceRef 依全序選代表")
+    }
+
+    /// ⑩ 計劃 §4.3：達到 `foundCompatibleRevision` 的版本同級——rev 2 的遠端 found 仍可跨 ID 採用，且 rev 2／3 不以版本分勝負
+    @Test func compatibleRevisionsAreEligibleAndRankedEqually() {
+        #expect(pick([Self.remote(revision: LRCAligner.foundCompatibleRevision)]) != nil)
+        let two = Self.remote(lines: Self.anchors, revision: LRCAligner.foundCompatibleRevision)
+        let three = Self.remote(lines: Self.shifted, revision: LRCAligner.revision)
+        #expect(pick([two, three]) == pick([three, two]))
+        let byDigestOnly = pick([Self.remote(lines: Self.anchors, revision: LRCAligner.revision), Self.remote(lines: Self.shifted, revision: LRCAligner.revision)])
+        #expect(pick([two, three])?.outcome == byDigestOnly?.outcome)
     }
 
     @Test func theIndexKeepsEachWritersRecordsAndReplacesThemWhole() async {

@@ -219,12 +219,20 @@ struct TimingRecordMergeTests {
         #expect(TimingRecord.merged(existing: T.notFound(at: T.base), incoming: later) == later)
     }
 
-    /// 舊版本 found 遇到新版本的 notFound：錨點留著、版本前進（同一版本不再重查）
+    /// 舊版本 found 遇到新版本的 notFound：錨點留著、版本前進（同一版本不再重查）——但最多前進到 `foundCompatibleRevision`，
+    /// 不把舊錨點標成新演算法對出來的（⑩ 計劃 §4.3、附錄 B A#8）
     @Test func foundKeepsItsAnchorsButTakesTheNewerAlignerRevision() {
         let old = TimingRecord(persistentID: T.id, lyricsHash: T.hash, outcome: T.found().outcome, fetchedAt: T.base, alignerRevision: 1)
         let merged = TimingRecord.merged(existing: old, incoming: T.notFound(at: T.base.addingTimeInterval(60)))
         #expect(merged.outcome == T.found().outcome)
-        #expect(merged.alignerRevision == LRCAligner.revision)
+        #expect(merged.alignerRevision == LRCAligner.foundCompatibleRevision)
+    }
+
+    @Test func aCompatibleFoundIsNotRelabelledByANewerNotFound() {
+        let found = TimingRecord(persistentID: T.id, lyricsHash: T.hash, outcome: T.found().outcome, fetchedAt: T.base,
+                                 alignerRevision: LRCAligner.foundCompatibleRevision)
+        let merged = TimingRecord.merged(existing: found, incoming: T.notFound(at: T.base.addingTimeInterval(60)))
+        #expect(merged == found)
     }
 
     @Test func theIncomingRecordWinsATieBetweenLikeOutcomes() {
@@ -263,17 +271,29 @@ struct TimingLookupPolicyTests {
         #expect(!TimingLookupPolicy.shouldLookup(record: T.found(), currentHash: T.hash, now: T.base.addingTimeInterval(365 * Self.day)))
     }
 
-    /// 舊演算法對出來的 found 要重查一次，否則修好的對齊永遠到不了已存過的歌
-    @Test func foundFromAnOlderAlignerIsLookedUpAgain() {
+    /// 錨點已不可信（低於 `foundCompatibleRevision`）的 found 要重查一次，否則修好的對齊永遠到不了已存過的歌
+    @Test func foundFromAnIncompatibleAlignerIsLookedUpAgain() {
         let found = T.found()
-        let old = TimingRecord(persistentID: found.persistentID, lyricsHash: found.lyricsHash, outcome: found.outcome, fetchedAt: found.fetchedAt, alignerRevision: LRCAligner.revision - 1)
+        let old = TimingRecord(persistentID: found.persistentID, lyricsHash: found.lyricsHash, outcome: found.outcome, fetchedAt: found.fetchedAt,
+                               alignerRevision: LRCAligner.foundCompatibleRevision - 1)
         #expect(TimingLookupPolicy.shouldLookup(record: old, currentHash: T.hash, now: T.base))
     }
 
-    /// notFound 與演算法版本無關（沒有任何來源給時間），照 7 天規則
-    @Test func notFoundFromAnOlderAlignerKeepsTheSevenDayRule() {
-        let old = TimingRecord(persistentID: T.id, lyricsHash: T.hash, outcome: .notFound, fetchedAt: T.base, alignerRevision: LRCAligner.revision - 1)
+    /// ⑩ 計劃 G3：既有 found 不因 revision 3 重查（錨點仍可信）
+    @Test func aCompatibleFoundFromAnOlderAlignerIsNotLookedUpAgain() {
+        let found = T.found()
+        let old = TimingRecord(persistentID: found.persistentID, lyricsHash: found.lyricsHash, outcome: found.outcome, fetchedAt: found.fetchedAt,
+                               alignerRevision: LRCAligner.foundCompatibleRevision)
+        #expect(LRCAligner.foundCompatibleRevision < LRCAligner.revision)
         #expect(!TimingLookupPolicy.shouldLookup(record: old, currentHash: T.hash, now: T.base))
+    }
+
+    /// ⑩ 計劃 G3：舊演算法判的 notFound 可能是漏判，重查一次；同版本的 notFound 照 7 天規則
+    @Test func notFoundFromAnOlderAlignerIsLookedUpOnce() {
+        let old = TimingRecord(persistentID: T.id, lyricsHash: T.hash, outcome: .notFound, fetchedAt: T.base, alignerRevision: LRCAligner.revision - 1)
+        #expect(TimingLookupPolicy.shouldLookup(record: old, currentHash: T.hash, now: T.base))
+        let current = TimingRecord(persistentID: T.id, lyricsHash: T.hash, outcome: .notFound, fetchedAt: T.base, alignerRevision: LRCAligner.revision)
+        #expect(!TimingLookupPolicy.shouldLookup(record: current, currentHash: T.hash, now: T.base))
     }
 
     @Test func notFoundIsRetriedAfterSevenDays() {

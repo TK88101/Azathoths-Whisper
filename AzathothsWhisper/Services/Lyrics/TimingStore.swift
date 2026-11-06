@@ -107,14 +107,16 @@ struct TimingRecord: Equatable, Sendable {
         return SyncWriterID.isValid(String(parts[0])) && TimingStore.isCanonicalID(String(parts[1]))
     }
 
-    /// 匯入他機記錄（§6.5）：不用時鐘決勝。本機沒有→採用；同詞 found 勝 notFound、兩邊 found 取 alignerRevision 大者；
+    /// 匯入他機記錄（§6.5）：不用時鐘決勝。本機沒有→採用；同詞 found 勝 notFound、兩邊 found 取**有效**版本大者
+    /// （`LRCAligner.effectiveRevision`：可信的版本同級→保留本機，⑩ 計劃 §4.3）；
     /// 其餘（含異詞）保留本機——時間軸是對本機目前歌詞有效的快取，不要求兩台逐位相同（R1-1）
     static func importMerged(local: TimingRecord?, remote: TimingRecord) -> TimingRecord {
         guard let local else { return remote }
         guard local.lyricsHash == remote.lyricsHash else { return local }
         switch (local.isFound, remote.isFound) {
         case (false, true): return remote
-        case (true, true): return remote.alignerRevision > local.alignerRevision ? remote : local
+        case (true, true):
+            return LRCAligner.effectiveRevision(remote.alignerRevision) > LRCAligner.effectiveRevision(local.alignerRevision) ? remote : local
         default: return local
         }
     }
@@ -125,10 +127,11 @@ struct TimingRecord: Equatable, Sendable {
         guard let existing, existing.lyricsHash == incoming.lyricsHash else { return incoming }
         switch (existing.outcome, incoming.outcome) {
         case (.found, .notFound):
-            // 錨點留著，但記下這個對齊版本已重查過：否則舊版本 found 每次都會再查（Codex review P2）
+            // 錨點留著，但記下這個對齊版本已重查過：否則舊版本 found 每次都會再查（Codex review P2）。
+            // 最多記到 `foundCompatibleRevision`：不把舊錨點標成新演算法對出來的（⑩ 計劃 §4.3、§8 R5）
             return TimingRecord(
                 persistentID: existing.persistentID, lyricsHash: existing.lyricsHash, outcome: existing.outcome, fetchedAt: existing.fetchedAt,
-                alignerRevision: max(existing.alignerRevision, incoming.alignerRevision),
+                alignerRevision: max(existing.alignerRevision, LRCAligner.effectiveRevision(incoming.alignerRevision)),
                 origin: existing.origin, sourceRef: existing.sourceRef, match: existing.match
             )
         case (.notFound, .found): return incoming
@@ -155,7 +158,9 @@ enum TimingLookupPolicy {
     static func shouldLookup(record: TimingRecord?, currentHash: LyricsFingerprint, now: Date) -> Bool {
         guard let record else { return true }
         if record.lyricsHash != currentHash { return true }
-        if case .found = record.outcome { return record.alignerRevision < LRCAligner.revision }
+        // found：錨點不可信才重查（⑩ 計劃 G3：revision 3 不重查既有 found）；notFound：舊演算法判的可能是漏判，重查一次
+        if case .found = record.outcome { return record.alignerRevision < LRCAligner.foundCompatibleRevision }
+        if record.alignerRevision < LRCAligner.revision { return true }
         let age = now.timeIntervalSince(record.fetchedAt)
         return age >= retryInterval || age < -futureTolerance
     }

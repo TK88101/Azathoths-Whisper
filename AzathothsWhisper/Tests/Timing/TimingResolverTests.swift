@@ -216,6 +216,33 @@ struct TimingResolverTests {
         #expect(await second.callCount == 1)
     }
 
+    /// ⑩ 計劃附錄 E（Codex 快審 #3）：真實 resolver 的 20 s 時限到點時，正在跑最壞輸入（2000×2000、每行 500 字）的對齊
+    /// 要在 ≤ 1 s 內被取消並返回 unavailable、不存檔
+    @Test func theDeadlineCancelsAWorstCaseAlignmentWithinOneSecond() async {
+        func line(_ seed: Int, _ salt: Int) -> String {
+            var random = SplitMix64(seed: UInt64(seed * 7919 + salt))
+            let letters = Array("abcdefghijklmnopqrstuvwxyz")
+            return String((0..<ProviderOutcome.maximumLineLength).map { _ in letters[Int(random.next() % 26)] })
+        }
+        let count = ProviderOutcome.maximumTimedLines
+        let lyrics = (0..<count).map { line($0, 1) }.joined(separator: "\n")
+        let cues = (0..<count).map { LRCLine(start: Double($0) * 0.1, text: line($0, 2)) }
+        let deadline = GatedPollClock()
+        let provider = FakeTimingProvider(.lrclib, [.outcome(.timed(cues, matched: Self.matched))])
+        let (resolver, store) = resolver([provider], deadline: deadline)
+        let result = Task { await resolver.resolve(request(lyrics), priority: .visible) }
+        await deadline.waitUntilPending(1)
+        while await provider.callCount < 1 { await Task.yield() }
+        try? await Task.sleep(nanoseconds: 300_000_000)   // 讓對齊確實開始跑
+        let releasedAt = ContinuousClock.now
+        await deadline.releaseAll()
+        let outcome = await result.value.outcome
+        let elapsed = ContinuousClock.now - releasedAt
+        #expect(outcome == .unavailable)
+        #expect(elapsed <= .seconds(1), "時限到點後 \(elapsed) 才返回")
+        #expect(await store.load(persistentID: Self.id) == nil)
+    }
+
     @Test func atTheDeadlineAnAlreadyAcceptedCandidateIsStored() async {
         let deadline = GatedPollClock()
         let provider = FakeTimingProvider(.lrclib, searches: [.candidates(Self.threeCandidates)], timings: [
@@ -346,13 +373,13 @@ struct TimingResolverTests {
     @Test func anOldAlignerFoundThatFindsNothingNewIsKeptAndNotRetriedAgain() async throws {
         let store = TimingStore(directory: directory())
         let old = TimingRecord(persistentID: Self.id, lyricsHash: .of(Self.lyrics), outcome: .found(source: .qq, lines: [.init(index: 0, start: 5)]),
-                               fetchedAt: Self.now.addingTimeInterval(-86_400), alignerRevision: LRCAligner.revision - 1)
+                               fetchedAt: Self.now.addingTimeInterval(-86_400), alignerRevision: LRCAligner.foundCompatibleRevision - 1)
         try await store.save(old)
         let provider = FakeTimingProvider(.lrclib, [.outcome(.noTiming(.notFound)), .outcome(.noTiming(.notFound))])
         let (resolver, _) = resolver([provider], store: store)
         #expect(await resolver.resolve(request(), priority: .visible).outcome == .found(.qq, [.init(index: 0, start: 5)]))
         #expect(await provider.callCount == 1)
-        #expect(await store.load(persistentID: Self.id)?.alignerRevision == LRCAligner.revision)
+        #expect(await store.load(persistentID: Self.id)?.alignerRevision == LRCAligner.foundCompatibleRevision)
         #expect(await resolver.resolve(request(), priority: .visible).outcome == .found(.qq, [.init(index: 0, start: 5)]))
         #expect(await provider.callCount == 1)
     }

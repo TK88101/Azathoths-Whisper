@@ -450,7 +450,7 @@ actor TimingResolver: TimingResolving {
                 guard !Task.isCancelled else { return .cancelled }
                 switch outcome {
                 case .timed(let lines, _):
-                    let alignment = await Self.align(lyrics: lyrics, lrc: lines)
+                    let alignment = await Self.align(lyrics: lyrics, lrc: lines, duration: query.duration)
                     guard !Task.isCancelled else { return .cancelled }
                     diagnostics.record(.answer(provider.source, rank: rank, alignment: alignment, elapsed: clock.now - started))
                     guard let alignment, alignment.isAccepted else { continue }
@@ -473,8 +473,8 @@ actor TimingResolver: TimingResolving {
 
     /// 對齊是同步 CPU 工作：在 actor 外跑，不佔住 resolver（resolve／shutdown 照常進得來；R2 層級審查）
     @concurrent
-    private nonisolated static func align(lyrics: String, lrc: [LRCLine]) async -> LRCAligner.Alignment? {
-        LRCAligner.alignment(lyrics: lyrics, lrc: lrc)
+    private nonisolated static func align(lyrics: String, lrc: [LRCLine], duration: Double) async -> LRCAligner.Alignment? {
+        LRCAligner.alignment(lyrics: lyrics, lrc: lrc, duration: duration)
     }
 
     /// artist、title 非空且不超過比對上限，duration 有限、> 0、< 一天（Codex R1 #5；過長就不送請求）

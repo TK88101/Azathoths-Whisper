@@ -49,6 +49,46 @@ struct TimingRecordSyncTests {
                 "同版本不用時鐘決勝：保留本機")
     }
 
+    /// ⑩ 計劃 §4.3（附錄 B A#2）：rev 2 與 rev 3 的 found 同級（錨點都可信）——遠端較新版本不覆寫本機 found
+    @Test func aCompatibleLocalFoundIsNotReplacedByANewerRevisionRemoteFound() {
+        let local = found(revision: LRCAligner.foundCompatibleRevision, origin: Self.macA)
+        let remote = found(Self.lyrics, Self.otherAnchors, revision: LRCAligner.revision)
+        #expect(TimingRecord.importMerged(local: local, remote: remote) == local)
+    }
+
+    @Test func aLocalOldNotFoundIsKeptAgainstANewerRemoteNotFoundAndLooksUpItself() {
+        let local = TimingRecord(persistentID: Self.pid, lyricsHash: Self.lyrics, outcome: .notFound, fetchedAt: Self.base,
+                                 alignerRevision: LRCAligner.revision - 1, origin: Self.macA)
+        let remote = notFound()
+        let merged = TimingRecord.importMerged(local: local, remote: remote)
+        #expect(merged == local)
+        #expect(TimingLookupPolicy.shouldLookup(record: merged, currentHash: Self.lyrics, now: Self.base))
+    }
+
+    /// 他機舊版 app 持續上傳 rev 2 notFound：本機已是 rev 3（found 或 notFound）就保留，不循環
+    @Test func anOldAppKeepsUploadingOldNotFoundsAndNothingChanges() {
+        let oldRemote = TimingRecord(persistentID: Self.pid, lyricsHash: Self.lyrics, outcome: .notFound, fetchedAt: Self.base,
+                                     alignerRevision: LRCAligner.revision - 1, origin: Self.macB)
+        for local in [found(origin: Self.macA), notFound(origin: Self.macA)] {
+            let merged = [oldRemote, oldRemote, oldRemote].reduce(local) { TimingRecord.importMerged(local: $0, remote: $1) }
+            #expect(merged == local)
+            #expect(!TimingLookupPolicy.shouldLookup(record: merged, currentHash: Self.lyrics, now: Self.base))
+        }
+    }
+
+    /// 雙機交錯：A 有 rev 2 found、B 有 rev 3 found（不同錨點），互相匯入多輪後各自保留本機、不來回翻轉
+    @Test func twoMacsWithCompatibleFoundsConvergeWithoutFlipping() {
+        var a = found(revision: LRCAligner.foundCompatibleRevision, origin: Self.macA)
+        var b = found(Self.lyrics, Self.otherAnchors, revision: LRCAligner.revision)
+        let (initialA, initialB) = (a, b)
+        for _ in 0..<3 {
+            let (nextA, nextB) = (TimingRecord.importMerged(local: a, remote: b), TimingRecord.importMerged(local: b, remote: a))
+            (a, b) = (nextA, nextB)
+        }
+        #expect(a == initialA)
+        #expect(b == initialB)
+    }
+
     @Test func differentLyricsKeepTheLocalRecord() {
         let local = found(Self.otherLyrics, origin: Self.macA, fetchedAt: Self.base)
         let newerRemote = found(fetchedAt: Self.base.addingTimeInterval(86_400 * 30))

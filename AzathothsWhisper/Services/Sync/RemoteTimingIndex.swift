@@ -21,13 +21,13 @@ actor RemoteTimingIndex {
     static let durationTolerance: TimeInterval = 0.5
 
     /// 採用條件（§12-1）：found、歌詞雜湊相同、歌手與曲名 `exactKey` 完全相同（不容一字差、不忽略 remaster，R2）、
-    /// 曲長差 ≤ 0.5 s、對齊器版本不低於現行、錨點套得上；依 `sourceRef` 去重（同一來源多版本依全序選代表，R3-4）後
+    /// 曲長差 ≤ 0.5 s、對齊器版本不低於 `foundCompatibleRevision`（⑩ 計劃 §4.3）、錨點套得上；依 `sourceRef` 去重（同一來源多版本依全序選代表，R3-4）後
     /// 恰一個、或多個但錨點完全相同（取 sourceRef 小者）才採用
     static func pick(_ candidates: [TimingRecord], for query: TimingQuery, lyricsHash: LyricsFingerprint, lineCount: Int) -> TimingRecord? {
         let eligible = candidates.filter { record in
             guard case .found(_, let lines) = record.outcome, record.lyricsHash == lyricsHash,
                   let match = record.match, let sourceRef = record.sourceRef, !sourceRef.isEmpty,
-                  record.alignerRevision >= LRCAligner.revision,
+                  record.alignerRevision >= LRCAligner.foundCompatibleRevision,
                   TrackMatcher.exactKey(match.artist) == TrackMatcher.exactKey(query.artist),
                   TrackMatcher.exactKey(match.title) == TrackMatcher.exactKey(query.title),
                   abs(match.duration - query.duration) <= durationTolerance,
@@ -42,9 +42,10 @@ actor RemoteTimingIndex {
         return representatives.allSatisfy({ anchors(of: $0) == anchors(of: first) }) ? first : nil
     }
 
-    /// 同一 sourceRef 的版本全序：alignerRevision 大者優先 → 錨點正規化 JSON 的 SHA-256 小者
+    /// 同一 sourceRef 的版本全序：有效版本（`LRCAligner.effectiveRevision`）大者優先 → 錨點正規化 JSON 的 SHA-256 小者
     private static func precedes(_ lhs: TimingRecord, _ rhs: TimingRecord) -> Bool {
-        if lhs.alignerRevision != rhs.alignerRevision { return lhs.alignerRevision > rhs.alignerRevision }
+        let (left, right) = (LRCAligner.effectiveRevision(lhs.alignerRevision), LRCAligner.effectiveRevision(rhs.alignerRevision))
+        if left != right { return left > right }
         return anchorDigest(lhs) < anchorDigest(rhs)
     }
 
