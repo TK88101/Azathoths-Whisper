@@ -40,6 +40,66 @@ The iPad app talks only to Azathoth's Whisper on your own Mac, over your home ne
 *   🖼 **Cover Flow:** Browse the current album's artwork in a 3D carousel (display only — no playback controls).
 *   📱 **iPad Remote (3.0):** An optional relay serves your Music library and playback controls to the companion iPad app, Yog-Sothoth's Echo. Off by default.
 
+## How it works
+
+### Finding lyrics for the song that's playing
+
+```mermaid
+flowchart TD
+    A["A track starts playing in Music.app"] --> B["Azathoth's Whisper notices<br/>(right away, or within 3 seconds)"]
+    B --> C{"Does the track<br/>have lyrics?"}
+    C -- "Yes, or they can't be read" --> CF["Cover Flow"]
+    C -- "No" --> E["Editor"]
+    E --> F["Search Genius<br/>(automatically, or press Fetch Lyrics)"]
+    F -- "Found" --> R["Lyrics appear in the editor<br/>for you to check"]
+    F -- "No match or an error" --> M["Paste or type the lyrics yourself"]
+    R --> W["Press Write to iTunes"]
+    M --> W
+    W --> X{"Read back from Music.app:<br/>are the lyrics there?"}
+    X -- "Yes" --> CF
+    X -- "Still missing: stays here with a warning" --> E
+    E -- "No lyrics for this song" --> CF
+```
+
+You can switch between Cover Flow and the Editor at any time.
+
+### What it connects to
+
+```mermaid
+flowchart LR
+    Pad["Yog-Sothoth's Echo on iPad<br/>optional"]
+    subgraph Mac["Your Mac"]
+        Music["Music.app"]
+        Editor["Editor"]
+        Batch["Batch"]
+        CoverFlow["Cover Flow"]
+        Relay["iPad relay<br/>optional"]
+        FX["Lyric effects"]
+        Local[("App data on this Mac")]
+    end
+    subgraph Online["Online services"]
+        Genius["Genius"]
+        Dark["DarkLyrics"]
+        Timed["Timed-lyrics sources"]
+        MB["MusicBrainz"]
+    end
+    Cloud[("iCloud Drive<br/>optional")]
+
+    Music -- "current track and lyrics" --> Editor
+    Music -. "Up Next and history<br/>read-only" .-> CoverFlow
+    Editor -- "writes lyrics only" --> Music
+    Batch -- "writes lyrics only" --> Music
+    Editor -- "search" --> Genius
+    Batch -- "search" --> Genius
+    Batch -- "if Genius finds nothing" --> Dark
+    FX -- "line timings" --> Timed
+    FX -- "artist genres" --> MB
+    FX -- "timings and<br/>artist data" --- Local
+    Local <-. "four kinds of data<br/>see Usage" .-> Cloud
+    Pad <-. "paired, same Wi-Fi<br/>encrypted" .-> Relay
+    Relay -- "playback commands" --> Music
+```
+
 ## Prerequisites
 
 **🔑 Genius API Token (Required)**

@@ -39,6 +39,66 @@ iPad App 只會經由家中區網，連到你自己 Mac 上的 Azathoth's Whispe
 *   🖼 **封面瀏覽：** 以 3D 旋轉木馬瀏覽當前專輯封面（純展示，無播放控制）。
 *   📱 **iPad 遙控（3.0）：** 可選的中繼把 Music 曲庫與播放控制提供給配套的 iPad App「Yog-Sothoth's Echo」。預設關閉。
 
+## 運作方式
+
+### 替正在播放的歌找歌詞
+
+```mermaid
+flowchart TD
+    A["Music.app 開始播放一首歌"] --> B["Azathoth's Whisper 偵測到<br/>（馬上，最慢 3 秒內）"]
+    B --> C{"這首歌<br/>有歌詞嗎？"}
+    C -- "有，或讀不到" --> CF["Cover Flow"]
+    C -- "沒有" --> E["Editor"]
+    E --> F["搜尋 Genius<br/>（自動，或按「獲取歌詞」）"]
+    F -- "找到" --> R["歌詞填進編輯框<br/>讓你檢查"]
+    F -- "沒找到或出錯" --> M["自己貼上或輸入歌詞"]
+    R --> W["按「寫入 iTunes」"]
+    M --> W
+    W --> X{"從 Music.app 讀回：<br/>歌詞寫進去了嗎？"}
+    X -- "有" --> CF
+    X -- "還是沒有：留在這裡並提示" --> E
+    E -- "這首沒有歌詞" --> CF
+```
+
+Cover Flow 和 Editor 隨時可以自己切換。
+
+### 跟哪些東西連接
+
+```mermaid
+flowchart LR
+    Pad["iPad 上的 Yog-Sothoth's Echo<br/>（選用）"]
+    subgraph Mac["你的 Mac"]
+        Music["Music.app"]
+        Editor["Editor"]
+        Batch["Batch"]
+        CoverFlow["Cover Flow"]
+        Relay["iPad 中繼<br/>（選用）"]
+        FX["歌詞特效"]
+        Local[("這台 Mac 上的 app 資料")]
+    end
+    subgraph Online["網路上的服務"]
+        Genius["Genius"]
+        Dark["DarkLyrics"]
+        Timed["時間軸歌詞來源"]
+        MB["MusicBrainz"]
+    end
+    Cloud[("iCloud Drive<br/>（選用）")]
+
+    Music -- "目前曲目與歌詞" --> Editor
+    Music -. "接下來與播放紀錄<br/>（唯讀）" .-> CoverFlow
+    Editor -- "只寫入歌詞" --> Music
+    Batch -- "只寫入歌詞" --> Music
+    Editor -- "搜尋" --> Genius
+    Batch -- "搜尋" --> Genius
+    Batch -- "Genius 找不到時" --> Dark
+    FX -- "每行的時間點" --> Timed
+    FX -- "歌手曲風" --> MB
+    FX -- "時間軸、<br/>歌手資料" --- Local
+    Local <-. "四類資料<br/>見使用說明" .-> Cloud
+    Pad <-. "已配對、同一個 Wi-Fi<br/>加密" .-> Relay
+    Relay -- "播放指令" --> Music
+```
+
 ## 前置要求
 
 **🔑 Genius API Token（必需）**

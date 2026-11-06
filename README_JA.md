@@ -37,6 +37,66 @@ iPad アプリが通信する相手は、自宅のネットワーク内にある
 *   🖼 **Cover Flow:** 現在のアルバムアートワークを 3D カルーセルで閲覧（表示のみ — 再生コントロールなし）。
 *   📱 **iPad リモコン（3.0）:** 中継をオンにすると、Music ライブラリと再生操作を iPad アプリ「Yog-Sothoth's Echo」から使えます。初期設定はオフです。
 
+## 仕組み
+
+### 再生中の曲の歌詞を見つける流れ
+
+```mermaid
+flowchart TD
+    A["Music.app で曲の再生が始まる"] --> B["Azathoth's Whisper が検知<br/>（すぐに、遅くとも 3 秒以内）"]
+    B --> C{"この曲に<br/>歌詞はある？"}
+    C -- "ある、または読み取れない" --> CF["Cover Flow"]
+    C -- "ない" --> E["Editor"]
+    E --> F["Genius を検索<br/>（自動、または「歌詞を取得」）"]
+    F -- "見つかった" --> R["歌詞がエディタに入る<br/>（内容を確認）"]
+    F -- "見つからない、またはエラー" --> M["歌詞を自分で貼り付け・入力"]
+    R --> W["「iTunesに書き込み」を押す"]
+    M --> W
+    W --> X{"Music.app から読み戻し：<br/>歌詞は入った？"}
+    X -- "入った" --> CF
+    X -- "まだない：警告を出してここに残る" --> E
+    E -- "この曲は歌詞なし" --> CF
+```
+
+Cover Flow とエディタはいつでも切り替えられます。
+
+### つながる先
+
+```mermaid
+flowchart LR
+    Pad["iPad の Yog-Sothoth's Echo<br/>（任意）"]
+    subgraph Mac["この Mac"]
+        Music["Music.app"]
+        Editor["Editor"]
+        Batch["Batch"]
+        CoverFlow["Cover Flow"]
+        Relay["iPad 中継<br/>（任意）"]
+        FX["歌詞エフェクト"]
+        Local[("この Mac 上のアプリデータ")]
+    end
+    subgraph Online["オンラインのサービス"]
+        Genius["Genius"]
+        Dark["DarkLyrics"]
+        Timed["タイムライン付き歌詞のソース"]
+        MB["MusicBrainz"]
+    end
+    Cloud[("iCloud Drive<br/>（任意）")]
+
+    Music -- "再生中の曲と歌詞" --> Editor
+    Music -. "次に再生・履歴<br/>（読み取りのみ）" .-> CoverFlow
+    Editor -- "書き込むのは歌詞だけ" --> Music
+    Batch -- "書き込むのは歌詞だけ" --> Music
+    Editor -- "検索" --> Genius
+    Batch -- "検索" --> Genius
+    Batch -- "Genius で見つからないとき" --> Dark
+    FX -- "行のタイミング" --> Timed
+    FX -- "アーティストのジャンル" --> MB
+    FX -- "タイムライン・<br/>アーティスト情報" --- Local
+    Local <-. "4 種類のデータ<br/>（使い方を参照）" .-> Cloud
+    Pad <-. "ペアリング済み・同じ Wi-Fi<br/>暗号化" .-> Relay
+    Relay -- "再生の操作" --> Music
+```
+
 ## 前提条件
 
 **🔑 Genius API Token（必須）**
