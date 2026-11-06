@@ -80,7 +80,7 @@ enum LRCAligner {
             }
         }
         // LRC 側覆蓋率以群組數計：沒有反向群組時＝對上的 Music 行數（與 revision 2 逐值相同，串接不放寬，Codex M1-Q2）
-        let comparable = cues.count(where: { !$0.isEmpty })
+        let comparable = LRCAlignmentPath.comparableCueCount(cues)
         return Alignment(
             anchors: anchors,
             musicRate: Double(path.matchedMusicLines) / Double(texts.count),

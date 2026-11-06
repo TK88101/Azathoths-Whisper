@@ -7,7 +7,6 @@ import Testing
 struct LRCAlignmentTests {
     private let music = "[Verse]\nLanterns over the river\nAsh in the wind\n[Chorus]\nCount the silent bells\nPaper boats at dawn"
 
-
     @Test func identicalTextAlignsEveryLine() throws {
         let timeline = try #require(LRCAligner.align(
             lyrics: music,

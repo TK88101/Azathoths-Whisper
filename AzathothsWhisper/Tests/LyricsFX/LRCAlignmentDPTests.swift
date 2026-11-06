@@ -7,7 +7,6 @@ import Testing
 // 歌詞全部是編造的測試句（不得用真歌詞）
 @Suite("LRCAligner revision 3")
 struct LRCAlignmentDPTests {
-
     private let six = "Lanterns over the river\nAsh in the wind\nCount the silent bells\nPaper boats at dawn\nStones under the old bridge\nSmoke above the hills"
 
     // MARK: 反向群組（Music 把 LRC 一行拆成多行）
@@ -148,8 +147,8 @@ struct LRCAlignmentDPTests {
             (10, "Lanterns over the river"), (14, "Ash in the wind"), (20, "Count the silent bells"), (204, "Stones under the old bridge oh"),
         ]), duration: duration))
         #expect(alignment.groups == 4)
-        #expect(alignment.anchors.compactMap { $0 }.allSatisfy { $0 <= duration + LRCAligner.durationSlack })
-        #expect(LRCAligner.storedLinesFit(alignment.lineStarts, lineCount: 5, durationLimit: duration + LRCAligner.durationSlack))
+        #expect(alignment.anchors.compactMap { $0 }.allSatisfy { $0 <= LRCAligner.startLimit(duration: duration) })
+        #expect(LRCAligner.storedLinesFit(alignment.lineStarts, lineCount: 5, durationLimit: LRCAligner.startLimit(duration: duration)))
     }
 
     /// Music 行數多到「每個 cue 吃滿 3 行也到不了 0.7」：不跑 DP（不配置 M×L 表）、直接不採用

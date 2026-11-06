@@ -7,7 +7,6 @@ import Testing
 struct TimingAlignmentTests {
     private let music = "Lanterns over the river\nAsh in the wind\nCount the silent bells\nPaper boats at dawn"
 
-
     /// Codex R2 反例：Music 漏了前段，LRC 有兩段相同的副歌。前向第一個命中會整段錨到前一段，
     /// Music 側 100 %，但 LRC 側只錨到一半以下 → 拒絕
     @Test func aRepeatedChorusWithAMissingFirstHalfIsRejected() {

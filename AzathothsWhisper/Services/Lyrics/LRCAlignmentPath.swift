@@ -37,6 +37,9 @@ struct LRCAlignmentPath: Equatable, Sendable {
     /// Music 行數上限：比照外部 LRC 的 `ProviderOutcome.maximumTimedLines`（超過不是一首歌），表最壞 2000×2000（約 36 MB）
     static let maximumMusicLines = ProviderOutcome.maximumTimedLines
 
+    /// 可比對的 cue 數（正規化後非空）：預檢與 `lrcCoverage` 的分母共用
+    static func comparableCueCount(_ cues: [[Character]]) -> Int { cues.count(where: { !$0.isEmpty }) }
+
     /// 每個 cue 最多吃 `maxMergedMusicLines` 行：連這個理論上限都到不了 `alignmentRateThreshold` 就不可能採用
     static func canReachRate(musicLines: Int, comparableCues: Int) -> Bool {
         Double(LRCAligner.maxMergedMusicLines * comparableCues) >= LRCAligner.alignmentRateThreshold * Double(musicLines)
@@ -46,7 +49,7 @@ struct LRCAlignmentPath: Equatable, Sendable {
     /// Music 超過上限、或理論上限到不了門檻：不配置 M×L 表、回空路徑（＝不採用；本機歌詞行數沒有上限，安全評審 F2、codex R2）
     static func find(music: [[Character]], cues: [[Character]]) -> LRCAlignmentPath? {
         guard !Task.isCancelled else { return nil }
-        guard music.count <= maximumMusicLines, canReachRate(musicLines: music.count, comparableCues: cues.count(where: { !$0.isEmpty })) else {
+        guard music.count <= maximumMusicLines, canReachRate(musicLines: music.count, comparableCues: comparableCueCount(cues)) else {
             return LRCAlignmentPath(steps: [])
         }
         var table = Grid(rows: music.count + 1, columns: cues.count + 1, filledWith: Score.zero)
