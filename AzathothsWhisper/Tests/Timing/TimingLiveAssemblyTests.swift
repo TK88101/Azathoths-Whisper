@@ -55,12 +55,12 @@ struct TimingLiveAssemblyTests {
     }
 
     @Test func diagnosticLinesCarryOnlySourceOutcomeScoreAndTime() {
-        let alignment = LRCAligner.Alignment(anchors: [1, nil, 3], musicRate: 0.666, lrcCoverage: 0.5)
+        let alignment = LRCAligner.Alignment(anchors: [1, nil, 3], musicRate: 0.666, lrcCoverage: 0.5, groups: 2)
         #expect(OSLogTimingDiagnostics.line(for: .answer(.youtubeMusic, rank: 0, alignment: alignment, elapsed: 0.4321))
-            == "source=youtubeMusic result=alignFail rank=0 music=0.67 lrc=0.50 anchors=2 ms=432")
-        let accepted = LRCAligner.Alignment(anchors: [1, 2, 3], musicRate: 1, lrcCoverage: 0.75)
+            == "source=youtubeMusic result=alignFail rank=0 music=0.67 lrc=0.50 groups=2 ms=432")
+        let accepted = LRCAligner.Alignment(anchors: [1, 2, 3], musicRate: 1, lrcCoverage: 0.75, groups: 3)
         #expect(OSLogTimingDiagnostics.line(for: .answer(.netease, rank: 2, alignment: accepted, elapsed: 1))
-            == "source=netease result=answer rank=2 music=1.00 lrc=0.75 anchors=3 ms=1000")
+            == "source=netease result=answer rank=2 music=1.00 lrc=0.75 groups=3 ms=1000")
         #expect(OSLogTimingDiagnostics.line(for: .picked(.netease, rank: 1, tried: 3)) == "source=netease result=picked rank=1 tried=3")
         #expect(OSLogTimingDiagnostics.line(for: .noTiming(.qq, .mismatch, elapsed: 0.2)) == "source=qq result=mismatch ms=200")
         #expect(OSLogTimingDiagnostics.line(for: .failure(.lrclib, .server(status: 503), elapsed: 0.05)) == "source=lrclib result=failure kind=server503 ms=50")
@@ -68,7 +68,7 @@ struct TimingLiveAssemblyTests {
         #expect(OSLogTimingDiagnostics.line(for: .skipped(.missingMetadata)) == "result=skipped reason=missingMetadata")
     }
 
-    static let accepted = LRCAligner.Alignment(anchors: [1, 2, 3], musicRate: 1, lrcCoverage: 1)
+    static let accepted = LRCAligner.Alignment(anchors: [1, 2, 3], musicRate: 1, lrcCoverage: 1, groups: 3)
 
     @Test func aSummaryIsWrittenEveryTwentyQueries() {
         var tally = TimingTally()

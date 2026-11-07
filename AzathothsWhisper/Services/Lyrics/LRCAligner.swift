@@ -2,10 +2,12 @@ import Foundation
 
 /// 外部時間軸「只借時間、不借文字」（母計劃 §2.4，Codex R1-4；C 段計劃 §3.4）。
 ///
-/// Music 的每個歌詞行在 LRC 中單調向前找相似度 ≥ `lineSimilarityThreshold` 的行；單行不中時試連續 2–`maxMergedCues` 行串接
-/// （Genius 常把 LRC 兩行合成一行，錨到第一行起點；docs/plans/2026-10-19-lyrics-fx-merged-line-align.md）。採用條件全部成立：
-/// Music 側對上比例 ≥ `alignmentRateThreshold`、LRC 側（非空行）被對上比例 ≥ `lrcCoverageThreshold`、
-/// 直接錨點 ≥ `minimumAnchors`（否則視為別盤／別曲／別版本，或重複副歌錯錨）。
+/// Music 歌詞行與 LRC 行以相似度 ≥ `lineSimilarityThreshold` 做**單調最優**對齊（`LRCAlignmentPath`，revision 3）：
+/// 一個 Music 行可對連續 1–`maxMergedCues` 個 LRC 行（Genius 把 LRC 兩行合成一行，錨到第一行起點；
+/// docs/plans/2026-10-19-lyrics-fx-merged-line-align.md），連續 2–`maxMergedMusicLines` 個 Music 行也可對一個 LRC 行
+/// （Music 把 LRC 一行拆開，docs/plans/2026-11-06-lyrics-timing-fix.md）。採用條件全部成立：
+/// Music 側對上比例 ≥ `alignmentRateThreshold`、LRC 側（非空行）被對上的群組比例 ≥ `lrcCoverageThreshold`、
+/// 群組數 ≥ `minimumAnchors`（否則視為別盤／別曲／別版本，或重複副歌錯錨）。
 /// 未對上的行在相鄰已對上行之間等距內插。顯示文字永遠是 Music 的
 enum LRCAligner {
     static let lineSimilarityThreshold = 0.8
@@ -15,56 +17,96 @@ enum LRCAligner {
     static let minimumAnchors = 3
     /// Music 一行最多對上幾行連續的 LRC（不跨空行）
     static let maxMergedCues = 3
-    /// 對齊演算法版本：1＝一對一、2＝加串接。存檔記下它，舊版本對出的 found 重查一次（`TimingLookupPolicy`）
-    static let revision = 2
+    /// 幾行連續的 Music 最多對上一個 LRC 行（Music 把 LRC 一行拆開）
+    static let maxMergedMusicLines = 3
+    /// 對齊演算法版本：1＝一對一、2＝加串接、3＝單調最優＋反向群組。新寫入的記錄記下它；notFound 低於它就重查一次
+    static let revision = 3
+    /// found 錨點仍可信的最低版本：比較一律透過 `TimingRecord.hasCompatibleAnchors`／`comparableRevision`（⑩ 計劃 §4.3）。
+    /// **升級它之前必須先把 `alignerRevision` 拆成「錨點產生版本」與「已重查版本」兩欄**（⑩ 計劃 §8 R5）：
+    /// 現行 `TimingRecord.merged` 保留舊錨點時會把版本升到已查版本，兩義共用一欄
+    static let foundCompatibleRevision = 2
+
     /// 外部 cue 與存檔時間可以比曲長晚這麼多（曲長取整、尾奏淡出）
     static let durationSlack: Double = 5
+
+    /// 外部 cue、反向群組切分點、存檔讀回共用的起點上限（唯一定義）
+    static func startLimit(duration: Double) -> Double { duration + durationSlack }
 
     /// 一次對齊的結果：`anchors[i]`＝Music 第 i 行對上的 LRC 開始秒數（nil＝未對上）
     struct Alignment: Equatable, Sendable {
         let anchors: [Double?]
         let musicRate: Double
         let lrcCoverage: Double
+        /// 直接 cue 群組數（反向群組只算 1）：`minimumAnchors` 與 `lrcCoverage` 都以它計
+        let groups: Int
 
         var isAccepted: Bool {
-            anchors.compactMap { $0 }.count >= LRCAligner.minimumAnchors
+            groups >= LRCAligner.minimumAnchors
                 && musicRate >= LRCAligner.alignmentRateThreshold
                 && lrcCoverage >= LRCAligner.lrcCoverageThreshold
         }
 
-        /// 存檔只存直接錨點（index＝`LyricsLines.lyricTexts` 序號），讀回時用同一個內插重建
+        /// 存檔存每個已定起點的行（直接錨點與反向群組的切分點；index＝`LyricsLines.lyricTexts` 序號），讀回時用同一個內插重建
         var lineStarts: [TimingRecord.LineStart] {
             anchors.enumerated().compactMap { index, start in start.map { TimingRecord.LineStart(index: index, start: $0) } }
         }
     }
 
     static func align(lyrics: String, lrc: [LRCLine], duration: Double, source: TimingSource) -> LyricsTimeline? {
-        guard let alignment = alignment(lyrics: lyrics, lrc: lrc), alignment.isAccepted else { return nil }
+        guard let alignment = alignment(lyrics: lyrics, lrc: lrc, duration: duration), alignment.isAccepted else { return nil }
         return timeline(lyrics: lyrics, anchors: alignment.anchors, duration: duration, source: source)
     }
 
-    /// Music 沒有歌詞行＝nil
-    static func alignment(lyrics: String, lrc: [LRCLine]) -> Alignment? {
+    /// Music 沒有歌詞行、或被取消＝nil。`duration` 決定反向群組切分點的上界（`startLimit`，與 cue 驗證、存檔讀回同一個）
+    static func alignment(lyrics: String, lrc: [LRCLine], duration: Double) -> Alignment? {
         let texts = LyricsLines.lyricTexts(lyrics)
         guard !texts.isEmpty else { return nil }
         // 兩邊各正規化一次（不在 M×L 的配對迴圈裡重算）
         let music = texts.map { Array(normalized($0)) }
         let cues = lrc.map { Array(normalized($0.text)) }
-        guard let hits = matchedIndices(music, cues: cues) else { return nil }
-        let anchors = hits.map { $0.map { lrc[$0.index].start } }
-        // LRC 側覆蓋率照舊以對上的 Music 行數計：串接不放寬這道防錯錨的門檻（Codex M1-Q2）
-        let matched = hits.compactMap { $0 }.count
-        let comparable = cues.filter { !$0.isEmpty }.count
+        guard let path = LRCAlignmentPath.find(music: music, cues: cues) else { return nil }
+        var anchors = [Double?](repeating: nil, count: texts.count)
+        for step in path.steps {
+            switch step {
+            case .forward(let line, let cue, _):
+                anchors[line] = lrc[cue].start
+            case .reverse(let line, let cue, let span):
+                let start = lrc[cue].start
+                let next = nextCueStart(after: cue, in: lrc, cues: cues) ?? LyricsTimelineBuilder.lastLineEnd(start: start, duration: duration)
+                // 夾在存檔讀回的上限內：否則最後一個 cue 落在曲長＋slack 內時，切分點會超限、存了顯示不了（安全評審 F1）
+                let end = max(start, min(next, startLimit(duration: duration)))
+                let starts = groupStarts(weights: music[line..<(line + span)].map(\.count), start: start, end: end)
+                for (offset, value) in starts.enumerated() { anchors[line + offset] = value }
+            }
+        }
+        // LRC 側覆蓋率以群組數計：沒有反向群組時＝對上的 Music 行數（與 revision 2 逐值相同，串接不放寬，Codex M1-Q2）
+        let comparable = LRCAlignmentPath.comparableCueCount(cues)
         return Alignment(
             anchors: anchors,
-            musicRate: Double(matched) / Double(texts.count),
-            lrcCoverage: comparable == 0 ? 0 : Double(matched) / Double(comparable)
+            musicRate: Double(path.matchedMusicLines) / Double(texts.count),
+            lrcCoverage: comparable == 0 ? 0 : Double(path.steps.count) / Double(comparable),
+            groups: path.steps.count
         )
+    }
+
+    /// 反向群組在 `[start, end)` 內按權重（正規化字數）切分起點；權重總和為 0 時等分。首行＝`start`，單調不減
+    static func groupStarts(weights: [Int], start: Double, end: Double) -> [Double] {
+        let total = weights.reduce(0, +)
+        let span = end - start
+        return weights.indices.map { index in
+            let before = weights[..<index].reduce(0, +)
+            let fraction = total == 0 ? Double(index) / Double(weights.count) : Double(before) / Double(total)
+            return start + span * fraction
+        }
+    }
+
+    private static func nextCueStart(after cue: Int, in lrc: [LRCLine], cues: [[Character]]) -> Double? {
+        cues.indices.dropFirst(cue + 1).first { !cues[$0].isEmpty }.map { lrc[$0].start }
     }
 
     /// 外部 cue 的邊界驗證（Codex R1 #8）：丟掉非有限、負值、超過曲長＋slack 的；依時間穩定排序；同一時間只留第一行
     static func sanitizedCues(_ lrc: [LRCLine], duration: Double) -> [LRCLine] {
-        let limit = duration + durationSlack
+        let limit = startLimit(duration: duration)
         let valid = lrc.enumerated()
             .filter { $0.element.start.isFinite && $0.element.start >= 0 && $0.element.start <= limit }
             .sorted { ($0.element.start, $0.offset) < ($1.element.start, $1.offset) }
@@ -75,7 +117,7 @@ enum LRCAligner {
     /// 由存檔錨點重建（Codex R1 #7）：index 在目前歌詞行數內且遞增、時間有限、單調不減、不超過曲長＋slack；不合＝nil
     static func timeline(lyrics: String, stored: [TimingRecord.LineStart], duration: Double, source: TimingSource) -> LyricsTimeline? {
         let count = LyricsLines.lyricTexts(lyrics).count
-        guard storedLinesFit(stored, lineCount: count, durationLimit: duration + durationSlack) else { return nil }
+        guard storedLinesFit(stored, lineCount: count, durationLimit: startLimit(duration: duration)) else { return nil }
         var anchors = [Double?](repeating: nil, count: count)
         for line in stored { anchors[line.index] = line.start }
         return timeline(lyrics: lyrics, anchors: anchors, duration: duration, source: source)
@@ -114,47 +156,29 @@ enum LRCAligner {
         similarity(Array(normalized(a)), Array(normalized(b)))
     }
 
+    /// `candidate` 已比 `reference` 長到不可能達門檻（差距超過允許的編輯距離）：串接時用來提早停，再接只會更不相似
+    static func isTooLong(_ candidate: Int, comparedWith reference: Int) -> Bool {
+        candidate - reference > allowedDistance(longest: candidate)
+    }
+
+    static func isSimilar(_ left: [Character], _ right: [Character]) -> Bool {
+        similarity(left, right) >= lineSimilarityThreshold
+    }
+
+    /// 門檻內允許的最大編輯距離；向上取整只會少提早結束，不會誤判
+    private static func allowedDistance(longest: Int) -> Int {
+        Int((Double(longest) * (1 - lineSimilarityThreshold)).rounded(.up))
+    }
+
     private static func similarity(_ left: [Character], _ right: [Character]) -> Double {
         let longest = max(left.count, right.count)
         guard longest > 0 else { return 0 }
-        // 門檻內允許的最大距離；向上取整只會少提早結束，不會誤判
-        let allowed = Int((Double(longest) * (1 - lineSimilarityThreshold)).rounded(.up))
+        let allowed = allowedDistance(longest: longest)
         return 1 - Double(EditDistance.between(left, right, limit: allowed)) / Double(longest)
     }
 
     static func normalized(_ text: String) -> String {
         String(text.lowercased().filter { $0.isLetter || $0.isNumber })
-    }
-
-    /// 一個 Music 行對上的 LRC：從 `index` 起連續 `span` 行
-    private struct Hit {
-        let index: Int
-        let span: Int
-    }
-
-    /// 單調前向：每行回傳對上的 LRC 起點與行數；同一起點先試單行、再試串接。每次比對前檢查取消（20 s 時限與 shutdown 才管得到它）；取消＝nil
-    private static func matchedIndices(_ music: [[Character]], cues: [[Character]]) -> [Hit?]? {
-        var cursor = 0
-        var hits: [Hit?] = []
-        for line in music {
-            var hit: Hit?
-            search: for index in cues.indices.dropFirst(cursor) {
-                var joined: [Character] = []
-                for span in 1...maxMergedCues {
-                    let next = index + span - 1
-                    guard next < cues.count, !cues[next].isEmpty else { break }
-                    guard !Task.isCancelled else { return nil }
-                    joined += cues[next]
-                    if similarity(line, joined) >= lineSimilarityThreshold {
-                        hit = Hit(index: index, span: span)
-                        break search
-                    }
-                }
-            }
-            if let hit { cursor = hit.index + hit.span }
-            hits.append(hit)
-        }
-        return hits
     }
 
     /// 前段以 `duration×lead`、末段以 `duration×tail` 為邊界（已對上的時間超出邊界時以它為準）
