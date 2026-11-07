@@ -10,7 +10,7 @@
 
 | アプリ | プラットフォーム | バージョン | 内容 |
 |---|---|---|---|
-| **Azathoth's Whisper**（アザトースの囁き） | macOS | 3.1.0 | 上記の歌詞アプリ。iPad から この Mac の Music を操作できるようにする**中継**機能（任意）を追加 |
+| **Azathoth's Whisper**（アザトースの囁き） | macOS | 3.1.1 | 上記の歌詞アプリ。iPad から この Mac の Music を操作できるようにする**中継**機能（任意）を追加 |
 | **Yog-Sothoth's Echo**（ヨグ＝ソトースの残響） | iPad | 1.0.1 | レコードプレーヤー風のリモコン。家のどこからでも Mac の Music ライブラリを見て、再生を操作できます |
 
 iPad アプリが通信する相手は、自宅のネットワーク内にあるあなた自身の Mac の Azathoth's Whisper だけです。
@@ -217,7 +217,7 @@ flowchart LR
     chflags hidden "$STAGING/dmg_background.png"
 
     hdiutil create -volname "Azathoth's Whisper" -srcfolder "$STAGING" \
-      -format UDZO -ov "$WORK/Azathoths-Whisper-v3.1.0.dmg"
+      -format UDZO -ov "$WORK/Azathoths-Whisper-v3.1.1.dmg"
     ```
 
     ボリューム名とアイテム名は上記のままにしてください — `.DS_Store` がバックグラウンドイメージとアイコン位置を名前で解決します。

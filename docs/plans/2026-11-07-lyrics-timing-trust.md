@@ -1,6 +1,6 @@
 # ⑪ 時間軸查到了但不一定準——「不準」標記與離線診斷
 
-狀態：**v1.0 定稿，使用者 2026-11-07 拍板開工（「可以，開工吧」）**：Codex R1–R3＋快審收斂，處置見附錄 A–C。分支 `wip/lyrics-timing-trust`（自 main 2368bfb）。
+狀態：**結案（2026-11-07）**：使用者指示發版 v3.1.1（視同簽 I-74）；T6 在場未做（見 §9）。v1.0 定稿，使用者 2026-11-07 拍板開工（「可以，開工吧」）：Codex R1–R3＋快審收斂，處置見附錄 A–C。分支 `wip/lyrics-timing-trust`（自 main 2368bfb）。
 前案：`2026-11-06-lyrics-timing-fix.md`（⑩，I-73 結案；遺留 T5 25 首、§8 R5）。
 
 ## 0. 複述
@@ -141,6 +141,7 @@
   - **T5 名單（更正 §4.4 的事實）**：⑩ 其實有存逐首結果（`tools/nf/data/t45-report.json` 的 `t5Shadow`，80 筆含 pid）。仍依計劃重跑 `t45`（離線、只讀已存資料）：可比 80、不變 55、會變 **25**，與 ⑩ 一致。名單 `out/t5-manifest.json`：25 筆，只含 pid、歌詞指紋（25／25 皆有）與差異數字。§4.4 原寫的「舊新錨點摘要雜湊」改為存差異數字（`maxLineDiff` 等），比雜湊更能直接用。
 
 - **T5 全量（2026-11-07 19:06–20:32，checkpoint 34f2beb）**：單元 2263 條＝2236 綠、26 跳過（既有）、**1 紅**＝`BatchOverlappingLoadTests.overlappingLoadSuspendsPollingUntilLastCompletes` 超時 120 s——memory 記載的既有偶發掛起（2026-09-27 起；⑩ 全量同一條），本分支對 `Features/Batch` 改動 0 行，未跳過、照列。完整性：2263＝⑩ 的 2221＋本案新增 42（`TimingFlagStore` 13、`Timing flag provenance` 8、`LyricsFX timing flag` 15、`AppModel timing flag` 6，全綠），無因超時而消失的測試。coverage_gate：Services＋Infra **96.6 %**（`TimingFlagStore` 100 %、`TimingFlag` 100 %；`App/AppModel+TimingFlags` 82 %，不在閘門範圍）。no_playback_gate 綠；Scripts Python 471 條 OK。
+- **結案（2026-11-07）**：使用者聽完說明（「這個版本的改動就只是手動打標記」，確認無誤）後指示發版 v3.1.1、合併 main、刪分支、發 Release、更新 /Applications。**T6 使用者在場 #1 未做**：使用者直接指示發版；右鍵標記／取消的實機行為由 T3 的 UI 測試（使用者在場、真 app 視窗）覆蓋。遺留另案（待使用者決定）：①外部時間軸套用後同首 metadata 晚到會退回估算（既有行為）；②安全讀檔流程 5 個 store 收斂；③simcodex 延後 P2（附錄 D）。
 ## 10. 待拍板
 無（Q1 已答；其餘取捨照 §4 的假設，評審若有異議再問）。
 
