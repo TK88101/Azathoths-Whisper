@@ -10,7 +10,7 @@
 
 | App | 平台 | 版本 | 用途 |
 |---|---|---|---|
-| **Azathoth's Whisper**（阿撒托斯的低語） | macOS | 3.1.0 | 上面的歌詞工具，外加可選的**中繼**，讓 iPad 控制這台 Mac 上的 Music |
+| **Azathoth's Whisper**（阿撒托斯的低語） | macOS | 3.1.1 | 上面的歌詞工具，外加可選的**中繼**，讓 iPad 控制這台 Mac 上的 Music |
 | **Yog-Sothoth's Echo**（尤格·索托斯的回響） | iPad | 1.0.1 | 黑膠唱機造型的遙控器：在家裡任何地方瀏覽 Mac 的 Music 曲庫並控制播放 |
 
 iPad App 只會經由家中區網，連到你自己 Mac 上的 Azathoth's Whisper。詳見
@@ -219,7 +219,7 @@ flowchart LR
     chflags hidden "$STAGING/dmg_background.png"
 
     hdiutil create -volname "Azathoth's Whisper" -srcfolder "$STAGING" \
-      -format UDZO -ov "$WORK/Azathoths-Whisper-v3.1.0.dmg"
+      -format UDZO -ov "$WORK/Azathoths-Whisper-v3.1.1.dmg"
     ```
 
     卷名與各項目的檔名必須與上方完全一致——`.DS_Store` 按**名稱**解析背景圖與圖示位置。

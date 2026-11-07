@@ -116,6 +116,46 @@ final class LyricsFXUITests: AppUITestCase {
         XCTAssertFalse(element(ID.lyricsFXTimingMark).exists, "拿到時間軸後不應有 ~")
     }
 
+    // MARK: ⑪（⑪ 計劃 T3）：時間軸不準標記
+
+    private static let markTitle = "Mark Timing as Off"
+    private static let unmarkTitle = "Unmark Timing"
+
+    /// 在特效層內右鍵。層的 AX 元素是左上角一枚 1×1 文字，往內偏一點點在畫布上（右鍵選單掛在整個特效層）
+    private func rightClickLyricsFX() {
+        element(ID.lyricsFXLayer).coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 60, dy: 60)).rightClick()
+    }
+
+    /// I-74：外部時間軸 → 右鍵標記，角落出現 `!`；再右鍵取消，`!` 消失
+    func testAFoundTimelineCanBeMarkedAsOffAndUnmarked() {
+        startPlainLyrics(timing: "found")
+        waitForValue(element(ID.lyricsFXLayer), "Paper boats drift past the harbor lights", timeout: Self.timeout, "3.5 秒處應是時間軸的行")
+        XCTAssertFalse(element(ID.lyricsFXTimingFlagMark).exists, "未標記前不應有 !")
+
+        rightClickLyricsFX()
+        let mark = app.menuItems[Self.markTitle]
+        XCTAssertTrue(mark.waitForExistence(timeout: Self.timeout), "右鍵選單應有 \(Self.markTitle)")
+        mark.click()
+        XCTAssertTrue(element(ID.lyricsFXTimingFlagMark).waitForExistence(timeout: Self.timeout), "標記後角落應有 !")
+        XCTAssertFalse(element(ID.lyricsFXTimingMark).exists, "外部時間軸不應有 ~")
+
+        rightClickLyricsFX()
+        let unmark = app.menuItems[Self.unmarkTitle]
+        XCTAssertTrue(unmark.waitForExistence(timeout: Self.timeout), "已標記時右鍵選單應有 \(Self.unmarkTitle)")
+        unmark.click()
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: element(ID.lyricsFXTimingFlagMark))
+        XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: Self.timeout), .completed, "取消後 ! 應消失")
+    }
+
+    /// I-74：估算時間（角落 `~`）不提供標記
+    func testEstimatedTimingOffersNoMarkMenu() {
+        startPlainLyrics(timing: "notFound")
+        XCTAssertTrue(element(ID.lyricsFXTimingMark).waitForExistence(timeout: Self.timeout), "估算時應有 ~")
+        rightClickLyricsFX()
+        XCTAssertFalse(app.menuItems[Self.markTitle].waitForExistence(timeout: 2), "估算時不應出現 \(Self.markTitle)")
+        XCTAssertFalse(element(ID.lyricsFXTimingFlagMark).exists)
+    }
+
     // MARK: B1（B1 計劃 §5）：風格依曲風自動選
 
     private func waitForRecipe(_ predicate: @escaping (String) -> Bool, _ message: String, file: StaticString = #filePath, line: UInt = #line) {

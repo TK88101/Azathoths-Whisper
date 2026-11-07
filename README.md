@@ -10,7 +10,7 @@ It supports multiple lyrics sources and features a dark-themed, localized user i
 
 | App | Platform | Version | What it does |
 |---|---|---|---|
-| **Azathoth's Whisper** | macOS | 3.1.0 | The lyrics app above, plus an optional **relay** that lets the iPad control Music on this Mac |
+| **Azathoth's Whisper** | macOS | 3.1.1 | The lyrics app above, plus an optional **relay** that lets the iPad control Music on this Mac |
 | **Yog-Sothoth's Echo** (尤格·索托斯的回響) | iPad | 1.0.1 | A vinyl-turntable remote: browse your Mac's Music library and control playback from anywhere in the house |
 
 The iPad app talks only to Azathoth's Whisper on your own Mac, over your home network. See
@@ -222,7 +222,7 @@ Requirements: **macOS 14.0+**, **Xcode 16+** (Swift 6), [XcodeGen](https://githu
     chflags hidden "$STAGING/dmg_background.png"
 
     hdiutil create -volname "Azathoth's Whisper" -srcfolder "$STAGING" \
-      -format UDZO -ov "$WORK/Azathoths-Whisper-v3.1.0.dmg"
+      -format UDZO -ov "$WORK/Azathoths-Whisper-v3.1.1.dmg"
     ```
 
     The volume name and the item names must stay exactly as above — the `.DS_Store` resolves the

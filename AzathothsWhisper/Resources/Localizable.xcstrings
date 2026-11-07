@@ -1979,6 +1979,29 @@
         }
       }
     },
+    "timing_flagged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timing marked as off"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイミングのずれを記録済み"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已標記時間軸不準"
+          }
+        }
+      }
+    },
     "timing_not_found_yet": {
       "extractionState": "manual",
       "localizations": {
