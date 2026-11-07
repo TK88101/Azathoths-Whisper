@@ -140,6 +140,7 @@
   - `flags selftest`：A／B／U／D、來源失敗熔斷（同來源失敗後本次不再請求）、provenance 四種、標記附近錨點差——**OK**。`run.sh`＝讀標記 → osascript 唯讀讀 Music → 逐首查來源 → `out/flags-YYYYMMDD.tsv`。真資料待使用者標記後跑。
   - **T5 名單（更正 §4.4 的事實）**：⑩ 其實有存逐首結果（`tools/nf/data/t45-report.json` 的 `t5Shadow`，80 筆含 pid）。仍依計劃重跑 `t45`（離線、只讀已存資料）：可比 80、不變 55、會變 **25**，與 ⑩ 一致。名單 `out/t5-manifest.json`：25 筆，只含 pid、歌詞指紋（25／25 皆有）與差異數字。§4.4 原寫的「舊新錨點摘要雜湊」改為存差異數字（`maxLineDiff` 等），比雜湊更能直接用。
 
+- **T5 全量（2026-11-07 19:06–20:32，checkpoint 34f2beb）**：單元 2263 條＝2236 綠、26 跳過（既有）、**1 紅**＝`BatchOverlappingLoadTests.overlappingLoadSuspendsPollingUntilLastCompletes` 超時 120 s——memory 記載的既有偶發掛起（2026-09-27 起；⑩ 全量同一條），本分支對 `Features/Batch` 改動 0 行，未跳過、照列。完整性：2263＝⑩ 的 2221＋本案新增 42（`TimingFlagStore` 13、`Timing flag provenance` 8、`LyricsFX timing flag` 15、`AppModel timing flag` 6，全綠），無因超時而消失的測試。coverage_gate：Services＋Infra **96.6 %**（`TimingFlagStore` 100 %、`TimingFlag` 100 %；`App/AppModel+TimingFlags` 82 %，不在閘門範圍）。no_playback_gate 綠；Scripts Python 471 條 OK。
 ## 10. 待拍板
 無（Q1 已答；其餘取捨照 §4 的假設，評審若有異議再問）。
 
