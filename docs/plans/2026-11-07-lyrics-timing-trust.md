@@ -43,7 +43,7 @@
 ### 4.1 入口與回饋
 - 入口：歌詞特效層的**右鍵選單**（`.contextMenu` 掛在 `LyricsFXView` 的 ZStack），項目寫死英文（A-07 同慣例）：`Mark Timing as Off` ／已標記時 `Unmark Timing`。
   理由：特效層就是他「看到不準」的地方；不在畫面上常駐按鈕（Mac 介面極簡、memory「找歌詞的工具，不是播放器」）。
-- 可用條件（純函式 `TimingFlagAvailability.resolve(status:, timeline:, persistentID:)`，單測）：`status == .present`、時間軸存在且來源 ≠ `.estimated`、persistentID 非空。其他情況選單項目不出現（估算本來就標 `~`，標它沒有資訊量）。
+- 可用條件（simcodex R1 收斂為一處）：VM 的 `canToggleTimingFlag`＝有標記鍵（有詞、pid 非空）且 `appliedTiming != nil`（快照只在時間軸非估算時存在，由 `setTimeline` 單一寫入點保證）。其他情況選單項目不出現（估算本來就標 `~`，標它沒有資訊量）。
 - 回饋：標記中的歌，角落（`~` 的同一位置）顯示小字 `!`，同 `~` 的字型與顏色；a11y label `timing_flagged`（三語 xcstrings）。取消標記即消失。
   顯示條件（純函式 `LyricsFXTimingMark.resolve` 回 `.estimated`／`.flagged`／`.none`，Codex R2-3）：`!` 只在「目前時間軸非估算、且 applied 快照屬於當前 identity 與 lyricsHash、且該鍵已標記」時出現；換曲後外部時間軸還沒回來的估算窗口只顯示 `~`。
 - `.embeddedLRC` 也可標（他自己的 LRC 也可能歪）；診斷工具對它只報「內嵌」不查外部。
@@ -100,7 +100,7 @@
 ## 5. 任務清單
 | # | 任務 | DoD |
 |---|---|---|
-| T1 | 紅燈：`TimingFlagAvailabilityTests`（可用條件全分支）、`TimingFlagStoreTests`（往返、同鍵冪等、**同 pid 不同 lyricsHash 互不覆蓋**、positions 上限 10、**512 KB 寫入裁減＋塞滿後重讀成功**、取消只刪當前鍵、壞檔／新版本／超大／符號連結不讀不寫、空 pid 拒絕、原子寫入）、`TimingFlagProvenanceTests`（matched／storeMissing／storeMismatch／embedded 各分支）、`LyricsFXTimingFlagTests`（VM：applied 快照隨 applyTiming 設定、embeddedLRC 快照、換曲清掉；擷取在 await 前；pending 期間不可再觸發；失敗回復；換曲後回呼被丟；epoch 亂序兩種；歌詞指紋不同＝未標記；**已標記歌曲重新進入、外部查找未回時只顯示 `~`**）、`AppModelTimingFlagTests`（存檔失敗仍可標且 provenance＝storeMissing；**標記前後 TimingStore 檔逐位不變**；resolver 呼叫 0 次） | 新測試紅、既有綠；紅燈摘要記 §9 |
+| T1 | 紅燈：`TimingFlagStoreTests`（往返、同鍵冪等、**同 pid 不同 lyricsHash 互不覆蓋**、positions 上限 10、**512 KB 寫入裁減＋塞滿後重讀成功**、取消只刪當前鍵、壞檔／新版本／超大／符號連結不讀不寫、空 pid 拒絕、原子寫入）、`TimingFlagProvenanceTests`（matched／storeMissing／storeMismatch／embedded 各分支）、`LyricsFXTimingFlagTests`（VM：applied 快照隨 applyTiming 設定、embeddedLRC 快照、換曲清掉；擷取在 await 前；pending 期間不可再觸發；失敗回復；換曲後回呼被丟；epoch 亂序兩種；歌詞指紋不同＝未標記；**已標記歌曲重新進入、外部查找未回時只顯示 `~`**）、`AppModelTimingFlagTests`（存檔失敗仍可標且 provenance＝storeMissing；**標記前後 TimingStore 檔逐位不變**；resolver 呼叫 0 次） | 新測試紅、既有綠；紅燈摘要記 §9 |
 | T2 | 實作 store＋VM＋AppModel 接線＋右鍵選單＋`!` 回饋＋xcstrings 三語＋`AccessibilityID` | T1 全綠；`xcodegen generate` 後產物一起 commit |
 | T3 | XCUITest `LyricsFXTimingFlagUITests`：UI 測試替身時間軸（非估算）→右鍵出現 `Mark Timing as Off`→點後 `!` 出現→再右鍵 `Unmark Timing`→消失；估算時選單項目不存在。**T2 一完成就先跑**（Codex R1-10：本 app 無 ZStack 右鍵自動化先例） | 使用者在場跑綠（Automation Mode、ABC 輸入法）。若 XCUITest 無法穩定開出該右鍵選單：記事實、改由單元測試覆蓋選單命令，實機操作驗收併入 T6，不放寬其他斷言 |
 | T4 | 離線診斷工具（repo 外）＋自編 fixture 測試（放工具資料夾）：A／B／U／D 各一、來源失敗（逾時、429→熔斷）、provenance 四種；重跑 T5 shadow 產出 manifest | fixture 輸出預期分類與 unavailable；對真機標記檔（使用者標 ≥ 1 首後）跑一次，輸出只有數字 |
@@ -171,3 +171,21 @@
 | 1 | P1 | resolver 只存 source＋錨點，工具重查到的候選無法證明是當時那份，可能把候選改版誤判成對齊器錯錨 | **修改採納**：B 只在「用當時版本重跑重查到的候選、錨點與 applied 快照逐值相同」時成立，否則歸 U（候選已變）。不採「resolver 傳 candidate ID＋LRC 雜湊」：逐值重現已足以認定同一份（⑩ T5 已用此法，80／82 重現），加欄位要改 resolver、存檔與同步格式，超出「只標記」範圍 |
 
 **快審（2026-11-07，評 v0.4）**：不成立——逐值相同只證明「當時版本的輸出相同」，不同候選（只差未對上的行或文字）也可能產生相同錨點。**採納其修正**：B 降為「疑似對齊器錯錨（當時輸出可重現）」，不宣稱同一候選；需要確證時另案在套用當時保存候選內容雜湊。分歧收斂，定稿 v1.0。
+
+## 附錄 D simcodex（2026-11-07，三輪；checkpoint 5d37573／c887cfb → 421401e → b834ba1 → 本次，皆 wip、未 push）
+codex 一律 `codex review --base main`。安全評審只在 R1 派一次（Opus）。
+
+| 輪 | 來源 | 處置 |
+|---|---|---|
+| R1 | codex P2＋安全 MEDIUM-1（同一件） | **採納（紅→綠）**：單筆標記單獨超過 512 KB 時，裁減迴圈會把舊標記連同新的一起丟光、寫空檔並回報成功。改為先量單筆，放不下拋 `flagTooLarge`、不動檔；裁減時新的那筆不丟（`aSingleFlagTooLargeToFitIsRejectedWithoutTouchingTheFile`、`theNewFlagIsNeverTheOneTrimmed`） |
+| R1 | 安全 LOW-1／2（檢查後讀取的 TOCTOU、資料夾是符號連結） | **不改**：需同使用者權限，`TimingStore`／`ArtistConsensusStore` 同寫法、同一已接受風險；要收斂應三個 store 一起改（另案） |
+| R1 | 安全 LOW-3（A→B→A 切歌時查詢可能早於寫入、畫面暫時未標） | **不改**：檔案正確、下次換回會重查修正；不值得為此加狀態 |
+| R1 | simplify altitude／simplification P1（可標記判斷兩處定義、`applied.source == timeline.source` 事後對帳） | **採納**：`timeline` 與 `appliedTiming` 改由 `setTimeline` 單一寫入點設定（估算＝nil），可標記＝有鍵且有快照，`!` 用同一判斷；刪 `TimingFlagAvailability`。不採「`LyricsTimeline` 自帶快照」：要改 `LRCAligner`／builder 共用基礎設施，單一寫入點已達同效 |
+| R1 | simplify P1（守衛裡與 epoch 等價的條件） | **採納**：兩個回呼只留 `flagEpoch == epoch` |
+| R1 | reuse P1（安全讀檔流程第 5 份手抄） | **延後（需使用者決定）**：收斂要動 4 個既有 store，多檔重構超出本案 |
+| R1 | 其餘 P2 | 採納：`InMemoryTimingFlagStore` 限 DEBUG、0.1 s 量化移到 `TimingFlag.quantized`、`LyricsTimeline.lineStarts`。延後：`with*` 手抄欄位、兩個同 category Logger、測試 fixture／替身重複、裁減迴圈 O(n²)、`isFlagged` 每次重讀檔、`TimingFlagRecorder` 抽層 |
+| R2 | codex P2 | **採納（紅→綠）**：語法合法但內容不合規格的檔（非正規 pid、估算來源、positions 超量）被當正常讀入、寫入時覆寫。讀檔逐條 `isWellFormed`，不合整檔當未知 |
+| R2 | simplify（增量） | 無 P1。採納：寫入也用 `isWellFormed` 把關（`malformedFlag`），讀寫同一謂詞；計劃殘留舊名更新。不採：前置大小檢查多一次 encode（毫秒級，換來不先裁舊標記）、UI 測試替身的 lineStarts 重複 |
+| R3 | codex P2 | **採納（紅→綠）**：錨點只驗數量，負數／非有限／亂序也收。`isWellFormed` 加 `areWellFormedAnchors`（與 `TimingStore` 同一不變式）與 positions 有限非負。已核內嵌 LRC 起點由 `LRCParser` 依時間排序，不會被誤拒 |
+
+修正後：相關 7 suite 79 條綠。simcodex 三輪用完，R3 的唯一一條已修；是否再加一輪由使用者決定。

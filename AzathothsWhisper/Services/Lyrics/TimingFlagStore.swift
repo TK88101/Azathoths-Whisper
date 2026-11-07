@@ -18,6 +18,8 @@ actor TimingFlagStore: TimingFlagStoring {
         case unrecognizedFileOnDisk
         /// 這一筆單獨就超過寫入上限：不寫、不動既有標記（安全評審 MEDIUM-1／codex R1）
         case flagTooLarge
+        /// 不是本版讀得回來的形狀（與讀檔同一個 `isWellFormed`）：寫進去會讓整檔變成讀不懂
+        case malformedFlag
     }
 
     static let schemaVersion = 1
@@ -66,6 +68,7 @@ actor TimingFlagStore: TimingFlagStoring {
         let existing = try currentFlags()
         let previous = existing.first { $0.key == incoming.key }
         let merged = incoming.withPositions(Array(((previous?.positions ?? []) + incoming.positions).suffix(TimingFlag.maxPositions)))
+        guard merged.isWellFormed else { throw StoreError.malformedFlag }
         guard try Self.encode([merged]).count <= maxWriteBytes else { throw StoreError.flagTooLarge }
         try write(existing.filter { $0.key != incoming.key } + [merged], keeping: merged.key)
     }
@@ -170,7 +173,8 @@ extension TimingFlag {
     /// 本版寫得出來的形狀才算讀得懂（codex R2）：任一條不合就整檔當未知，不讀不覆寫
     var isWellFormed: Bool {
         TimingStore.isCanonicalID(persistentID) && applied.source != .estimated
-            && positions.count <= Self.maxPositions && applied.anchors.count <= TimingStore.maxLines
+            && positions.count <= Self.maxPositions && positions.allSatisfy { $0.isFinite && $0 >= 0 }
+            && applied.anchors.count <= TimingStore.maxLines && applied.anchors.areWellFormedAnchors   // 與 TimingStore 同一份錨點不變式（codex R3）
     }
 
     func withPersistentID(_ id: String) -> TimingFlag {

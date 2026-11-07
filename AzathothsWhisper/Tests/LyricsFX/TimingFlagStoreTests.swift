@@ -106,6 +106,18 @@ struct TimingFlagStoreTests {
         #expect(!(await store.isFlagged(key())))
     }
 
+    @Test func aFlagThatCouldNotBeReadBackIsNotWritten() async throws {
+        let directory = tempDirectory()
+        let store = TimingFlagStore(directory: directory)
+        let flag = Self.flag()
+        let estimated = TimingFlag(
+            persistentID: flag.persistentID, lyricsHash: flag.lyricsHash, markedAt: flag.markedAt, positions: flag.positions,
+            applied: AppliedTiming(source: .estimated, anchors: []), stored: nil, provenance: .storeMissing
+        )
+        await #expect(throws: TimingFlagStore.StoreError.malformedFlag) { try await store.flag(estimated) }
+        #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent(TimingFlagStore.fileName).path))
+    }
+
     @Test func theNewFlagIsNeverTheOneTrimmed() async throws {
         let store = TimingFlagStore(directory: tempDirectory(), maxWriteBytes: 4096)
         // 新的那筆時間比既有的都早（時鐘被調過）：仍然保留新的，丟既有最舊者
@@ -131,7 +143,7 @@ struct TimingFlagStoreTests {
     }
 
     enum Unreadable: String, CaseIterable, Sendable {
-        case corruptJSON, newerVersion, oversized, symbolicLink, invalidPersistentID, estimatedSource, tooManyPositions
+        case corruptJSON, newerVersion, oversized, symbolicLink, invalidPersistentID, estimatedSource, tooManyPositions, unorderedAnchors
     }
 
     @Test(arguments: Unreadable.allCases)
@@ -157,6 +169,12 @@ struct TimingFlagStoreTests {
             try Self.file(with: TimingFlag(
                 persistentID: flag.persistentID, lyricsHash: flag.lyricsHash, markedAt: flag.markedAt, positions: flag.positions,
                 applied: AppliedTiming(source: .estimated, anchors: []), stored: nil, provenance: .storeMissing
+            )).write(to: url)
+        case .unorderedAnchors:
+            let flag = Self.flag(pid: "00000000000000BB")
+            try Self.file(with: TimingFlag(
+                persistentID: flag.persistentID, lyricsHash: flag.lyricsHash, markedAt: flag.markedAt, positions: flag.positions,
+                applied: AppliedTiming(source: .lrclib, anchors: [.init(index: 1, start: 9), .init(index: 0, start: 5)]), stored: nil, provenance: .storeMissing
             )).write(to: url)
         case .tooManyPositions:
             try Self.file(with: Self.flag(pid: "00000000000000BB", positions: (0..<11).map(Double.init))).write(to: url)
