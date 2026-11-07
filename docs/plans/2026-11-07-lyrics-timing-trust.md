@@ -87,7 +87,7 @@
 `~/Developer/azw-timing-probe/tools/flags/`，沿用 `tools/nf` 的作法，**直接編譯 app 原檔**（Codex R1-4）：對齊（`LRCAligner`／`LRCAlignmentPath`／`EditDistance`／`LRCParser`）、選曲（`TrackMatcher`／`CandidateRanking`／`ProviderOutcome`）、**五個 provider 與其 parser、`TimedLyricsProvider`、`SourceGate`、HTTP client 與 `TimingResolver+Live.swift` 的來源組裝（含各來源 `minimumInterval`：LRCLIB 0.5 s、其他 1 s）**。實作時若某檔依賴 app-only 型別無法單獨編譯，就在工具內加最小 shim，不改 app 原檔；改不動時該來源列「unavailable（工具限制）」，不靜默略過。
 1. 讀 `TimingFlags.json`、對應的 `Timings/<pid>.json`、Music 歌詞（唯讀 osascript，只讀 lyrics 與曲長；不送播放控制）。
 2. 每首（以序號代替曲名）依序查各來源，同一來源請求間隔照 app 的 `SourceGate`、單一請求逾時照 app、429／失敗記 `unavailable` 並照 app 的熔斷規則停用該來源到本次結束。
-3. 逐首輸出：provenance；applied 來源／錨點數；現在的存檔與 applied 是否相同；各來源候選的 TrackMatcher 結果、時長差、rev 3 對齊的 musicRate／lrcCoverage／groups、與 applied 錨點的逐行差（中位數、最大、標記位置 ±15 s 內的差）；各來源之間的互比；是否在 T5 25 首內（25 首另列 rev 2 vs rev 3）。T5 名單的權威來源（Codex R2-4）：⑩ 只留彙總數字、未存逐首結果；T4 先用 `tools/nf/t45` 重跑一次 shadow，產出 `out/t5-manifest.json`（只含 pid、lyricsHash、舊新錨點摘要雜湊、重跑日期），並核對重跑結果仍為 80 可比／25 不同；數字不符時記實際值、照實值用，不硬湊 25。
+3. 逐首輸出：provenance；applied 來源／錨點數；現在的存檔與 applied 是否相同；各來源候選的 TrackMatcher 結果、時長差、rev 3 對齊的 musicRate／lrcCoverage／groups、與 applied 錨點的逐行差（中位數、最大、標記位置 ±15 s 內的差）；各來源之間的互比；是否在 T5 25 首內（25 首另列 rev 2 vs rev 3）。T5 名單的權威來源（Codex R2-4）：〔更正：⑩ 其實有存逐首結果，見 §9 T4〕T4 先用 `tools/nf/t45` 重跑一次 shadow，產出 `out/t5-manifest.json`（只含 pid、lyricsHash、舊新錨點摘要雜湊、重跑日期），並核對重跑結果仍為 80 可比／25 不同；數字不符時記實際值、照實值用，不硬湊 25。
 4. 分類（推測，供修法計劃用，Codex R1-9）：A 套用的來源疑似錯版本（時長差大或其他來源彼此一致而與它不同）；B **疑似**對齊器錯錨（當時輸出可重現；不是「已證明同一候選」，Codex R3-1／快審）：用 applied 當時的對齊器版本（rev 2＝`tools/nf/t45/V2Oracle.swift`、rev 3＝分支原檔；版本取自 `stored.alignerRevision`，provenance 非 matched 時無版本可用→不判 B）重跑重新取得的候選，錨點與 applied 快照**逐值相同**才進 B（只代表當時輸出可重現，不同候選也可能產生相同錨點），再看另一版本結果是否不同、差是否集中在標記位置附近；重現不了＝候選已變，歸 U 並註明「候選已變」（同 ⑩ T5 的『舊對齊器能重現存檔錨點』驗證法）。不改 resolver、不加候選 ID 欄位；B 只作修法計劃的線索，修法計劃仍需各自的證據；**U 未定**（各來源彼此一致、與 applied 也一致，他仍說不準——可能是來源 LRC、Music 播放位置、整體 offset 或歌詞版本，需要人耳，列 TBD，不預設修法）；D 內嵌 LRC。
 5. 輸出只寫到 `~/Developer/azw-timing-probe/out/flags-YYYYMMDD.tsv`，不進 repo，不出曲名歌詞。
 
@@ -135,6 +135,10 @@
   - 偏離 §4.2 字面（筆誤級）：檔案放 `Application Support/.../TimingFlags/flags.json`（資料夾＋檔名，同 `ArtistConsensus/` 慣例），非 `TimingFlags.json`。
   - 實作中觀察（既有行為、非本案引入、未改）：同一首在外部時間軸套用後若再收到 metadata 變更，`apply` 會把時間軸重建為估算，而 `requestedTiming` 擋住同 (pid, 指紋) 重查——該首會回到估算直到換歌。標記狀態依鍵保留不受影響。是否另案交使用者決定。
 - **T3 綠（2026-11-07，使用者在場）**：`LyricsFXUITests.testAFoundTimelineCanBeMarkedAsOffAndUnmarked`（14.6 s）、`testEstimatedTimingOffersNoMarkMenu`（9.0 s）2／2 綠；右鍵自動化可行，不需 fallback。
+- **T4（2026-11-07，repo 外 `~/Developer/azw-timing-probe/tools/flags/`）**：`build.sh` 直接編 app 原檔（五個 provider、`SourceGate`、`LRCAligner`／`LRCAlignmentPath`、`TrackMatcher`／`CandidateRanking`、`TimingFlagStore`（同一份 `isWellFormed`）、`TimingStore`）＋ ⑩ 的 `V2Oracle`；SwiftSoup（QQ 來源依賴）從套件原始碼編成 `lib/libSwiftSoup.a`。
+  - **shim（依 §4.4 例外條款）**：`TimingResolver.swift` 牽出 iCloud 同步、設定存檔等 app 型別，工具不編它；`LiveProviders.swift` 照抄 `liveProviders` 的順序與間隔——provider 與 `LRCLIBProvider.minimumInterval` 仍是原檔，唯一抄來的常數是非 LRCLIB 間隔 1 s（檔內註明 app 改動時要同步）。
+  - `flags selftest`：A／B／U／D、來源失敗熔斷（同來源失敗後本次不再請求）、provenance 四種、標記附近錨點差——**OK**。`run.sh`＝讀標記 → osascript 唯讀讀 Music → 逐首查來源 → `out/flags-YYYYMMDD.tsv`。真資料待使用者標記後跑。
+  - **T5 名單（更正 §4.4 的事實）**：⑩ 其實有存逐首結果（`tools/nf/data/t45-report.json` 的 `t5Shadow`，80 筆含 pid）。仍依計劃重跑 `t45`（離線、只讀已存資料）：可比 80、不變 55、會變 **25**，與 ⑩ 一致。名單 `out/t5-manifest.json`：25 筆，只含 pid、歌詞指紋（25／25 皆有）與差異數字。§4.4 原寫的「舊新錨點摘要雜湊」改為存差異數字（`maxLineDiff` 等），比雜湊更能直接用。
 
 ## 10. 待拍板
 無（Q1 已答；其餘取捨照 §4 的假設，評審若有異議再問）。
