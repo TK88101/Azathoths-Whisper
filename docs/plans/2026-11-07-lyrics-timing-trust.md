@@ -134,6 +134,7 @@
 - **T2 綠（2026-11-07）**：store／provenance／可用條件／角落判定／VM（快照、pending、epoch）／AppModel 接線／右鍵選單／`!`／`timing_flagged` 三語／`AccessibilityID` 完成；相關 7 suite（新 4＋`TimingMarksTests`（三語檢查加 `timing_flagged`）、`LyricsFXViewModelTests`、`AppModelTimingTests`）78 條綠。
   - 偏離 §4.2 字面（筆誤級）：檔案放 `Application Support/.../TimingFlags/flags.json`（資料夾＋檔名，同 `ArtistConsensus/` 慣例），非 `TimingFlags.json`。
   - 實作中觀察（既有行為、非本案引入、未改）：同一首在外部時間軸套用後若再收到 metadata 變更，`apply` 會把時間軸重建為估算，而 `requestedTiming` 擋住同 (pid, 指紋) 重查——該首會回到估算直到換歌。標記狀態依鍵保留不受影響。是否另案交使用者決定。
+- **T3 綠（2026-11-07，使用者在場）**：`LyricsFXUITests.testAFoundTimelineCanBeMarkedAsOffAndUnmarked`（14.6 s）、`testEstimatedTimingOffersNoMarkMenu`（9.0 s）2／2 綠；右鍵自動化可行，不需 fallback。
 
 ## 10. 待拍板
 無（Q1 已答；其餘取捨照 §4 的假設，評審若有異議再問）。
