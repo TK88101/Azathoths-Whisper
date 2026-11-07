@@ -1,6 +1,6 @@
 # ⑩ 歌詞對不上唱的時機——對齊器漏判修正
 
-狀態：**v1.2（2026-11-06）**：v1.0 經 Codex 四輪定稿、使用者 2026-11-06 拍板開工；實作時修訂 §4.1 tie-break（附錄 D，Codex 快審成立）、效能驗收（附錄 E，Codex 快審兩輪成立）。分支 `wip/lyrics-timing-fix`（自 main dbc48da）。
+狀態：**v1.3 結案（2026-11-07）**：I-73 使用者 2026-11-07 簽字、合併進 main。v1.0 經 Codex 四輪定稿、使用者 2026-11-06 拍板開工；實作時修訂 §4.1 tie-break（附錄 D，Codex 快審成立）、效能驗收（附錄 E，Codex 快審兩輪成立）；simcodex 三輪處置見附錄 F。分支 `wip/lyrics-timing-fix`（自 main dbc48da）。
 前案：`2026-10-25-lyrics-timing-accuracy.md`（C-17 結案「停」）。本案不重啟那條 ML 量測路線。
 
 ## 0. 複述
@@ -124,6 +124,10 @@
 - **T2 綠（2026-11-06）**：對齊器 4 suite 37 條綠（含 600 組 oracle）。效能：見附錄 E（Debug 合成門檻改為 Release 探針＋resolver 時限測試）。
 - **T3 紅→綠（2026-11-06）**：紅 8 條（found rev 2 不重查、notFound 舊版重查、`importMerged` 有效版本、雙機收斂、`RemoteTimingIndex` rev 2 同級、`merged` 不升到 3、resolver 舊 found 記到 2）；實作後相關 14 suite 198 條綠。checkpoint `aed25e3`（wip，未 push）。
 - **T4（2026-11-06，`tools/nf/t45`，branch 原檔 -O）**：notFound 33 首、有通過 TrackMatcher 且帶時間候選者 28 首：舊 0、新 **19** 採用（門檻 18 達標）；19 首全為 TrackMatcher exact、時長差 0.04–2.2 s。〈Here Comes the Sun〉musicRate 0.90、lrcCoverage 0.93、群組 25。對照組：①交叉 896 對 0 採用；②同團近鄰（不同曲名、不同歌詞）574 對 0；③合成（自身歌詞 40 % 換成他曲）172 對 0。只作把關，不是「不增加錯配」的證明。
+- **T6 全量（2026-11-07 01:21，checkpoint 7cd76b1）**：單元 2221 條＝2194 綠、26 跳過（既有）、**1 紅**＝`BatchOverlappingLoadTests.overlappingLoadSuspendsPollingUntilLastCompletes` 超時 120 s，單獨重跑同樣超時——memory 記載的既有偶發掛起（2026-09-27 起），本分支對 `Features/Batch` 改動 0 行，未跳過、照列。總數＝I-72 時 2190＋本案新增 31，無因超時而消失的測試。coverage_gate：Services＋Infra 96.6 %（`LRCAlignmentPath` 100 %、`LRCAligner` 98.4 %、`TimingStore` 99.3 %、`RemoteTimingIndex` 93.5 %）。no_playback_gate 綠；Scripts Python 471 條 OK。
+- **在場 #1 前置（2026-11-07）**：Release 建置成功；162 個 found 檔 SHA-256 已存（驗收 5 的「之前」）；〈Here Comes the Sun〉存檔＝notFound rev 2（新版播放時會重查）。
+- **在場 #1（2026-11-07，使用者在場）**：新版 Release 播〈Here Comes the Sun〉（Abbey Road），使用者回報「沒什麼問題了」。存檔由 notFound rev 2 變為 **found（youtubeMusic）rev 3、36 個錨點**（fetchedAt 2026-11-07T02:20:12Z）——notFound 依版本重查生效。驗收 5：裝新版、播放一次後，162 個 found 檔 SHA-256 **162／162 逐位不變**（iCloud 同步開著；同步匯入是否已在這段時間發生未另外核對，TBD）。
+- **結案（2026-11-07）**：使用者簽 I-73（「可以簽，合併吧」）。遺留：T5 的 25 首 lrclib-found 新舊顯示差異（另案，待使用者決定）；其他來源 80 首的 shadow（TBD）；simcodex 延後的 P2 兩條（附錄 F）。
 - **T5 shadow（不寫入）**：lrclib-found 82 首；舊對齊器能逐值重現存檔者 80 首（rev 1、rev 2 各 1 首重現不了，列「來源已變」排除）。80 首中 **55 首不變、25 首顯示會變**：以「新版多出直接錨點」為主（原本內插的行，新版直接對上），逐行最大差 0.4–62 s。哪邊正確需音訊或人耳判定，**本案不改 found**，交使用者另案決定。其他來源 80 首：TBD。
 
 
@@ -184,3 +188,20 @@
   | 3 | ≤ 1 s 要以真實 `TimingResolver` 時限＋最壞輸入證明 | **採納**：新增 `TimingResolverTests.theDeadlineCancelsAWorstCaseAlignmentWithinOneSecond`（GatedPollClock 放行時限、最壞輸入 2000×2000×500 字）：返回 `unavailable`、不存檔、到點後 ≤ 1 s——已綠 |
   | 4 | 單首上限不限制多候選×多來源累積 | **駁回（附既有程式證據）**：累積已有三道上限——每首總時限 20 s（`TimingResolver.deadline`）、同一時間只跑一首、第 2／3 名候選只在已用 ≤ 10 s 時才取（`extraCandidateCutoff`），每來源最多 3 名（`rankedLimit`）。最壞累積估計：來源數 × 3 × 單次；正常曲 ≤ 9.4 ms／次，異常 996 行 241 ms／次，皆遠低於 20 s；對齊在 `@concurrent` 背景執行、不佔 resolver。不另加 CPU 預算 |
 - **Codex 快審 R2（2026-11-06）：成立**——四項處置均成立，#4 駁回成立（無本案範圍內的反例），效能驗收修訂整體可接受。
+
+## 附錄 F simcodex（2026-11-06，三輪；實作 checkpoint aed25e3 → 7a90809 → 7ee959a → 7cd76b1，皆 wip、未 push）
+codex 一律 `codex review --base main`（實作已在 wip checkpoint，`--uncommitted` 看不到）。安全評審只在 R1 派一次（Opus）。
+
+| 輪 | 來源 | 處置 |
+|---|---|---|
+| R1 | codex | 無 P0／P1 |
+| R1 | 安全 F1 MEDIUM | **採納（紅→綠）**：最後一個 cue 落在曲長＋5 s 內時反向群組切分點超限 → 存了顯示不了、永不重查。切分上界夾到 `startLimit` |
+| R1 | 安全 F2 MEDIUM | **採納（紅→綠）**：本機歌詞行數無上限 → M×L 表可達數百 MB。理論上限到不了門檻就不跑 DP |
+| R1 | 安全 F3／F4 LOW | 採納：重建每行查取消；串接先比長度 |
+| R1 | simplify 四角度 | 採納：版本語意收斂到 `TimingRecord` extension、`duration`／`groups` 必填、診斷印 `groups`、DP 兩迴圈合一、`Step.advance`、`Grid`、測試共用 `AlignmentFixtures`、oracle 改 `[Character]` 版比較。不採：預先串接全部組合（Release 已 ≤ 12 ms，增記憶體）、`steps` 免配置、減少取消檢查 |
+| R2 | codex P2 | **採納（紅→綠）**：預檢後 Music 仍可達 ~8,571 行（> 150 MB）。Music 行數上限＝`maximumTimedLines`，預檢與上限移入 `LRCAlignmentPath.find`（回空路徑＝不採用） |
+| R2 | simplify | 採納：`canReachRate` 共用（測試不再抄公式、去掉多餘 `min`）、`startLimit` 唯一定義、`predatesCurrentAligner`／`revisionAfterRequery`、文件錯位、遮罩位數測試、`similarSpans` 直接回遮罩。**不採**：讀取路徑（`storedOutcome`、`RemoteTimingIndex.pick`）加曲長上限——F1 後已無超限錨點的寫入者，改讀取路徑超出範圍；`alignment()` 改非 Optional——動到 resolver 取消語意，超出範圍；`Step` 屬性再合併——邊際 |
+| R3 | codex | 無可行動問題 |
+| R3 | simplify | 只剩 P2，便宜者已修（`comparableCueCount` 共用、測試用 `startLimit`、空行）；延後：`maximumMusicLines` 別名內聯、遮罩位數公式移到型別旁（需放寬 private） |
+
+修正後：相關 14 suite 202 條綠；T4／T5 探針重跑結果不變（19 採用、對照 0／896、0／574、0／172；T5 55／80 不變）；Release 一般曲最大 9.2 ms，996 行異常歌詞欄被預檢擋下不跑 DP。
