@@ -95,6 +95,27 @@ struct TimingFlagStoreTests {
         #expect(await store.isFlagged(TimingFlagKey(persistentID: pids.last!, lyricsHash: Self.hashA)))
     }
 
+    @Test func aSingleFlagTooLargeToFitIsRejectedWithoutTouchingTheFile() async throws {
+        let directory = tempDirectory()
+        let store = TimingFlagStore(directory: directory, maxWriteBytes: 4096)
+        try await store.flag(Self.flag(pid: "00000000000000AA", anchors: 2))
+        let url = directory.appendingPathComponent(TimingFlagStore.fileName)
+        let before = try Data(contentsOf: url)
+        await #expect(throws: TimingFlagStore.StoreError.flagTooLarge) { try await store.flag(Self.flag(anchors: 2000)) }
+        #expect(try Data(contentsOf: url) == before)
+        #expect(!(await store.isFlagged(key())))
+    }
+
+    @Test func theNewFlagIsNeverTheOneTrimmed() async throws {
+        let store = TimingFlagStore(directory: tempDirectory(), maxWriteBytes: 4096)
+        // 新的那筆時間比既有的都早（時鐘被調過）：仍然保留新的，丟既有最舊者
+        for index in 0..<10 {
+            try await store.flag(Self.flag(pid: String(format: "%016X", index + 1), markedAt: Date(timeIntervalSince1970: 1_900_000_000 + Double(index)), anchors: 10))
+        }
+        try await store.flag(Self.flag(markedAt: Date(timeIntervalSince1970: 1_700_000_000), anchors: 10))
+        #expect(await store.isFlagged(key()))
+    }
+
     @Test func aStoreFilledToTheRealLimitStillReadsBack() async throws {
         let directory = tempDirectory()
         let store = TimingFlagStore(directory: directory)

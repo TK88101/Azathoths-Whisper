@@ -137,7 +137,6 @@ final class LyricsFXViewModel {
         guard new != status else { return }
         status = new
         setBaseTimeline(timeline(for: lyrics))
-        syncTimingFlagKey()
         updateClock()
     }
 
@@ -172,7 +171,6 @@ final class LyricsFXViewModel {
         status = LyricsStatus.resolve(lyrics: lyrics, isMarked: isMarkedNoLyrics(persistentID))
         setBaseTimeline(timeline(for: lyrics))
         genreStyle = GenreStyleResolver.resolve(genre: metadata.genre, lyrics: lyrics)
-        syncTimingFlagKey()
         updateClock()
         requestTimingIfNeeded()
     }
@@ -200,19 +198,21 @@ final class LyricsFXViewModel {
         else { return }
         let duration = metadata.duration ?? (lines.last?.start ?? 0) + LyricsTimelineBuilder.lastLineFallback
         guard let found = LRCAligner.timeline(lyrics: lyrics, stored: lines, duration: duration, source: source.timingSource) else { return }
-        timeline = found
-        appliedTiming = AppliedTiming(source: source.timingSource, anchors: lines)
+        setTimeline(found, applied: AppliedTiming(source: source.timingSource, anchors: lines))
     }
 
-    /// 本地建出的時間軸（估算或內嵌 LRC）與它的快照一起換：估算沒有快照，內嵌 LRC 記各行起點（Codex R2-1）
+    /// 本地建出的時間軸（估算或內嵌 LRC）：估算沒有快照，內嵌 LRC 記各行起點（Codex R2-1）。
+    /// 歌詞、狀態或身分在此之前已更新，所以順帶重算標記鍵
     private func setBaseTimeline(_ base: LyricsTimeline?) {
-        timeline = base
-        appliedTiming = base.flatMap(Self.embeddedSnapshot)
+        let applied = base.flatMap { $0.source == .embeddedLRC ? AppliedTiming(source: .embeddedLRC, anchors: $0.lineStarts) : nil }
+        setTimeline(base, applied: applied)
+        syncTimingFlagKey()
     }
 
-    private static func embeddedSnapshot(_ timeline: LyricsTimeline) -> AppliedTiming? {
-        guard timeline.source == .embeddedLRC else { return nil }
-        return AppliedTiming(source: .embeddedLRC, anchors: timeline.lines.enumerated().map { .init(index: $0.offset, start: $0.element.start) })
+    /// `timeline` 與 `appliedTiming` 的唯一寫入點：快照恆為畫面這份時間軸的（估算＝nil），不必事後比對來源
+    private func setTimeline(_ timeline: LyricsTimeline?, applied: AppliedTiming?) {
+        self.timeline = timeline
+        appliedTiming = applied
     }
 
     /// 只有確實有詞（`.present`）才建；`.present` 蘊含 lyrics 非 nil
@@ -229,7 +229,6 @@ final class LyricsFXViewModel {
         metadata = .unknown
         status = .unknown
         setBaseTimeline(nil)
-        syncTimingFlagKey()
         genreStyle = nil
         statusText = text
         sessionSignature = nil
@@ -283,13 +282,13 @@ final class LyricsFXViewModel {
 
     // MARK: ⑪ 時間軸不準標記
 
+    /// 可標記＝有標記鍵（有詞、有 pid）且畫面有快照（非估算）。`!` 用同一個快照判斷（同一語義一處定義）
     var canToggleTimingFlag: Bool {
-        onToggleTimingFlag != nil && timingFlag != .pending && flagKey != nil
-            && TimingFlagAvailability.isAvailable(status: status, timeline: timeline, applied: appliedTiming, persistentID: identity?.persistentID ?? "")
+        onToggleTimingFlag != nil && timingFlag != .pending && flagKey != nil && appliedTiming != nil
     }
 
     var timingMark: LyricsFXTimingMark.Kind {
-        LyricsFXTimingMark.resolve(timeline: timeline, status: status, flag: timingFlag, applied: appliedTiming)
+        LyricsFXTimingMark.resolve(timeline: timeline, status: status, flag: timingFlag, hasAppliedTiming: appliedTiming != nil)
     }
 
     /// 標記或取消當前這首。請求在任何 await 之前擷取（按下後換歌，送出的仍是按下當時那首）；
@@ -298,14 +297,15 @@ final class LyricsFXViewModel {
         guard canToggleTimingFlag, let key = flagKey, let applied = appliedTiming, let onToggle = onToggleTimingFlag else { return }
         let previous = timingFlag
         let request = TimingFlagRequest(
-            key: key, position: positionClock.position(at: .now).map { ($0 * 10).rounded() / 10 }, applied: applied, wantsFlagged: previous != .flagged
+            key: key, position: positionClock.position(at: .now).map(TimingFlag.quantized), applied: applied, wantsFlagged: previous != .flagged
         )
         timingFlag = .pending
         flagEpoch += 1
         let epoch = flagEpoch
         Task { [weak self] in
             let succeeded = await onToggle(request)
-            guard let self, self.flagEpoch == epoch, self.flagKey == key else { return }
+            // 換鍵與新的切換都會 +1 epoch：epoch 沒變＝鍵沒變、期間沒有別的切換
+            guard let self, self.flagEpoch == epoch else { return }
             self.timingFlag = succeeded ? (request.wantsFlagged ? .flagged : .unflagged) : previous
         }
     }
@@ -325,7 +325,7 @@ final class LyricsFXViewModel {
         let epoch = flagEpoch
         Task { [weak self] in
             let flagged = await lookup(newKey)
-            guard let self, self.flagEpoch == epoch, self.flagKey == newKey, self.timingFlag != .pending else { return }
+            guard let self, self.flagEpoch == epoch else { return }
             self.timingFlag = flagged ? .flagged : .unflagged
         }
     }

@@ -57,46 +57,28 @@ struct TimingFlagProvenanceTests {
         #expect(result.stored == nil)
     }
 
-    // MARK: 可用條件
+    // MARK: 角落標記（可標記與 `!` 共用「畫面有快照」一個判斷：VM 的 `appliedTiming` 只在非估算時存在）
 
     private func timeline(_ source: TimingSource) -> LyricsTimeline {
         LyricsTimeline(lines: [TimedLine(start: 5, end: 9, text: "Lanterns over the river", isChorus: false)], source: source, duration: 200)
     }
 
-    @Test(arguments: [TimingSource.lrclib, .youtubeMusic, .deezer, .qq, .netease, .embeddedLRC])
-    func anAppliedNonEstimatedTimelineCanBeFlagged(source: TimingSource) {
-        #expect(TimingFlagAvailability.isAvailable(
-            status: .present, timeline: timeline(source), applied: AppliedTiming(source: source, anchors: Self.anchors), persistentID: Self.pid
-        ))
-    }
-
-    @Test func anEstimatedTimelineCannotBeFlagged() {
-        #expect(!TimingFlagAvailability.isAvailable(status: .present, timeline: timeline(.estimated), applied: nil, persistentID: Self.pid))
-    }
-
-    @Test func flaggingNeedsLyricsATimelineASnapshotAndAPersistentID() {
-        let lrclib = timeline(.lrclib)
-        #expect(!TimingFlagAvailability.isAvailable(status: .missing, timeline: lrclib, applied: applied, persistentID: Self.pid))
-        #expect(!TimingFlagAvailability.isAvailable(status: .present, timeline: nil, applied: applied, persistentID: Self.pid))
-        #expect(!TimingFlagAvailability.isAvailable(status: .present, timeline: lrclib, applied: nil, persistentID: Self.pid))
-        #expect(!TimingFlagAvailability.isAvailable(status: .present, timeline: lrclib, applied: applied, persistentID: ""))
-        // 快照與畫面來源不同（不該發生，但不得誤標）
-        #expect(!TimingFlagAvailability.isAvailable(
-            status: .present, timeline: lrclib, applied: AppliedTiming(source: .netease, anchors: Self.anchors), persistentID: Self.pid
-        ))
-    }
-
-    // MARK: 角落標記
-
     @Test func theCornerShowsTheTildeForEstimatedTimingEvenWhenFlagged() {
-        #expect(LyricsFXTimingMark.resolve(timeline: timeline(.estimated), status: .present, flag: .flagged, applied: nil) == .estimated)
+        #expect(LyricsFXTimingMark.resolve(timeline: timeline(.estimated), status: .present, flag: .flagged, hasAppliedTiming: false) == .estimated)
     }
 
     @Test func theCornerShowsTheFlagOnlyForAFlaggedAppliedTimeline() {
-        #expect(LyricsFXTimingMark.resolve(timeline: timeline(.lrclib), status: .present, flag: .flagged, applied: applied) == .flagged)
-        #expect(LyricsFXTimingMark.resolve(timeline: timeline(.lrclib), status: .present, flag: .unflagged, applied: applied) == .none)
-        #expect(LyricsFXTimingMark.resolve(timeline: timeline(.lrclib), status: .present, flag: .pending, applied: applied) == .none)
-        #expect(LyricsFXTimingMark.resolve(timeline: timeline(.lrclib), status: .present, flag: .flagged, applied: nil) == .none)
-        #expect(LyricsFXTimingMark.resolve(timeline: timeline(.lrclib), status: .missing, flag: .flagged, applied: applied) == .none)
+        #expect(LyricsFXTimingMark.resolve(timeline: timeline(.lrclib), status: .present, flag: .flagged, hasAppliedTiming: true) == .flagged)
+        #expect(LyricsFXTimingMark.resolve(timeline: timeline(.lrclib), status: .present, flag: .unflagged, hasAppliedTiming: true) == .none)
+        #expect(LyricsFXTimingMark.resolve(timeline: timeline(.lrclib), status: .present, flag: .pending, hasAppliedTiming: true) == .none)
+        #expect(LyricsFXTimingMark.resolve(timeline: timeline(.lrclib), status: .present, flag: .flagged, hasAppliedTiming: false) == .none)
+    }
+
+    @Test func lineStartsFollowTheDisplayedLines() {
+        let timeline = LyricsTimeline(lines: [
+            TimedLine(start: 1, end: 3, text: "Lanterns", isChorus: false),
+            TimedLine(start: 3.5, end: 6, text: "Ash", isChorus: false),
+        ], source: .embeddedLRC, duration: 10)
+        #expect(timeline.lineStarts == [.init(index: 0, start: 1), .init(index: 1, start: 3.5)])
     }
 }

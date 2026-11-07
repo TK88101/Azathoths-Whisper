@@ -12,10 +12,9 @@ enum LyricsFXTimingMark {
 
     /// ⑪：同一個角落兩種記號。`!` 只在畫面的時間軸就是被標記的那份時出現；
     /// 標過的歌重新播放、外部時間軸還沒回來的估算窗口只顯示 `~`（Codex R2-3）
-    static func resolve(timeline: LyricsTimeline?, status: LyricsStatus, flag: TimingFlagState, applied: AppliedTiming?) -> Kind {
+    static func resolve(timeline: LyricsTimeline?, status: LyricsStatus, flag: TimingFlagState, hasAppliedTiming: Bool) -> Kind {
         if isShown(timeline: timeline, status: status) { return .estimated }
-        guard flag == .flagged, status == .present, let timeline, let applied, applied.source == timeline.source else { return .none }
-        return .flagged
+        return flag == .flagged && hasAppliedTiming ? .flagged : .none
     }
 
     static let flaggedSymbol = "!"

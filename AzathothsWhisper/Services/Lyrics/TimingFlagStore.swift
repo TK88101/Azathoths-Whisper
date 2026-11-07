@@ -16,6 +16,8 @@ actor TimingFlagStore: TimingFlagStoring {
     enum StoreError: Error, Equatable {
         case invalidPersistentID
         case unrecognizedFileOnDisk
+        /// 這一筆單獨就超過寫入上限：不寫、不動既有標記（安全評審 MEDIUM-1／codex R1）
+        case flagTooLarge
     }
 
     static let schemaVersion = 1
@@ -64,14 +66,15 @@ actor TimingFlagStore: TimingFlagStoring {
         let existing = try currentFlags()
         let previous = existing.first { $0.key == incoming.key }
         let merged = incoming.withPositions(Array(((previous?.positions ?? []) + incoming.positions).suffix(TimingFlag.maxPositions)))
-        try write(existing.filter { $0.key != incoming.key } + [merged])
+        guard try Self.encode([merged]).count <= maxWriteBytes else { throw StoreError.flagTooLarge }
+        try write(existing.filter { $0.key != incoming.key } + [merged], keeping: merged.key)
     }
 
     func clear(_ key: TimingFlagKey) throws {
         guard let key = Self.canonical(key) else { throw StoreError.invalidPersistentID }
         let existing = try currentFlags()
         guard existing.contains(where: { $0.key == key }) else { return }
-        try write(existing.filter { $0.key != key })
+        try write(existing.filter { $0.key != key }, keeping: nil)
     }
 
     /// 診斷與測試用：全部標記，依 (persistentID, lyricsHash) 排序
@@ -89,12 +92,13 @@ actor TimingFlagStore: TimingFlagStoring {
         }
     }
 
-    /// 超過寫入上限就從最舊的丟起（同時刻以鍵排序，結果穩定）
-    private func write(_ flags: [TimingFlag]) throws {
+    /// 超過寫入上限就從最舊的丟起（同時刻以鍵排序，結果穩定）；`protected`（剛標的那筆）絕不丟——
+    /// 呼叫端已確認它單獨放得下
+    private func write(_ flags: [TimingFlag], keeping protected: TimingFlagKey?) throws {
         var kept = flags.sorted { ($0.markedAt, $0.persistentID, $0.lyricsHash.hex) < ($1.markedAt, $1.persistentID, $1.lyricsHash.hex) }
         var data = try Self.encode(kept)
-        while data.count > maxWriteBytes, !kept.isEmpty {
-            kept.removeFirst()
+        while data.count > maxWriteBytes, let oldest = kept.firstIndex(where: { $0.key != protected }) {
+            kept.remove(at: oldest)
             data = try Self.encode(kept)
         }
         if kept.count < flags.count { flagLog.info("timing flags trimmed: dropped \(flags.count - kept.count) oldest") }
@@ -142,7 +146,8 @@ actor TimingFlagStore: TimingFlagStoring {
     }
 }
 
-/// 只在記憶體的標記（UI 測試組裝用；不碰使用者的檔）
+#if DEBUG
+/// 只在記憶體的標記（UI 測試組裝與單元測試用；不碰使用者的檔、不進 Release）
 actor InMemoryTimingFlagStore: TimingFlagStoring {
     private var flags: [TimingFlagKey: TimingFlag] = [:]
 
@@ -158,6 +163,7 @@ actor InMemoryTimingFlagStore: TimingFlagStoring {
         flags[key] = nil
     }
 }
+#endif
 
 extension TimingFlag {
     func withPersistentID(_ id: String) -> TimingFlag {

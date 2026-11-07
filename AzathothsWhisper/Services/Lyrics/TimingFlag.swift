@@ -31,6 +31,11 @@ struct TimingFlag: Equatable, Sendable, Codable {
 
     static let maxPositions = 10
 
+    /// 位置存 0.1 s 粒度（存檔規格）
+    static func quantized(_ seconds: Double) -> Double {
+        (seconds * 10).rounded() / 10
+    }
+
     let persistentID: String
     let lyricsHash: LyricsFingerprint
     let markedAt: Date
@@ -69,10 +74,9 @@ enum TimingFlagProvenance {
     }
 }
 
-/// 右鍵選單何時出現（計劃 §4.1）：有詞、時間軸不是估算、而且畫面的快照就是這份時間軸
-enum TimingFlagAvailability {
-    static func isAvailable(status: LyricsStatus, timeline: LyricsTimeline?, applied: AppliedTiming?, persistentID: String) -> Bool {
-        guard status == .present, !persistentID.isEmpty, let timeline, timeline.source != .estimated, let applied else { return false }
-        return applied.source == timeline.source
+extension LyricsTimeline {
+    /// 各行起點（序號＝顯示行序）：內嵌 LRC 的快照用
+    var lineStarts: [TimingRecord.LineStart] {
+        lines.enumerated().map { .init(index: $0.offset, start: $0.element.start) }
     }
 }
