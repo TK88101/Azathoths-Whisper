@@ -131,7 +131,7 @@ struct TimingFlagStoreTests {
     }
 
     enum Unreadable: String, CaseIterable, Sendable {
-        case corruptJSON, newerVersion, oversized, symbolicLink
+        case corruptJSON, newerVersion, oversized, symbolicLink, invalidPersistentID, estimatedSource, tooManyPositions
     }
 
     @Test(arguments: Unreadable.allCases)
@@ -150,6 +150,16 @@ struct TimingFlagStoreTests {
             let target = directory.appendingPathComponent("elsewhere.json")
             try Data(#"{"schemaVersion": 1, "flags": []}"#.utf8).write(to: target)
             try FileManager.default.createSymbolicLink(at: url, withDestinationURL: target)
+        case .invalidPersistentID:
+            try Self.file(with: Self.flag(pid: "not-a-pid")).write(to: url)
+        case .estimatedSource:
+            let flag = Self.flag(pid: "00000000000000BB")
+            try Self.file(with: TimingFlag(
+                persistentID: flag.persistentID, lyricsHash: flag.lyricsHash, markedAt: flag.markedAt, positions: flag.positions,
+                applied: AppliedTiming(source: .estimated, anchors: []), stored: nil, provenance: .storeMissing
+            )).write(to: url)
+        case .tooManyPositions:
+            try Self.file(with: Self.flag(pid: "00000000000000BB", positions: (0..<11).map(Double.init))).write(to: url)
         }
         let before = try? Data(contentsOf: url)
         let store = TimingFlagStore(directory: directory)
@@ -157,6 +167,14 @@ struct TimingFlagStoreTests {
         await #expect(throws: TimingFlagStore.StoreError.unrecognizedFileOnDisk) { try await store.flag(Self.flag()) }
         await #expect(throws: TimingFlagStore.StoreError.unrecognizedFileOnDisk) { try await store.clear(key()) }
         #expect((try? Data(contentsOf: url)) == before)
+    }
+
+    /// 語法合法、內容不合規格的檔（被竄改或他版寫的）：同壞檔，不讀不覆寫（codex R2）
+    private static func file(with flag: TimingFlag) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let json = String(decoding: try encoder.encode(flag), as: UTF8.self)
+        return Data(#"{"schemaVersion": 1, "flags": [\#(json)]}"#.utf8)
     }
 
     @Test func theInMemoryStoreFollowsTheSameKeyRules() async throws {

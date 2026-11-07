@@ -114,7 +114,8 @@ actor TimingFlagStore: TimingFlagStoring {
               values.isRegularFile == true, let size = values.fileSize, size <= Self.maxFileBytes,
               let data = try? Data(contentsOf: url),
               let version = try? Self.decoder.decode(SchemaProbe.self, from: data).schemaVersion, version == Self.schemaVersion,
-              let stored = try? Self.decoder.decode(StoredFile.self, from: data)
+              let stored = try? Self.decoder.decode(StoredFile.self, from: data),
+              stored.flags.allSatisfy(\.isWellFormed)
         else {
             flagLog.error("timing flag file unrecognized; left untouched")
             return .unrecognized
@@ -166,6 +167,12 @@ actor InMemoryTimingFlagStore: TimingFlagStoring {
 #endif
 
 extension TimingFlag {
+    /// 本版寫得出來的形狀才算讀得懂（codex R2）：任一條不合就整檔當未知，不讀不覆寫
+    var isWellFormed: Bool {
+        TimingStore.isCanonicalID(persistentID) && applied.source != .estimated
+            && positions.count <= Self.maxPositions && applied.anchors.count <= TimingStore.maxLines
+    }
+
     func withPersistentID(_ id: String) -> TimingFlag {
         TimingFlag(persistentID: id, lyricsHash: lyricsHash, markedAt: markedAt, positions: positions, applied: applied, stored: stored, provenance: provenance)
     }
