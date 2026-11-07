@@ -93,7 +93,7 @@ struct TimingMarksTests {
     }
 
     @Test func theNewStringsExistInAllThreeLanguages() throws {
-        for key in ["timing_estimated", "timing_not_found_yet"] {
+        for key in ["timing_estimated", "timing_not_found_yet", "timing_flagged"] {
             for language in ["en", "zh-Hant", "ja"] {
                 let bundle = try #require(Bundle.main.path(forResource: language, ofType: "lproj").flatMap(Bundle.init(path:)))
                 #expect(bundle.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING", "\(key) \(language)")

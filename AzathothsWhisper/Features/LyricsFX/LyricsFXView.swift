@@ -288,21 +288,40 @@ struct LyricsFXView: View {
             statusOverlay
             timingMark
         }
+        // ⑪：播放時聽出不準就右鍵標記（寫死英文，A-07 同慣例）；只記證據，不改顯示
+        .contextMenu {
+            if model.canToggleTimingFlag {
+                Button { model.toggleTimingFlag() } label: {
+                    Text(verbatim: model.timingFlag == .flagged ? TimingFlagMenu.unmark : TimingFlagMenu.mark)
+                }
+            }
+        }
     }
 
-    /// 估算時間的角落小字 `~`（C 段計劃 §3.10）：拿到外部時間軸後熱替換，標記隨之消失
+    /// 角落小字：估算時間 `~`（C 段計劃 §3.10，拿到外部時間軸後熱替換而消失）；⑪ 已標記不準 `!`
     @ViewBuilder
     private var timingMark: some View {
-        if model.isVisible, LyricsFXTimingMark.isShown(timeline: model.timeline, status: model.status) {
-            Text(verbatim: LyricsFXTimingMark.symbol)
-                .font(Theme.Fonts.mono(11))
-                .foregroundStyle(Theme.Gray.g400)
-                .padding(12)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .allowsHitTesting(false)
-                .accessibilityLabel(Text("timing_estimated"))
-                .accessibilityIdentifier(AccessibilityID.lyricsFXTimingMark)
+        if model.isVisible {
+            switch model.timingMark {
+            case .estimated:
+                cornerMark(LyricsFXTimingMark.symbol, label: "timing_estimated", id: AccessibilityID.lyricsFXTimingMark)
+            case .flagged:
+                cornerMark(LyricsFXTimingMark.flaggedSymbol, label: "timing_flagged", id: AccessibilityID.lyricsFXTimingFlagMark)
+            case .none:
+                EmptyView()
+            }
         }
+    }
+
+    private func cornerMark(_ symbol: String, label: LocalizedStringKey, id: String) -> some View {
+        Text(verbatim: symbol)
+            .font(Theme.Fonts.mono(11))
+            .foregroundStyle(Theme.Gray.g400)
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            .allowsHitTesting(false)
+            .accessibilityLabel(Text(label))
+            .accessibilityIdentifier(id)
     }
 
     private func frame(at now: ContinuousClock.Instant) -> some View {

@@ -48,7 +48,9 @@ extension AppModel {
             isMusicRunning: { true },
             timing: UITestTimingResolver(environment: environment[LyricsFXPreviewFixture.fakeTimingVariable]),
             // ⑨：只在測試指定的臨時資料夾同步，假硬體身分；不碰使用者的 iCloud
-            cloudSync: CloudSyncEnvironment.uiTest(environment: environment)
+            cloudSync: CloudSyncEnvironment.uiTest(environment: environment),
+            // ⑪：標記只在記憶體，不碰使用者的標記檔
+            timingFlags: InMemoryTimingFlagStore()
         )
         model.lyricsFX.forcesReducedMotion = environment[LyricsFXPreviewFixture.reduceMotionVariable] == "1"
         if let nonce = LyricsFXPreviewRecipe.nonce(in: environment) {

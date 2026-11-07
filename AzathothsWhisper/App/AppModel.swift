@@ -80,6 +80,7 @@ final class AppModel {
     /// 時間軸存檔：與查找共用同一個 actor（兩個 actor 指同一資料夾會互相蓋掉，A1 §3.6）
     @ObservationIgnored let timingStore: TimingStore?
     @ObservationIgnored let remoteTimingIndex: RemoteTimingIndex?
+    @ObservationIgnored let timingFlags: (any TimingFlagStoring)?
     @ObservationIgnored var cloudSync: CloudSyncCoordinator?
     @ObservationIgnored var cloudSyncTask: Task<Void, Never>?
     @ObservationIgnored var cloudSyncIndexClear: Task<Void, Never>?
@@ -131,8 +132,11 @@ final class AppModel {
         /// ⑨ iCloud 同步。nil＝不同步
         cloudSync: CloudSyncEnvironment? = nil,
         timingStore: TimingStore? = nil,
-        remoteTimingIndex: RemoteTimingIndex? = nil
+        remoteTimingIndex: RemoteTimingIndex? = nil,
+        /// ⑪「時間軸不準」標記。nil＝不提供標記（單元測試預設）
+        timingFlags: (any TimingFlagStoring)? = nil
     ) {
+        self.timingFlags = timingFlags
         self.cloudSyncEnvironment = cloudSync
         self.timingStore = timingStore
         self.remoteTimingIndex = remoteTimingIndex
@@ -229,6 +233,7 @@ final class AppModel {
         lyricsFX.artistGenres = { [weak self] artist in self?.artistBook?.genres(forArtist: artist) ?? .unknown }
         lyricsFX.artistDecision = { [weak self] artist in self?.decisionBook.decision(forArtist: artist)?.choice }
         lyricsFX.artistConsensus = { [weak self] artist in self?.consensusTable[ArtistDecisionBook.key(artist)] }
+        installTimingFlags()
         let scanner = LibraryGateScanner(music: music)
         #if DEBUG
         // I-68 量測：每次掃描一個 token（重掃時舊掃描的 AE 停不下來，區間會重疊）
@@ -399,11 +404,14 @@ final class AppModel {
         let artistConsensus: ArtistConsensusStore? = isAutomatedTest ? nil : ArtistConsensusStore(directory: ArtistConsensusStore.defaultDirectory)
         // ⑨：自動化測試一律不碰使用者的 iCloud
         let cloudSync: CloudSyncEnvironment? = isAutomatedTest ? nil : .live()
+        // ⑪：自動化測試不碰使用者的標記檔
+        let timingFlags: (any TimingFlagStoring)? = isAutomatedTest ? nil : TimingFlagStore(directory: TimingFlagStore.defaultDirectory)
         #else
         let artistStyles: ArtistStylesFactory? = liveArtistStyles(music: music)
         let artistDecisions: ArtistDecisionStore? = ArtistDecisionStore(directory: ArtistDecisionStore.defaultDirectory)
         let artistConsensus: ArtistConsensusStore? = ArtistConsensusStore(directory: ArtistConsensusStore.defaultDirectory)
         let cloudSync: CloudSyncEnvironment? = .live()
+        let timingFlags: (any TimingFlagStoring)? = TimingFlagStore(directory: TimingFlagStore.defaultDirectory)
         #endif
         return AppModel(
             configStore: store,
@@ -425,7 +433,8 @@ final class AppModel {
             artistConsensus: artistConsensus,
             cloudSync: cloudSync,
             timingStore: timingStore,
-            remoteTimingIndex: remoteTimingIndex
+            remoteTimingIndex: remoteTimingIndex,
+            timingFlags: timingFlags
         )
     }
 
