@@ -10,11 +10,20 @@
       "bundleIdentifier": "com.ibridgezhao.yogsothothsecho",
       "developerName": "TK88101",
       "subtitle": "黑膠唱機造型的 Music 遙控器",
-      "localizedDescription": "把 iPad 變成黑膠唱機造型的遙控器，控制家中 Mac 上的 Music。需要 iPadOS 18 以上，與執行 Azathoth's Whisper 3.0.0 的 Mac 在同一個 Wi-Fi。",
+      "localizedDescription": "把 iPad 變成黑膠唱機造型的遙控器，控制家中 Mac 上的 Music。需要 iPadOS 18 以上，與執行 Azathoth's Whisper 3.0.0 以上的 Mac 在同一個 Wi-Fi。",
       "iconURL": "https://raw.githubusercontent.com/TK88101/Azathoths-Whisper/main/YogSothothsEcho/distribution/icon.png",
       "tintColor": "1C1C1E",
       "category": "entertainment",
       "versions": [
+        {
+          "version": "1.0.2",
+          "buildVersion": "9",
+          "date": "2026-11-11T13:20:37Z",
+          "localizedDescription": "新增 4 種唱片樣式：Smoke、Streak、Flake、Chunk（Smoke 可選自動／水感／深墨／淺墨／強調色）。換片動畫更順。唱機外觀按鈕換成唱臂圖示。",
+          "downloadURL": "https://github.com/TK88101/Azathoths-Whisper/releases/download/yse-v1.0.2/YogSothothsEcho-1.0.2-9.ipa",
+          "size": 79605632,
+          "minOSVersion": "18.0"
+        },
         {
           "version": "1.0.1",
           "buildVersion": "3",
