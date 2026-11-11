@@ -11,7 +11,7 @@ It supports multiple lyrics sources and features a dark-themed, localized user i
 | App | Platform | Version | What it does |
 |---|---|---|---|
 | **Azathoth's Whisper** | macOS | 3.1.1 | The lyrics app above, plus an optional **relay** that lets the iPad control Music on this Mac |
-| **Yog-Sothoth's Echo** (尤格·索托斯的回響) | iPad | 1.0.1 | A vinyl-turntable remote: browse your Mac's Music library and control playback from anywhere in the house |
+| **Yog-Sothoth's Echo** (尤格·索托斯的回響) | iPad | 1.0.2 | A vinyl-turntable remote: browse your Mac's Music library and control playback from anywhere in the house |
 
 The iPad app talks only to Azathoth's Whisper on your own Mac, over your home network. See
 [iPad Remote: Yog-Sothoth's Echo](#ipad-remote-yog-sothoths-echo).
@@ -265,7 +265,7 @@ controller.
 *   Switch the turntable look (Default, Pioneer, Rega, Technics) in Settings or from the button on the
     turntable screen. The Pioneer, Rega and Technics looks are the maintainer's own renders modeled after
     those turntables; they are not affiliated with the brands.
-*   Choose a record style (Random, Classic, Transparent, Splash, Marble) and a light, dark or
+*   Choose a record style (Random, Classic, Transparent, Splash, Marble, Smoke, Streak, Flake, Chunk) and a light, dark or
     system appearance.
 
 **Requirements**
@@ -282,6 +282,13 @@ Apple ID, for example **SideStore**, **AltStore** or **iLoader**.
 
 > With a free Apple ID, sideloaded apps expire after **7 days**. Re-sign / re-install it then
 > (SideStore can do this automatically). Re-installing over the old copy keeps your pairing.
+
+With **SideStore** you can also add this source and install or update the app from inside SideStore,
+which then keeps renewing it for you:
+
+```
+https://raw.githubusercontent.com/TK88101/Azathoths-Whisper/main/YogSothothsEcho/distribution/source.json
+```
 
 ### First-time setup
 

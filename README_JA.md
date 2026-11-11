@@ -11,7 +11,7 @@
 | アプリ | プラットフォーム | バージョン | 内容 |
 |---|---|---|---|
 | **Azathoth's Whisper**（アザトースの囁き） | macOS | 3.1.1 | 上記の歌詞アプリ。iPad から この Mac の Music を操作できるようにする**中継**機能（任意）を追加 |
-| **Yog-Sothoth's Echo**（ヨグ＝ソトースの残響） | iPad | 1.0.1 | レコードプレーヤー風のリモコン。家のどこからでも Mac の Music ライブラリを見て、再生を操作できます |
+| **Yog-Sothoth's Echo**（ヨグ＝ソトースの残響） | iPad | 1.0.2 | レコードプレーヤー風のリモコン。家のどこからでも Mac の Music ライブラリを見て、再生を操作できます |
 
 iPad アプリが通信する相手は、自宅のネットワーク内にあるあなた自身の Mac の Azathoth's Whisper だけです。
 詳しくは [iPad リモコン：Yog-Sothoth's Echo](#ipad-リモコンyog-sothoths-echo) を参照してください。
@@ -253,7 +253,7 @@ Yog-Sothoth's Echo は、iPad を Mac の Music 用のレコードプレーヤ�
 *   プレーヤー画面では、レコードをタップすると一時停止／再開、左右にスワイプすると曲送り／曲戻しです。
 *   下のカプセルには、前の曲／再生・一時停止／次の曲と **Genius**（Music 本体の Genius シャッフル。上の Genius 歌詞トークンとは別物です）があります。
 *   プレーヤーの見た目（Default、Pioneer、Rega、Technics）を、設定画面またはプレーヤー画面のボタンから切り替えられます。Pioneer、Rega、Technics の見た目はそれぞれのモデルを参考にメンテナーが自作したもので、各メーカーとは関係ありません。
-*   レコードの見た目（Random、Classic、Transparent、Splash、Marble）と、ライト／ダーク／システムに合わせる外観を選べます。
+*   レコードの見た目（Random、Classic、Transparent、Splash、Marble、Smoke、Streak、Flake、Chunk）と、ライト／ダーク／システムに合わせる外観を選べます。
 
 **必要なもの**
 
@@ -265,6 +265,12 @@ Yog-Sothoth's Echo は、iPad を Mac の Music 用のレコードプレーヤ�
 iPad アプリは [Releases ページ](https://github.com/TK88101/Azathoths-Whisper/releases) に `.ipa` として置いています。**署名はしておらず**、App Store にもありません。**SideStore**、**AltStore**、**iLoader** などのサイドロードツールで、自分の Apple ID で署名してインストールしてください。
 
 > 無料の Apple ID でサイドロードしたアプリは **7 日**で使えなくなります。そのときは署名／インストールし直してください（SideStore なら自動で更新できます）。上書きインストールならペアリングは残ります。
+
+**SideStore** を使う場合は、次のソースを追加すると SideStore の中からインストールと更新ができ、署名の更新も自動で行われます。
+
+```
+https://raw.githubusercontent.com/TK88101/Azathoths-Whisper/main/YogSothothsEcho/distribution/source.json
+```
 
 ### 初回の設定
 
