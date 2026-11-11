@@ -115,6 +115,12 @@ struct RecordStyleTests {
         #expect(RecordStyle.chunk.icon == .bundled("RecordStyleChunk"))
     }
 
+    /// 唱機外觀鈕圖示（使用者 2026-11-11 選 C＝唱臂，取代 record.circle 同心圓）：內建向量資產、跟著前景色著色
+    @Test func turntableSkinIconIsBundledTemplate() throws {
+        let image = try #require(UIImage(named: TurntableSkinIcon.asset))
+        #expect(image.renderingMode == .alwaysTemplate)
+    }
+
     /// 煙渦變化設定：預設與壞值＝自動；rawValue 寫死（資料格式）
     @Test func smokeVariantChoicePreference() {
         #expect(SmokeVariantChoice.allCases == [.auto, .water, .darkInk, .lightInk, .accent])

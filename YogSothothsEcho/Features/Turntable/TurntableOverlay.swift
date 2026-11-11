@@ -136,7 +136,7 @@ struct TurntableOverlay: View {
             model.overlay.beginHold(.skinPicker)
             showsSkinPicker = true
         } label: {
-            Label("Turntable Skin", systemImage: "record.circle").overlayCircleButton()
+            Label("Turntable Skin", image: TurntableSkinIcon.asset).overlayCircleButton()
         }
         .accessibilityIdentifier(AccessibilityID.turntableSkinButton)
         .popover(isPresented: $showsSkinPicker, arrowEdge: .top) {
@@ -252,6 +252,11 @@ struct TurntableOverlay: View {
     }
 }
 
+
+/// 唱機外觀鈕的圖示：asset catalog 的向量唱臂（使用者 2026-11-11 選定；SF Symbols 的 record.circle 同心圓不像唱機）
+enum TurntableSkinIcon {
+    static let asset = "TurntableSkinIcon"
+}
 
 private extension Label where Title == Text, Icon == Image {
     /// 浮層角落的圓鈕（關閉、唱機外觀）：只顯示圖示、40 pt 半透明黑圓
