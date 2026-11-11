@@ -54,19 +54,49 @@ final class TurntableUITests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: sign * dx * 400, dy: sign * dy * 400)))
     }
 
-    /// v2.1 T8：DEBUG 調整面板的滑桿拖到兩端，不得被場景的甩動手勢吃掉而切歌
-    func testTuningSlidersDoNotSkipTracks() {
-        let tint = app.sliders[AccessibilityID.turntableTuningTint], haze = app.sliders[AccessibilityID.turntableTuningOtherHaze]
-        for _ in 0..<5 where !tint.exists {
+    /// 叫出浮層（同 closeAndReadTitle：點最右側中間的空白）
+    private func showOverlay(waitingFor element: XCUIElement) {
+        for _ in 0..<5 where !element.exists {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.985, dy: 0.5)).tap()
-            _ = tint.waitForExistence(timeout: 1.5)
+            _ = element.waitForExistence(timeout: 1.5)
         }
-        XCTAssertTrue(tint.exists && haze.exists)
-        for slider in [tint, haze] {
-            slider.adjust(toNormalizedSliderPosition: 0)
-            slider.adjust(toNormalizedSliderPosition: 1)
+        XCTAssertTrue(element.exists)
+    }
+
+    /// CR-037：浮層 9 顆樣式；點煙渦展開第二排、選變化（不收合）、再點煙渦收合；選擇重開保留
+    func testSmokeVariantRowOpensClosesAndPersists() {
+        let smoke = app.buttons[AccessibilityID.turntableStyle("smoke")]
+        showOverlay(waitingFor: smoke)
+        for raw in ["random", "classic", "transparent", "splash", "marble", "smoke", "streak", "flake", "chunk"] {
+            XCTAssertTrue(app.buttons[AccessibilityID.turntableStyle(raw)].exists, raw)
         }
-        XCTAssertEqual(closeAndReadTitle(), "Synthetic Song 01")
+        let darkInk = app.buttons[AccessibilityID.turntableSmokeVariant("darkInk")]
+        smoke.tap()
+        XCTAssertTrue(darkInk.waitForExistence(timeout: 3))
+        darkInk.tap()
+        XCTAssertTrue(waitFor("selected == true", [], on: darkInk))
+        XCTAssertTrue(darkInk.exists, "選變化不收合")
+        smoke.tap()
+        XCTAssertTrue(waitFor("exists == false", [], on: darkInk))
+
+        app.terminate()
+        app = XCUIApplication.launchConnected([AccessibilityID.nowPlayingArgument])
+        let open = app.buttons[AccessibilityID.nowPlayingOpenTurntable]
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        open.tap()
+        XCTAssertTrue(record.waitForExistence(timeout: 10))
+        let smokeAgain = app.buttons[AccessibilityID.turntableStyle("smoke")]
+        showOverlay(waitingFor: smokeAgain)
+        XCTAssertTrue(smokeAgain.isSelected)
+        smokeAgain.tap()
+        let darkInkAgain = app.buttons[AccessibilityID.turntableSmokeVariant("darkInk")]
+        XCTAssertTrue(darkInkAgain.waitForExistence(timeout: 3))
+        XCTAssertTrue(darkInkAgain.isSelected)
+    }
+
+    /// CR-039 §11.5 B3：進唱機後 2 s 內標籤印字遮罩就緒（DEBUG 才有的 accessibilityValue；Release 唱片元素沒有 value）
+    func testLabelPrintMaskReadyWithinTwoSeconds() {
+        XCTAssertTrue(waitFor("value == %@", ["labelPrint=ready"], on: record, timeout: 2), "value=\(String(describing: record.value))")
     }
 
     func testSwipeLeftSkipsToNextAndRightGoesBack() {

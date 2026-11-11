@@ -13,6 +13,13 @@ struct RecordSpin: Equatable {
     private var anchor: Double?
     private var braking = false
 
+    /// CR-039：不轉時的角度（純讀）。靜止＝base；煞停中＝煞停結束（0.35 s）時的角度；轉動中＝nil（沒有靜止角）
+    var restingAngle: Double? {
+        guard let anchor else { return base }
+        guard braking else { return nil }
+        return angle(at: anchor + Self.brakeSeconds)
+    }
+
     func angle(at now: Double) -> Double {
         guard let anchor else { return base }
         let v = Self.degreesPerSecond

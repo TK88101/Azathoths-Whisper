@@ -13,7 +13,8 @@ final class LibraryUITests: XCTestCase {
     }
 
     func testShowsEveryAlbumAndScrollsToTheEnd() {
-        let app = XCUIApplication.launchConnected()
+        // 計數在 DEBUG 量測面板上：開發者工具預設關，以啟動參數打開
+        let app = XCUIApplication.launchConnected([AccessibilityID.developerToolsArgument, "YES"])
         let count = app.staticTexts[AccessibilityID.libraryCount]
         XCTAssertTrue(count.waitForExistence(timeout: 10))
         let all = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "albums 240"), object: count)

@@ -13,6 +13,7 @@ import UIKit
 @Observable
 final class TurntableViewModel {
     static let recordStyleKey = "turntable.recordStyle"
+    static let smokeVariantKey = "turntable.smokeVariant"
     /// 皮膚選擇（CR-034）：存皮膚 id；未知或不可用＝classic，存值不改寫
     static let skinKey = "turntable.skin"
     static let placeholderText = "…"
@@ -32,7 +33,12 @@ final class TurntableViewModel {
     /// 選擇器預覽（設定頁與浮層共用這一個，r3-1）
     let previews: SkinPreviewRenderer
     let overlay: TurntableOverlayState
-    private(set) var swipe: SwipeTransition
+    private(set) var swipe: SwipeTransition {
+        didSet { g7Trace.observe(from: oldValue, to: swipe) }
+    }
+    /// CR-039 §4.4：G7 signpost（每次轉場一個 interval）
+    /// §11 S2：標籤印字快取同時是轉場觀察者（G7 中不畫、logical miss 寫進 end）
+    @ObservationIgnored private let g7Trace = G7Trace(sink: OSG7TraceSink(), observer: LabelPrintStore.shared)
     /// 唱機層（S6 §4.8）：存在與否由它決定；殼層只讀
     private(set) var layer: TurntableLayerState = .hidden
     /// 這一次進出唱機用的 Reduce Motion（含 DEBUG 強制）：狀態機與 TurntableView 的進場動畫讀同一份
@@ -52,6 +58,13 @@ final class TurntableViewModel {
     var recordStyle: RecordStyle {
         didSet {
             store.set(recordStyle.rawValue, forKey: Self.recordStyleKey)
+            overlay.poke()
+        }
+    }
+    /// 煙渦的變化（CR-037 §4.1b）：手選或 RANDOM 抽到煙渦都讀這一個設定（Q6）
+    var smokeVariant: SmokeVariantChoice {
+        didSet {
+            store.set(smokeVariant.rawValue, forKey: Self.smokeVariantKey)
             overlay.poke()
         }
     }
@@ -102,6 +115,7 @@ final class TurntableViewModel {
         overlay = TurntableOverlayState(sleep: sleep)
         swipe = SwipeTransition(displayScale: displayScale)
         recordStyle = RecordStyle.restore(store.string(forKey: Self.recordStyleKey))
+        smokeVariant = SmokeVariantChoice.restore(store.string(forKey: Self.smokeVariantKey))
         sprites.onFailure = { [weak self] id, generation in self?.disableSkin(id, generation: generation) }
         sprites.focusTarget = { [weak self] in self?.spriteFocusFrame }
         memoryWarning = NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil,
@@ -189,7 +203,34 @@ final class TurntableViewModel {
         let albumID = nowPlaying.clock?.event.albumID
         let ownArtwork = albumID != nil && coverAlbum == albumID
         return TurntableDeck(trackID: nowPlaying.currentTrackID, albumID: albumID, label: label, style: resolvedStyle, splash: splashStyle,
-                             cover: ownArtwork ? cover : nil, colors: ownArtwork ? colors : .fallback)
+                             cover: ownArtwork ? cover : nil, colors: ownArtwork ? colors : .fallback,
+                             swirl: SwirlRecipe.make(style: resolvedStyle, trackID: nowPlaying.currentTrackID, smoke: smokeVariant))
+    }
+
+    // MARK: 煙渦第二排（CR-037 §4.5b）
+
+    /// 第二排展開＝浮層持有 `.smokeVariants`（唯一狀態：浮層收起、關唱機時 endAllHolds 一併收合）
+    var isSmokeRowOpen: Bool { overlay.holds.contains(.smokeVariants) }
+
+    /// 樣式鈕：點煙渦＝選中並展開，已展開再點＝收合；點其他樣式＝選中並收合
+    func tapStyle(_ style: RecordStyle) {
+        if style == .smoke, recordStyle == .smoke, isSmokeRowOpen {
+            overlay.endHold(.smokeVariants)
+            return
+        }
+        recordStyle = style
+        if style == .smoke {
+            overlay.beginHold(.smokeVariants)
+        } else {
+            overlay.endHold(.smokeVariants)
+        }
+    }
+
+    /// 手選強調色但這首的封面沒有合適強調色時實際用的墨色；讀畫面上的主唱片（轉場決定後＝新曲）
+    var smokeAccentFallback: SmokeInk? {
+        let deck = incomingDeck ?? groupDeck
+        guard let recipe = deck.swirl, recipe.ink == .accent else { return nil }
+        return SwirlPalette.resolve(recipe, colors: deck.colors, reduceTransparency: false).accentFallback
     }
 
     /// 主組（封面套＋唱片）畫的資料：換標籤與淡化時是新曲，其他轉場階段是凍結的舊組，平時跟已採用狀態
@@ -207,9 +248,29 @@ final class TurntableViewModel {
         return skin.playbackAngle(state: event.state, position: nowPlaying.position() ?? 0, duration: event.duration)
     }
 
+    private var isPlaying: Bool { nowPlaying.clock?.event.state == .playing }
+
+    /// CR-039：唱片 TimelineView 是否要每幀更新（煞停後停表，見 RecordTimelinePolicy）
+    var recordTimelineNeedsTicks: Bool {
+        RecordTimelinePolicy.needsTicks(isPlaying: isPlaying, phase: swipe.phase, reduceMotion: swipe.reduceMotion)
+    }
+
+    /// CR-039 增補（使用者 2026-11-01 同意）：唱臂角只在播放中、未抬臂、不在進場時隨進度變（見 armAngle）→ 只有那時每幀更新；
+    /// 抬臂與落臂的動畫由 `.animation(value:)` 插值（序列圖唱臂是 Animatable），不靠 TimelineView
+    var armTimelineNeedsTicks: Bool {
+        if case .entering = layer { return false }
+        return isPlaying && !swipe.armLifted
+    }
+
+    /// 畫面上的唱片角（TimelineView 每次給 date 呼叫）：停表且有靜止角＝兩盤共讀靜止角，不推進 spin；否則照 `recordAngle(at:)`
+    func displayedRecordAngle(at now: Double) -> Double {
+        if !recordTimelineNeedsTicks, let resting = spin.restingAngle { return resting }
+        return recordAngle(at: now)
+    }
+
     /// 唱片角：轉場抬臂中煞停（與抬臂同時）；否則播放中才轉（TimelineView 每幀呼叫）
     func recordAngle(at now: Double) -> Double {
-        let motion: RecordSpin.Motion = swipe.armLifted ? .braking : nowPlaying.clock?.event.state == .playing ? .spinning : .still
+        let motion: RecordSpin.Motion = swipe.armLifted ? .braking : isPlaying ? .spinning : .still
         spin.update(motion, at: now)
         return spin.angle(at: now)
     }
@@ -416,6 +477,9 @@ final class TurntableViewModel {
     // MARK: 轉場
 
     private func begin(_ direction: SwipeTransition.Direction) {
+        #if LIQUID_SAMPLE
+        LiquidSwipeMarker.mark()
+        #endif
         transitionSerial += 1
         let serial = transitionSerial
         outgoingDeck = liveDeck

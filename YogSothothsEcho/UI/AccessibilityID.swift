@@ -70,16 +70,27 @@ enum AccessibilityID {
     static let turntableArm = "turntable.arm"
     static let turntableClose = "turntable.close"
     /// DEBUG 調整面板（v2.1 T8）：磨砂盤主色濃淡、霧濃淡
-    static let turntableTuningTint = "turntable.tuning.tint"
-    static let turntableTuningHaze = "turntable.tuning.haze"
-    static let turntableTuningOtherTint = "turntable.tuning.otherTint"
-    static let turntableTuningOtherHaze = "turntable.tuning.otherHaze"
     static let turntableNotice = "turntable.notice"
     static func turntableStyle(_ raw: String) -> String { "turntable.style.\(raw)" }
+    /// CR-037 煙渦第二排的五個選項（SmokeVariantChoice 的 rawValue）
+    static func turntableSmokeVariant(_ raw: String) -> String { "turntable.smokeVariant.\(raw)" }
     /// CR-034 唱機皮膚切換（皮膚 id）：選擇器的格子
     static func turntableSkin(_ id: String) -> String { "turntable.skin.\(id)" }
     /// CR-034 增補 A：唱機浮層開選擇器的圓鈕、設定頁「唱機外觀」那一列
     static let turntableSkinButton = "turntable.skinButton"
+    #if DEBUG
+    /// Debug 包開發者工具開關（UserDefaults argument domain；值跟在後面："YES"）
+    static let developerToolsArgument = "-debug.developerTools"
+    // CR-038 液態黑膠小樣（Debug；App 端另有 LIQUID_SAMPLE 旗標）
+    static let liquidPreviewButton = "turntable.liquid.preview"
+    static let liquidLiveToggle = "turntable.liquid.live"
+    static let liquidPreset = "turntable.liquid.preset"
+    static let liquidPreviewCanvas = "liquid.preview"
+    static let liquidPreviewRecord = "liquid.preview.record"
+    static let liquidPreviewClose = "liquid.preview.close"
+    static let liquidPreviewAuto = "liquid.preview.auto"
+    static func liquidPreviewPhase(_ raw: String) -> String { "liquid.preview.phase.\(raw)" }
+    #endif
     static let settingsTurntableSkin = "settings.turntableSkin"
     /// 合成播放器一開始就在播；連上後自動開唱機（只在 DEBUG 有作用）
     static let nowPlayingArgument = "-YSEUITestNowPlaying"

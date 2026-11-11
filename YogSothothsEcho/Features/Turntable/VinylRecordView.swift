@@ -11,6 +11,26 @@ struct VinylRecordView: View {
     let angle: Double
     /// 磨砂盤的主色與霧濃淡（v2.1 T8）；Release 恆 `.standard`
     var tuning: TransparentTuning = .standard
+    /// SWIRL 系列的花紋配方（CR-037）；其他樣式＝nil
+    var swirl: SwirlRecipe? = nil
+    /// 標籤印字遮罩快取（CR-039 §11 S2；測試注入）
+    var labelPrints: LabelPrintStore = .shared
+    #if LIQUID_SAMPLE
+    /// CR-038 液態黑膠小樣（Debug）：有值時盤面換成液態層，蓋過樣式
+    var liquid: LiquidFrame? = nil
+    #endif
+
+    /// 烘焙邊長上限（M1 一張 4 MiB；顯示時放大，花紋本身柔和）
+    static let swirlBakeLimit = 1024
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// 每次 body 算一次再傳下去（本視圖在 TimelineView 內每幀重建，所以仍是每幀一次；改到 deck 層算是 P2）
+    private func makeSwirlKey() -> SwirlArtworkStore.Key? {
+        guard let swirl else { return nil }
+        let palette = SwirlPalette.resolve(swirl, colors: colors, reduceTransparency: reduceTransparency)
+        return SwirlArtworkStore.Key(recipe: swirl, colors: palette, side: min(Self.swirlBakeLimit, max(1, Int((side * displayScale).rounded()))))
+    }
 
     private var s: CGFloat { side / TurntableMetrics.recordSize }
 
@@ -32,7 +52,10 @@ struct VinylRecordView: View {
 
     var body: some View {
         let finish = transparentFinish
-        let usesMaterial = finish?.usesMaterial == true
+        let usesMaterial = finish?.usesMaterial == true && !isLiquid
+        let swirlKey = makeSwirlKey()
+        let labelKey = LabelPrintKey.make(recordSide: side, displayScale: displayScale, modules: VinylAssetsEasterEgg.modules)
+        let translucent = swirlKey.map { $0.colors.opacity < 1 } ?? usesMaterial
         ZStack {
             // 磨砂層必須在 drawingGroup 之外：合成圖層內的 Material 拿不到後面的封套與背景
             // 透明盤是乳白透光：材質固定淺色版本（深色模式的 Material 會讓盤面發黑）
@@ -41,21 +64,79 @@ struct VinylRecordView: View {
                     .opacity(tuning.look(for: TransparentFinish.tint(for: colors)).material)
             }
             ZStack {
-                styleLayers(finish)
-                rotationCue(RotationCue.cue(style: style, finish: finish), finish: finish)
+                faceLayers(finish, swirlKey: swirlKey)
                 Circle().strokeBorder(AngularGradient(stops: Self.rimStops, center: .center), lineWidth: 3 * s)
                 if usesMaterial { Circle().strokeBorder(Color.white.opacity(0.22), lineWidth: 1.2 * s) }
-                labelView.rotationEffect(.degrees(angle))
+                labelView(labelKey).rotationEffect(.degrees(angle))
                 centerHole
             }
             .drawingGroup()
         }
         .frame(width: side, height: side)
         // 投影放在合成圖層之外：drawingGroup 的範圍只有唱片大小，往下偏移的模糊陰影放在裡面會被切出一條直邊（#5-1 實機發現）
-        .background(Circle().fill(Color.black.opacity(finish?.shadowOpacity ?? 0.2)).blur(radius: 12 * s).offset(y: 12 * s))
+        .background(Circle().fill(Color.black.opacity(TransparentFinish.shadowOpacity(translucent: translucent || isLiquid))).blur(radius: 12 * s).offset(y: 12 * s))
+        // SWIRL：顯示期間登記使用中（不被淘汰）；鍵改變（換歌、換尺寸、換色、Reduce Transparency）即換一張
+        .task(id: swirlKey) {
+            if let swirlKey { await SwirlArtworkStore.shared.use(swirlKey) }
+        }
+        // 標籤印字：顯示期間登記使用中；沒有 G7 時當場畫一次（G7 中只標 pending）
+        .task(id: labelKey) { await labelPrints.use(labelKey) }
     }
 
-    @ViewBuilder private func styleLayers(_ finish: TransparentFinish?) -> some View {
+    private var isLiquid: Bool {
+        #if LIQUID_SAMPLE
+        liquid != nil
+        #else
+        false
+        #endif
+    }
+
+    /// 盤面（樣式層＋轉動參照）；CR-038 小樣的單一整合點：液態層＋不轉的溝紋高光
+    @ViewBuilder private func faceLayers(_ finish: TransparentFinish?, swirlKey: SwirlArtworkStore.Key?) -> some View {
+        #if LIQUID_SAMPLE
+        if let liquid {
+            LiquidVinylLayer(frame: liquid, side: side)
+            base(.screen)
+        } else {
+            styleLayers(finish, swirlKey: swirlKey)
+            rotationCue(RotationCue.cue(style: style, finish: finish), finish: finish)
+        }
+        #else
+        styleLayers(finish, swirlKey: swirlKey)
+        rotationCue(RotationCue.cue(style: style, finish: finish), finish: finish)
+        #endif
+    }
+
+    /// SWIRL 系列（CR-037 §4.4）：烘好的盤面（底色＋花紋，已含不透明度）只旋轉；未就緒先畫底色，就緒後淡入（Reduce Motion＝直接出現）
+    @ViewBuilder private func swirlLayers(_ key: SwirlArtworkStore.Key?) -> some View {
+        if let key {
+            let state = SwirlArtworkStore.shared.state(for: key)
+            ZStack {
+                if case .ready(let face) = state {
+                    Image(decorative: face.image, scale: 1).resizable()
+                        .rotationEffect(.degrees(angle))
+                        .transition(.opacity)
+                } else {
+                    swirlBaseFill(key.colors)
+                }
+            }
+            .animation(reduceMotion ? nil : .easeIn(duration: 0.2), value: state?.isReady == true)
+            base(.screen)
+        }
+    }
+
+    @ViewBuilder private func swirlBaseFill(_ palette: SwirlColors) -> some View {
+        switch palette.base {
+        case .solid(let color):
+            Circle().fill(color.color.opacity(palette.opacity))
+        case .gradient(let from, let to):
+            Circle().fill(LinearGradient(colors: [from.color, to.color], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .opacity(palette.opacity)
+                .rotationEffect(.degrees(angle))
+        }
+    }
+
+    @ViewBuilder private func styleLayers(_ finish: TransparentFinish?, swirlKey: SwirlArtworkStore.Key?) -> some View {
         switch style {
         case .classic, .random:
             base(.normal)
@@ -84,6 +165,8 @@ struct VinylRecordView: View {
             spinning(.marble, tint: nil, opacity: layer.alpha)
                 .blendMode(layer.blend == .colorBurn ? .colorBurn : .hardLight)
             base(.screen)
+        case .smoke, .streak, .flake, .chunk:
+            swirlLayers(swirlKey)
         }
     }
 
@@ -142,11 +225,11 @@ struct VinylRecordView: View {
     }
 
     /// 標籤（§4.2b v1.4）：歌名＋歌手在中心孔上方；印字（環狀字、品牌字、條碼）由 LabelRing 依 LabelLayout 畫
-    private var labelView: some View {
-        let diameter = Self.labelDiameter * s
+    private func labelView(_ key: LabelPrintKey) -> some View {
+        let diameter = Self.labelDiameter(forSide: side)
         return ZStack(alignment: .top) {
             Circle().fill(colors.primary.color)
-            LabelRing(diameter: diameter, color: colors.text.color)
+            labelPrint(key, diameter: diameter)
             VStack(spacing: diameter * 0.012) {
                 Text(verbatim: label.title).font(.system(size: LabelLayout.titleFont * diameter, weight: .bold))
                 Text(verbatim: label.artist).font(.system(size: LabelLayout.artistFont * diameter, weight: .medium)).opacity(0.7)
@@ -160,7 +243,26 @@ struct VinylRecordView: View {
         .frame(width: diameter, height: diameter)
     }
 
+    /// 固定印字（CR-039 §11 S2）：遮罩就緒＝文字色填滿、以遮罩的透明度裁出；否則即時畫現行 LabelRing（外觀相同）
+    @ViewBuilder private func labelPrint(_ key: LabelPrintKey, diameter: CGFloat) -> some View {
+        if case .ready(let mask) = labelPrints.lookup(key) {
+            // 遮罩照原尺寸（畫布略大於標籤、置中），不縮放
+            Color.clear.frame(width: diameter, height: diameter)
+                .overlay {
+                    Rectangle().fill(colors.text.color)
+                        .frame(width: key.canvasSide, height: key.canvasSide)
+                        .mask(Image(decorative: mask, scale: key.scale))
+                }
+                .accessibilityHidden(true)
+        } else {
+            LabelRing(diameter: diameter, tint: colors.text)
+        }
+    }
+
     static let labelDiameter: CGFloat = 214
+
+    /// 標籤直徑（pt）的唯一公式：labelView 與標籤印字快取鍵（LabelPrintKey.make）共用，兩邊尺寸不會走岔
+    static func labelDiameter(forSide side: CGFloat) -> CGFloat { labelDiameter * side / TurntableMetrics.recordSize }
 
     @ViewBuilder private var centerHole: some View {
         if let center = VinylAssets.image(.center) {

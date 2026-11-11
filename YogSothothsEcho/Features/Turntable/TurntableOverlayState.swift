@@ -34,10 +34,10 @@ final class TurntableOverlayState {
 
     /// 停自動隱藏的原因（可疊加；CR-034 增補 A r1-4）
     enum HoldReason: Hashable {
-        /// DEBUG 調整面板拖滑桿（v2.1 T8）
-        case tuningSlider
         /// 唱機外觀選擇器開著（浮層隱藏會讓 popover 的錨點消失）
         case skinPicker
+        /// 煙渦第二排展開中（CR-037 §4.5b；第二排是否展開＝有沒有這個 hold，浮層收起即一併收合）
+        case smokeVariants
     }
 
     private(set) var holds: Set<HoldReason> = []

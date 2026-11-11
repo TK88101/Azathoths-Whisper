@@ -264,7 +264,8 @@ struct LibraryDebugOverlay: View {
 
     var body: some View {
         #if DEBUG
-        DebugPanel(model: model, layout: layout)
+        // 「Developer tools」開關後（預設關）
+        if DeveloperTools.shared.isOn { DebugPanel(model: model, layout: layout) }
         #else
         EmptyView()
         #endif

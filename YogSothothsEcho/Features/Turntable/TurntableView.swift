@@ -45,6 +45,9 @@ struct TurntableView: View {
         // 原版：浮層隱藏時沉浸式（系統列一起藏）
         .statusBarHidden(!model.overlay.isVisible)
         .accessibilityIdentifier(AccessibilityID.turntable)
+        #if LIQUID_SAMPLE
+        .fullScreenCover(isPresented: Bindable(LiquidSample.shared).isPreviewPresented) { LiquidPreviewCanvas(model: model) }
+        #endif
     }
 
     // MARK: 背景
@@ -152,29 +155,64 @@ struct TurntableView: View {
 
     /// 換曲（同專輯換標籤、Reduce Motion 淡化）時以 trackID 換身分，淡入淡出
     private func record(_ deck: TurntableDeck, _ layout: TurntableLayout) -> some View {
-        TimelineView(.animation(paused: model.nowPlaying.clock?.event.state != .playing)) { timeline in
-            VinylRecordView(side: layout.record.width, style: deck.style, splash: deck.splash, colors: deck.colors, label: deck.label,
-                            angle: model.recordAngle(at: timeline.date.timeIntervalSinceReferenceDate), tuning: Self.tuning)
+        TimelineView(.animation(paused: recordPaused(deck))) { timeline in
+            recordFace(deck, layout, now: timeline.date.timeIntervalSinceReferenceDate)
         }
         .scaleEffect(layout.recordVisibleScale)
         .accessibilityElement()
         .accessibilityLabel(Text(model.nowPlaying.clock?.event.state == .playing ? "Pause" : "Play"))
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier(AccessibilityID.turntableRecord)
+        #if DEBUG
+        .accessibilityValue(Text(verbatim: labelPrintProbe(layout)))
+        #endif
         .accessibilityFocused($recordFocused)
         .accessibilityAction { Task { await model.tapRecord() } }
         .id(deck.trackID)
         .transition(.opacity)
-    }
-
-    /// 磨砂盤可調量：Release 恆 standard；DEBUG 讀調整面板的單一 store（v2.1 T8）
-    @MainActor private static var tuning: TransparentTuning {
-        #if DEBUG
-        TransparentTuningStore.shared.tuning
-        #else
-        .standard
+        #if LIQUID_SAMPLE
+        .onDisappear { LiquidMotionStore.shared.release(Self.liquidKey(deck)) }
         #endif
     }
+
+    /// 唱片不轉就暫停（CR-039：非播放中、或轉場中煞停之後）；CR-038 live 開著時液體還在晃就不暫停（收斂後 store 回報，才再暫停）
+    private func recordPaused(_ deck: TurntableDeck) -> Bool {
+        #if LIQUID_SAMPLE
+        if LiquidSample.shared.isLive, LiquidMotionStore.shared.isAnimating(Self.liquidKey(deck)) { return false }
+        #endif
+        return !model.recordTimelineNeedsTicks
+    }
+
+    #if DEBUG
+    /// CR-039 §11.5 B3：給 UI 測試讀標籤印字遮罩的狀態（與 VinylRecordView 同一把鍵；Release 沒有）
+    private func labelPrintProbe(_ layout: TurntableLayout) -> String {
+        let key = LabelPrintKey.make(recordSide: layout.record.width, displayScale: displayScale, modules: VinylAssetsEasterEgg.modules)
+        switch LabelPrintStore.shared.lookup(key) {
+        case .ready: return "labelPrint=ready"
+        case .fallback(let reason): return "labelPrint=\(reason.rawValue)"
+        }
+    }
+    #endif
+
+    private func recordFace(_ deck: TurntableDeck, _ layout: TurntableLayout, now: Double) -> VinylRecordView {
+        // CR-039：停表時兩盤共讀靜止角（不取 TimelineView 最後一次 callback）
+        let angle = model.displayedRecordAngle(at: now)
+        var face = VinylRecordView(side: layout.record.width, style: deck.style, splash: deck.splash, colors: deck.colors, label: deck.label,
+                                   angle: angle, swirl: deck.swirl)
+        #if LIQUID_SAMPLE
+        let sample = LiquidSample.shared
+        if sample.isLive {
+            // 液體跟真實盤角（G7 舊新兩盤共用 spin，各自一份液體狀態）
+            face.liquid = LiquidMotionStore.shared.frame(for: Self.liquidKey(deck), rawAngle: angle, at: now, preset: sample.preset,
+                                                         reduceMotion: sample.reduceMotionPreview)
+        }
+        #endif
+        return face
+    }
+
+    #if LIQUID_SAMPLE
+    private static func liquidKey(_ deck: TurntableDeck) -> String { deck.trackID ?? "-" }
+    #endif
 
     /// 繪製方式由皮膚決定（CR-034 加新 case 時編譯器會逼這裡處理）
     private func armBase(_ layout: TurntableLayout) -> some View {
@@ -228,7 +266,7 @@ struct TurntableView: View {
     }
 
     private func tonearm(_ layout: TurntableLayout) -> some View {
-        TimelineView(.animation(paused: model.nowPlaying.clock?.event.state != .playing)) { _ in
+        TimelineView(.animation(paused: !model.armTimelineNeedsTicks)) { _ in
             let angle = model.armAngle()
             switch layout.skin.spec.rendering {
             case .classicImages:

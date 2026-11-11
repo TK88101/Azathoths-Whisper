@@ -77,6 +77,15 @@ struct TurntableViewModelTests {
         }
     }
 
+    /// 換專輯轉場 clearing 之後各段（sheathing 160、exchanging 330、drawing 200、placing 150）依序放行；每段後呼叫 check
+    private func finishNewAlbumTransition(_ check: () -> Void = {}) async {
+        for ms in [150, 160, 330, 200] {
+            await fire(.milliseconds(ms))
+            check()
+        }
+        await fire(.milliseconds(150))
+    }
+
     private func swipeLeft(reduceMotion: Bool = false) async {
         model.swipeChanged(CGSize(width: -5, height: 0))
         model.swipeEnded(CGSize(width: -80, height: 0), reduceMotion: reduceMotion)
@@ -420,6 +429,71 @@ struct TurntableViewModelTests {
         await start()
         _ = model.recordAngle(at: 0)
         #expect(model.recordAngle(at: 10) == 180)
+    }
+
+    /// CR-039 階段 A：換專輯轉場中，煞停（lifting）之後停表；回 idle 且播放中恢復
+    @Test func recordTimelineStopsAfterTheBrakeAndResumes() async {
+        await start()
+        #expect(model.recordTimelineNeedsTicks)
+        reply(.applied, PlaybackSamples.t9, album: PlaybackSamples.otherAlbum)
+        await swipeLeft()
+        #expect(model.swipe.phase == .lifting(.next, ready: true) && model.recordTimelineNeedsTicks)
+        await fire(Self.lift)
+        #expect(model.swipe.phase == .clearing(.next) && !model.recordTimelineNeedsTicks)
+        await finishNewAlbumTransition { #expect(!model.recordTimelineNeedsTicks, "phase \(model.swipe.phase)") }
+        #expect(model.swipe.phase == .idle && model.recordTimelineNeedsTicks)
+    }
+
+    /// 停表期間畫面角＝煞停終止角，與 TimelineView 給的時間無關（兩盤讀到同一值）；恢復後從該角接續
+    @Test func frozenDisplayAngleIsTheBrakeEndAndResumeIsContinuous() async {
+        await start()
+        _ = model.displayedRecordAngle(at: 0)
+        _ = model.displayedRecordAngle(at: 1)
+        reply(.applied, PlaybackSamples.t9, album: PlaybackSamples.otherAlbum)
+        await swipeLeft()
+        _ = model.displayedRecordAngle(at: 2)          // lifting 的第一個 tick：開始煞停
+        let brakeEnd = model.displayedRecordAngle(at: 2.35)
+        await fire(Self.lift)
+        #expect(!model.recordTimelineNeedsTicks)
+        for t in [2.4, 3.0, 50.0] { #expect(abs(model.displayedRecordAngle(at: t) - brakeEnd) < 1e-9, "t \(t)") }
+        await finishNewAlbumTransition()
+        #expect(model.swipe.phase == .idle)
+        #expect(abs(model.displayedRecordAngle(at: 10) - brakeEnd) < 1e-9)
+        #expect(abs(model.displayedRecordAngle(at: 11) - (brakeEnd + RecordSpin.degreesPerSecond).truncatingRemainder(dividingBy: 360)) < 1e-9)
+    }
+
+    /// Reduce Motion：不煞停，等回覆（awaiting）期間唱片照轉
+    @Test func reduceMotionKeepsTickingWhileAwaiting() async {
+        await start()
+        client.lock.withLock { client.holdControl = true }
+        await swipeLeft(reduceMotion: true)
+        await fire(Self.lift)
+        #expect(model.swipe.phase == .awaiting(.next) && model.recordTimelineNeedsTicks)
+    }
+
+    /// CR-039 增補：唱臂角只在播放中、未抬臂時隨進度變 → 只有那時 tick；轉場中抬臂、暫停都停表
+    @Test func armTimelineTicksOnlyWhileTheArmFollowsProgress() async {
+        await start()
+        #expect(model.armTimelineNeedsTicks)
+        reply(.applied, PlaybackSamples.t9, album: PlaybackSamples.otherAlbum)
+        await swipeLeft()
+        #expect(model.swipe.armLifted && !model.armTimelineNeedsTicks)
+        await fire(Self.lift)
+        await finishNewAlbumTransition { #expect(!model.armTimelineNeedsTicks, "phase \(model.swipe.phase)") }
+        #expect(model.swipe.phase == .idle && model.armTimelineNeedsTicks)
+    }
+
+    /// Reduce Motion 不抬臂：轉場中唱臂照跟進度；暫停時停表
+    @Test func armTimelineFollowsReduceMotionAndPause() async {
+        await start()
+        client.lock.withLock { client.holdControl = true }
+        await swipeLeft(reduceMotion: true)
+        #expect(!model.swipe.armLifted && model.armTimelineNeedsTicks)
+        // 時間戳要比 start() 的 at: 1 新，否則被當成舊事件略過
+        client.push(PlaybackSamples.event(PlaybackSamples.t1, .paused, at: 3))
+        await settle()
+        #expect(nowPlaying.clock?.event.state == .paused)
+        #expect(!model.armTimelineNeedsTicks)
     }
 
     @Test func doesNotSpinWhilePaused() async {

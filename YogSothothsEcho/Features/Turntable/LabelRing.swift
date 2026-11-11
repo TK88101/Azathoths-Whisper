@@ -87,9 +87,16 @@ enum LabelLayout {
 }
 
 /// 標籤上的固定印字：外圈環狀字、內緣細圈、品牌字、條碼（不畫數字；取代 MD Vinyl 素材的印字；#5-1）。`diameter`＝標籤直徑
-struct LabelRing: View {
+struct LabelRing: View, Equatable {
     let diameter: CGFloat
-    let color: Color
+    let tint: RGBColor
+
+    private var color: Color { tint.color }
+
+    /// CR-039 §11 S1：輸入只有直徑與文字色（RGBColor 是值型別，比較穩定）
+    nonisolated static func == (lhs: LabelRing, rhs: LabelRing) -> Bool {
+        lhs.diameter == rhs.diameter && lhs.tint == rhs.tint
+    }
 
     var body: some View {
         ZStack {
@@ -99,7 +106,7 @@ struct LabelRing: View {
                 context.stroke(Path(ellipseIn: CGRect(x: center.x - rim / 2, y: center.y - rim / 2, width: rim, height: rim)),
                                with: .color(color.opacity(0.25)), lineWidth: max(0.5, diameter * 0.0037))
                 drawRing(center: center, in: &context)
-                if let modules = VinylAssetsEasterEgg.digits.flatMap(UPCABarcode.modules) {
+                if let modules = VinylAssetsEasterEgg.modules {
                     for bar in LabelLayout.barcodeBars(modules, diameter: diameter) {
                         context.fill(Path(bar.offsetBy(dx: center.x, dy: center.y)), with: .color(color))
                     }
@@ -136,4 +143,6 @@ enum VinylAssetsEasterEgg {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return UPCABarcode.checkDigit(trimmed) == nil ? nil : trimmed
     }()
+    /// 模組序列只算一次：唱片在 TimelineView 內每幀重建，每次建標籤快取鍵都重解析會白做（simcodex r1）
+    static let modules: [Bool]? = digits.flatMap(UPCABarcode.modules)
 }

@@ -46,6 +46,9 @@ struct SettingsSheet: View {
                     .pickerStyle(.inline)
                     .labelsHidden()
                 }
+                #if DEBUG
+                developerSection
+                #endif
             }
             .navigationTitle(Text("Settings"))
             .navigationBarTitleDisplayMode(.inline)
@@ -59,6 +62,18 @@ struct SettingsSheet: View {
             }
         }
     }
+
+    #if DEBUG
+    /// Debug 包才有：量測面板與診斷鈕的單一開關（預設關；yse-dev-tools-cleanup.md）。文字不本地化（同其他 DEBUG UI）
+    private var developerSection: some View {
+        @Bindable var tools = DeveloperTools.shared
+        return Section {
+            Toggle(isOn: $tools.isOn) { Text(verbatim: "Developer tools") }
+        } header: {
+            Text(verbatim: "Debug")
+        }
+    }
+    #endif
 
     private var doneButton: some ToolbarContent {
         ToolbarItem(placement: .confirmationAction) {

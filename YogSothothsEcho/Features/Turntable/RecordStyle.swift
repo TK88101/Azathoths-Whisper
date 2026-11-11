@@ -3,9 +3,17 @@ import Foundation
 import Observation
 #endif
 
-/// 唱片樣式（F-V-03；sprint-5-detail.md D8、§4.6；spec「唱片样式」）。rawValue 存設定
+/// 唱片樣式（F-V-03；sprint-5-detail.md D8、§4.6；spec「唱片样式」）。rawValue 存設定（資料格式，不可改名）。
+/// CR-037 新增 SMOKE／STREAK／FLAKE／CHUNK（合稱 SWIRL 系列，程式生成花紋、依封面取色；yse-swirl-style.md）
 enum RecordStyle: String, CaseIterable {
-    case random, classic, transparent, splash, marble
+    case random, classic, transparent, splash, marble, smoke, streak, flake, chunk
+
+    /// 浮層圖示來源：原版 MD Vinyl 預覽素材（只在本機）／asset catalog 的自製圖／RANDOM 的洗牌箭頭
+    enum IconSource: Equatable {
+        case vinylAsset(VinylAssets.Name)
+        case bundled(String)
+        case symbol
+    }
 
     /// 設定讀回：沒有或壞值＝RANDOM（原版全新安裝＝RANDOM）
     static func restore(_ raw: String?) -> RecordStyle { raw.flatMap(RecordStyle.init(rawValue:)) ?? .random }
@@ -16,25 +24,50 @@ enum RecordStyle: String, CaseIterable {
         return Self.builtIn(bucket: JavaHash.string(trackID ?? "").magnitude % 100)
     }
 
-    /// 浮層樣式圖示用的原版預覽素材（#5-1 G6）；RANDOM 沒有預覽圖（畫洗牌箭頭）
-    var preview: VinylAssets.Name? {
+    /// SWIRL 系列：共用配方、配色與烘焙
+    var isSwirl: Bool {
         switch self {
-        case .random: nil
-        case .classic: .previewClassic
-        case .transparent: .previewColoredBase
-        case .splash: .previewSplash
-        case .marble: .previewMarble
+        case .smoke, .streak, .flake, .chunk: true
+        case .random, .classic, .transparent, .splash, .marble: false
         }
     }
 
+    /// 浮層樣式圖示（#5-1 G6；CR-037 新 4 種為自製灰階圖，公開版也有）
+    var icon: IconSource {
+        switch self {
+        case .random: .symbol
+        case .classic: .vinylAsset(.previewClassic)
+        case .transparent: .vinylAsset(.previewColoredBase)
+        case .splash: .vinylAsset(.previewSplash)
+        case .marble: .vinylAsset(.previewMarble)
+        case .smoke: .bundled("RecordStyleSmoke")
+        case .streak: .bundled("RecordStyleStreak")
+        case .flake: .bundled("RecordStyleFlake")
+        case .chunk: .bundled("RecordStyleChunk")
+        }
+    }
+
+    /// 0…84 與原版相同；CR-037 只把 SPLASH 尾段 85…99 切給新 4 種（7／3／2／3），原本其他樣式的歌不變
     static func builtIn(bucket: UInt32) -> RecordStyle {
         switch bucket {
         case ..<15: .classic
         case ..<40: .transparent
         case ..<65: .marble
-        default: .splash
+        case ..<85: .splash
+        case ..<92: .smoke
+        case ..<95: .streak
+        case ..<97: .flake
+        default: .chunk
         }
     }
+}
+
+/// 煙渦的變化（CR-037 §4.1b）：自動＝每首歌依配方雜湊固定抽一種；其他＝每首都用那一種。
+/// RANDOM 抽到煙渦時同樣跟隨這個設定（使用者 2026-10-31 Q6「跟著走」）。rawValue 存設定
+enum SmokeVariantChoice: String, CaseIterable {
+    case auto, water, darkInk, lightInk, accent
+
+    static func restore(_ raw: String?) -> SmokeVariantChoice { raw.flatMap(SmokeVariantChoice.init(rawValue:)) ?? .auto }
 }
 
 /// TRANSPARENT 的質感（#5-1 S5 收尾，使用者實機回饋＋Codex 辯論）：一律磨砂半透明（透出後面的封套與背景）；
@@ -78,11 +111,14 @@ enum TransparentFinish: Equatable {
     var usesMaterial: Bool { self == .frosted }
 
     /// 透明盤的投影要淡，否則透過盤面看到一團黑
-    var shadowOpacity: Double { usesMaterial ? 0.08 : 0.2 }
+    var shadowOpacity: Double { Self.shadowOpacity(translucent: usesMaterial) }
+
+    /// 唱片投影濃淡的唯一規則：透光的盤（磨砂、SWIRL 半透明款）淡、不透光的深（CR-037 共用）
+    static func shadowOpacity(translucent: Bool) -> Double { translucent ? 0.08 : 0.2 }
 }
 
 /// 磨砂盤的可調量（v2.1 T8／T10）：主色濃淡、材質（霧）濃淡，分紅色與其他兩組（使用者以調整面板實機定案）；
-/// `standard` 是唯一基準，Release 恆用它，DEBUG 由調整面板（`TransparentTuningStore`）覆寫
+/// `standard` 是唯一基準（DEBUG 調整面板已於開發者工具清理移除）
 struct TransparentTuning: Equatable {
     struct Look: Equatable {
         let frostedTint: Double
@@ -120,39 +156,6 @@ struct TransparentTuning: Equatable {
     /// 依盤面實際的疊色挑一組；無色磨砂（nil）＝其他
     func look(for tint: RGBColor?) -> Look { tint.map(Self.isRed) == true ? red : other }
 }
-
-#if DEBUG
-/// 調整面板的單一真相：所有唱片讀同一份；寫入即存進 UserDefaults，重開 app 保留
-@MainActor
-@Observable
-final class TransparentTuningStore {
-    static let shared = TransparentTuningStore(defaults: .standard)
-    private static let prefix = "debug.transparentTuning."
-
-    @ObservationIgnored private let defaults: UserDefaults
-    var tuning: TransparentTuning {
-        didSet {
-            for (key, value) in Self.entries(tuning) { defaults.set(value, forKey: Self.prefix + key) }
-        }
-    }
-
-    init(defaults: UserDefaults) {
-        self.defaults = defaults
-        let standard = TransparentTuning.standard
-        func read(_ key: String, _ fallback: Double) -> Double { defaults.object(forKey: Self.prefix + key) as? Double ?? fallback }
-        tuning = TransparentTuning(
-            red: .init(frostedTint: read("redTint", standard.red.frostedTint), material: read("redMaterial", standard.red.material)),
-            other: .init(frostedTint: read("otherTint", standard.other.frostedTint), material: read("otherMaterial", standard.other.material)))
-    }
-
-    func reset() { tuning = .standard }
-
-    private static func entries(_ tuning: TransparentTuning) -> [(String, Double)] {
-        [("redTint", tuning.red.frostedTint), ("redMaterial", tuning.red.material),
-         ("otherTint", tuning.other.frostedTint), ("otherMaterial", tuning.other.material)]
-    }
-}
-#endif
 
 /// SPLASH 兩層圖案的配色組合；`hashCode % 3` 為截斷取餘（可能為負）：1 → 1、2 → 2、其餘 → 3
 enum SplashStyle: Equatable {
